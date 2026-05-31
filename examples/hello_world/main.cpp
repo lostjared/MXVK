@@ -25,8 +25,7 @@ namespace example {
             destroyGraphicsPipeline();
         }
 
-        void event(mxvk::VK_Window *window, SDL_Event &e) override {
-            (void)window;
+        void event([[maybe_unused]] mxvk::VK_Window *window, SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
@@ -40,8 +39,7 @@ namespace example {
             createGraphicsPipeline();
         }
 
-        void render(mxvk::VK_Window *window) override {
-            (void)window;
+        void render([[maybe_unused]] mxvk::VK_Window *window) override {
             if (device == VK_NULL_HANDLE || swapchain == VK_NULL_HANDLE || command_buffers.empty()) {
                 return;
             }

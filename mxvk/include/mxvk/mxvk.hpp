@@ -69,13 +69,13 @@ namespace mxvk {
          * @brief Render one frame.
          * @param window Current window instance pointer.
          */
-        virtual void render(VK_Window *window);
+        virtual void render([[maybe_unused]] VK_Window *window);
 
         /**
          * @brief Execute one processing/update step.
          * @param window Current window instance pointer.
          */
-        virtual void proc(VK_Window *window);
+        virtual void proc([[maybe_unused]] VK_Window *window);
 
         /**
          * @brief Check whether Vulkan validation layers are currently enabled.
@@ -83,7 +83,7 @@ namespace mxvk {
          */
         [[nodiscard]] bool validationEnabled() const;
 
-        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data);
+        static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data);
 
       protected:
         /**

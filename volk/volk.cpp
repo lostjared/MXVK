@@ -61,10 +61,8 @@ static PFN_vkVoidFunction vkGetDeviceProcAddrStub(void* context, const char* nam
 	return vkGetDeviceProcAddr((VkDevice)context, name);
 }
 
-static PFN_vkVoidFunction nullProcAddrStub(void* context, const char* name)
+static PFN_vkVoidFunction nullProcAddrStub([[maybe_unused]] void* context, [[maybe_unused]] const char* name)
 {
-	(void)context;
-	(void)name;
 	return NULL;
 }
 

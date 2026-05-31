@@ -14,9 +14,7 @@
 #include <vector>
 
 namespace mxvk {
-    VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) {
-        (void)type;
-        (void)user_data;
+    VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data) {
         const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
                                   ? callback_data->pMessage
                                   : "Unknown Vulkan validation message";
@@ -409,13 +407,11 @@ namespace mxvk {
         }
     }
 
-    void VK_Window::render(VK_Window *window) {
-        (void)window;
+    void VK_Window::render([[maybe_unused]] VK_Window *window) {
         drawFrame();
     }
 
-    void VK_Window::proc(VK_Window *window) {
-        (void)window;
+    void VK_Window::proc([[maybe_unused]] VK_Window *window) {
     }
 
     bool VK_Window::initWindow(const std::string &title, int width, int height, SDL_WindowFlags flags) {
