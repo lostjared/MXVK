@@ -165,10 +165,10 @@ namespace mxvk {
         static std::optional<VkDebugUtilsMessengerCreateInfoEXT> makeDebugMessengerCreateInfo();
         void setupDebugMessenger();
         void cleanupDebugMessenger();
-
         bool createSwapchain();
         bool createRenderResources();
         bool createSyncObjects();
+        void cleanupSyncObjects();
         void cleanupSwapchain();
         void recreateSwapchain();
         void drawFrame();

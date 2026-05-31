@@ -362,12 +362,7 @@ namespace mxvk {
             return false;
         }
 
-        std::cout << "mxvk: creating swapchain/render/sync device resources\n";
-        createDevice();
-        if (swapchain == VK_NULL_HANDLE || command_buffers.empty()) {
-            std::cerr << "mxvk: Failed to create Vulkan rendering resources\n";
-            return false;
-        }
+        std::cout << "mxvk: deferring swapchain/render/sync resource creation until first frame\n";
 
         std::cout << "mxvk: initVulkan complete\n";
         return true;
@@ -805,6 +800,34 @@ namespace mxvk {
         return true;
     }
 
+    void VK_Window::cleanupSyncObjects() {
+        if (device == VK_NULL_HANDLE) {
+            return;
+        }
+
+        if (in_flight != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying in-flight fence\n";
+            vkDestroyFence(device, in_flight, nullptr);
+            in_flight = VK_NULL_HANDLE;
+        }
+
+        if (!render_finished.empty()) {
+            std::cout << "vk: destroying render-finished semaphores\n";
+            for (VkSemaphore semaphore : render_finished) {
+                if (semaphore != VK_NULL_HANDLE) {
+                    vkDestroySemaphore(device, semaphore, nullptr);
+                }
+            }
+            render_finished.clear();
+        }
+
+        if (image_available != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying image-available semaphore\n";
+            vkDestroySemaphore(device, image_available, nullptr);
+            image_available = VK_NULL_HANDLE;
+        }
+    }
+
     void VK_Window::recreateSwapchain() {
         if (device == VK_NULL_HANDLE || window == nullptr) {
             return;
@@ -822,8 +845,9 @@ namespace mxvk {
         std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", w, h);
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
+        cleanupSyncObjects();
         cleanupSwapchain();
-        if (!createSwapchain() || !createRenderResources()) {
+        if (!createSwapchain() || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             return;
         }
@@ -856,9 +880,13 @@ namespace mxvk {
             command_pool = VK_NULL_HANDLE;
         }
 
-        std::cout << "vk: destroying swapchain image views\n";
-        for (VkImageView image_view : swapchain_image_views) {
-            vkDestroyImageView(device, image_view, nullptr);
+        if (!swapchain_image_views.empty()) {
+            std::cout << "vk: destroying swapchain image views\n";
+            for (VkImageView image_view : swapchain_image_views) {
+                if (image_view != VK_NULL_HANDLE) {
+                    vkDestroyImageView(device, image_view, nullptr);
+                }
+            }
         }
         swapchain_image_views.clear();
         swapchain_images.clear();
@@ -873,7 +901,22 @@ namespace mxvk {
     }
 
     void VK_Window::drawFrame() {
-        if (device == VK_NULL_HANDLE || swapchain == VK_NULL_HANDLE || command_buffers.empty()) {
+        if (device == VK_NULL_HANDLE) {
+            return;
+        }
+
+        if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
+            image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+            std::cout << "mxvk: creating deferred swapchain/render/sync resources\n";
+            createDevice();
+            if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
+                image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+                std::cerr << "mxvk: deferred resource creation failed; skipping frame\n";
+                return;
+            }
+        }
+
+        if (render_finished.empty()) {
             return;
         }
 
