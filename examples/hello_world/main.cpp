@@ -1,6 +1,7 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -11,6 +12,11 @@
 namespace example {
     class ExampleWindow : public mxvk::VK_Window {
         std::string current_path = ".";
+
+        struct PushConstants {
+            float time;
+            float aspect;
+        };
 
       public:
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION) {
@@ -138,6 +144,21 @@ namespace example {
             scissor.offset = {0, 0};
             scissor.extent = swapchain_extent;
             vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed_seconds = std::chrono::duration<float>(now - start_time_).count();
+            const float aspect =
+                (swapchain_extent.height > 0U)
+                    ? static_cast<float>(swapchain_extent.width) / static_cast<float>(swapchain_extent.height)
+                    : 1.0F;
+            const PushConstants push_constants{elapsed_seconds, aspect};
+            vkCmdPushConstants(
+                cmd,
+                pipeline_layout_,
+                VK_SHADER_STAGE_VERTEX_BIT,
+                0,
+                sizeof(PushConstants),
+                &push_constants);
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
             vkCmdEndRendering(cmd);
@@ -314,6 +335,12 @@ namespace example {
 
                 VkPipelineLayoutCreateInfo pipeline_layout_info{};
                 pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+                VkPushConstantRange push_constant_range{};
+                push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+                push_constant_range.offset = 0;
+                push_constant_range.size = sizeof(PushConstants);
+                pipeline_layout_info.pushConstantRangeCount = 1;
+                pipeline_layout_info.pPushConstantRanges = &push_constant_range;
                 if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout_) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create pipeline layout");
                 }
@@ -374,6 +401,7 @@ namespace example {
 
         VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
+        std::chrono::steady_clock::time_point start_time_ = std::chrono::steady_clock::now();
     };
 } // namespace example
 
