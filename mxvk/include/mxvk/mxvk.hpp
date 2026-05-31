@@ -10,6 +10,12 @@
 #include <vector>
 #include <volk/volk.h>
 
+#ifdef ENABLE_VALIDATION
+#define MXVK_VALIDATION true
+#else
+#define MXVK_VALIDATION false
+#endif
+
 namespace mxvk {
     /**
      * @brief Main Vulkan window wrapper for MXVK.

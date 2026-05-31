@@ -8,12 +8,6 @@
 #include <string>
 #include <vector>
 
-#ifdef ENABLE_VALIDATION
-#define MXVK_VALIDATION true
-#else
-#define MXVK_VALIDATION false
-#endif
-
 namespace example {
     class ExampleWindow : public mxvk::VK_Window {
         std::string current_path = ".";
@@ -381,7 +375,7 @@ namespace example {
         VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
     };
-} 
+} // namespace example
 
 int main(int argc, char **argv) {
     try {

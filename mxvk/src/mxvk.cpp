@@ -511,10 +511,33 @@ namespace mxvk {
             VkPhysicalDeviceProperties properties{};
             vkGetPhysicalDeviceProperties(candidate, &properties);
 
+            const char *device_type = "unknown";
+            switch (properties.deviceType) {
+            case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+                device_type = "integrated";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+                device_type = "discrete";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+                device_type = "virtual";
+                break;
+            case VK_PHYSICAL_DEVICE_TYPE_CPU:
+                device_type = "cpu";
+                break;
+            default:
+                break;
+            }
+
             physical_device = candidate;
             graphics_queue_family = candidate_graphics;
             present_queue_family = candidate_present;
-            std::cout << std::format("vk: selected physical device: {}\n", properties.deviceName);
+            std::cout << std::format(
+                "vk: selected GPU='{}' type={} vendor=0x{:04x} device=0x{:04x}\n",
+                properties.deviceName,
+                device_type,
+                properties.vendorID,
+                properties.deviceID);
             return;
         }
 
