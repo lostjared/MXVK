@@ -6,20 +6,20 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
-#include <fstream>
 #include <format>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <optional>
 #include <vector>
 
 namespace mxvk {
-    VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,VkDebugUtilsMessageTypeFlagsEXT type,const VkDebugUtilsMessengerCallbackDataEXT *callback_data,void *user_data) {
+    VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) {
         (void)type;
         (void)user_data;
         const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
-            ? callback_data->pMessage
-            : "Unknown Vulkan validation message";
+                                  ? callback_data->pMessage
+                                  : "Unknown Vulkan validation message";
 
         if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0U) {
             std::cerr << std::format("vk validation error: {}\n", message);
@@ -52,8 +52,7 @@ namespace mxvk {
                 device,
                 surface,
                 &present_mode_count,
-                support.present_modes.data()
-            );
+                support.present_modes.data());
         }
 
         return support;
@@ -92,13 +91,11 @@ namespace mxvk {
         actual_extent.width = std::clamp(
             static_cast<uint32_t>(std::max(width, 1)),
             capabilities.minImageExtent.width,
-            capabilities.maxImageExtent.width
-        );
+            capabilities.maxImageExtent.width);
         actual_extent.height = std::clamp(
             static_cast<uint32_t>(std::max(height, 1)),
             capabilities.minImageExtent.height,
-            capabilities.maxImageExtent.height
-        );
+            capabilities.maxImageExtent.height);
 
         return actual_extent;
     }
@@ -279,8 +276,7 @@ namespace mxvk {
             if (!hasValidationLayerSupport()) {
                 std::cerr << std::format(
                     "mxvk: validation layer '{}' is not available; continuing without validation\n",
-                    validation_layer_name
-                );
+                    validation_layer_name);
                 validation_enabled = false;
             } else {
                 enabled_layers.push_back(validation_layer_name);
@@ -337,7 +333,6 @@ namespace mxvk {
                   << VK_VERSION_MINOR(instanceVersion) << "."
                   << VK_VERSION_PATCH(instanceVersion) << "\n";
 
-
         std::cout << "SDL3: creating Vulkan presentation surface from SDL window\n";
         if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr, &surface)) {
             std::cerr << std::format("mxvk: Failed to create Vulkan surface: {}\n", SDL_GetError());
@@ -367,34 +362,34 @@ namespace mxvk {
         std::cout << "mxvk: initVulkan complete\n";
         return true;
     }
-        
+
     void VK_Window::event(VK_Window *window, SDL_Event &e) {
-        switch(e.type) {
-            case SDL_EVENT_KEY_DOWN:
-            switch(e.key.key) {
-                case SDLK_ESCAPE:
+        switch (e.type) {
+        case SDL_EVENT_KEY_DOWN:
+            switch (e.key.key) {
+            case SDLK_ESCAPE:
                 active = false;
                 break;
             }
             break;
         }
     }
-        
+
     void VK_Window::loop() {
         SDL_Event e;
         active = true;
         while (active) {
             while (SDL_PollEvent(&e)) {
                 switch (e.type) {
-                    case SDL_EVENT_QUIT:
-                        active = false;
-                        break;
-                    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-                        last_resize_event_ms_ = SDL_GetTicks();
-                        framebuffer_resized_ = true;
-                        break;
-                    default:
-                        break;
+                case SDL_EVENT_QUIT:
+                    active = false;
+                    break;
+                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                    last_resize_event_ms_ = SDL_GetTicks();
+                    framebuffer_resized_ = true;
+                    break;
+                default:
+                    break;
                 }
                 event(this, e);
             }
@@ -413,12 +408,12 @@ namespace mxvk {
             SDL_Delay(1);
         }
     }
-        
+
     void VK_Window::render(VK_Window *window) {
         (void)window;
         drawFrame();
     }
-        
+
     void VK_Window::proc(VK_Window *window) {
         (void)window;
     }
@@ -528,7 +523,6 @@ namespace mxvk {
         }
 
         std::cout << "vk: no suitable physical device selected\n";
-
     }
     void VK_Window::createLogicalDevice() {
         std::cout << "mxvk: entering createLogicalDevice\n";
@@ -565,8 +559,7 @@ namespace mxvk {
         std::cout << std::format(
             "vk: feature support - synchronization2={}, dynamicRendering={}\n",
             supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false",
-            supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false"
-        );
+            supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false");
 
         if (supported_vulkan13_features.synchronization2 != VK_TRUE) {
             std::cout << "vk: synchronization2 is unsupported on selected physical device\n";
@@ -612,7 +605,6 @@ namespace mxvk {
         vkGetDeviceQueue(device, graphics_queue_family, 0, &graphics_queue);
         vkGetDeviceQueue(device, present_queue_family, 0, &present_queue);
         std::cout << "mxvk: createLogicalDevice complete\n";
-
     }
 
     void VK_Window::createDevice() {
@@ -641,7 +633,6 @@ namespace mxvk {
         }
 
         std::cout << "mxvk: createDevice complete\n";
-
     }
 
     bool VK_Window::createSwapchain() {
@@ -869,8 +860,7 @@ namespace mxvk {
                 device,
                 command_pool,
                 static_cast<uint32_t>(command_buffers.size()),
-                command_buffers.data()
-            );
+                command_buffers.data());
             command_buffers.clear();
         }
 
@@ -1095,8 +1085,7 @@ namespace mxvk {
         if (count_result != VK_SUCCESS) {
             std::cerr << std::format(
                 "mxvk: Failed to query validation layer count (VkResult={})\n",
-                static_cast<int>(count_result)
-            );
+                static_cast<int>(count_result));
             return false;
         }
 
@@ -1109,8 +1098,7 @@ namespace mxvk {
         if (layers_result != VK_SUCCESS) {
             std::cerr << std::format(
                 "mxvk: Failed to enumerate validation layers (VkResult={})\n",
-                static_cast<int>(layers_result)
-            );
+                static_cast<int>(layers_result));
             return false;
         }
 
@@ -1118,8 +1106,7 @@ namespace mxvk {
             available_layers,
             [](const VkLayerProperties &layer) {
                 return std::strcmp(layer.layerName, validation_layer_name) == 0;
-            }
-        );
+            });
     }
 
     std::optional<VkDebugUtilsMessengerCreateInfoEXT> VK_Window::makeDebugMessengerCreateInfo() {
@@ -1153,8 +1140,7 @@ namespace mxvk {
             instance,
             &maybe_create_info.value(),
             nullptr,
-            &debug_messenger
-        );
+            &debug_messenger);
         if (result != VK_SUCCESS) {
             std::cerr << "mxvk: failed to create Vulkan debug messenger\n";
             debug_messenger = VK_NULL_HANDLE;
@@ -1168,4 +1154,4 @@ namespace mxvk {
             debug_messenger = VK_NULL_HANDLE;
         }
     }
-}
+} // namespace mxvk

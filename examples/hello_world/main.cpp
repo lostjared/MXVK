@@ -1,17 +1,18 @@
+#include "mxvk/argz.hpp"
+#include "mxvk/mxvk.hpp"
+#include "mxvk/mxvk_exception.hpp"
 #include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <iostream>
 #include <string>
 #include <vector>
-#include "mxvk/mxvk.hpp"
-#include "mxvk/mxvk_exception.hpp"
-#include "mxvk/argz.hpp"
 
 namespace example {
     class ExampleWindow : public mxvk::VK_Window {
         std::string current_path = ".";
-    public: 
+
+      public:
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen) : mxvk::VK_Window(text, width, height, fullscreen) {
             current_path = path;
             createGraphicsPipeline();
@@ -61,8 +62,7 @@ namespace example {
                 image_index >= command_buffers.size() ||
                 image_index >= swapchain_images.size() ||
                 image_index >= swapchain_image_views.size() ||
-                image_index >= render_finished.size()
-            ) {
+                image_index >= render_finished.size()) {
                 throw mxvk::Exception("Swapchain image index out of bounds");
             }
 
@@ -224,7 +224,7 @@ namespace example {
             }
         }
 
-    private:
+      private:
         void destroyGraphicsPipeline() {
             if (device == VK_NULL_HANDLE) {
                 pipeline_layout_ = VK_NULL_HANDLE;
@@ -351,8 +351,7 @@ namespace example {
                         1,
                         &pipeline_info,
                         nullptr,
-                        &graphics_pipeline_
-                    ) != VK_SUCCESS) {
+                        &graphics_pipeline_) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create graphics pipeline");
                 }
             } catch (...) {
@@ -378,7 +377,7 @@ namespace example {
         VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
     };
-}
+} // namespace example
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);

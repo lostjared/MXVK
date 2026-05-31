@@ -607,7 +607,7 @@ struct Arguments {
     std::string filename;   ///< Optional input filename (@c --filename).
     std::string texture;    ///< Optional texture file path (@c --texture).
     std::string shaderPath; ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    int camera_index = 0; ///< Optional camera index
+    int camera_index = 0;   ///< Optional camera index
 };
 
 /**
