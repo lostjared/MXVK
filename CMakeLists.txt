@@ -144,3 +144,4 @@ target_include_directories(mxvk PUBLIC
 )
 target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 Vulkan::Vulkan)
 add_subdirectory(examples/hello_world)
+add_subdirectory(examples/static_example)
