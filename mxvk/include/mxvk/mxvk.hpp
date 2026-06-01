@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include "mxvk_sprite.hpp"
+#include "mxvk_text.hpp"
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -83,6 +84,34 @@ namespace mxvk {
          * @param window Current window instance pointer.
          */
         virtual void proc([[maybe_unused]] VK_Window *window);
+
+        /**
+         * @brief Set the active text-render font.
+         * @param fontPath Path to a TTF font file.
+         * @param fontSize Font point size.
+         */
+        void setFont(const std::string &fontPath, int fontSize = 24);
+
+        /**
+         * @brief Queue a text string for rendering during the current frame.
+         * @param text UTF-8 text.
+         * @param x Pixel X coordinate.
+         * @param y Pixel Y coordinate.
+         * @param col Text color.
+         */
+        void printText(const std::string &text, int x, int y, const SDL_Color &col);
+
+        /** @brief Clear all queued text draw calls for the current frame. */
+        void clearTextQueue();
+
+        /**
+         * @brief Measure text dimensions in pixels.
+         * @param text Text string to measure.
+         * @param width Output width in pixels.
+         * @param height Output height in pixels.
+         * @return true when measurement succeeded.
+         */
+        [[nodiscard]] bool getTextDimensions(const std::string &text, int &width, int &height);
 
         /**
          * @brief Create a sprite from a PNG file and register it with this window.
@@ -211,6 +240,10 @@ namespace mxvk {
         void createSpriteDescriptorSetLayout();
         void createSpritePipeline();
         void destroySpritePipeline();
+        void ensureTextRenderer();
+        void createTextDescriptorSetLayout();
+        void createTextPipeline();
+        void destroyTextPipeline();
 
       protected:
         // Protected state allows subclasses to implement custom rendering paths.
@@ -260,6 +293,14 @@ namespace mxvk {
         VkPipelineLayout sprite_pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline sprite_pipeline_ = VK_NULL_HANDLE;
         bool sprite_state_dirty_ = false;
+
+        std::unique_ptr<VK_Text> text_renderer_{};
+        VkDescriptorSetLayout text_descriptor_set_layout_ = VK_NULL_HANDLE;
+        VkPipelineLayout text_pipeline_layout_ = VK_NULL_HANDLE;
+        VkPipeline text_pipeline_ = VK_NULL_HANDLE;
+        bool text_state_dirty_ = false;
+        std::string font_path_ = "font.ttf";
+        int font_size_ = 24;
     };
 
 } // namespace mxvk

@@ -146,7 +146,7 @@ namespace mxvk {
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
         VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &fontSampler));
-        std::cout << std::format("[VK_Text] Font loaded: {} @ {}pt\n", fontPath, fontSize);
+        std::cout << std::format("mxvk: Font loaded: {} @ {}pt\n", fontPath, fontSize);
     }
 
     void VK_Text::setFont(const std::string &fontPath, int fontSize) {
@@ -162,7 +162,7 @@ namespace mxvk {
             fontSampler = VK_NULL_HANDLE;
         }
         initFont(fontPath, fontSize);
-        std::cout << std::format("[VK_Text] Font changed: {} @ {}pt\n", fontPath, fontSize);
+        std::cout << std::format("mxvk: Font changed: {} @ {}pt\n", fontPath, fontSize);
     }
 
     SDL_Surface *VK_Text::convertToRGBA(SDL_Surface *surface) {
@@ -254,7 +254,7 @@ namespace mxvk {
 
             SDL_DestroySurface(rgbaSurface);
 
-            std::cout << std::format("[VK_Text] Cached new glyph: \"{}\" ({}x{})\n", text, quad.width, quad.height);
+            std::cout << std::format("mxvk: Cached new glyph: \"{}\" ({}x{})\n", text, quad.width, quad.height);
 
             // Store in cache
             textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
@@ -322,6 +322,27 @@ namespace mxvk {
     }
 
     void VK_Text::clearQueue() {
+        if (device == VK_NULL_HANDLE) {
+            textQuads.clear();
+            return;
+        }
+
+        // Text quads own vertex/index buffers referenced by submitted command buffers.
+        // Wait for graphics work to finish before destroying these resources.
+        const VkResult queue_idle_result = vkQueueWaitIdle(graphicsQueue);
+        if (queue_idle_result == VK_ERROR_DEVICE_LOST) {
+            std::cerr << "mxvk: Device lost while clearing queue; skipping text resource reset\n";
+            textQuads.clear();
+            return;
+        }
+        if (queue_idle_result != VK_SUCCESS) {
+            throw mxvk::Exception(std::format(
+                "Fatal : VkResult is \"{}\" in {} at line {}",
+                static_cast<int>(queue_idle_result),
+                __FILE__,
+                __LINE__));
+        }
+
         textQuads.clear();
         if (descriptorPool != VK_NULL_HANDLE) {
             VK_CHECK_RESULT(vkResetDescriptorPool(device, descriptorPool, 0));

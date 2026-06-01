@@ -161,6 +161,10 @@ set(mxvk_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite.vert)
 set(mxvk_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite.frag)
 set(mxvk_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite.vert.spv)
 set(mxvk_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite.frag.spv)
+set(mxvk_TEXT_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/text.vert)
+set(mxvk_TEXT_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/text.frag)
+set(mxvk_TEXT_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/text.vert.spv)
+set(mxvk_TEXT_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/text.frag.spv)
 
 add_custom_command(
     OUTPUT ${mxvk_VERTEX_SPV}
@@ -180,10 +184,30 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${mxvk_TEXT_VERTEX_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_TEXT_VERTEX_SHADER} -o ${mxvk_TEXT_VERTEX_SPV}
+    DEPENDS ${mxvk_TEXT_VERTEX_SHADER}
+    COMMENT "Compiling MXVK text vertex shader"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${mxvk_TEXT_FRAGMENT_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_TEXT_FRAGMENT_SHADER} -o ${mxvk_TEXT_FRAGMENT_SPV}
+    DEPENDS ${mxvk_TEXT_FRAGMENT_SHADER}
+    COMMENT "Compiling MXVK text fragment shader"
+    VERBATIM
+)
+
 add_custom_target(mxvk_shaders
     DEPENDS
         ${mxvk_VERTEX_SPV}
         ${mxvk_FRAGMENT_SPV}
+    ${mxvk_TEXT_VERTEX_SPV}
+    ${mxvk_TEXT_FRAGMENT_SPV}
 )
 if(CV)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_cv.cpp)
@@ -199,10 +223,14 @@ if(CV)
 endif()
 target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG)
 add_dependencies(mxvk mxvk_shaders)
-target_compile_definitions(mxvk PUBLIC MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}")
+target_compile_definitions(mxvk PUBLIC
+    MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
+    MXVK_TEXT_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
+)
 if(CV)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
 endif()
 add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)
 add_subdirectory(examples/sprite_example)
+add_subdirectory(examples/text_example)
