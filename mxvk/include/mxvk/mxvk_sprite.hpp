@@ -178,6 +178,8 @@ namespace mxvk {
         void setRenderPass(VkRenderPass rp) { renderPass = rp; }
         /** @brief Assign dynamic-rendering color attachment format used to build pipelines. */
         void setColorAttachmentFormat(VkFormat format) { colorAttachmentFormat = format; }
+        /** @brief Assign dynamic-rendering depth attachment format used to build pipelines. */
+        void setDepthAttachmentFormat(VkFormat format) { depthAttachmentFormat = format; }
         /**
          * @brief Rebind the command pool used for upload/staging operations.
          *
@@ -275,6 +277,7 @@ namespace mxvk {
         VkPipelineLayout customPipelineLayout = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
         VkFormat colorAttachmentFormat = VK_FORMAT_UNDEFINED;
+        VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         std::string vertexShaderPath;
         void createCustomPipeline();
 

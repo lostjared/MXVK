@@ -560,6 +560,9 @@ namespace mxvk {
         renderingInfo.viewMask = 0;
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+        if (depthAttachmentFormat != VK_FORMAT_UNDEFINED) {
+            renderingInfo.depthAttachmentFormat = depthAttachmentFormat;
+        }
 
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.pNext = &renderingInfo;
@@ -714,6 +717,9 @@ namespace mxvk {
         renderingInfo.viewMask = 0;
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+        if (depthAttachmentFormat != VK_FORMAT_UNDEFINED) {
+            renderingInfo.depthAttachmentFormat = depthAttachmentFormat;
+        }
 
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.pNext = &renderingInfo;

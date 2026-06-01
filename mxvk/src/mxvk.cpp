@@ -1144,6 +1144,7 @@ namespace mxvk {
                     continue;
                 }
                 sprite->setColorAttachmentFormat(swapchain_format);
+                sprite->setDepthAttachmentFormat(depth_format);
                 sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
                 sprite->rebuildPipeline();
                 sprite->rebuildInstancedPipeline();
@@ -1822,6 +1823,9 @@ namespace mxvk {
             rendering_info.viewMask = 0;
             rendering_info.colorAttachmentCount = 1;
             rendering_info.pColorAttachmentFormats = &swapchain_format;
+            if (depth_format != VK_FORMAT_UNDEFINED) {
+                rendering_info.depthAttachmentFormat = depth_format;
+            }
 
             VkGraphicsPipelineCreateInfo pipeline_info{};
             pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1883,6 +1887,7 @@ namespace mxvk {
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
         sprite->setColorAttachmentFormat(swapchain_format);
+        sprite->setDepthAttachmentFormat(depth_format);
 
         if (!vertexShaderPath.empty()) {
             sprite->setVertexShaderPath(vertexShaderPath);
@@ -1921,6 +1926,7 @@ namespace mxvk {
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
         sprite->setColorAttachmentFormat(swapchain_format);
+        sprite->setDepthAttachmentFormat(depth_format);
 
         if (!vertexShaderPath.empty()) {
             sprite->setVertexShaderPath(vertexShaderPath);
@@ -1959,6 +1965,7 @@ namespace mxvk {
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
         sprite->setColorAttachmentFormat(swapchain_format);
+        sprite->setDepthAttachmentFormat(depth_format);
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
 
@@ -2147,6 +2154,9 @@ namespace mxvk {
             rendering_info.viewMask = 0;
             rendering_info.colorAttachmentCount = 1;
             rendering_info.pColorAttachmentFormats = &swapchain_format;
+            if (depth_format != VK_FORMAT_UNDEFINED) {
+                rendering_info.depthAttachmentFormat = depth_format;
+            }
 
             VkGraphicsPipelineCreateInfo pipeline_info{};
             pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
