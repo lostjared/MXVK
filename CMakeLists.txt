@@ -136,7 +136,9 @@ else()
 message(STATUS "Found Vulkan")
 endif()
 find_package(PNG REQUIRED)
+find_package(ZLIB REQUIRED)
 find_package(SDL3_ttf REQUIRED)
+find_package(glm REQUIRED)
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
 message(FATAL_ERROR "glslc not found. Please install Vulkan SDK shader tools.")
@@ -219,11 +221,17 @@ target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxvk>
 )
+if(DEFINED GLM_INCLUDE_DIRS)
+    target_include_directories(mxvk PUBLIC ${GLM_INCLUDE_DIRS})
+endif()
 if(CV)
     target_include_directories(mxvk PUBLIC ${OpenCV_INCLUDE_DIRS})
     target_compile_definitions(mxvk PUBLIC MXVK_WITH_CV)
 endif()
-target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG)
+target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG ZLIB::ZLIB)
+if(TARGET glm::glm)
+    target_link_libraries(mxvk PUBLIC glm::glm)
+endif()
 add_dependencies(mxvk mxvk_shaders)
 target_compile_definitions(mxvk PUBLIC
     MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
