@@ -45,3 +45,12 @@ target_compile_definitions(opencv_model PRIVATE
     opencv_model_SHADER_DIR="${opencv_model_SHADER_OUTPUT_DIR}"
     opencv_model_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
+
+set(opencv_model_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
+add_custom_command(TARGET opencv_model POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:opencv_model>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${opencv_model_DATA_SOURCE_DIR}
+        $<TARGET_FILE_DIR:opencv_model>/data
+    COMMENT "Copying opencv_model data directory to runtime output directory"
+)
