@@ -476,6 +476,7 @@ namespace mxvk {
     bool VK_Window::ensureRenderResources() {
         const auto sync_ready = [this]() {
             return std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+                   render_finished_.size() == swapchain_images.size() &&
                    std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
                    std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
         };
@@ -672,6 +673,7 @@ namespace mxvk {
 
         const bool sync_ready =
             std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            render_finished_.size() == swapchain_images.size() &&
             std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
             std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
 
@@ -942,6 +944,8 @@ namespace mxvk {
         fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
+        render_finished_.assign(swapchain_images.size(), VK_NULL_HANDLE);
+
         for (uint32_t frame = 0; frame < max_frames_in_flight; ++frame) {
             std::cout << std::format("vk: creating image-available semaphore for frame {}\n", frame);
             if (vkCreateSemaphore(device, &semaphore_info, nullptr, &image_available_[frame]) != VK_SUCCESS) {
@@ -949,14 +953,16 @@ namespace mxvk {
                 return false;
             }
 
-            std::cout << std::format("vk: creating render-finished semaphore for frame {}\n", frame);
-            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished_[frame]) != VK_SUCCESS) {
+            std::cout << std::format("vk: creating in-flight fence for frame {}\n", frame);
+            if (vkCreateFence(device, &fence_info, nullptr, &in_flight_fences_[frame]) != VK_SUCCESS) {
                 cleanupSyncObjects();
                 return false;
             }
+        }
 
-            std::cout << std::format("vk: creating in-flight fence for frame {}\n", frame);
-            if (vkCreateFence(device, &fence_info, nullptr, &in_flight_fences_[frame]) != VK_SUCCESS) {
+        for (size_t image_index = 0; image_index < render_finished_.size(); ++image_index) {
+            std::cout << std::format("vk: creating render-finished semaphore for swapchain image {}\n", image_index);
+            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished_[image_index]) != VK_SUCCESS) {
                 cleanupSyncObjects();
                 return false;
             }
@@ -1024,6 +1030,7 @@ namespace mxvk {
         }
 
         image_fences_.clear();
+        render_finished_.clear();
         current_frame_ = 0;
     }
 
@@ -1213,7 +1220,6 @@ namespace mxvk {
 
         VkFence &frame_fence = in_flight_fences_[current_frame_];
         VkSemaphore &acquire_semaphore = image_available_[current_frame_];
-        VkSemaphore &present_semaphore = render_finished_[current_frame_];
         const size_t depth_slot = static_cast<size_t>(current_frame_);
 
         const VkResult wait_result = vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
@@ -1292,6 +1298,13 @@ namespace mxvk {
             std::cerr << "mxvk: acquired image index exceeds tracked in-flight image count\n";
             return;
         }
+
+        if (image_index >= render_finished_.size() || render_finished_[image_index] == VK_NULL_HANDLE) {
+            std::cerr << "mxvk: acquired image index exceeds render-finished semaphore count\n";
+            return;
+        }
+
+        VkSemaphore &present_semaphore = render_finished_[image_index];
 
         if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
             const VkResult image_wait_result = vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);

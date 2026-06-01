@@ -52,7 +52,6 @@ namespace example {
 
             VkFence &frame_fence = in_flight_fences_[current_frame_];
             VkSemaphore &acquire_semaphore = image_available_[current_frame_];
-            VkSemaphore &present_semaphore = render_finished_[current_frame_];
 
             vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
 
@@ -70,9 +69,12 @@ namespace example {
                 image_index >= command_buffers.size() ||
                 image_index >= swapchain_images.size() ||
                 image_index >= swapchain_image_views.size() ||
-                image_index >= image_fences_.size()) {
+                image_index >= image_fences_.size() ||
+                image_index >= render_finished_.size()) {
                 throw mxvk::Exception("Swapchain image index out of bounds");
             }
+
+            VkSemaphore &present_semaphore = render_finished_[image_index];
 
             if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
                 vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);

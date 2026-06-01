@@ -333,7 +333,7 @@ namespace mxvk {
         std::vector<VkCommandBuffer> command_buffers{};
 
         std::array<VkSemaphore, max_frames_in_flight> image_available_{};
-        std::array<VkSemaphore, max_frames_in_flight> render_finished_{};
+        std::vector<VkSemaphore> render_finished_{};
         std::array<VkFence, max_frames_in_flight> in_flight_fences_{};
         std::vector<VkFence> image_fences_{};
         uint32_t current_frame_ = 0;
