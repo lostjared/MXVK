@@ -1,5 +1,7 @@
  cmake_minimum_required(VERSION 3.10)
 project(libmxvk VERSION 0.1.0)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile commands for tooling" FORCE)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -219,7 +221,7 @@ endif()
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxvk>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 if(DEFINED GLM_INCLUDE_DIRS)
     target_include_directories(mxvk PUBLIC ${GLM_INCLUDE_DIRS})
@@ -249,3 +251,52 @@ add_subdirectory(examples/tux_example)
 if(CV)
 add_subdirectory(examples/opencv_example)
 endif()
+
+set(MXVK_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/mxvk")
+
+install(TARGETS mxvk
+    EXPORT mxvkTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include/mxvk
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/mxvkConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvkConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/mxvkConfig.cmake
+    INSTALL_DESTINATION ${MXVK_INSTALL_CMAKEDIR}
+)
+
+install(EXPORT mxvkTargets
+    FILE mxvkTargets.cmake
+    NAMESPACE mxvk::
+    DESTINATION ${MXVK_INSTALL_CMAKEDIR}
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/mxvkConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/mxvkConfigVersion.cmake
+    DESTINATION ${MXVK_INSTALL_CMAKEDIR}
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+    IMMEDIATE
+    @ONLY
+)
+
+add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+)
