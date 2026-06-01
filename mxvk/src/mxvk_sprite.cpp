@@ -395,8 +395,8 @@ namespace mxvk {
     void VK_Sprite::enableInstancing(uint32_t maxInstances,
                                     const std::string &instanceVertShaderPath,
                                     const std::string &instanceFragShaderPath) {
-        if (renderPass == VK_NULL_HANDLE || descriptorSetLayout == VK_NULL_HANDLE) {
-            throw mxvk::Exception("VKSprite::enableInstancing called before renderPass/descriptorSetLayout set");
+        if (colorAttachmentFormat == VK_FORMAT_UNDEFINED || descriptorSetLayout == VK_NULL_HANDLE) {
+            throw mxvk::Exception("VKSprite::enableInstancing called before color format/descriptorSetLayout set");
         }
         ensureInstanceBuffer(maxInstances);
         createQuadBuffer();
@@ -541,7 +541,14 @@ namespace mxvk {
         VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &instancedPipelineLayout));
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        renderingInfo.viewMask = 0;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.pNext = &renderingInfo;
         pipelineInfo.stageCount = 2;
         pipelineInfo.pStages = shaderStages;
         pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -553,7 +560,7 @@ namespace mxvk {
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = instancedPipelineLayout;
-        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.renderPass = VK_NULL_HANDLE;
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
@@ -566,7 +573,7 @@ namespace mxvk {
     void VK_Sprite::createCustomPipeline() {
         if (!hasCustomShader || fragmentShaderModule == VK_NULL_HANDLE)
             return;
-        if (renderPass == VK_NULL_HANDLE || descriptorSetLayout == VK_NULL_HANDLE)
+        if (colorAttachmentFormat == VK_FORMAT_UNDEFINED || descriptorSetLayout == VK_NULL_HANDLE)
             return;
 
         if (customPipeline != VK_NULL_HANDLE) {
@@ -688,7 +695,14 @@ namespace mxvk {
         VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &customPipelineLayout));
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        renderingInfo.viewMask = 0;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.pNext = &renderingInfo;
         pipelineInfo.stageCount = 2;
         pipelineInfo.pStages = shaderStages;
         pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -700,7 +714,7 @@ namespace mxvk {
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = customPipelineLayout;
-        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.renderPass = VK_NULL_HANDLE;
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
@@ -787,7 +801,7 @@ namespace mxvk {
             fragmentShaderModule = createShaderModule(shaderCode);
             hasCustomShader = true;
 
-            if (renderPass != VK_NULL_HANDLE && descriptorSetLayout != VK_NULL_HANDLE) {
+            if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
                 createCustomPipeline();
             }
         }
@@ -845,7 +859,7 @@ namespace mxvk {
             fragmentShaderModule = createShaderModule(shaderCode);
             hasCustomShader = true;
 
-            if (renderPass != VK_NULL_HANDLE && descriptorSetLayout != VK_NULL_HANDLE) {
+            if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
                 createCustomPipeline();
             }
         }

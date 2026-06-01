@@ -13,6 +13,10 @@
 #include <optional>
 #include <vector>
 
+#ifndef MXVK_SPRITE_SHADER_DIR
+#define MXVK_SPRITE_SHADER_DIR "."
+#endif
+
 namespace mxvk {
     VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data) {
         const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
@@ -171,6 +175,17 @@ namespace mxvk {
         if (device != VK_NULL_HANDLE) {
             std::cout << "vk: waiting for device idle before teardown\n";
             vkDeviceWaitIdle(device);
+        }
+
+        if (!sprites_.empty()) {
+            std::cout << std::format("vk: releasing {} sprite(s)\n", sprites_.size());
+            sprites_.clear();
+        }
+        sprite_state_dirty_ = false;
+        destroySpritePipeline();
+        if (sprite_descriptor_set_layout_ != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, sprite_descriptor_set_layout_, nullptr);
+            sprite_descriptor_set_layout_ = VK_NULL_HANDLE;
         }
 
         if (in_flight != VK_NULL_HANDLE) {
@@ -855,12 +870,15 @@ namespace mxvk {
         std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", w, h);
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
+        sprite_state_dirty_ = true;
+        destroySpritePipeline();
         cleanupSyncObjects();
         cleanupSwapchain();
         if (!createSwapchain() || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             return;
         }
+
         onSwapchainRecreated();
         framebuffer_resized_ = false;
         std::cout << "mxvk: swapchain recreation complete\n";
@@ -927,6 +945,24 @@ namespace mxvk {
 
         if (render_finished.empty()) {
             return;
+        }
+
+        if (sprite_state_dirty_ && !sprites_.empty() && swapchain_format != VK_FORMAT_UNDEFINED) {
+            for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+                if (!sprite) {
+                    continue;
+                }
+                sprite->setColorAttachmentFormat(swapchain_format);
+                sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+                sprite->rebuildPipeline();
+                sprite->rebuildInstancedPipeline();
+            }
+            try {
+                createSpritePipeline();
+            } catch (const std::exception &ex) {
+                std::cerr << std::format("mxvk: sprite pipeline build skipped: {}\n", ex.what());
+            }
+            sprite_state_dirty_ = false;
         }
 
         vkWaitForFences(device, 1, &in_flight, VK_TRUE, UINT64_MAX);
@@ -1011,6 +1047,33 @@ namespace mxvk {
         rendering_info.pStencilAttachment = nullptr;
 
         vkCmdBeginRendering(cmd, &rendering_info);
+
+        VkViewport viewport{};
+        viewport.x = 0.0F;
+        viewport.y = 0.0F;
+        viewport.width = static_cast<float>(swapchain_extent.width);
+        viewport.height = static_cast<float>(swapchain_extent.height);
+        viewport.minDepth = 0.0F;
+        viewport.maxDepth = 1.0F;
+        vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = swapchain_extent;
+        vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+        if (!sprites_.empty()) {
+            if (sprite_pipeline_ != VK_NULL_HANDLE) {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+            }
+            for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+                if (!sprite) {
+                    continue;
+                }
+                sprite->renderSprites(cmd, sprite_pipeline_layout_, swapchain_extent.width, swapchain_extent.height);
+            }
+        }
+
         vkCmdEndRendering(cmd);
 
         VkImageMemoryBarrier2 to_present_barrier{};
@@ -1092,6 +1155,12 @@ namespace mxvk {
         } else if (present_result != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to present swapchain image\n";
         }
+
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+            if (sprite) {
+                sprite->clearQueue();
+            }
+        }
     }
 
     bool VK_Window::validationEnabled() const {
@@ -1172,5 +1241,330 @@ namespace mxvk {
             vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
             debug_messenger = VK_NULL_HANDLE;
         }
+    }
+
+    VK_Sprite *VK_Window::createSprite(const std::string &pngPath, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
+        }
+
+        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+            createSpriteDescriptorSetLayout();
+        }
+
+        auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setColorAttachmentFormat(swapchain_format);
+
+        if (!vertexShaderPath.empty()) {
+            sprite->setVertexShaderPath(vertexShaderPath);
+        }
+
+        sprite->loadSprite(pngPath, fragmentShaderPath);
+
+        if (fragmentShaderPath.empty()) {
+            createSpritePipeline();
+        }
+
+        VK_Sprite *const sprite_ptr = sprite.get();
+        sprites_.push_back(std::move(sprite));
+        sprite_state_dirty_ = true;
+        return sprite_ptr;
+    }
+
+    VK_Sprite *VK_Window::createSprite(SDL_Surface *surface, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        if (surface == nullptr) {
+            throw mxvk::Exception("Cannot create sprite from a null SDL surface");
+        }
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
+        }
+
+        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+            createSpriteDescriptorSetLayout();
+        }
+
+        auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setColorAttachmentFormat(swapchain_format);
+
+        if (!vertexShaderPath.empty()) {
+            sprite->setVertexShaderPath(vertexShaderPath);
+        }
+
+        sprite->loadSprite(surface, fragmentShaderPath);
+
+        if (fragmentShaderPath.empty()) {
+            createSpritePipeline();
+        }
+
+        VK_Sprite *const sprite_ptr = sprite.get();
+        sprites_.push_back(std::move(sprite));
+        sprite_state_dirty_ = true;
+        return sprite_ptr;
+    }
+
+    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        if (width <= 0 || height <= 0) {
+            throw mxvk::Exception("Sprite dimensions must be positive");
+        }
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
+        }
+
+        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+            createSpriteDescriptorSetLayout();
+        }
+
+        auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setColorAttachmentFormat(swapchain_format);
+
+        sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
+
+        if (fragmentShaderPath.empty()) {
+            createSpritePipeline();
+        }
+
+        VK_Sprite *const sprite_ptr = sprite.get();
+        sprites_.push_back(std::move(sprite));
+        sprite_state_dirty_ = true;
+        return sprite_ptr;
+    }
+
+    void VK_Window::createSpriteDescriptorSetLayout() {
+        if (device == VK_NULL_HANDLE || sprite_descriptor_set_layout_ != VK_NULL_HANDLE) {
+            return;
+        }
+
+        VkDescriptorSetLayoutBinding sampler_binding{};
+        sampler_binding.binding = 0;
+        sampler_binding.descriptorCount = 1;
+        sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        sampler_binding.pImmutableSamplers = nullptr;
+        sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layout_info{};
+        layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layout_info.bindingCount = 1;
+        layout_info.pBindings = &sampler_binding;
+
+        if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &sprite_descriptor_set_layout_) != VK_SUCCESS) {
+            throw mxvk::Exception("Failed to create sprite descriptor set layout");
+        }
+    }
+
+    void VK_Window::destroySpritePipeline() {
+        if (device == VK_NULL_HANDLE) {
+            sprite_pipeline_ = VK_NULL_HANDLE;
+            sprite_pipeline_layout_ = VK_NULL_HANDLE;
+            return;
+        }
+
+        if (sprite_pipeline_ != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, sprite_pipeline_, nullptr);
+            sprite_pipeline_ = VK_NULL_HANDLE;
+        }
+        if (sprite_pipeline_layout_ != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, sprite_pipeline_layout_, nullptr);
+            sprite_pipeline_layout_ = VK_NULL_HANDLE;
+        }
+    }
+
+    void VK_Window::createSpritePipeline() {
+        if (device == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
+            return;
+        }
+        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+            createSpriteDescriptorSetLayout();
+        }
+
+        destroySpritePipeline();
+
+        const std::string shader_dir = std::string(MXVK_SPRITE_SHADER_DIR);
+        const std::vector<char> vert_shader = loadSpv(shader_dir + "/sprite.vert.spv");
+        const std::vector<char> frag_shader = loadSpv(shader_dir + "/sprite.frag.spv");
+
+        const VkShaderModule vert_module = createShaderModule(device, vert_shader);
+        VkShaderModule frag_module = VK_NULL_HANDLE;
+
+        try {
+            frag_module = createShaderModule(device, frag_shader);
+
+            VkPipelineShaderStageCreateInfo vert_stage{};
+            vert_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vert_stage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vert_stage.module = vert_module;
+            vert_stage.pName = "main";
+
+            VkPipelineShaderStageCreateInfo frag_stage{};
+            frag_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            frag_stage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            frag_stage.module = frag_module;
+            frag_stage.pName = "main";
+
+            const VkPipelineShaderStageCreateInfo shader_stages[] = {vert_stage, frag_stage};
+
+            VkVertexInputBindingDescription binding_description{};
+            binding_description.binding = 0;
+            binding_description.stride = sizeof(float) * 4;
+            binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            std::array<VkVertexInputAttributeDescription, 2> attributes{};
+            attributes[0].binding = 0;
+            attributes[0].location = 0;
+            attributes[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributes[0].offset = 0;
+            attributes[1].binding = 0;
+            attributes[1].location = 1;
+            attributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+            attributes[1].offset = sizeof(float) * 2;
+
+            VkPipelineVertexInputStateCreateInfo vertex_input{};
+            vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertex_input.vertexBindingDescriptionCount = 1;
+            vertex_input.pVertexBindingDescriptions = &binding_description;
+            vertex_input.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributes.size());
+            vertex_input.pVertexAttributeDescriptions = attributes.data();
+
+            VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+            input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            input_assembly.primitiveRestartEnable = VK_FALSE;
+
+            const std::array<VkDynamicState, 2> dynamic_states = {
+                VK_DYNAMIC_STATE_VIEWPORT,
+                VK_DYNAMIC_STATE_SCISSOR,
+            };
+            VkPipelineDynamicStateCreateInfo dynamic_state{};
+            dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dynamic_state.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
+            dynamic_state.pDynamicStates = dynamic_states.data();
+
+            VkPipelineViewportStateCreateInfo viewport_state{};
+            viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewport_state.viewportCount = 1;
+            viewport_state.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo rasterizer{};
+            rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            rasterizer.depthClampEnable = VK_FALSE;
+            rasterizer.rasterizerDiscardEnable = VK_FALSE;
+            rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+            rasterizer.lineWidth = 1.0F;
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+            rasterizer.depthBiasEnable = VK_FALSE;
+
+            VkPipelineMultisampleStateCreateInfo multisampling{};
+            multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            multisampling.sampleShadingEnable = VK_FALSE;
+            multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            VkPipelineDepthStencilStateCreateInfo depth_stencil{};
+            depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depth_stencil.depthTestEnable = VK_FALSE;
+            depth_stencil.depthWriteEnable = VK_FALSE;
+
+            VkPipelineColorBlendAttachmentState color_attachment{};
+            color_attachment.colorWriteMask =
+                VK_COLOR_COMPONENT_R_BIT |
+                VK_COLOR_COMPONENT_G_BIT |
+                VK_COLOR_COMPONENT_B_BIT |
+                VK_COLOR_COMPONENT_A_BIT;
+            color_attachment.blendEnable = VK_TRUE;
+            color_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            color_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            color_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+            color_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            color_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            color_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo color_blending{};
+            color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            color_blending.logicOpEnable = VK_FALSE;
+            color_blending.attachmentCount = 1;
+            color_blending.pAttachments = &color_attachment;
+
+            VkPushConstantRange push_constant_range{};
+            push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            push_constant_range.offset = 0;
+            push_constant_range.size = sizeof(float) * 12;
+
+            VkPipelineLayoutCreateInfo pipeline_layout_info{};
+            pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            pipeline_layout_info.setLayoutCount = 1;
+            pipeline_layout_info.pSetLayouts = &sprite_descriptor_set_layout_;
+            pipeline_layout_info.pushConstantRangeCount = 1;
+            pipeline_layout_info.pPushConstantRanges = &push_constant_range;
+
+            if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &sprite_pipeline_layout_) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to create sprite pipeline layout");
+            }
+
+            VkPipelineRenderingCreateInfo rendering_info{};
+            rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+            rendering_info.viewMask = 0;
+            rendering_info.colorAttachmentCount = 1;
+            rendering_info.pColorAttachmentFormats = &swapchain_format;
+
+            VkGraphicsPipelineCreateInfo pipeline_info{};
+            pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipeline_info.pNext = &rendering_info;
+            pipeline_info.stageCount = 2;
+            pipeline_info.pStages = shader_stages;
+            pipeline_info.pVertexInputState = &vertex_input;
+            pipeline_info.pInputAssemblyState = &input_assembly;
+            pipeline_info.pViewportState = &viewport_state;
+            pipeline_info.pRasterizationState = &rasterizer;
+            pipeline_info.pMultisampleState = &multisampling;
+            pipeline_info.pDepthStencilState = &depth_stencil;
+            pipeline_info.pColorBlendState = &color_blending;
+            pipeline_info.pDynamicState = &dynamic_state;
+            pipeline_info.layout = sprite_pipeline_layout_;
+            pipeline_info.renderPass = VK_NULL_HANDLE;
+            pipeline_info.subpass = 0;
+            pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
+            pipeline_info.basePipelineIndex = -1;
+
+            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &sprite_pipeline_) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to create sprite graphics pipeline");
+            }
+        } catch (...) {
+            if (sprite_pipeline_ != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, sprite_pipeline_, nullptr);
+                sprite_pipeline_ = VK_NULL_HANDLE;
+            }
+            if (sprite_pipeline_layout_ != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, sprite_pipeline_layout_, nullptr);
+                sprite_pipeline_layout_ = VK_NULL_HANDLE;
+            }
+            if (frag_module != VK_NULL_HANDLE) {
+                vkDestroyShaderModule(device, frag_module, nullptr);
+            }
+            vkDestroyShaderModule(device, vert_module, nullptr);
+            throw;
+        }
+
+        vkDestroyShaderModule(device, frag_module, nullptr);
+        vkDestroyShaderModule(device, vert_module, nullptr);
     }
 } // namespace mxvk

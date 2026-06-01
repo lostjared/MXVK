@@ -137,6 +137,10 @@ message(STATUS "Found Vulkan")
 endif()
 find_package(PNG REQUIRED)
 find_package(SDL3_ttf REQUIRED)
+find_program(GLSLC_EXECUTABLE glslc)
+if(NOT GLSLC_EXECUTABLE)
+message(FATAL_ERROR "glslc not found. Please install Vulkan SDK shader tools.")
+endif()
 if(CV)
     find_package(OpenCV REQUIRED)
     message(STATUS "OpenCV support enabled (version ${OpenCV_VERSION})")
@@ -149,6 +153,37 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_sprite.cpp
     mxvk/src/mxvk_text.cpp
+)
+
+set(mxvk_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/shaders)
+set(mxvk_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/mxvk/shaders)
+set(mxvk_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite.vert)
+set(mxvk_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite.frag)
+set(mxvk_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite.vert.spv)
+set(mxvk_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite.frag.spv)
+
+add_custom_command(
+    OUTPUT ${mxvk_VERTEX_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_VERTEX_SHADER} -o ${mxvk_VERTEX_SPV}
+    DEPENDS ${mxvk_VERTEX_SHADER}
+    COMMENT "Compiling MXVK sprite vertex shader"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${mxvk_FRAGMENT_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_FRAGMENT_SHADER} -o ${mxvk_FRAGMENT_SPV}
+    DEPENDS ${mxvk_FRAGMENT_SHADER}
+    COMMENT "Compiling MXVK sprite fragment shader"
+    VERBATIM
+)
+
+add_custom_target(mxvk_shaders
+    DEPENDS
+        ${mxvk_VERTEX_SPV}
+        ${mxvk_FRAGMENT_SPV}
 )
 if(CV)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_cv.cpp)
@@ -163,8 +198,11 @@ if(CV)
     target_compile_definitions(mxvk PUBLIC MXVK_WITH_CV)
 endif()
 target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG)
+add_dependencies(mxvk mxvk_shaders)
+target_compile_definitions(mxvk PUBLIC MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}")
 if(CV)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
 endif()
 add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)
+add_subdirectory(examples/sprite_example)

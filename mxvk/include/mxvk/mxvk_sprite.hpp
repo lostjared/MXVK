@@ -176,6 +176,8 @@ namespace mxvk {
         void setDescriptorSetLayout(VkDescriptorSetLayout layout) { descriptorSetLayout = layout; }
         /** @brief Assign the render pass used to build the custom pipeline. */
         void setRenderPass(VkRenderPass rp) { renderPass = rp; }
+        /** @brief Assign dynamic-rendering color attachment format used to build pipelines. */
+        void setColorAttachmentFormat(VkFormat format) { colorAttachmentFormat = format; }
         /** @brief Override the vertex shader path (used when rebuilding the pipeline). */
         void setVertexShaderPath(const std::string &path) { vertexShaderPath = path; }
 
@@ -260,6 +262,7 @@ namespace mxvk {
         VkPipeline customPipeline = VK_NULL_HANDLE;
         VkPipelineLayout customPipelineLayout = VK_NULL_HANDLE;
         VkRenderPass renderPass = VK_NULL_HANDLE;
+        VkFormat colorAttachmentFormat = VK_FORMAT_UNDEFINED;
         std::string vertexShaderPath;
         void createCustomPipeline();
 

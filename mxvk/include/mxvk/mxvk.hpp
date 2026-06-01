@@ -2,6 +2,7 @@
 #define _MXVK_MXVK_H_
 
 #include <SDL3/SDL.h>
+#include "mxvk_sprite.hpp"
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -82,6 +83,34 @@ namespace mxvk {
          * @param window Current window instance pointer.
          */
         virtual void proc([[maybe_unused]] VK_Window *window);
+
+        /**
+         * @brief Create a sprite from a PNG file and register it with this window.
+         * @param pngPath Path to the PNG file.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @return Non-owning pointer to the created sprite.
+         */
+        VK_Sprite *createSprite(const std::string &pngPath, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+
+        /**
+         * @brief Create a sprite from an SDL surface and register it with this window.
+         * @param surface Source surface pointer.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @return Non-owning pointer to the created sprite.
+         */
+        VK_Sprite *createSprite(SDL_Surface *surface, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+
+        /**
+         * @brief Create a blank sprite texture and register it with this window.
+         * @param width Texture width in pixels.
+         * @param height Texture height in pixels.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @return Non-owning pointer to the created sprite.
+         */
+        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
          * @brief Check whether Vulkan validation layers are currently enabled.
@@ -179,6 +208,9 @@ namespace mxvk {
         void cleanupSwapchain();
         void recreateSwapchain();
         void drawFrame();
+        void createSpriteDescriptorSetLayout();
+        void createSpritePipeline();
+        void destroySpritePipeline();
 
       protected:
         // Protected state allows subclasses to implement custom rendering paths.
@@ -222,6 +254,12 @@ namespace mxvk {
         bool framebuffer_resized_ = false;
         uint64_t last_resize_event_ms_ = 0;
         static constexpr uint64_t resize_settle_delay_ms_ = 150;
+
+        std::vector<std::unique_ptr<VK_Sprite>> sprites_{};
+        VkDescriptorSetLayout sprite_descriptor_set_layout_ = VK_NULL_HANDLE;
+        VkPipelineLayout sprite_pipeline_layout_ = VK_NULL_HANDLE;
+        VkPipeline sprite_pipeline_ = VK_NULL_HANDLE;
+        bool sprite_state_dirty_ = false;
     };
 
 } // namespace mxvk
