@@ -4,6 +4,7 @@
 #include "mxvk_sprite.hpp"
 #include "mxvk_text.hpp"
 #include <SDL3/SDL.h>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -261,6 +262,7 @@ namespace mxvk {
 
       private:
         static constexpr uint32_t invalid_queue_index = std::numeric_limits<uint32_t>::max();
+        static constexpr uint32_t max_frames_in_flight = 2;
 
         static constexpr const char *validation_layer_name = "VK_LAYER_KHRONOS_validation";
 
@@ -282,7 +284,7 @@ namespace mxvk {
         bool createRenderResources();
         bool createSyncObjects();
         void cleanupSyncObjects();
-        void cleanupSwapchain();
+        void cleanupSwapchain(bool preserveCommandPool = true);
         void recreateSwapchain();
         void drawFrame();
         void createSpriteDescriptorSetLayout();
@@ -330,9 +332,11 @@ namespace mxvk {
         VkCommandPool command_pool = VK_NULL_HANDLE;
         std::vector<VkCommandBuffer> command_buffers{};
 
-        VkSemaphore image_available = VK_NULL_HANDLE;
-        std::vector<VkSemaphore> render_finished{};
-        VkFence in_flight = VK_NULL_HANDLE;
+        std::array<VkSemaphore, max_frames_in_flight> image_available_{};
+        std::array<VkSemaphore, max_frames_in_flight> render_finished_{};
+        std::array<VkFence, max_frames_in_flight> in_flight_fences_{};
+        std::vector<VkFence> image_fences_{};
+        uint32_t current_frame_ = 0;
 
         bool sdl_initialized = false;
         bool active = false;

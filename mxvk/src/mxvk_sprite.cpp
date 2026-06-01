@@ -33,27 +33,33 @@ namespace mxvk {
 
         destroyStagingResources();
         if (quadVertexBuffer != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite quad vertex buffer\n";
             vkDestroyBuffer(device, quadVertexBuffer, nullptr);
             vkFreeMemory(device, quadVertexBufferMemory, nullptr);
         }
         if (quadIndexBuffer != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite quad index buffer\n";
             vkDestroyBuffer(device, quadIndexBuffer, nullptr);
             vkFreeMemory(device, quadIndexBufferMemory, nullptr);
         }
 
         if (descriptorPool != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite descriptor pool\n";
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         }
 
         if (spriteSampler != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite sampler\n";
             vkDestroySampler(device, spriteSampler, nullptr);
         }
 
         if (spriteImageView != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite image view\n";
             vkDestroyImageView(device, spriteImageView, nullptr);
         }
 
         if (spriteImage != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite image\n";
             vkDestroyImage(device, spriteImage, nullptr);
             vkFreeMemory(device, spriteImageMemory, nullptr);
         }
@@ -63,10 +69,12 @@ namespace mxvk {
         }
 
         if (customPipeline != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite custom pipeline\n";
             vkDestroyPipeline(device, customPipeline, nullptr);
         }
 
         if (customPipelineLayout != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite custom pipeline layout\n";
             vkDestroyPipelineLayout(device, customPipelineLayout, nullptr);
         }
 
@@ -92,16 +100,19 @@ namespace mxvk {
         }
 
         if (spriteSampler != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite sampler\n";
             vkDestroySampler(device, spriteSampler, nullptr);
             spriteSampler = VK_NULL_HANDLE;
         }
 
         if (spriteImageView != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite image view\n";
             vkDestroyImageView(device, spriteImageView, nullptr);
             spriteImageView = VK_NULL_HANDLE;
         }
 
         if (spriteImage != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite image\n";
             vkDestroyImage(device, spriteImage, nullptr);
             spriteImage = VK_NULL_HANDLE;
         }
@@ -116,11 +127,13 @@ namespace mxvk {
         }
 
         if (customPipeline != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite custom pipeline\n";
             vkDestroyPipeline(device, customPipeline, nullptr);
             customPipeline = VK_NULL_HANDLE;
         }
 
         if (customPipelineLayout != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite custom pipeline layout\n";
             vkDestroyPipelineLayout(device, customPipelineLayout, nullptr);
             customPipelineLayout = VK_NULL_HANDLE;
         }

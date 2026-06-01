@@ -1023,14 +1023,17 @@ namespace mxvk {
         }
 
         if (pipelineFill_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying fill pipeline");
             vkDestroyPipeline(window_->getDevice(), pipelineFill_, nullptr);
             pipelineFill_ = VK_NULL_HANDLE;
         }
         if (pipelineWireframe_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying wireframe pipeline");
             vkDestroyPipeline(window_->getDevice(), pipelineWireframe_, nullptr);
             pipelineWireframe_ = VK_NULL_HANDLE;
         }
         if (pipelineLayout_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying pipeline layout");
             vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
             pipelineLayout_ = VK_NULL_HANDLE;
         }
@@ -1047,10 +1050,12 @@ namespace mxvk {
 
         descriptorSets_.clear();
         if (descriptorPool_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying descriptor pool");
             vkDestroyDescriptorPool(window_->getDevice(), descriptorPool_, nullptr);
             descriptorPool_ = VK_NULL_HANDLE;
         }
         if (descriptorSetLayout_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying descriptor set layout");
             vkDestroyDescriptorSetLayout(window_->getDevice(), descriptorSetLayout_, nullptr);
             descriptorSetLayout_ = VK_NULL_HANDLE;
         }
@@ -1067,18 +1072,22 @@ namespace mxvk {
 
         for (const TextureEntry &tex : textures_) {
             if (tex.view != VK_NULL_HANDLE) {
+                logVKAbstractModelStep("destroying texture image view");
                 vkDestroyImageView(window_->getDevice(), tex.view, nullptr);
             }
             if (tex.image != VK_NULL_HANDLE) {
+                logVKAbstractModelStep("destroying texture image");
                 vkDestroyImage(window_->getDevice(), tex.image, nullptr);
             }
             if (tex.memory != VK_NULL_HANDLE) {
+                logVKAbstractModelStep("freeing texture memory");
                 vkFreeMemory(window_->getDevice(), tex.memory, nullptr);
             }
         }
         textures_.clear();
 
         if (textureSampler_ != VK_NULL_HANDLE) {
+            logVKAbstractModelStep("destroying texture sampler");
             vkDestroySampler(window_->getDevice(), textureSampler_, nullptr);
             textureSampler_ = VK_NULL_HANDLE;
         }

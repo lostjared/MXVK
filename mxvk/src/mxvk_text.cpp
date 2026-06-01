@@ -24,20 +24,26 @@ namespace mxvk {
         clearCache();
 
         if (descriptorPool != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying text descriptor pool\n";
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
         }
 
         if (fontSampler != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying text font sampler\n";
             vkDestroySampler(device, fontSampler, nullptr);
         }
 
         if (font) {
+            std::cout << "mxvk: closing text font\n";
             TTF_CloseFont(font);
         }
         TTF_Quit();
     }
 
     void VK_Text::clearCache() {
+        if (!textureCache.empty()) {
+            std::cout << std::format("vk: destroying {} cached text texture(s)\n", textureCache.size());
+        }
         for (auto &[key, cached] : textureCache) {
             if (cached.imageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, cached.imageView, nullptr);
