@@ -356,11 +356,13 @@ class SpaceRoxWindow : public mxvk::VK_Window {
     Sint16 joyRestLX = 0, joyRestLY = 0;
     int joyCenterStable = 0;
 
-    int countdownTimer = 0;
-    int countdownDuration = 60;
+    Uint32 countdownTimer = 0;
+    Uint32 countdownDuration = 1000;
+    Uint32 countdownStartMs = 0;
     int countdownNumber = 3;
-    int launchTimer = 0;
-    int launchDuration = 60;
+    Uint32 launchTimer = 0;
+    Uint32 launchDuration = 1000;
+    Uint32 launchStartMs = 0;
     float shipLaunchY = 0;
 
     int lastFontSize = 0;
@@ -515,6 +517,8 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         state = STATE_COUNTDOWN;
         countdownTimer = 0;
         countdownNumber = 3;
+        countdownStartMs = SDL_GetTicks();
+        launchStartMs = 0;
         wasExploding = false;
     }
 
@@ -1044,25 +1048,32 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         state = STATE_COUNTDOWN;
         countdownTimer = 0;
         countdownNumber = 3;
+        countdownStartMs = SDL_GetTicks();
+        launchStartMs = 0;
     }
 
     void updateCountdown() {
-        countdownTimer++;
-        if (countdownTimer >= countdownDuration) {
-            countdownTimer = 0;
-            countdownNumber--;
-            if (countdownNumber < 0) {
-                state = STATE_LAUNCH;
-                launchTimer = 0;
-                shipLaunchY = static_cast<float>(GAME_H);
-            }
+        const Uint32 now = SDL_GetTicks();
+        const Uint32 elapsed = now - countdownStartMs;
+
+        countdownTimer = elapsed % countdownDuration;
+        countdownNumber = 3 - static_cast<int>(elapsed / countdownDuration);
+
+        if (elapsed >= (countdownDuration * 4U)) {
+            state = STATE_LAUNCH;
+            launchTimer = 0;
+            launchStartMs = now;
+            shipLaunchY = static_cast<float>(GAME_H);
         }
     }
 
     void updateLaunch() {
-        launchTimer++;
-        if (launchTimer < launchDuration / 2) {
-            shipLaunchY = GAME_H - (launchTimer * (GAME_H - ship.y) / (launchDuration / 2));
+        const Uint32 now = SDL_GetTicks();
+        launchTimer = std::min<Uint32>(now - launchStartMs, launchDuration);
+        if (launchTimer < launchDuration / 2U) {
+            shipLaunchY = static_cast<float>(GAME_H) -
+                          (static_cast<float>(launchTimer) * (static_cast<float>(GAME_H) - ship.y) /
+                           static_cast<float>(launchDuration / 2U));
         } else {
             shipLaunchY = ship.y;
         }
@@ -1298,7 +1309,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
                 int textY = centerY - textH / 2;
                 printText(buf.c_str(), textX, textY, {255, 255, 0, 255});
 
-                if ((countdownTimer / 10) % 2) {
+                if (((countdownTimer / 167U) % 2U) != 0U) {
                     setColor(1.0f, 1.0f, 0.0f, 0.5f);
                     int padding = std::max(15, static_cast<int>(15 * std::min(sx(), sy())));
                     int rectX = textX - padding;

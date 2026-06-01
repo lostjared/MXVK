@@ -342,6 +342,7 @@ namespace mxvk {
         bool active = false;
         bool validation_enabled = false;
         bool framebuffer_resized_ = false;
+        bool force_swapchain_recreate_ = false;
         uint64_t last_resize_event_ms_ = 0;
         static constexpr uint64_t resize_settle_delay_ms_ = 150;
 

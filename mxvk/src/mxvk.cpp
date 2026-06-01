@@ -398,8 +398,23 @@ namespace mxvk {
                     active = false;
                     break;
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-                    last_resize_event_ms_ = SDL_GetTicks();
-                    framebuffer_resized_ = true;
+                    if (window != nullptr) {
+                        int pixel_w = 0;
+                        int pixel_h = 0;
+                        SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+                        const bool has_swapchain_extent =
+                            (swapchain_extent.width != 0U) &&
+                            (swapchain_extent.height != 0U);
+                        const bool extent_changed =
+                            !has_swapchain_extent ||
+                            (swapchain_extent.width != static_cast<uint32_t>(pixel_w)) ||
+                            (swapchain_extent.height != static_cast<uint32_t>(pixel_h));
+                        if (extent_changed) {
+                            force_swapchain_recreate_ = false;
+                            last_resize_event_ms_ = SDL_GetTicks();
+                            framebuffer_resized_ = true;
+                        }
+                    }
                     break;
                 default:
                     break;
@@ -408,7 +423,9 @@ namespace mxvk {
             }
             if (framebuffer_resized_) {
                 const uint64_t now_ms = SDL_GetTicks();
-                if (last_resize_event_ms_ != 0 && (now_ms - last_resize_event_ms_) < resize_settle_delay_ms_) {
+                if (!force_swapchain_recreate_ &&
+                    last_resize_event_ms_ != 0 &&
+                    (now_ms - last_resize_event_ms_) < resize_settle_delay_ms_) {
                     proc(this);
                     render(this);
                     SDL_Delay(1);
@@ -1048,7 +1065,8 @@ namespace mxvk {
             return;
         }
 
-        if (swapchain != VK_NULL_HANDLE &&
+        if (!force_swapchain_recreate_ &&
+            swapchain != VK_NULL_HANDLE &&
             swapchain_extent.width == static_cast<uint32_t>(w) &&
             swapchain_extent.height == static_cast<uint32_t>(h)) {
             framebuffer_resized_ = false;
@@ -1084,6 +1102,7 @@ namespace mxvk {
         }
 
         onSwapchainRecreated();
+        force_swapchain_recreate_ = false;
         framebuffer_resized_ = false;
         std::cout << "mxvk: swapchain recreation complete\n";
     }
@@ -1245,6 +1264,7 @@ namespace mxvk {
         if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
             last_acquire_error = VK_SUCCESS;
             repeated_acquire_errors = 0;
+            force_swapchain_recreate_ = true;
             framebuffer_resized_ = true;
             return;
         }
@@ -1255,6 +1275,7 @@ namespace mxvk {
                 last_acquire_error = acquire_result;
                 repeated_acquire_errors = 0;
             }
+            force_swapchain_recreate_ = true;
             framebuffer_resized_ = true;
             return;
         }
@@ -1557,8 +1578,24 @@ namespace mxvk {
         present_info.pImageIndices = &image_index;
 
         const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
-        if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
+        if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+            force_swapchain_recreate_ = true;
+            last_resize_event_ms_ = SDL_GetTicks();
             framebuffer_resized_ = true;
+        } else if (present_result == VK_SUBOPTIMAL_KHR) {
+            int pixel_w = 0;
+            int pixel_h = 0;
+            if (window != nullptr) {
+                SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+            }
+            const bool extent_changed =
+                (pixel_w > 0 && pixel_h > 0) &&
+                (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
+                 swapchain_extent.height != static_cast<uint32_t>(pixel_h));
+            if (extent_changed) {
+                last_resize_event_ms_ = SDL_GetTicks();
+                framebuffer_resized_ = true;
+            }
         } else if (present_result != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to present swapchain image\n";
         }
