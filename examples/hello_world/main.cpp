@@ -59,6 +59,7 @@ namespace example {
             const VkResult acquire_result =
                 vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, &image_index);
             if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
+                force_swapchain_recreate_ = true;
                 framebuffer_resized_ = true;
                 return;
             }
@@ -245,8 +246,24 @@ namespace example {
             present_info.pImageIndices = &image_index;
 
             const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
-            if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
+            if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+                force_swapchain_recreate_ = true;
+                last_resize_event_ms_ = SDL_GetTicks();
                 framebuffer_resized_ = true;
+            } else if (present_result == VK_SUBOPTIMAL_KHR) {
+                int pixel_w = 0;
+                int pixel_h = 0;
+                if (window != nullptr) {
+                    SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+                }
+                const bool extent_changed =
+                    (pixel_w > 0 && pixel_h > 0) &&
+                    (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
+                     swapchain_extent.height != static_cast<uint32_t>(pixel_h));
+                if (extent_changed) {
+                    last_resize_event_ms_ = SDL_GetTicks();
+                    framebuffer_resized_ = true;
+                }
             } else if (present_result != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to present swapchain image");
             }

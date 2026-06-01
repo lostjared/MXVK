@@ -1070,7 +1070,6 @@ namespace mxvk {
             swapchain_extent.width == static_cast<uint32_t>(w) &&
             swapchain_extent.height == static_cast<uint32_t>(h)) {
             framebuffer_resized_ = false;
-            std::cout << "mxvk: resize event matches current swapchain extent; skipping recreation\n";
             return;
         }
 
