@@ -376,7 +376,7 @@ namespace mxvk {
         return true;
     }
 
-    void VK_Window::event(VK_Window *window, SDL_Event &e) {
+    void VK_Window::event(SDL_Event &e) {
         switch (e.type) {
         case SDL_EVENT_KEY_DOWN:
             switch (e.key.key) {
@@ -419,31 +419,31 @@ namespace mxvk {
                 default:
                     break;
                 }
-                event(this, e);
+                event(e);
             }
             if (framebuffer_resized_) {
                 const uint64_t now_ms = SDL_GetTicks();
                 if (!force_swapchain_recreate_ &&
                     last_resize_event_ms_ != 0 &&
                     (now_ms - last_resize_event_ms_) < resize_settle_delay_ms_) {
-                    proc(this);
-                    render(this);
+                    proc();
+                    render();
                     SDL_Delay(1);
                     continue;
                 }
                 recreateSwapchain();
             }
-            proc(this);
-            render(this);
+            proc();
+            render();
             SDL_Delay(1);
         }
     }
 
-    void VK_Window::render([[maybe_unused]] VK_Window *window) {
+    void VK_Window::render() {
         drawFrame();
     }
 
-    void VK_Window::proc([[maybe_unused]] VK_Window *window) {
+    void VK_Window::proc() {
     }
 
     bool VK_Window::initWindow(const std::string &title, int width, int height, SDL_WindowFlags flags) {

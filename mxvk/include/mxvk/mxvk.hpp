@@ -71,10 +71,9 @@ namespace mxvk {
 
         /**
          * @brief Handle one SDL event.
-         * @param window Current window instance pointer.
          * @param e SDL event to process.
          */
-        virtual void event(VK_Window *window, SDL_Event &e);
+        virtual void event(SDL_Event &e);
 
         /**
          * @brief Run the main event/render loop.
@@ -83,15 +82,13 @@ namespace mxvk {
 
         /**
          * @brief Render one frame.
-         * @param window Current window instance pointer.
          */
-        virtual void render([[maybe_unused]] VK_Window *window);
+        virtual void render();
 
         /**
          * @brief Execute one processing/update step.
-         * @param window Current window instance pointer.
          */
-        virtual void proc([[maybe_unused]] VK_Window *window);
+        virtual void proc();
 
         /**
          * @brief Set the active text-render font.

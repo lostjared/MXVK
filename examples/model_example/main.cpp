@@ -38,7 +38,7 @@ namespace example {
             model_.cleanup(this);
         }
 
-        void event([[maybe_unused]] mxvk::VK_Window *window, SDL_Event &e) override {
+        void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }

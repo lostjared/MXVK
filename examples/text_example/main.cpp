@@ -16,13 +16,13 @@ namespace example {
             setFont(current_path + "/data/font.ttf", 24);
         }
 
-        void event([[maybe_unused]] mxvk::VK_Window *window, SDL_Event &e) override {
+        void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
         }
 
-        void proc([[maybe_unused]] mxvk::VK_Window *window) override {
+        void proc() override {
             printText("Hello World", 15, 15, SDL_Color{255, 255, 255, 255});
         }
     };

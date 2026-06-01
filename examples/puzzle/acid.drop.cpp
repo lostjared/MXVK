@@ -382,7 +382,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
         return w / 2 - (int)(strlen(text) * getCharWidth() / 2);
     }
 
-    void proc([[maybe_unused]] mxvk::VK_Window *window_ptr) override {
+    void proc() override {
         if (window != nullptr) {
             SDL_GetWindowSizeInPixels(window.get(), &w, &h);
         }
@@ -1119,7 +1119,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
         }
     }
 
-    void event([[maybe_unused]] mxvk::VK_Window *window_ptr, SDL_Event &e) override {
+    void event(SDL_Event &e) override {
         if (e.type == SDL_EVENT_QUIT || (currentScreen == SCREEN_START && e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE)) {
             exit();
             return;

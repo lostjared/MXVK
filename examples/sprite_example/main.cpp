@@ -28,13 +28,13 @@ namespace example {
             sprite_ = createSprite(image_path, vertex_shader, fragment_shader);
         }
 
-        void event([[maybe_unused]] mxvk::VK_Window *window, SDL_Event &e) override {
+        void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
         }
 
-        void proc([[maybe_unused]] mxvk::VK_Window *window) override {
+        void proc() override {
             if (sprite_ == nullptr) {
                 return;
             }

@@ -135,7 +135,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         }
     }
 
-    void proc([[maybe_unused]] mxvk::VK_Window *window_ptr) override {
+    void proc() override {
         initializeResources();
         if (!resources_initialized || pixel == nullptr || starSprite == nullptr) {
             return;
@@ -195,7 +195,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         }
     }
 
-    void event([[maybe_unused]] mxvk::VK_Window *window_ptr, SDL_Event &e) override {
+    void event(SDL_Event &e) override {
         switch (e.type) {
         case SDL_EVENT_QUIT:
             exit();

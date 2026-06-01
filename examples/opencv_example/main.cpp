@@ -125,7 +125,7 @@ namespace example {
             capture_.close();
         }
 
-        void event([[maybe_unused]] mxvk::VK_Window *window, SDL_Event &e) override {
+        void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
@@ -135,7 +135,7 @@ namespace example {
             initializeCameraRendering();
         }
 
-        void proc([[maybe_unused]] mxvk::VK_Window *window) override {
+        void proc() override {
             cv::Mat frame;
             if (!capture_.read(frame)) {
                 if (using_file_) {
