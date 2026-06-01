@@ -45,3 +45,13 @@ target_compile_definitions(sprite_example PRIVATE
     sprite_example_SHADER_DIR="${sprite_example_SHADER_OUTPUT_DIR}"
     sprite_example_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
+
+set(sprite_example_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/font.ttf)
+
+add_custom_command(TARGET sprite_example POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:sprite_example>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${sprite_example_FONT_SOURCE}
+        $<TARGET_FILE_DIR:sprite_example>/data/font.ttf
+    COMMENT "Copying sprite example font.ttf to runtime output directory"
+)

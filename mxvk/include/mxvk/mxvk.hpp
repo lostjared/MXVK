@@ -352,7 +352,8 @@ namespace mxvk {
         VkPipelineLayout text_pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline text_pipeline_ = VK_NULL_HANDLE;
         bool text_state_dirty_ = false;
-        std::string font_path_ = "font.ttf";
+        bool font_configured_ = false;
+        std::string font_path_{};
         int font_size_ = 24;
     };
 

@@ -70,10 +70,15 @@ target_compile_definitions(tux_example PRIVATE
     tux_example_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+set(tux_example_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/font.ttf)
+
 add_custom_command(TARGET tux_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:tux_example>/data
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         $<TARGET_FILE_DIR:tux_example>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${tux_example_FONT_SOURCE}
+        $<TARGET_FILE_DIR:tux_example>/data/font.ttf
     COMMENT "Copying tux example assets to runtime output directory"
 )

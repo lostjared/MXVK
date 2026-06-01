@@ -162,7 +162,6 @@ namespace mxvk {
             fontSampler = VK_NULL_HANDLE;
         }
         initFont(fontPath, fontSize);
-        std::cout << std::format("mxvk: Font changed: {} @ {}pt\n", fontPath, fontSize);
     }
 
     SDL_Surface *VK_Text::convertToRGBA(SDL_Surface *surface) {

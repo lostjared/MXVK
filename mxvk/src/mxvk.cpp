@@ -1584,6 +1584,7 @@ namespace mxvk {
 
         font_path_ = fontPath;
         font_size_ = fontSize;
+        font_configured_ = true;
 
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot set font before Vulkan device initialization");
@@ -1595,14 +1596,21 @@ namespace mxvk {
             throw mxvk::Exception("Cannot initialize text renderer before swapchain and command resources are available");
         }
 
-        ensureTextRenderer();
-        text_renderer_->setFont(font_path_, font_size_);
+        if (!text_renderer_) {
+            ensureTextRenderer();
+        } else {
+            text_renderer_->setFont(font_path_, font_size_);
+        }
         text_state_dirty_ = true;
     }
 
     void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col) {
         if (text.empty()) {
             return;
+        }
+
+        if (!font_configured_) {
+            throw mxvk::Exception("printText requires setFont() to be called first");
         }
 
         ensureTextRenderer();
@@ -1616,6 +1624,10 @@ namespace mxvk {
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height) {
+        if (!font_configured_) {
+            throw mxvk::Exception("getTextDimensions requires setFont() to be called first");
+        }
+
         if (!text_renderer_) {
             ensureTextRenderer();
         }
@@ -1629,6 +1641,10 @@ namespace mxvk {
 
     void VK_Window::ensureTextRenderer() {
         if (text_renderer_) {
+            return;
+        }
+
+        if (!font_configured_ || font_path_.empty() || font_size_ <= 0) {
             return;
         }
 

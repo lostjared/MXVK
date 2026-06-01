@@ -31,7 +31,7 @@ namespace example {
                     const std::string backgroundPath = assetRoot_ + "/data/ant-bg.png";
 
                     
-                    setFont(path + "/data/font.ttf", 24);
+                    setFont(assetRoot_ + "/data/font.ttf", 24);
                     background_ = createSprite(backgroundPath, backgroundVertPath, backgroundFragPath);
                     model_.load(this, modelPath, "", assetRoot_ + "/data", 1.0f);
                     model_.setShaders(this, vertPath, fragPath);
