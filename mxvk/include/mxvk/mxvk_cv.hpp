@@ -2,8 +2,8 @@
  * @file vk_cv.hpp
  * @brief OpenCV video-capture integration for the Vulkan backend.
  *
- * mx::MXCapture (Vulkan variant) wraps cv::VideoCapture and feeds decoded
- * frames into a VKSprite for display within a VKWindow.
+ * mx::VKCapture (Vulkan variant) wraps cv::VideoCapture and feeds decoded
+ * frames into a VK_Sprite for display within a VK_Window.
  */
 #ifndef __VK_OPENCV__H_
 #define __VK_OPENCV__H_
