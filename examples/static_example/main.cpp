@@ -409,7 +409,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::StaticWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen);
+        example::StaticWindow ex_window(args.path, "Static Noise Example", args.width, args.height, args.fullscreen);
         ex_window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
