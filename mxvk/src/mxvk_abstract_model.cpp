@@ -121,6 +121,117 @@ namespace mxvk {
         std::memcpy(uniformBuffersMapped_[imageIndex], &ubo, sizeof(UniformBufferObject));
     }
 
+    bool VKAbstractModel::updatePrimaryTexture(const void *pixels, int width, int height, int pitch) {
+        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
+            return false;
+        }
+        if (pixels == nullptr || width <= 0 || height <= 0) {
+            return false;
+        }
+
+        const uint32_t uploadWidth = static_cast<uint32_t>(width);
+        const uint32_t uploadHeight = static_cast<uint32_t>(height);
+        const uint32_t srcRowBytes = static_cast<uint32_t>(pitch > 0 ? pitch : width * 4);
+        const uint32_t tightRowBytes = uploadWidth * 4U;
+        if (srcRowBytes < tightRowBytes) {
+            return false;
+        }
+
+        if (textures_.empty()) {
+            createFallbackTexture();
+            if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
+                createDescriptorSets();
+            }
+        }
+
+        TextureEntry &texture = textures_[0];
+        if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE || texture.view == VK_NULL_HANDLE) {
+            return false;
+        }
+
+        bool recreatedTexture = false;
+        if (texture.width != uploadWidth || texture.height != uploadHeight) {
+            vkDeviceWaitIdle(window_->getDevice());
+
+            if (texture.view != VK_NULL_HANDLE) {
+                vkDestroyImageView(window_->getDevice(), texture.view, nullptr);
+            }
+            if (texture.image != VK_NULL_HANDLE) {
+                vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+            }
+            if (texture.memory != VK_NULL_HANDLE) {
+                vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+            }
+
+            texture.view = VK_NULL_HANDLE;
+            texture.image = VK_NULL_HANDLE;
+            texture.memory = VK_NULL_HANDLE;
+
+            createImage(uploadWidth, uploadHeight, VK_FORMAT_R8G8B8A8_UNORM,
+                        VK_IMAGE_TILING_OPTIMAL,
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                        texture.image, texture.memory);
+
+            texture.view = createImageView(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+            texture.width = uploadWidth;
+            texture.height = uploadHeight;
+            recreatedTexture = true;
+
+            if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
+                vkResetDescriptorPool(window_->getDevice(), descriptorPool_, 0);
+                descriptorSets_.clear();
+                createDescriptorSets();
+            }
+        }
+
+        const VkDeviceSize stagingSize = static_cast<VkDeviceSize>(tightRowBytes) * uploadHeight;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+        createBuffer(stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     stagingBuffer, stagingMemory);
+
+        void *mapped = nullptr;
+        const VkResult mapResult = vkMapMemory(window_->getDevice(), stagingMemory, 0, stagingSize, 0, &mapped);
+        if (mapResult != VK_SUCCESS || mapped == nullptr) {
+            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            return false;
+        }
+
+        if (srcRowBytes == tightRowBytes) {
+            std::memcpy(mapped, pixels, static_cast<size_t>(stagingSize));
+        } else {
+            const auto *src = static_cast<const uint8_t *>(pixels);
+            auto *dst = static_cast<uint8_t *>(mapped);
+            for (uint32_t y = 0; y < uploadHeight; ++y) {
+                const size_t srcOffset = static_cast<size_t>(y) * srcRowBytes;
+                const size_t dstOffset = static_cast<size_t>(y) * tightRowBytes;
+                std::memcpy(dst + dstOffset, src + srcOffset, tightRowBytes);
+            }
+        }
+        vkUnmapMemory(window_->getDevice(), stagingMemory);
+
+        if (recreatedTexture) {
+            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
+                                  VK_IMAGE_LAYOUT_UNDEFINED,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        } else {
+            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        }
+        copyBufferToImage(stagingBuffer, texture.image, uploadWidth, uploadHeight);
+        transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+        return true;
+    }
+
     void VKAbstractModel::render(VkCommandBuffer cmd, uint32_t imageIndex, bool wireframe) const {
         if (cmd == VK_NULL_HANDLE || imageIndex >= uniformBuffers_.size() || descriptorSets_.empty()) {
             return;
@@ -699,7 +810,7 @@ namespace mxvk {
         uboBinding.binding = 1;
         uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboBinding.descriptorCount = 1;
-        uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         const std::array<VkDescriptorSetLayoutBinding, 2> bindings = {samplerBinding, uboBinding};
 

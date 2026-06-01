@@ -25,6 +25,7 @@ namespace mxvk {
         glm::mat4 model{1.0f};
         glm::mat4 view{1.0f};
         glm::mat4 proj{1.0f};
+      glm::vec4 fx{0.0f, 0.0f, 0.0f, 0.0f};
     };
 
     /**
@@ -73,6 +74,16 @@ namespace mxvk {
          * @param ubo New transform values.
          */
         void updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo);
+
+        /**
+         * @brief Upload raw RGBA pixels into the primary model texture.
+         * @param pixels Pointer to RGBA8 pixel data.
+         * @param width Texture width in pixels.
+         * @param height Texture height in pixels.
+         * @param pitch Bytes per input row. When 0, defaults to width * 4.
+         * @return True when the upload succeeds, false for invalid inputs or unavailable resources.
+         */
+        [[nodiscard]] bool updatePrimaryTexture(const void *pixels, int width, int height, int pitch = 0);
 
         /**
          * @brief Record draw commands for this model.

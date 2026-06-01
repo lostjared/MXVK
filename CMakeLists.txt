@@ -251,6 +251,7 @@ add_subdirectory(examples/tux_example)
 add_subdirectory(examples/asteroids)
 if(CV)
 add_subdirectory(examples/opencv_example)
+add_subdirectory(examples/opencv_model)
 endif()
 
 set(MXVK_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/mxvk")
