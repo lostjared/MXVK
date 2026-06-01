@@ -816,6 +816,105 @@ namespace mxvk {
             return false;
         }
 
+        auto findDepthFormat = [&](VkPhysicalDevice gpu) -> VkFormat {
+            const std::array<VkFormat, 2> candidates = {
+                VK_FORMAT_D32_SFLOAT,
+                VK_FORMAT_D16_UNORM,
+            };
+
+            for (const VkFormat format : candidates) {
+                VkFormatProperties props{};
+                vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
+                if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0U) {
+                    return format;
+                }
+            }
+
+            return VK_FORMAT_UNDEFINED;
+        };
+
+        depth_format = findDepthFormat(physical_device);
+        if (depth_format == VK_FORMAT_UNDEFINED) {
+            std::cerr << "mxvk: failed to find a supported depth format\n";
+            return false;
+        }
+
+        depth_images.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        depth_image_memories.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        depth_image_views.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        depth_image_initialized.assign(swapchain_images.size(), false);
+
+        for (size_t i = 0; i < swapchain_images.size(); ++i) {
+            VkImageCreateInfo imageInfo{};
+            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent.width = swapchain_extent.width;
+            imageInfo.extent.height = swapchain_extent.height;
+            imageInfo.extent.depth = 1;
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.format = depth_format;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+            if (vkCreateImage(device, &imageInfo, nullptr, &depth_images[i]) != VK_SUCCESS) {
+                std::cerr << std::format("mxvk: failed to create depth image {}\n", i);
+                return false;
+            }
+
+            VkMemoryRequirements memReq{};
+            vkGetImageMemoryRequirements(device, depth_images[i], &memReq);
+
+            VkPhysicalDeviceMemoryProperties memProps{};
+            vkGetPhysicalDeviceMemoryProperties(physical_device, &memProps);
+            uint32_t memoryTypeIndex = UINT32_MAX;
+            for (uint32_t t = 0; t < memProps.memoryTypeCount; ++t) {
+                if (((memReq.memoryTypeBits & (1u << t)) != 0U) &&
+                    ((memProps.memoryTypes[t].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U)) {
+                    memoryTypeIndex = t;
+                    break;
+                }
+            }
+            if (memoryTypeIndex == UINT32_MAX) {
+                std::cerr << "mxvk: failed to find depth image memory type\n";
+                return false;
+            }
+
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memReq.size;
+            allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+            if (vkAllocateMemory(device, &allocInfo, nullptr, &depth_image_memories[i]) != VK_SUCCESS) {
+                std::cerr << std::format("mxvk: failed to allocate depth image memory {}\n", i);
+                return false;
+            }
+
+            if (vkBindImageMemory(device, depth_images[i], depth_image_memories[i], 0) != VK_SUCCESS) {
+                std::cerr << std::format("mxvk: failed to bind depth image memory {}\n", i);
+                return false;
+            }
+
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = depth_images[i];
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = depth_format;
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            viewInfo.subresourceRange.baseMipLevel = 0;
+            viewInfo.subresourceRange.levelCount = 1;
+            viewInfo.subresourceRange.baseArrayLayer = 0;
+            viewInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(device, &viewInfo, nullptr, &depth_image_views[i]) != VK_SUCCESS) {
+                std::cerr << std::format("mxvk: failed to create depth image view {}\n", i);
+                return false;
+            }
+        }
+
         std::cout << "vk: createRenderResources complete\n";
         return true;
     }
@@ -968,8 +1067,41 @@ namespace mxvk {
             }
         }
         swapchain_image_views.clear();
+
+        if (!depth_image_views.empty()) {
+            std::cout << "vk: destroying depth image views\n";
+            for (VkImageView view : depth_image_views) {
+                if (view != VK_NULL_HANDLE) {
+                    vkDestroyImageView(device, view, nullptr);
+                }
+            }
+        }
+        depth_image_views.clear();
+
+        if (!depth_images.empty()) {
+            std::cout << "vk: destroying depth images\n";
+            for (VkImage image : depth_images) {
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(device, image, nullptr);
+                }
+            }
+        }
+        depth_images.clear();
+
+        if (!depth_image_memories.empty()) {
+            std::cout << "vk: freeing depth image memory\n";
+            for (VkDeviceMemory memory : depth_image_memories) {
+                if (memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, memory, nullptr);
+                }
+            }
+        }
+        depth_image_memories.clear();
+        depth_image_initialized.clear();
+
         swapchain_images.clear();
         swapchain_image_initialized.clear();
+        depth_format = VK_FORMAT_UNDEFINED;
 
         if (swapchain != VK_NULL_HANDLE) {
             std::cout << "vk: destroying swapchain\n";
@@ -1148,6 +1280,36 @@ namespace mxvk {
         pre_render_dependency.pImageMemoryBarriers = &to_color_barrier;
         vkCmdPipelineBarrier2(cmd, &pre_render_dependency);
 
+        VkImageMemoryBarrier2 to_depth_barrier{};
+        to_depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        to_depth_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+        to_depth_barrier.srcAccessMask = VK_ACCESS_2_NONE;
+        to_depth_barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+        to_depth_barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        to_depth_barrier.oldLayout =
+            (image_index < depth_image_initialized.size() && depth_image_initialized[image_index])
+                ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+                : VK_IMAGE_LAYOUT_UNDEFINED;
+        to_depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        to_depth_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        to_depth_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        if (image_index < depth_images.size()) {
+            to_depth_barrier.image = depth_images[image_index];
+        }
+        to_depth_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        to_depth_barrier.subresourceRange.baseMipLevel = 0;
+        to_depth_barrier.subresourceRange.levelCount = 1;
+        to_depth_barrier.subresourceRange.baseArrayLayer = 0;
+        to_depth_barrier.subresourceRange.layerCount = 1;
+
+        if (to_depth_barrier.image != VK_NULL_HANDLE) {
+            VkDependencyInfo pre_depth_dependency{};
+            pre_depth_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            pre_depth_dependency.imageMemoryBarrierCount = 1;
+            pre_depth_dependency.pImageMemoryBarriers = &to_depth_barrier;
+            vkCmdPipelineBarrier2(cmd, &pre_depth_dependency);
+        }
+
         VkRenderingAttachmentInfo color_attachment{};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         color_attachment.imageView = swapchain_image_views[image_index];
@@ -1159,6 +1321,19 @@ namespace mxvk {
         color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         color_attachment.clearValue = clear_value;
 
+        VkClearValue depth_clear_value{};
+        depth_clear_value.depthStencil = {1.0f, 0};
+
+        VkRenderingAttachmentInfo depth_attachment{};
+        depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        if (image_index < depth_image_views.size()) {
+            depth_attachment.imageView = depth_image_views[image_index];
+        }
+        depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment.clearValue = depth_clear_value;
+
         VkRenderingInfo rendering_info{};
         rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         rendering_info.renderArea.offset = {0, 0};
@@ -1167,7 +1342,7 @@ namespace mxvk {
         rendering_info.viewMask = 0;
         rendering_info.colorAttachmentCount = 1;
         rendering_info.pColorAttachments = &color_attachment;
-        rendering_info.pDepthAttachment = nullptr;
+        rendering_info.pDepthAttachment = (depth_attachment.imageView != VK_NULL_HANDLE) ? &depth_attachment : nullptr;
         rendering_info.pStencilAttachment = nullptr;
 
         vkCmdBeginRendering(cmd, &rendering_info);
@@ -1206,6 +1381,9 @@ namespace mxvk {
         onRecordCustomRendering(cmd, image_index);
 
         vkCmdEndRendering(cmd);
+        if (image_index < depth_image_initialized.size()) {
+            depth_image_initialized[image_index] = true;
+        }
 
         VkImageMemoryBarrier2 to_present_barrier{};
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

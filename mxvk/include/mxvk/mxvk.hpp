@@ -129,6 +129,9 @@ namespace mxvk {
         /** @brief Get the current swapchain extent. */
         [[nodiscard]] VkExtent2D getSwapchainExtent() const noexcept { return swapchain_extent; }
 
+        /** @brief Get the depth format used for dynamic rendering attachments. */
+        [[nodiscard]] VkFormat getDepthFormat() const noexcept { return depth_format; }
+
         /** @brief Get the number of swapchain images currently allocated. */
         [[nodiscard]] size_t getSwapchainImageCount() const noexcept { return swapchain_images.size(); }
 
@@ -314,10 +317,15 @@ namespace mxvk {
 
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
+        VkFormat depth_format = VK_FORMAT_UNDEFINED;
         VkExtent2D swapchain_extent{};
         std::vector<VkImage> swapchain_images{};
         std::vector<VkImageView> swapchain_image_views{};
         std::vector<bool> swapchain_image_initialized{};
+        std::vector<VkImage> depth_images{};
+        std::vector<VkDeviceMemory> depth_image_memories{};
+        std::vector<VkImageView> depth_image_views{};
+        std::vector<bool> depth_image_initialized{};
 
         VkCommandPool command_pool = VK_NULL_HANDLE;
         std::vector<VkCommandBuffer> command_buffers{};

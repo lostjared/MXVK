@@ -924,8 +924,8 @@ namespace mxvk {
             rasterizer.depthClampEnable = VK_FALSE;
             rasterizer.rasterizerDiscardEnable = VK_FALSE;
             rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-            rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-            rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
             rasterizer.depthBiasEnable = VK_FALSE;
             rasterizer.lineWidth = 1.0f;
 
@@ -936,8 +936,9 @@ namespace mxvk {
 
             VkPipelineDepthStencilStateCreateInfo depthStencil{};
             depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-            depthStencil.depthTestEnable = VK_FALSE;
-            depthStencil.depthWriteEnable = VK_FALSE;
+            depthStencil.depthTestEnable = VK_TRUE;
+            depthStencil.depthWriteEnable = VK_TRUE;
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
             VkPipelineColorBlendAttachmentState blendAttachment{};
             blendAttachment.colorWriteMask =
@@ -963,10 +964,14 @@ namespace mxvk {
             }
 
             const VkFormat colorFormat = window_->getSwapchainFormat();
+            const VkFormat depthFormat = window_->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
             renderingInfo.colorAttachmentCount = 1;
             renderingInfo.pColorAttachmentFormats = &colorFormat;
+            if (depthFormat != VK_FORMAT_UNDEFINED) {
+                renderingInfo.depthAttachmentFormat = depthFormat;
+            }
 
             VkGraphicsPipelineCreateInfo pipelineInfo{};
             pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
