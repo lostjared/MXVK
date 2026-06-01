@@ -5,8 +5,8 @@
 #ifndef __LOADPNG_H__
 #define __LOADPNG_H__
 
-#include <cstddef>
 #include <SDL3/SDL.h>
+#include <cstddef>
 
 /** @namespace mxvk
  *  @brief Utilities for loading and saving PNG images. */

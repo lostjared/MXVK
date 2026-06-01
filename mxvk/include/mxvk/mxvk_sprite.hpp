@@ -29,12 +29,12 @@
 #include <vector>
 
 #ifndef VK_CHECK_RESULT
-#define VK_CHECK_RESULT(f)                                                                                                                    \
-    {                                                                                                                                         \
-        VkResult res = (f);                                                                                                                   \
-        if (res != VK_SUCCESS) {                                                                                                              \
+#define VK_CHECK_RESULT(f)                                                                                                                \
+    {                                                                                                                                     \
+        VkResult res = (f);                                                                                                               \
+        if (res != VK_SUCCESS) {                                                                                                          \
             throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__)); \
-        }                                                                                                                                     \
+        }                                                                                                                                 \
     }
 #endif
 
@@ -59,7 +59,7 @@ namespace mxvk {
          * @param commandPool    Command pool for staging operations.
          */
         VK_Sprite(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue,
-                 VkCommandPool commandPool);
+                  VkCommandPool commandPool);
 
         /** @brief Destructor — frees all Vulkan resources. */
         ~VK_Sprite();

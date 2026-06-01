@@ -18,24 +18,22 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-                ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
+        ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-                            assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path),
-                            fallbackWidth_(width),
-                            fallbackHeight_(height) {
-                        const std::string modelPath = filename.empty() ? (assetRoot_ + "/data/tux.obj") : filename;
-                    const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
-                    const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
-                    const std::string backgroundVertPath = std::string(tux_example_SHADER_DIR) + "/background.vert.spv";
-                    const std::string backgroundFragPath = std::string(tux_example_SHADER_DIR) + "/background.frag.spv";
-                    const std::string backgroundPath = assetRoot_ + "/data/ant-bg.png";
+              assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path),
+              fallbackWidth_(width),
+              fallbackHeight_(height) {
+            const std::string modelPath = filename.empty() ? (assetRoot_ + "/data/tux.obj") : filename;
+            const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
+            const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
+            const std::string backgroundVertPath = std::string(tux_example_SHADER_DIR) + "/background.vert.spv";
+            const std::string backgroundFragPath = std::string(tux_example_SHADER_DIR) + "/background.frag.spv";
+            const std::string backgroundPath = assetRoot_ + "/data/ant-bg.png";
 
-                    
-                    setFont(assetRoot_ + "/data/font.ttf", 24);
-                    background_ = createSprite(backgroundPath, backgroundVertPath, backgroundFragPath);
-                    model_.load(this, modelPath, "", assetRoot_ + "/data", 1.0f);
-                    model_.setShaders(this, vertPath, fragPath);
-
+            setFont(assetRoot_ + "/data/font.ttf", 24);
+            background_ = createSprite(backgroundPath, backgroundVertPath, backgroundFragPath);
+            model_.load(this, modelPath, "", assetRoot_ + "/data", 1.0f);
+            model_.setShaders(this, vertPath, fragPath);
         }
 
         ~ModelWindow() override {
@@ -79,8 +77,8 @@ namespace example {
             const VkExtent2D extent = getSwapchainExtent();
 
             const float aspect = (extent.height > 0U)
-                ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                : 1.0f;
+                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
+                                     : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * 0.65f, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -96,10 +94,10 @@ namespace example {
 
       private:
         std::string assetRoot_;
-                mxvk::VK_Sprite *background_ = nullptr;
+        mxvk::VK_Sprite *background_ = nullptr;
         mxvk::VKAbstractModel model_{};
-                int fallbackWidth_ = 1280;
-                int fallbackHeight_ = 720;
+        int fallbackWidth_ = 1280;
+        int fallbackHeight_ = 720;
         std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
     };
 

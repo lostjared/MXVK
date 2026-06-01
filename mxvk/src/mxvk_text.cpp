@@ -8,7 +8,7 @@
 namespace mxvk {
 
     VK_Text::VK_Text(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue,
-                   VkCommandPool cmdPool, const std::string &fontPath, int fontSize)
+                     VkCommandPool cmdPool, const std::string &fontPath, int fontSize)
         : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
 
         if (!TTF_Init()) {
@@ -300,7 +300,7 @@ namespace mxvk {
     }
 
     void VK_Text::renderText(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                            uint32_t screenWidth, uint32_t screenHeight) {
+                             uint32_t screenWidth, uint32_t screenHeight) {
 
         struct TextPushConstants {
             float screenWidth;
@@ -349,8 +349,8 @@ namespace mxvk {
     }
 
     void VK_Text::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                              VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                              VkDeviceMemory &bufferMemory) {
+                               VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                               VkDeviceMemory &bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -485,8 +485,8 @@ namespace mxvk {
     }
 
     void VK_Text::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                             VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                             VkImage &image, VkDeviceMemory &imageMemory) {
+                              VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+                              VkImage &image, VkDeviceMemory &imageMemory) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;

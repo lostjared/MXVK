@@ -404,7 +404,7 @@ namespace example {
         std::chrono::steady_clock::time_point start_time_ = std::chrono::steady_clock::now();
         uint32_t frame_index_ = 0;
     };
-} 
+} // namespace example
 
 int main(int argc, char **argv) {
     try {

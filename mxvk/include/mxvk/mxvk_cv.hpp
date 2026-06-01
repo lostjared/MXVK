@@ -143,8 +143,8 @@ namespace mxvk {
 
       private:
         std::unique_ptr<VK_Sprite> sprite; ///< Backing Vulkan sprite (owned).
-        cv::VideoCapture cap;             ///< OpenCV capture device.
-        cv::Mat frame;                    ///< Most recent decoded frame.
+        cv::VideoCapture cap;              ///< OpenCV capture device.
+        cv::Mat frame;                     ///< Most recent decoded frame.
     };
 } // namespace mxvk
 

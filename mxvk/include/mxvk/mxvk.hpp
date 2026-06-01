@@ -1,9 +1,9 @@
 #ifndef _MXVK_MXVK_H_
 #define _MXVK_MXVK_H_
 
-#include <SDL3/SDL.h>
 #include "mxvk_sprite.hpp"
 #include "mxvk_text.hpp"
+#include <SDL3/SDL.h>
 #include <cstdint>
 #include <limits>
 #include <memory>

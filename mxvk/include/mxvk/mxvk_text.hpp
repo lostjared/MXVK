@@ -12,9 +12,9 @@
 
 #include <volk/volk.h>
 
+#include "mxvk_exception.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
-#include "mxvk_exception.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -25,12 +25,12 @@
 #include <vector>
 
 #ifndef VK_CHECK_RESULT
-#define VK_CHECK_RESULT(f)                                                                                                                    \
-    {                                                                                                                                         \
-        VkResult res = (f);                                                                                                                   \
-        if (res != VK_SUCCESS) {                                                                                                              \
+#define VK_CHECK_RESULT(f)                                                                                                                \
+    {                                                                                                                                     \
+        VkResult res = (f);                                                                                                               \
+        if (res != VK_SUCCESS) {                                                                                                          \
             throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__)); \
-        }                                                                                                                                     \
+        }                                                                                                                                 \
     }
 #endif
 
@@ -86,7 +86,7 @@ namespace mxvk {
          * @param fontSize       Point size.
          */
         VK_Text(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue,
-               VkCommandPool commandPool, const std::string &fontPath, int fontSize = 24);
+                VkCommandPool commandPool, const std::string &fontPath, int fontSize = 24);
 
         /** @brief Destructor -- destroys all Vulkan and SDL_ttf resources. */
         ~VK_Text();

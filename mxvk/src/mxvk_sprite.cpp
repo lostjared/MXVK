@@ -407,8 +407,8 @@ namespace mxvk {
     }
 
     void VK_Sprite::enableInstancing(uint32_t maxInstances,
-                                    const std::string &instanceVertShaderPath,
-                                    const std::string &instanceFragShaderPath) {
+                                     const std::string &instanceVertShaderPath,
+                                     const std::string &instanceFragShaderPath) {
         if (colorAttachmentFormat == VK_FORMAT_UNDEFINED || descriptorSetLayout == VK_NULL_HANDLE) {
             throw mxvk::Exception("VKSprite::enableInstancing called before color format/descriptorSetLayout set");
         }
@@ -904,7 +904,8 @@ namespace mxvk {
         } else {
             if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
                 vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX);
-            }            if (spriteImageView != VK_NULL_HANDLE) {
+            }
+            if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
             }
@@ -1149,7 +1150,7 @@ namespace mxvk {
     }
 
     void VK_Sprite::renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                                 uint32_t screenWidth, uint32_t screenHeight) {
+                                  uint32_t screenWidth, uint32_t screenHeight) {
         if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated)
             return;
         if (descriptorSet == VK_NULL_HANDLE) {
@@ -1294,8 +1295,8 @@ namespace mxvk {
     }
 
     void VK_Sprite::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                                VkDeviceMemory &bufferMemory) {
+                                 VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                                 VkDeviceMemory &bufferMemory) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -1424,8 +1425,8 @@ namespace mxvk {
     }
 
     void VK_Sprite::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                               VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                               VkImage &image, VkDeviceMemory &imageMemory) {
+                                VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+                                VkImage &image, VkDeviceMemory &imageMemory) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;

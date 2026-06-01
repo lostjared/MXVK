@@ -27,7 +27,7 @@ namespace example {
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
 
-                        model_.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
+            model_.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model_.setShaders(this, vertPath, fragPath);
         }
 
@@ -53,8 +53,8 @@ namespace example {
             const VkExtent2D extent = getSwapchainExtent();
 
             const float aspect = (extent.height > 0U)
-                ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                : 1.0f;
+                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
+                                     : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * 0.65f, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
         std::string filename = args.filename;
-        if(args.filename.empty()) {
+        if (args.filename.empty()) {
             filename = args.path + "/data/pyramid.obj";
         }
         example::ModelWindow window(filename, args.path, "MXVK Model Example", args.width, args.height, args.fullscreen);

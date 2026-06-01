@@ -3,19 +3,19 @@
  * @brief Implementation of mxvk PNG loading and saving utilities.
  */
 #include "mxvk/mxvk_png.hpp"
-#include <cstdio>
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <iostream>
 #include <limits>
 #include <memory>
+#include <png.h>
 #include <ranges>
 #include <string>
 #include <vector>
-#include <SDL3/SDL.h>
-#include <png.h>
-#include <iostream>
 
 namespace mxvk {
 
@@ -323,4 +323,4 @@ namespace mxvk {
                             16,
                             swap_16bit_endianness);
     }
-} 
+} // namespace mxvk

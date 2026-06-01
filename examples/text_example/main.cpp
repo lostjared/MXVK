@@ -26,7 +26,7 @@ namespace example {
             printText("Hello World", 15, 15, SDL_Color{255, 255, 255, 255});
         }
     };
-}
+} // namespace example
 
 int main(int argc, char **argv) {
     try {

@@ -39,8 +39,8 @@ namespace mxvk {
     }
 
     bool VK_Capture::createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue,
-                                VkCommandPool cmdPool, size_t width, size_t height,
-                                const std::string &vert, const std::string &frag) {
+                                 VkCommandPool cmdPool, size_t width, size_t height,
+                                 const std::string &vert, const std::string &frag) {
         sprite = std::make_unique<VK_Sprite>(device, physDev, gQueue, cmdPool);
         sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
         sprite->enableExtendedUBO();

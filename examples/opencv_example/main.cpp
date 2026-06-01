@@ -1,6 +1,6 @@
 #include "mxvk/argz.hpp"
-#include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk.hpp"
+#include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <cstdlib>
 #include <format>
@@ -108,7 +108,7 @@ namespace example {
             }
             fallback_width_ = args.width;
             fallback_height_ = args.height;
-            if(!using_file_) {
+            if (!using_file_) {
                 capture_.set(cv::CAP_PROP_FRAME_WIDTH, fallback_width_);
                 capture_.set(cv::CAP_PROP_FRAME_HEIGHT, fallback_height_);
                 fallback_width_ = capture_.get(cv::CAP_PROP_FRAME_WIDTH);
@@ -117,7 +117,7 @@ namespace example {
                 capture_.set(cv::CAP_PROP_FPS, fps);
             }
             fps = capture_.get(cv::CAP_PROP_FPS);
-            std::cout << "mxvk_cv: Capture opened at: " << fallback_width_ << "x" << fallback_height_ <<  " @ " << fps << " fps\n";
+            std::cout << "mxvk_cv: Capture opened at: " << fallback_width_ << "x" << fallback_height_ << " @ " << fps << " fps\n";
             initializeCameraRendering();
         }
 
@@ -167,7 +167,7 @@ namespace example {
             }
         }
     };
-}
+} // namespace example
 
 int main(int argc, char **argv) {
     try {
