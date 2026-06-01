@@ -79,7 +79,7 @@ namespace mxvk {
 
         /**
          * @brief Parse model data from disk into CPU-side arrays.
-         * @param path Path to .obj or .mxmod model.
+         * @param path Path to .obj, .mxmod, or .mxmod.z model.
          * @param positionScale Uniform scale applied to positions.
          */
         void load(const std::string &path, float positionScale = 1.0f);
@@ -156,6 +156,7 @@ namespace mxvk {
 
         void loadOBJ(const std::string &path, float positionScale);
         void loadMXMOD(const std::string &path, float positionScale);
+        void loadMXMODZ(const std::string &path, float positionScale);
         void loadMTL(const std::string &path);
     };
 

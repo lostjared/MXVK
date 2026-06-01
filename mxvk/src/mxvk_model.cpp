@@ -3,13 +3,21 @@
 #include <cmath>
 #include <cstdio>
 
+#include <array>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+
+#include <zlib.h>
 
 namespace mxvk {
 
     namespace {
+        void logMXModelStep(const std::string &message) {
+            std::cout << "mxvk_model: " << message << '\n';
+        }
+
         struct Vec2 {
             float x{};
             float y{};
@@ -20,6 +28,213 @@ namespace mxvk {
             float y{};
             float z{};
         };
+
+        struct MXMODParseResult {
+            std::vector<VKVertex> vertices{};
+            std::vector<uint32_t> indices{};
+            std::vector<SubMesh> subMeshes{};
+        };
+
+        [[nodiscard]] std::string inflateCompressedText(const std::vector<unsigned char> &compressedData) {
+            z_stream stream{};
+            stream.next_in = const_cast<Bytef *>(reinterpret_cast<const Bytef *>(compressedData.data()));
+            stream.avail_in = static_cast<uInt>(compressedData.size());
+
+            if (inflateInit2(&stream, 15 + 32) != Z_OK) {
+                throw mxvk::Exception("MXModel::loadMXMODZ failed to initialize zlib inflater");
+            }
+
+            std::string output{};
+            std::array<char, 16384> buffer{};
+
+            int result = Z_OK;
+            while (result != Z_STREAM_END) {
+                stream.next_out = reinterpret_cast<Bytef *>(buffer.data());
+                stream.avail_out = static_cast<uInt>(buffer.size());
+
+                result = inflate(&stream, Z_NO_FLUSH);
+                if (result != Z_OK && result != Z_STREAM_END) {
+                    inflateEnd(&stream);
+                    throw mxvk::Exception("MXModel::loadMXMODZ failed to inflate compressed data");
+                }
+
+                const size_t producedBytes = buffer.size() - static_cast<size_t>(stream.avail_out);
+                output.append(buffer.data(), producedBytes);
+            }
+
+            inflateEnd(&stream);
+
+            if (output.empty()) {
+                throw mxvk::Exception("MXModel::loadMXMODZ produced empty decompressed payload");
+            }
+
+            return output;
+        }
+
+        [[nodiscard]] MXMODParseResult parseMXMODStream(std::istream &file,
+                                                        const std::string &sourcePath,
+                                                        float positionScale) {
+            struct TriBlock {
+                uint32_t textureIndex = 0;
+                std::vector<Vec3> pos{};
+                std::vector<Vec2> uv{};
+                std::vector<Vec3> nrm{};
+                std::vector<uint32_t> fileIndices{};
+            };
+
+            std::vector<TriBlock> triBlocks{};
+            TriBlock *current = nullptr;
+            int sectionType = -1;
+
+            auto trim = [](std::string &s) {
+                const size_t begin = s.find_first_not_of(" \t\r\n");
+                if (begin == std::string::npos) {
+                    s.clear();
+                    return;
+                }
+                const size_t end = s.find_last_not_of(" \t\r\n");
+                s = s.substr(begin, end - begin + 1);
+            };
+
+            std::string line{};
+            while (std::getline(file, line)) {
+                if (line.empty()) {
+                    continue;
+                }
+
+                const size_t commentPos = line.find('#');
+                if (commentPos != std::string::npos) {
+                    line = line.substr(0, commentPos);
+                }
+                trim(line);
+                if (line.empty()) {
+                    continue;
+                }
+
+                std::istringstream stream(line);
+                const char c = line[line.find_first_not_of(" \t")];
+                const bool isData = (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.';
+
+                if (isData && current != nullptr) {
+                    float x = 0.0f;
+                    float y = 0.0f;
+                    float z = 0.0f;
+
+                    switch (sectionType) {
+                    case 0:
+                        if (stream >> x >> y >> z) {
+                            current->pos.push_back({x * positionScale, y * positionScale, z * positionScale});
+                        }
+                        break;
+                    case 1:
+                        if (stream >> x >> y) {
+                            current->uv.push_back({x, y});
+                        }
+                        break;
+                    case 2:
+                        if (stream >> x >> y >> z) {
+                            current->nrm.push_back({x, y, z});
+                        }
+                        break;
+                    case 5: {
+                        uint32_t idx = 0;
+                        while (stream >> idx) {
+                            current->fileIndices.push_back(idx);
+                        }
+                    } break;
+                    default:
+                        break;
+                    }
+
+                    continue;
+                }
+
+                std::string tag{};
+                stream >> tag;
+                if (tag == "tri") {
+                    uint32_t surfaceType = 0;
+                    uint32_t textureIndex = 0;
+                    stream >> surfaceType >> textureIndex;
+                    static_cast<void>(surfaceType);
+                    triBlocks.emplace_back();
+                    current = &triBlocks.back();
+                    current->textureIndex = textureIndex;
+                    sectionType = -1;
+                    continue;
+                }
+
+                if (tag == "vert") {
+                    sectionType = 0;
+                    continue;
+                }
+                if (tag == "tex") {
+                    sectionType = 1;
+                    continue;
+                }
+                if (tag == "norm") {
+                    sectionType = 2;
+                    continue;
+                }
+                if (tag == "indices") {
+                    sectionType = 5;
+                    continue;
+                }
+            }
+
+            if (triBlocks.empty()) {
+                throw mxvk::Exception("MXModel::loadMXMOD no geometry found in " + sourcePath);
+            }
+
+            MXMODParseResult parsed{};
+            for (const TriBlock &blk : triBlocks) {
+                if (blk.pos.empty()) {
+                    continue;
+                }
+
+                const uint32_t vertexBase = static_cast<uint32_t>(parsed.vertices.size());
+                for (size_t i = 0; i < blk.pos.size(); ++i) {
+                    VKVertex v{};
+                    v.pos[0] = blk.pos[i].x;
+                    v.pos[1] = blk.pos[i].y;
+                    v.pos[2] = blk.pos[i].z;
+
+                    if (i < blk.uv.size()) {
+                        v.texCoord[0] = blk.uv[i].x;
+                        v.texCoord[1] = blk.uv[i].y;
+                    }
+                    if (i < blk.nrm.size()) {
+                        v.normal[0] = blk.nrm[i].x;
+                        v.normal[1] = blk.nrm[i].y;
+                        v.normal[2] = blk.nrm[i].z;
+                    }
+
+                    parsed.vertices.push_back(v);
+                }
+
+                const uint32_t firstIndex = static_cast<uint32_t>(parsed.indices.size());
+                if (!blk.fileIndices.empty()) {
+                    for (uint32_t idx : blk.fileIndices) {
+                        parsed.indices.push_back(vertexBase + idx);
+                    }
+                } else {
+                    for (uint32_t i = 0; i < static_cast<uint32_t>(blk.pos.size()); ++i) {
+                        parsed.indices.push_back(vertexBase + i);
+                    }
+                }
+
+                SubMesh sm{};
+                sm.firstIndex = firstIndex;
+                sm.indexCount = static_cast<uint32_t>(parsed.indices.size()) - firstIndex;
+                sm.textureIndex = blk.textureIndex;
+                parsed.subMeshes.push_back(sm);
+            }
+
+            if (parsed.vertices.empty() || parsed.indices.empty()) {
+                throw mxvk::Exception("MXModel::loadMXMOD no renderable data found in " + sourcePath);
+            }
+
+            return parsed;
+        }
     } // namespace
 
     std::size_t VKVertexHash::operator()(const VKVertex &v) const {
@@ -80,18 +295,30 @@ namespace mxvk {
             throw mxvk::Exception("MXModel::load path is empty");
         }
 
+        logMXModelStep("load begin: " + path);
+
         if (path.ends_with(".obj")) {
             loadOBJ(path, positionScale);
+            logMXModelStep("load complete (.obj): vertices=" + std::to_string(vertices_.size()) +
+                           ", indices=" + std::to_string(indices_.size()) +
+                           ", submeshes=" + std::to_string(subMeshes_.size()));
             return;
         }
 
         if (path.ends_with(".mxmod")) {
             loadMXMOD(path, positionScale);
+            logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(vertices_.size()) +
+                           ", indices=" + std::to_string(indices_.size()) +
+                           ", submeshes=" + std::to_string(subMeshes_.size()));
             return;
         }
 
         if (path.ends_with(".mxmod.z")) {
-            throw mxvk::Exception("MXModel::load does not support compressed .mxmod.z in this MXVK build");
+            loadMXMODZ(path, positionScale);
+            logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(vertices_.size()) +
+                           ", indices=" + std::to_string(indices_.size()) +
+                           ", submeshes=" + std::to_string(subMeshes_.size()));
+            return;
         }
 
         throw mxvk::Exception("MXModel::load unsupported file format: " + path);
@@ -316,169 +543,37 @@ namespace mxvk {
             throw mxvk::Exception("MXModel::loadMXMOD failed to open file: " + path);
         }
 
-        struct TriBlock {
-            uint32_t textureIndex = 0;
-            std::vector<Vec3> pos{};
-            std::vector<Vec2> uv{};
-            std::vector<Vec3> nrm{};
-            std::vector<uint32_t> fileIndices{};
-        };
+        const MXMODParseResult parsed = parseMXMODStream(file, path, positionScale);
 
-        std::vector<TriBlock> triBlocks{};
-        TriBlock *current = nullptr;
-        int sectionType = -1;
-
-        auto trim = [](std::string &s) {
-            const size_t begin = s.find_first_not_of(" \t\r\n");
-            if (begin == std::string::npos) {
-                s.clear();
-                return;
-            }
-            const size_t end = s.find_last_not_of(" \t\r\n");
-            s = s.substr(begin, end - begin + 1);
-        };
-
-        std::string line{};
-        while (std::getline(file, line)) {
-            if (line.empty()) {
-                continue;
-            }
-
-            const size_t commentPos = line.find('#');
-            if (commentPos != std::string::npos) {
-                line = line.substr(0, commentPos);
-            }
-            trim(line);
-            if (line.empty()) {
-                continue;
-            }
-
-            std::istringstream stream(line);
-            const char c = line[line.find_first_not_of(" \t")];
-            const bool isData = (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.';
-
-            if (isData && current != nullptr) {
-                float x = 0.0f;
-                float y = 0.0f;
-                float z = 0.0f;
-
-                switch (sectionType) {
-                case 0:
-                    if (stream >> x >> y >> z) {
-                        current->pos.push_back({x * positionScale, y * positionScale, z * positionScale});
-                    }
-                    break;
-                case 1:
-                    if (stream >> x >> y) {
-                        current->uv.push_back({x, y});
-                    }
-                    break;
-                case 2:
-                    if (stream >> x >> y >> z) {
-                        current->nrm.push_back({x, y, z});
-                    }
-                    break;
-                case 5: {
-                    uint32_t idx = 0;
-                    while (stream >> idx) {
-                        current->fileIndices.push_back(idx);
-                    }
-                } break;
-                default:
-                    break;
-                }
-
-                continue;
-            }
-
-            std::string tag{};
-            stream >> tag;
-            if (tag == "tri") {
-                uint32_t surfaceType = 0;
-                uint32_t textureIndex = 0;
-                stream >> surfaceType >> textureIndex;
-                static_cast<void>(surfaceType);
-                triBlocks.emplace_back();
-                current = &triBlocks.back();
-                current->textureIndex = textureIndex;
-                sectionType = -1;
-                continue;
-            }
-
-            if (tag == "vert") {
-                sectionType = 0;
-                continue;
-            }
-            if (tag == "tex") {
-                sectionType = 1;
-                continue;
-            }
-            if (tag == "norm") {
-                sectionType = 2;
-                continue;
-            }
-            if (tag == "indices") {
-                sectionType = 5;
-                continue;
-            }
-        }
-
-        if (triBlocks.empty()) {
-            throw mxvk::Exception("MXModel::loadMXMOD no geometry found in " + path);
-        }
-
-        vertices_.clear();
-        indices_.clear();
-        subMeshes_.clear();
+        vertices_ = parsed.vertices;
+        indices_ = parsed.indices;
+        subMeshes_ = parsed.subMeshes;
         materials_.clear();
         mtlLibPath_.clear();
 
-        for (const TriBlock &blk : triBlocks) {
-            if (blk.pos.empty()) {
-                continue;
-            }
+        compressIndices();
+    }
 
-            const uint32_t vertexBase = static_cast<uint32_t>(vertices_.size());
-            for (size_t i = 0; i < blk.pos.size(); ++i) {
-                VKVertex v{};
-                v.pos[0] = blk.pos[i].x;
-                v.pos[1] = blk.pos[i].y;
-                v.pos[2] = blk.pos[i].z;
-
-                if (i < blk.uv.size()) {
-                    v.texCoord[0] = blk.uv[i].x;
-                    v.texCoord[1] = blk.uv[i].y;
-                }
-                if (i < blk.nrm.size()) {
-                    v.normal[0] = blk.nrm[i].x;
-                    v.normal[1] = blk.nrm[i].y;
-                    v.normal[2] = blk.nrm[i].z;
-                }
-
-                vertices_.push_back(v);
-            }
-
-            const uint32_t firstIndex = static_cast<uint32_t>(indices_.size());
-            if (!blk.fileIndices.empty()) {
-                for (uint32_t idx : blk.fileIndices) {
-                    indices_.push_back(vertexBase + idx);
-                }
-            } else {
-                for (uint32_t i = 0; i < static_cast<uint32_t>(blk.pos.size()); ++i) {
-                    indices_.push_back(vertexBase + i);
-                }
-            }
-
-            SubMesh sm{};
-            sm.firstIndex = firstIndex;
-            sm.indexCount = static_cast<uint32_t>(indices_.size()) - firstIndex;
-            sm.textureIndex = blk.textureIndex;
-            subMeshes_.push_back(sm);
+    void MXModel::loadMXMODZ(const std::string &path, float positionScale) {
+        std::ifstream file(path, std::ios::binary);
+        if (!file.is_open()) {
+            throw mxvk::Exception("MXModel::loadMXMODZ failed to open file: " + path);
         }
 
-        if (vertices_.empty() || indices_.empty()) {
-            throw mxvk::Exception("MXModel::loadMXMOD no renderable data found in " + path);
+        std::vector<unsigned char> compressedData((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        if (compressedData.empty()) {
+            throw mxvk::Exception("MXModel::loadMXMODZ empty compressed file: " + path);
         }
+
+        const std::string decompressedText = inflateCompressedText(compressedData);
+        std::istringstream stream(decompressedText);
+        const MXMODParseResult parsed = parseMXMODStream(stream, path, positionScale);
+
+        vertices_ = parsed.vertices;
+        indices_ = parsed.indices;
+        subMeshes_ = parsed.subMeshes;
+        materials_.clear();
+        mtlLibPath_.clear();
 
         compressIndices();
     }
@@ -492,6 +587,8 @@ namespace mxvk {
         if (vertices_.empty() || indices_.empty()) {
             throw mxvk::Exception("MXModel::upload requires loaded geometry");
         }
+
+        logMXModelStep("upload begin");
 
         cleanup(device);
 
@@ -539,11 +636,19 @@ namespace mxvk {
         vkFreeMemory(device, stagingVertexMemory, nullptr);
         vkDestroyBuffer(device, stagingIndexBuffer, nullptr);
         vkFreeMemory(device, stagingIndexMemory, nullptr);
+
+        logMXModelStep("upload complete");
     }
 
     void MXModel::cleanup(VkDevice device) {
         if (device == VK_NULL_HANDLE) {
             return;
+        }
+
+        const bool hadBuffers = vertexBuffer_ != VK_NULL_HANDLE || indexBuffer_ != VK_NULL_HANDLE ||
+                                vertexBufferMemory_ != VK_NULL_HANDLE || indexBufferMemory_ != VK_NULL_HANDLE;
+        if (hadBuffers) {
+            logMXModelStep("teardown begin");
         }
 
         if (vertexBuffer_ != VK_NULL_HANDLE) {
@@ -562,6 +667,10 @@ namespace mxvk {
         if (indexBufferMemory_ != VK_NULL_HANDLE) {
             vkFreeMemory(device, indexBufferMemory_, nullptr);
             indexBufferMemory_ = VK_NULL_HANDLE;
+        }
+
+        if (hadBuffers) {
+            logMXModelStep("teardown complete");
         }
     }
 
