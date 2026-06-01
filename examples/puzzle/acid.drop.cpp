@@ -2,19 +2,19 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <SDL3/SDL.h>
+#include <algorithm>
 #include <climits>
 #include <cmath>
-#include <ctime>
+#include <compare>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <random>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <compare>
-#include <cstdlib>
 
 #ifndef puzzle_ASSET_DIR
 #define puzzle_ASSET_DIR "."
@@ -48,13 +48,15 @@ enum {
     BLOCK_COUNT
 };
 
-enum ScreenState { SCREEN_INTRO,
-                   SCREEN_START,
-                   SCREEN_GAME,
-                   SCREEN_GAMEOVER,
-                   SCREEN_OPTIONS,
-                   SCREEN_CREDITS,
-                   SCREEN_SCORES };
+enum ScreenState {
+    SCREEN_INTRO,
+    SCREEN_START,
+    SCREEN_GAME,
+    SCREEN_GAMEOVER,
+    SCREEN_OPTIONS,
+    SCREEN_CREDITS,
+    SCREEN_SCORES
+};
 
 struct GameData {
     unsigned long score;
@@ -131,7 +133,7 @@ struct Score {
     int score;
     std::string name;
     Score(std::string name_, int score_) : score(score_), name(name_) {}
-    Score() :  score{0}, name{} {}
+    Score() : score{0}, name{} {}
     auto operator<=>(const Score &s) const {
         return s.score <=> score;
     }
@@ -219,9 +221,9 @@ class HighScores {
 
 class MasterPieceWindow : public mxvk::VK_Window {
   private:
-        std::string current_path;
-        int w = 640;
-        int h = 480;
+    std::string current_path;
+    int w = 640;
+    int h = 480;
     HighScores scores;
     TileMatrix matrix;
     ScreenState currentScreen = SCREEN_INTRO;
@@ -258,9 +260,9 @@ class MasterPieceWindow : public mxvk::VK_Window {
   public:
     MasterPieceWindow(const std::string &path, int wx, int wy, bool full)
         : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION),
-                    current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path),
-                    w(wx),
-                    h(wy) {
+          current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path),
+          w(wx),
+          h(wy) {
         tryOpenFirstGamepad();
         updateFontSize();
         srand((unsigned int)time(0));

@@ -631,9 +631,10 @@ namespace mxvk {
         vkGetPhysicalDeviceFeatures2(physical_device, &features2);
 
         std::cout << std::format(
-            "vk: feature support - synchronization2={}, dynamicRendering={}\n",
+            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}\n",
             supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false",
-            supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false");
+            supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false",
+            features2.features.shaderFloat64 == VK_TRUE ? "true" : "false");
 
         if (supported_vulkan13_features.synchronization2 != VK_TRUE) {
             std::cout << "vk: synchronization2 is unsupported on selected physical device\n";
@@ -647,11 +648,16 @@ namespace mxvk {
         vulkan13_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
         vulkan13_features.synchronization2 = VK_TRUE;
         vulkan13_features.dynamicRendering = VK_TRUE;
-        features2.pNext = &vulkan13_features;
+
+        VkPhysicalDeviceFeatures2 enabled_features2{};
+        enabled_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        enabled_features2.features.shaderFloat64 = features2.features.shaderFloat64;
+
+        enabled_features2.pNext = &vulkan13_features;
 
         VkDeviceCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        create_info.pNext = &features2;
+        create_info.pNext = &enabled_features2;
         create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
         create_info.pQueueCreateInfos = queue_create_infos.data();
         create_info.enabledExtensionCount = static_cast<uint32_t>(required_device_extensions.size());
