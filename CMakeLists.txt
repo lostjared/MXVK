@@ -134,14 +134,14 @@ message(STATUS "Found Vulkan ${Vulkan_VERSION}")
 else()
 message(STATUS "Found Vulkan")
 endif()
-
+find_package(PNG REQUIRED)
 add_subdirectory(volk)
-add_library(mxvk STATIC mxvk/src/mxvk.cpp)
+add_library(mxvk STATIC mxvk/src/mxvk.cpp mxvk/src/mxvk_png.cpp)
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxvk>
 )
-target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 Vulkan::Vulkan)
+target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 Vulkan::Vulkan PNG::PNG)
 add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)
