@@ -17,7 +17,8 @@
 #include <png.h>
 #include <iostream>
 
-namespace {
+namespace mxvk {
+
     [[nodiscard]] bool HasPngExtension(const char *file) {
         if (file == nullptr) {
             return false;
@@ -98,9 +99,7 @@ namespace {
         std::fclose(file);
         return true;
     }
-} // namespace
 
-namespace mxvk {
     SDL_Surface *LoadPNG(const char *file) {
         if (!HasPngExtension(file)) {
             return nullptr;
@@ -324,4 +323,4 @@ namespace mxvk {
                             16,
                             swap_16bit_endianness);
     }
-} // namespace mxvk
+} 
