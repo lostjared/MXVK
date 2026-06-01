@@ -79,13 +79,12 @@ General run pattern:
 ./build/examples/<example>/<example> [options]
 ```
 
-Examples:
-
+Examples (in each subproject build directory):
 ```bash
-./build/examples/sprite_example/sprite_example -r 1920x1080 -f
-./build/examples/model_example/model_example -p ./examples/model_example
-./build/examples/opencv_example/opencv_example --camera 0 -r 1280x720
-./build/examples/opencv_model/opencv_model --filename ./models/torus.mxmod.z --camera 0
+./sprite_example -r 1920x1080 -f
+./model_example -p ./examples/model_example
+./opencv_example --camera 0 -r 1280x720
+./opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
 
 ## Examples
