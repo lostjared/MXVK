@@ -19,6 +19,7 @@ namespace example {
             if (current_path == ".") {
                 current_path = sprite_example_ASSET_DIR;
             }
+            setFont(current_path + "/data/font.ttf", 24);
             fallback_width_ = width;
             fallback_height_ = height;
             const std::string image_path = current_path + "/data/intro.png";
@@ -44,6 +45,7 @@ namespace example {
                 target_h = static_cast<int>(swapchain_extent.height);
             }
             sprite_->drawSpriteRect(0, 0, target_w, target_h);
+            printText("Hello, World!", 15, 15, {255, 255, 255, 255});
         }
     };
 } 
