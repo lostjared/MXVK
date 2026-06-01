@@ -12,12 +12,26 @@ namespace mxvk {
         std::cout << "mxvk: Created Sprite\n";
     }
 
+    void VK_Sprite::releaseUploadResources() {
+        destroyStagingResources();
+    }
+
+    void VK_Sprite::setCommandPool(VkCommandPool pool) {
+        if (pool == commandPool) {
+            return;
+        }
+
+        // uploadCmdBuffer is allocated from commandPool, so it must be released
+        // before switching to another pool.
+        destroyStagingResources();
+        commandPool = pool;
+    }
+
     VK_Sprite::~VK_Sprite() {
         vkDeviceWaitIdle(device);
         drawQueue.clear();
 
         destroyStagingResources();
-
         if (quadVertexBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(device, quadVertexBuffer, nullptr);
             vkFreeMemory(device, quadVertexBufferMemory, nullptr);

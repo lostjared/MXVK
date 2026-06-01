@@ -53,6 +53,14 @@ namespace mxvk {
         void close();
 
         /**
+         * @brief Destroy the current sprite and its Vulkan resources.
+         *
+         * Call this before swapchain/command-pool teardown to avoid destroying
+         * sprite staging command buffers against an invalid command pool.
+         */
+        void resetSprite();
+
+        /**
          * @brief Check whether the capture device is open.
          * @return @c true if the VideoCapture is opened.
          */

@@ -11,9 +11,9 @@ namespace mxvk {
     bool VK_Capture::open(const std::string &filename) {
         const bool ok = cap.open(filename);
         if (ok)
-            std::cout << std::format("[VK_Capture] Opened file: {}\n", filename);
+            std::cout << std::format("mxvk_cv: Opened file: {}\n", filename);
         else
-            std::cout << std::format("[VK_Capture] Failed to open file: {}\n", filename);
+            std::cout << std::format("mxvk_cv: Failed to open file: {}\n", filename);
         return ok;
     }
 
@@ -22,16 +22,20 @@ namespace mxvk {
             mode = cv::CAP_V4L2;
         if (cap.open(id, mode)) {
             cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
-            std::cout << std::format("[VK_Capture] Opened device: {}\n", id);
+            std::cout << std::format("mxvk_cv: Opened device: {}\n", id);
             return true;
         }
-        std::cout << std::format("[VK_Capture] Failed to open device: {}\n", id);
+        std::cout << std::format("mxvk_cv: Failed to open device: {}\n", id);
         return false;
     }
 
     void VK_Capture::close() {
         cap.release();
-        std::cout << "[VK_Capture] Capture closed\n";
+        std::cout << "mxvk_cv: Capture closed\n";
+    }
+
+    void VK_Capture::resetSprite() {
+        sprite.reset();
     }
 
     bool VK_Capture::createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue,
@@ -41,7 +45,7 @@ namespace mxvk {
         sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
         sprite->enableExtendedUBO();
         sprite->rebuildPipeline();
-        std::cout << std::format("[VK_Capture] Sprite created: {}x{}\n", width, height);
+        std::cout << std::format("mxvk_cv: Sprite created: {}x{}\n", width, height);
         return true;
     }
 
@@ -49,12 +53,12 @@ namespace mxvk {
         if (sprite) {
             sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
             sprite->enableExtendedUBO();
-            std::cout << std::format("[VK_Capture] Shader reloaded: vert={} frag={}\n",
+            std::cout << std::format("mxvk_cv: Shader reloaded: vert={} frag={}\n",
                                      std::filesystem::path(vert).filename().string(),
                                      std::filesystem::path(frag).filename().string());
             return true;
         }
-        std::cout << "[VK_Capture] Reload failed: no sprite\n";
+        std::cout << "mxvk_cv: Reload failed: no sprite\n";
         return false;
     }
 

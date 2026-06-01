@@ -178,6 +178,18 @@ namespace mxvk {
         void setRenderPass(VkRenderPass rp) { renderPass = rp; }
         /** @brief Assign dynamic-rendering color attachment format used to build pipelines. */
         void setColorAttachmentFormat(VkFormat format) { colorAttachmentFormat = format; }
+        /**
+         * @brief Rebind the command pool used for upload/staging operations.
+         *
+         * Any in-flight upload resources tied to the previous pool are released first.
+         */
+        void setCommandPool(VkCommandPool pool);
+        /**
+         * @brief Release upload/staging resources tied to the current command pool.
+         *
+         * Call this before destroying or recreating the command pool.
+         */
+        void releaseUploadResources();
         /** @brief Override the vertex shader path (used when rebuilding the pipeline). */
         void setVertexShaderPath(const std::string &path) { vertexShaderPath = path; }
 

@@ -662,6 +662,13 @@ namespace mxvk {
             return;
         }
 
+        if (swapchain != VK_NULL_HANDLE || command_pool != VK_NULL_HANDLE ||
+            image_available != VK_NULL_HANDLE || in_flight != VK_NULL_HANDLE ||
+            !render_finished.empty()) {
+            std::cout << "vk: createDevice skipped because render resources are already initialized\n";
+            return;
+        }
+
         std::cout << "vk: creating swapchain\n";
         if (!createSwapchain()) {
             std::cout << "vk: createSwapchain failed\n";
@@ -884,6 +891,13 @@ namespace mxvk {
         std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", w, h);
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
+
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+            if (sprite) {
+                sprite->releaseUploadResources();
+            }
+        }
+
         sprite_state_dirty_ = true;
         text_state_dirty_ = true;
         destroySpritePipeline();
@@ -893,6 +907,12 @@ namespace mxvk {
         if (!createSwapchain() || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             return;
+        }
+
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+            if (sprite) {
+                sprite->setCommandPool(command_pool);
+            }
         }
 
         onSwapchainRecreated();
