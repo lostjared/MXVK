@@ -1,0 +1,173 @@
+/**
+ * @file mxvk_abstract_model.hpp
+ * @brief High-level model wrapper integrated with MXVK dynamic rendering.
+ */
+#ifndef _MXVK_ABSTRACT_MODEL_H_
+#define _MXVK_ABSTRACT_MODEL_H_
+
+#include <volk/volk.h>
+
+#include "mxvk.hpp"
+#include "mxvk_model.hpp"
+
+#include <glm/glm.hpp>
+
+#include <string>
+#include <vector>
+
+namespace mxvk {
+
+    /**
+     * @struct UniformBufferObject
+     * @brief Default transform UBO payload for model shaders.
+     */
+    struct UniformBufferObject {
+        glm::mat4 model{1.0f};
+        glm::mat4 view{1.0f};
+        glm::mat4 proj{1.0f};
+    };
+
+    /**
+     * @class VKAbstractModel
+     * @brief Convenience wrapper that owns mesh, textures, descriptors, and pipeline state.
+     *
+     * This class is intended to be recorded from inside
+     * `VK_Window::onRecordCustomRendering()` so it participates in the same
+     * dynamic-rendering pass as sprites/text.
+     */
+    class VKAbstractModel {
+      public:
+        VKAbstractModel() = default;
+        ~VKAbstractModel() = default;
+
+        VKAbstractModel(const VKAbstractModel &) = delete;
+        VKAbstractModel &operator=(const VKAbstractModel &) = delete;
+        VKAbstractModel(VKAbstractModel &&) = delete;
+        VKAbstractModel &operator=(VKAbstractModel &&) = delete;
+
+        /**
+         * @brief Load mesh/texture resources and build Vulkan state.
+         * @param window Active MXVK window.
+         * @param modelPath Path to .obj or .mxmod mesh file.
+         * @param textureManifestPath Optional texture manifest path (.tex or .mtl-like text).
+         * @param textureBasePath Optional base path for texture files in the manifest.
+         * @param scale Uniform mesh scale.
+         */
+        void load(VK_Window *window,
+                  const std::string &modelPath,
+                  const std::string &textureManifestPath,
+                  const std::string &textureBasePath,
+                  float scale = 1.0f);
+
+        /**
+         * @brief Configure custom shader paths and rebuild pipelines.
+         * @param window Active MXVK window.
+         * @param vertSpv Vertex shader SPIR-V path.
+         * @param fragSpv Fragment shader SPIR-V path.
+         */
+        void setShaders(VK_Window *window, const std::string &vertSpv, const std::string &fragSpv);
+
+        /**
+         * @brief Update one per-frame UBO payload.
+         * @param imageIndex Swapchain image index.
+         * @param ubo New transform values.
+         */
+        void updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo);
+
+        /**
+         * @brief Record draw commands for this model.
+         * @param cmd Active command buffer, inside a dynamic rendering scope.
+         * @param imageIndex Current swapchain image index.
+         * @param wireframe Render using the optional wireframe pipeline when available.
+         */
+        void render(VkCommandBuffer cmd, uint32_t imageIndex, bool wireframe = false) const;
+
+        /**
+         * @brief Rebuild swapchain-dependent resources after resize.
+         * @param window Active MXVK window.
+         */
+        void resize(VK_Window *window);
+
+        /**
+         * @brief Destroy all owned Vulkan resources.
+         * @param window Active MXVK window.
+         */
+        void cleanup(VK_Window *window);
+
+        /** @brief Access the underlying mesh object. */
+        [[nodiscard]] const MXModel &model() const { return obj_; }
+        /** @brief Access the computed center offset used for normalization. */
+        [[nodiscard]] glm::vec3 modelCenterOffset() const { return modelCenterOffset_; }
+        /** @brief Access the computed render scale used for normalization. */
+        [[nodiscard]] float modelRenderScale() const { return modelRenderScale_; }
+
+      private:
+        struct TextureEntry {
+            VkImage image = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            VkImageView view = VK_NULL_HANDLE;
+            uint32_t width = 0;
+            uint32_t height = 0;
+        };
+
+        MXModel obj_{};
+        std::vector<TextureEntry> textures_{};
+
+        VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> descriptorSets_{};
+
+        VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
+        VkPipeline pipelineFill_ = VK_NULL_HANDLE;
+        VkPipeline pipelineWireframe_ = VK_NULL_HANDLE;
+        VkSampler textureSampler_ = VK_NULL_HANDLE;
+
+        std::vector<VkBuffer> uniformBuffers_{};
+        std::vector<VkDeviceMemory> uniformBufferMemory_{};
+        std::vector<void *> uniformBuffersMapped_{};
+
+        glm::vec3 modelCenterOffset_{0.0f, 0.0f, 0.0f};
+        float modelRenderScale_ = 1.0f;
+
+        std::string vertexShaderPath_{};
+        std::string fragmentShaderPath_{};
+
+        VK_Window *window_ = nullptr;
+
+        void computeBoundsAndScale();
+        void loadTextures(const std::string &textureManifestPath, const std::string &textureBasePath);
+        void loadTexturesFromMTL(const std::string &textureBasePath);
+        void createFallbackTexture();
+
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
+                          VkMemoryPropertyFlags properties, VkBuffer &buffer,
+                          VkDeviceMemory &bufferMemory) const;
+        [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
+        [[nodiscard]] VkCommandBuffer beginSingleTimeCommands() const;
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer) const;
+        void createImage(uint32_t width, uint32_t height, VkFormat format,
+                         VkImageTiling tiling, VkImageUsageFlags usage,
+                         VkMemoryPropertyFlags properties, VkImage &image,
+                         VkDeviceMemory &memory) const;
+        [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const;
+        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const;
+
+        void createTextureSampler();
+        void createDescriptorSetLayout();
+        void createUniformBuffers();
+        void destroyUniformBuffers();
+        void createDescriptorPool();
+        void createDescriptorSets();
+        void createPipelines();
+
+        void destroyPipelines();
+        void destroyDescriptors();
+        void destroyTextures();
+    };
+
+    using VK_AbstractModel = VKAbstractModel;
+
+} // namespace mxvk
+
+#endif

@@ -153,6 +153,8 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_sprite.cpp
     mxvk/src/mxvk_text.cpp
+    mxvk/src/mxvk_model.cpp
+    mxvk/src/mxvk_abstract_model.cpp
 )
 
 set(mxvk_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/shaders)
@@ -234,6 +236,7 @@ add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)
 add_subdirectory(examples/sprite_example)
 add_subdirectory(examples/text_example)
+add_subdirectory(examples/model_example)
 if(CV)
 add_subdirectory(examples/opencv_example)
 endif()

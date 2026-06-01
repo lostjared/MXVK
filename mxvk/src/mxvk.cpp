@@ -485,6 +485,22 @@ namespace mxvk {
 
     void VK_Window::onSwapchainRecreated() {}
 
+    void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
+
+    bool VK_Window::ensureRenderResources() {
+        if (device == VK_NULL_HANDLE) {
+            return false;
+        }
+
+        if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
+            image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+            createDevice();
+        }
+
+        return (swapchain != VK_NULL_HANDLE && !command_buffers.empty() && in_flight != VK_NULL_HANDLE &&
+                image_available != VK_NULL_HANDLE && render_finished.size() == swapchain_images.size());
+    }
+
     void VK_Window::pickDevice() {
         std::cout << "mxvk: entering pickDevice\n";
         if (instance == VK_NULL_HANDLE || surface == VK_NULL_HANDLE) {
@@ -978,12 +994,9 @@ namespace mxvk {
             return;
         }
 
-        if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
-            image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+        if (!ensureRenderResources()) {
             std::cout << "mxvk: creating deferred swapchain/render/sync resources\n";
-            createDevice();
-            if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
-                image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+            if (!ensureRenderResources()) {
                 std::cerr << "mxvk: deferred resource creation failed; skipping frame\n";
                 return;
             }
@@ -1189,6 +1202,8 @@ namespace mxvk {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline_);
             text_renderer_->renderText(cmd, text_pipeline_layout_, swapchain_extent.width, swapchain_extent.height);
         }
+
+        onRecordCustomRendering(cmd, image_index);
 
         vkCmdEndRendering(cmd);
 

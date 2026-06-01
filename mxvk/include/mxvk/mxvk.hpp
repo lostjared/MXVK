@@ -111,6 +111,33 @@ namespace mxvk {
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
 
+        /** @brief Get the Vulkan logical device handle. */
+        [[nodiscard]] VkDevice getDevice() const noexcept { return device; }
+
+        /** @brief Get the Vulkan physical device handle. */
+        [[nodiscard]] VkPhysicalDevice getPhysicalDevice() const noexcept { return physical_device; }
+
+        /** @brief Get the graphics queue handle. */
+        [[nodiscard]] VkQueue getGraphicsQueue() const noexcept { return graphics_queue; }
+
+        /** @brief Get the command pool used for graphics/upload work. */
+        [[nodiscard]] VkCommandPool getCommandPool() const noexcept { return command_pool; }
+
+        /** @brief Get the swapchain color format. */
+        [[nodiscard]] VkFormat getSwapchainFormat() const noexcept { return swapchain_format; }
+
+        /** @brief Get the current swapchain extent. */
+        [[nodiscard]] VkExtent2D getSwapchainExtent() const noexcept { return swapchain_extent; }
+
+        /** @brief Get the number of swapchain images currently allocated. */
+        [[nodiscard]] size_t getSwapchainImageCount() const noexcept { return swapchain_images.size(); }
+
+        /**
+         * @brief Ensure deferred render resources are initialized.
+         * @return true when swapchain, command pool, and sync objects are ready.
+         */
+        bool ensureRenderResources();
+
         /**
          * @brief Measure text dimensions in pixels.
          * @param text Text string to measure.
@@ -217,6 +244,17 @@ namespace mxvk {
          * Derived classes can rebuild swapchain-dependent resources here.
          */
         virtual void onSwapchainRecreated();
+
+        /**
+         * @brief Optional hook for derived classes to record extra draw commands.
+         *
+         * This callback is invoked inside the dynamic-rendering scope started by
+         * the window, after viewport/scissor are configured and before rendering ends.
+         *
+         * @param cmd Active command buffer in recording state.
+         * @param image_index Current swapchain image index.
+         */
+        virtual void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index);
 
       private:
         static constexpr uint32_t invalid_queue_index = std::numeric_limits<uint32_t>::max();
