@@ -9,6 +9,7 @@ namespace mxvk {
 
     VK_Sprite::VK_Sprite(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool)
         : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
+        std::cout << "[VK_Sprite] Created\n";
     }
 
     VK_Sprite::~VK_Sprite() {
@@ -403,6 +404,7 @@ namespace mxvk {
         instanceFragPath_ = instanceFragShaderPath;
         createInstancedPipeline(instanceVertShaderPath, instanceFragShaderPath);
         instancingEnabled = true;
+        std::cout << std::format("[VK_Sprite] Instancing enabled (max {} instances)\n", maxInstances);
     }
 
     void VK_Sprite::createInstancedPipeline(const std::string &vertPath, const std::string &fragPath) {
@@ -711,6 +713,7 @@ namespace mxvk {
         if (!hasCustomShader || fragmentShaderModule == VK_NULL_HANDLE)
             return;
         createCustomPipeline();
+        std::cout << "[VK_Sprite] Pipeline rebuilt\n";
     }
 
     void VK_Sprite::rebuildInstancedPipeline() {
@@ -759,6 +762,7 @@ namespace mxvk {
         }
         loadSprite(surface, fragmentShaderPath);
         SDL_DestroySurface(surface);
+        std::cout << std::format("[VK_Sprite] Loaded PNG: {}\n", pngPath);
     }
 
     void VK_Sprite::loadSprite(SDL_Surface *surface, const std::string &fragmentShaderPath) {
@@ -788,6 +792,7 @@ namespace mxvk {
             }
         }
         spriteLoaded = true;
+        std::cout << std::format("[VK_Sprite] Loaded surface texture: {}x{}\n", spriteWidth, spriteHeight);
     }
 
     void VK_Sprite::createEmptySprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
@@ -846,6 +851,7 @@ namespace mxvk {
         }
 
         spriteLoaded = true;
+        std::cout << std::format("[VK_Sprite] Created empty sprite: {}x{}\n", spriteWidth, spriteHeight);
     }
 
     void VK_Sprite::updateTexture(SDL_Surface *surface) {

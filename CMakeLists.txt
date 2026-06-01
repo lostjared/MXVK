@@ -14,6 +14,7 @@ include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 option(DEBUG_MODE "Debug mode" OFF)
 option(VALIDATION "Enable Vulkan validation layers" OFF)
+option(CV "Enable OpenCV video capture support (VK_Capture)" OFF)
 
 if(VALIDATION)
 add_compile_definitions(ENABLE_VALIDATION)
@@ -136,21 +137,34 @@ message(STATUS "Found Vulkan")
 endif()
 find_package(PNG REQUIRED)
 find_package(SDL3_ttf REQUIRED)
-find_package(OpenCV REQUIRED)
+if(CV)
+    find_package(OpenCV REQUIRED)
+    message(STATUS "OpenCV support enabled (version ${OpenCV_VERSION})")
+else()
+    message(STATUS "OpenCV support disabled (pass -DCV=ON to enable VK_Capture)")
+endif()
 add_subdirectory(volk)
 add_library(mxvk STATIC
     mxvk/src/mxvk.cpp
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_sprite.cpp
     mxvk/src/mxvk_text.cpp
-    mxvk/src/mxvk_cv.cpp
 )
+if(CV)
+    target_sources(mxvk PRIVATE mxvk/src/mxvk_cv.cpp)
+endif()
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxvk>
-    ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG ${OpenCV_LIBS})
+if(CV)
+    target_include_directories(mxvk PUBLIC ${OpenCV_INCLUDE_DIRS})
+    target_compile_definitions(mxvk PUBLIC MXVK_WITH_CV)
+endif()
+target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG)
+if(CV)
+    target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
+endif()
 add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)

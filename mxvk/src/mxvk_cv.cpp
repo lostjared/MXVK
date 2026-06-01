@@ -1,6 +1,6 @@
 /**
  * @file vk_cv.cpp
- * @brief Implementation of mx::MXCapture (Vulkan + OpenCV variant).
+ * @brief Implementation of mxvk::VK_Capture (Vulkan + OpenCV variant).
  */
 #include "mxvk/mxvk_cv.hpp"
 #include <filesystem>
@@ -9,7 +9,12 @@
 namespace mxvk {
 
     bool VK_Capture::open(const std::string &filename) {
-        return cap.open(filename);
+        const bool ok = cap.open(filename);
+        if (ok)
+            std::cout << std::format("[VK_Capture] Opened file: {}\n", filename);
+        else
+            std::cout << std::format("[VK_Capture] Failed to open file: {}\n", filename);
+        return ok;
     }
 
     bool VK_Capture::open(int id, int mode) {
@@ -17,13 +22,16 @@ namespace mxvk {
             mode = cv::CAP_V4L2;
         if (cap.open(id, mode)) {
             cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+            std::cout << std::format("[VK_Capture] Opened device: {}\n", id);
             return true;
         }
+        std::cout << std::format("[VK_Capture] Failed to open device: {}\n", id);
         return false;
     }
 
     void VK_Capture::close() {
         cap.release();
+        std::cout << "[VK_Capture] Capture closed\n";
     }
 
     bool VK_Capture::createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue,
@@ -33,7 +41,7 @@ namespace mxvk {
         sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
         sprite->enableExtendedUBO();
         sprite->rebuildPipeline();
-        std::cout << ">> MXCapture - CreateSprite for - [OK]\n";
+        std::cout << std::format("[VK_Capture] Sprite created: {}x{}\n", width, height);
         return true;
     }
 
@@ -41,10 +49,12 @@ namespace mxvk {
         if (sprite) {
             sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
             sprite->enableExtendedUBO();
-            std::cout << ">> MXCapture shader reloaded \n   Vertex: [" << std::filesystem::path(vert).filename().string() << "] - Fragment: [" << std::filesystem::path(frag).filename().string() << "] \n";
+            std::cout << std::format("[VK_Capture] Shader reloaded: vert={} frag={}\n",
+                                     std::filesystem::path(vert).filename().string(),
+                                     std::filesystem::path(frag).filename().string());
             return true;
         }
-        std::cout << ">> MXCapture failure to reload shader\n";
+        std::cout << "[VK_Capture] Reload failed: no sprite\n";
         return false;
     }
 

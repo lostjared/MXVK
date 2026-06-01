@@ -3,6 +3,7 @@
  * @brief Implementation of mx::VKText Vulkan SDL_ttf text renderer.
  */
 #include "mxvk/mxvk_text.hpp"
+#include <iostream>
 
 namespace mxvk {
 
@@ -145,6 +146,7 @@ namespace mxvk {
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
         VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &fontSampler));
+        std::cout << std::format("[VK_Text] Font loaded: {} @ {}pt\n", fontPath, fontSize);
     }
 
     void VK_Text::setFont(const std::string &fontPath, int fontSize) {
@@ -160,6 +162,7 @@ namespace mxvk {
             fontSampler = VK_NULL_HANDLE;
         }
         initFont(fontPath, fontSize);
+        std::cout << std::format("[VK_Text] Font changed: {} @ {}pt\n", fontPath, fontSize);
     }
 
     SDL_Surface *VK_Text::convertToRGBA(SDL_Surface *surface) {
@@ -250,6 +253,8 @@ namespace mxvk {
             quad.textImageView = createImageView(quad.textImage, VK_FORMAT_R8G8B8A8_UNORM);
 
             SDL_DestroySurface(rgbaSurface);
+
+            std::cout << std::format("[VK_Text] Cached new glyph: \"{}\" ({}x{})\n", text, quad.width, quad.height);
 
             // Store in cache
             textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
