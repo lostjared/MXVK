@@ -202,30 +202,16 @@ namespace mxvk {
             text_descriptor_set_layout_ = VK_NULL_HANDLE;
         }
 
-        if (in_flight != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying in-flight fence\n";
-            vkDestroyFence(device, in_flight, nullptr);
-            in_flight = VK_NULL_HANDLE;
-        }
-
-        if (!render_finished.empty()) {
-            std::cout << "vk: destroying render-finished semaphores\n";
-            for (VkSemaphore semaphore : render_finished) {
-                if (semaphore != VK_NULL_HANDLE) {
-                    vkDestroySemaphore(device, semaphore, nullptr);
-                }
-            }
-            render_finished.clear();
-        }
-
-        if (image_available != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying image-available semaphore\n";
-            vkDestroySemaphore(device, image_available, nullptr);
-            image_available = VK_NULL_HANDLE;
-        }
+        cleanupSyncObjects();
 
         std::cout << "vk: tearing down swapchain-dependent resources\n";
-        cleanupSwapchain();
+        cleanupSwapchain(false);
+
+        if (command_pool != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying command pool\n";
+            vkDestroyCommandPool(device, command_pool, nullptr);
+            command_pool = VK_NULL_HANDLE;
+        }
 
         if (device != VK_NULL_HANDLE) {
             std::cout << "vk: destroying logical device\n";
@@ -488,17 +474,23 @@ namespace mxvk {
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
     bool VK_Window::ensureRenderResources() {
+        const auto sync_ready = [this]() {
+            return std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+                   std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+                   std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        };
+
         if (device == VK_NULL_HANDLE) {
             return false;
         }
 
-        if (swapchain == VK_NULL_HANDLE || command_buffers.empty() || in_flight == VK_NULL_HANDLE ||
-            image_available == VK_NULL_HANDLE || render_finished.size() != swapchain_images.size()) {
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() ||
+            image_fences_.size() != swapchain_images.size()) {
             createDevice();
         }
 
-        return (swapchain != VK_NULL_HANDLE && !command_buffers.empty() && in_flight != VK_NULL_HANDLE &&
-                image_available != VK_NULL_HANDLE && render_finished.size() == swapchain_images.size());
+        return (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() &&
+                image_fences_.size() == swapchain_images.size());
     }
 
     void VK_Window::pickDevice() {
@@ -678,9 +670,13 @@ namespace mxvk {
             return;
         }
 
-        if (swapchain != VK_NULL_HANDLE || command_pool != VK_NULL_HANDLE ||
-            image_available != VK_NULL_HANDLE || in_flight != VK_NULL_HANDLE ||
-            !render_finished.empty()) {
+        const bool sync_ready =
+            std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+
+        if (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() &&
+            sync_ready && image_fences_.size() == swapchain_images.size()) {
             std::cout << "vk: createDevice skipped because render resources are already initialized\n";
             return;
         }
@@ -794,14 +790,22 @@ namespace mxvk {
 
     bool VK_Window::createRenderResources() {
         std::cout << "vk: entering createRenderResources\n";
-        VkCommandPoolCreateInfo pool_info{};
-        pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        pool_info.queueFamilyIndex = graphics_queue_family;
+        if (command_pool == VK_NULL_HANDLE) {
+            VkCommandPoolCreateInfo pool_info{};
+            pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            pool_info.queueFamilyIndex = graphics_queue_family;
 
-        std::cout << "vk: creating command pool\n";
-        if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) != VK_SUCCESS) {
-            return false;
+            std::cout << "vk: creating command pool\n";
+            if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) != VK_SUCCESS) {
+                return false;
+            }
+        }
+
+        if (!command_buffers.empty()) {
+            std::cout << "vk: freeing stale command buffers before reallocation\n";
+            vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
+            command_buffers.clear();
         }
 
         command_buffers.resize(swapchain_images.size());
@@ -839,12 +843,13 @@ namespace mxvk {
             return false;
         }
 
-        depth_images.resize(swapchain_images.size(), VK_NULL_HANDLE);
-        depth_image_memories.resize(swapchain_images.size(), VK_NULL_HANDLE);
-        depth_image_views.resize(swapchain_images.size(), VK_NULL_HANDLE);
-        depth_image_initialized.assign(swapchain_images.size(), false);
+        depth_images.resize(max_frames_in_flight, VK_NULL_HANDLE);
+        depth_image_memories.resize(max_frames_in_flight, VK_NULL_HANDLE);
+        depth_image_views.resize(max_frames_in_flight, VK_NULL_HANDLE);
+        depth_image_initialized.assign(max_frames_in_flight, false);
 
-        for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        for (size_t i = 0; i < depth_images.size(); ++i) {
+            std::cout << std::format("vk: creating depth image for frame {}\n", i);
             VkImageCreateInfo imageInfo{};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -883,6 +888,7 @@ namespace mxvk {
                 return false;
             }
 
+            std::cout << std::format("vk: allocating depth image memory for frame {}\n", i);
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = memReq.size;
@@ -898,6 +904,7 @@ namespace mxvk {
                 return false;
             }
 
+            std::cout << std::format("vk: creating depth image view for frame {}\n", i);
             VkImageViewCreateInfo viewInfo{};
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
             viewInfo.image = depth_images[i];
@@ -926,36 +933,37 @@ namespace mxvk {
             return false;
         }
 
+        cleanupSyncObjects();
+
         VkSemaphoreCreateInfo semaphore_info{};
         semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-        std::cout << "vk: creating image-available semaphore\n";
-        if (vkCreateSemaphore(device, &semaphore_info, nullptr, &image_available) != VK_SUCCESS) {
-            return false;
-        }
-
-        render_finished.resize(swapchain_images.size(), VK_NULL_HANDLE);
-        for (size_t i = 0; i < render_finished.size(); ++i) {
-            std::cout << std::format("vk: creating render-finished semaphore for swapchain image {}\n", i);
-            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished[i]) != VK_SUCCESS) {
-                for (VkSemaphore semaphore : render_finished) {
-                    if (semaphore != VK_NULL_HANDLE) {
-                        vkDestroySemaphore(device, semaphore, nullptr);
-                    }
-                }
-                render_finished.clear();
-                return false;
-            }
-        }
 
         VkFenceCreateInfo fence_info{};
         fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        std::cout << "vk: creating in-flight fence\n";
-        if (vkCreateFence(device, &fence_info, nullptr, &in_flight) != VK_SUCCESS) {
-            return false;
+        for (uint32_t frame = 0; frame < max_frames_in_flight; ++frame) {
+            std::cout << std::format("vk: creating image-available semaphore for frame {}\n", frame);
+            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &image_available_[frame]) != VK_SUCCESS) {
+                cleanupSyncObjects();
+                return false;
+            }
+
+            std::cout << std::format("vk: creating render-finished semaphore for frame {}\n", frame);
+            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished_[frame]) != VK_SUCCESS) {
+                cleanupSyncObjects();
+                return false;
+            }
+
+            std::cout << std::format("vk: creating in-flight fence for frame {}\n", frame);
+            if (vkCreateFence(device, &fence_info, nullptr, &in_flight_fences_[frame]) != VK_SUCCESS) {
+                cleanupSyncObjects();
+                return false;
+            }
         }
+
+        image_fences_.assign(swapchain_images.size(), VK_NULL_HANDLE);
+        current_frame_ = 0;
 
         std::cout << "vk: createSyncObjects complete\n";
         return true;
@@ -966,27 +974,57 @@ namespace mxvk {
             return;
         }
 
-        if (in_flight != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying in-flight fence\n";
-            vkDestroyFence(device, in_flight, nullptr);
-            in_flight = VK_NULL_HANDLE;
+        const bool has_in_flight_fences = std::ranges::any_of(
+            in_flight_fences_.begin(),
+            in_flight_fences_.end(),
+            [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        const bool has_render_finished = std::ranges::any_of(
+            render_finished_.begin(),
+            render_finished_.end(),
+            [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
+        const bool has_image_available = std::ranges::any_of(
+            image_available_.begin(),
+            image_available_.end(),
+            [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
+
+        if (!has_in_flight_fences && !has_render_finished && !has_image_available) {
+            image_fences_.clear();
+            current_frame_ = 0;
+            return;
         }
 
-        if (!render_finished.empty()) {
-            std::cout << "vk: destroying render-finished semaphores\n";
-            for (VkSemaphore semaphore : render_finished) {
-                if (semaphore != VK_NULL_HANDLE) {
-                    vkDestroySemaphore(device, semaphore, nullptr);
+        if (has_in_flight_fences) {
+            std::cout << "vk: destroying in-flight fences\n";
+            for (VkFence &fence : in_flight_fences_) {
+                if (fence != VK_NULL_HANDLE) {
+                    vkDestroyFence(device, fence, nullptr);
+                    fence = VK_NULL_HANDLE;
                 }
             }
-            render_finished.clear();
         }
 
-        if (image_available != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying image-available semaphore\n";
-            vkDestroySemaphore(device, image_available, nullptr);
-            image_available = VK_NULL_HANDLE;
+        if (has_render_finished) {
+            std::cout << "vk: destroying render-finished semaphores\n";
+            for (VkSemaphore &semaphore : render_finished_) {
+                if (semaphore != VK_NULL_HANDLE) {
+                    vkDestroySemaphore(device, semaphore, nullptr);
+                    semaphore = VK_NULL_HANDLE;
+                }
+            }
         }
+
+        if (has_image_available) {
+            std::cout << "vk: destroying image-available semaphores\n";
+            for (VkSemaphore &semaphore : image_available_) {
+                if (semaphore != VK_NULL_HANDLE) {
+                    vkDestroySemaphore(device, semaphore, nullptr);
+                    semaphore = VK_NULL_HANDLE;
+                }
+            }
+        }
+
+        image_fences_.clear();
+        current_frame_ = 0;
     }
 
     void VK_Window::recreateSwapchain() {
@@ -1000,6 +1038,14 @@ namespace mxvk {
         if (w == 0 || h == 0) {
             // Window is minimized; skip recreation until it has a real size.
             std::cout << "mxvk: resize detected while minimized; deferring swapchain recreation\n";
+            return;
+        }
+
+        if (swapchain != VK_NULL_HANDLE &&
+            swapchain_extent.width == static_cast<uint32_t>(w) &&
+            swapchain_extent.height == static_cast<uint32_t>(h)) {
+            framebuffer_resized_ = false;
+            std::cout << "mxvk: resize event matches current swapchain extent; skipping recreation\n";
             return;
         }
 
@@ -1018,7 +1064,7 @@ namespace mxvk {
         destroySpritePipeline();
         destroyTextPipeline();
         cleanupSyncObjects();
-        cleanupSwapchain();
+        cleanupSwapchain(true);
         if (!createSwapchain() || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             return;
@@ -1035,28 +1081,22 @@ namespace mxvk {
         std::cout << "mxvk: swapchain recreation complete\n";
     }
 
-    void VK_Window::cleanupSwapchain() {
+    void VK_Window::cleanupSwapchain(bool preserveCommandPool) {
         std::cout << "vk: entering cleanupSwapchain\n";
         if (device == VK_NULL_HANDLE) {
             std::cout << "vk: skipping cleanupSwapchain because logical device is null\n";
             return;
         }
 
-        if (command_pool != VK_NULL_HANDLE && !command_buffers.empty()) {
+        if (preserveCommandPool && command_pool != VK_NULL_HANDLE && !command_buffers.empty()) {
             std::cout << "vk: freeing command buffers\n";
             vkFreeCommandBuffers(
                 device,
                 command_pool,
                 static_cast<uint32_t>(command_buffers.size()),
                 command_buffers.data());
-            command_buffers.clear();
         }
-
-        if (command_pool != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying command pool\n";
-            vkDestroyCommandPool(device, command_pool, nullptr);
-            command_pool = VK_NULL_HANDLE;
-        }
+        command_buffers.clear();
 
         if (!swapchain_image_views.empty()) {
             std::cout << "vk: destroying swapchain image views\n";
@@ -1134,7 +1174,11 @@ namespace mxvk {
             }
         }
 
-        if (render_finished.empty()) {
+        const bool sync_ready =
+            std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        if (!sync_ready) {
             return;
         }
 
@@ -1167,7 +1211,12 @@ namespace mxvk {
             text_state_dirty_ = false;
         }
 
-        const VkResult wait_result = vkWaitForFences(device, 1, &in_flight, VK_TRUE, UINT64_MAX);
+        VkFence &frame_fence = in_flight_fences_[current_frame_];
+        VkSemaphore &acquire_semaphore = image_available_[current_frame_];
+        VkSemaphore &present_semaphore = render_finished_[current_frame_];
+        const size_t depth_slot = static_cast<size_t>(current_frame_);
+
+        const VkResult wait_result = vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
         if (wait_result == VK_ERROR_DEVICE_LOST) {
             std::cerr << "mxvk: device lost while waiting for frame fence; stopping render loop\n";
             active = false;
@@ -1182,7 +1231,7 @@ namespace mxvk {
         uint32_t image_index = 0;
         const uint64_t acquire_timeout_ns = 100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
         const VkResult acquire_result =
-            vkAcquireNextImageKHR(device, swapchain, acquire_timeout_ns, image_available, VK_NULL_HANDLE, &image_index);
+            vkAcquireNextImageKHR(device, swapchain, acquire_timeout_ns, acquire_semaphore, VK_NULL_HANDLE, &image_index);
 
         static VkResult last_acquire_error = VK_SUCCESS;
         static uint32_t repeated_acquire_errors = 0;
@@ -1238,9 +1287,24 @@ namespace mxvk {
         if (image_index >= command_buffers.size() || image_index >= swapchain_images.size() || image_index >= swapchain_image_views.size()) {
             return;
         }
-        if (image_index >= render_finished.size()) {
-            std::cerr << "mxvk: acquired image index exceeds render-finished semaphore count\n";
+
+        if (image_index >= image_fences_.size()) {
+            std::cerr << "mxvk: acquired image index exceeds tracked in-flight image count\n";
             return;
+        }
+
+        if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
+            const VkResult image_wait_result = vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);
+            if (image_wait_result == VK_ERROR_DEVICE_LOST) {
+                std::cerr << "mxvk: device lost while waiting on acquired image fence; stopping render loop\n";
+                active = false;
+                return;
+            }
+            if (image_wait_result != VK_SUCCESS) {
+                std::cerr << std::format("mxvk: Failed waiting for acquired image fence (VkResult={})\n", static_cast<int>(image_wait_result));
+                framebuffer_resized_ = true;
+                return;
+            }
         }
 
         const VkCommandBuffer cmd = command_buffers[image_index];
@@ -1288,14 +1352,14 @@ namespace mxvk {
         to_depth_barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
         to_depth_barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         to_depth_barrier.oldLayout =
-            (image_index < depth_image_initialized.size() && depth_image_initialized[image_index])
+            (depth_slot < depth_image_initialized.size() && depth_image_initialized[depth_slot])
                 ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
                 : VK_IMAGE_LAYOUT_UNDEFINED;
         to_depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         to_depth_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_depth_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        if (image_index < depth_images.size()) {
-            to_depth_barrier.image = depth_images[image_index];
+        if (depth_slot < depth_images.size()) {
+            to_depth_barrier.image = depth_images[depth_slot];
         }
         to_depth_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         to_depth_barrier.subresourceRange.baseMipLevel = 0;
@@ -1327,8 +1391,8 @@ namespace mxvk {
 
         VkRenderingAttachmentInfo depth_attachment{};
         depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        if (image_index < depth_image_views.size()) {
-            depth_attachment.imageView = depth_image_views[image_index];
+        if (depth_slot < depth_image_views.size()) {
+            depth_attachment.imageView = depth_image_views[depth_slot];
         }
         depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1382,8 +1446,8 @@ namespace mxvk {
         onRecordCustomRendering(cmd, image_index);
 
         vkCmdEndRendering(cmd);
-        if (image_index < depth_image_initialized.size()) {
-            depth_image_initialized[image_index] = true;
+        if (depth_slot < depth_image_initialized.size()) {
+            depth_image_initialized[depth_slot] = true;
         }
 
         VkImageMemoryBarrier2 to_present_barrier{};
@@ -1415,11 +1479,9 @@ namespace mxvk {
             return;
         }
 
-        const VkSemaphore signal_semaphore = render_finished[image_index];
-
         VkSemaphoreSubmitInfo wait_semaphore_info{};
         wait_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        wait_semaphore_info.semaphore = image_available;
+        wait_semaphore_info.semaphore = acquire_semaphore;
         wait_semaphore_info.value = 0;
         wait_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         wait_semaphore_info.deviceIndex = 0;
@@ -1431,7 +1493,7 @@ namespace mxvk {
 
         VkSemaphoreSubmitInfo signal_semaphore_info{};
         signal_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        signal_semaphore_info.semaphore = signal_semaphore;
+        signal_semaphore_info.semaphore = present_semaphore;
         signal_semaphore_info.value = 0;
         signal_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
         signal_semaphore_info.deviceIndex = 0;
@@ -1445,7 +1507,7 @@ namespace mxvk {
         submit_info.signalSemaphoreInfoCount = 1;
         submit_info.pSignalSemaphoreInfos = &signal_semaphore_info;
 
-        const VkResult fence_reset_result = vkResetFences(device, 1, &in_flight);
+        const VkResult fence_reset_result = vkResetFences(device, 1, &frame_fence);
         if (fence_reset_result == VK_ERROR_DEVICE_LOST) {
             std::cerr << "mxvk: device lost while resetting frame fence; stopping render loop\n";
             active = false;
@@ -1457,7 +1519,7 @@ namespace mxvk {
             return;
         }
 
-        const VkResult submit_result = vkQueueSubmit2(graphics_queue, 1, &submit_info, in_flight);
+        const VkResult submit_result = vkQueueSubmit2(graphics_queue, 1, &submit_info, frame_fence);
         if (submit_result == VK_ERROR_DEVICE_LOST) {
             std::cerr << "mxvk: device lost during queue submit; stopping render loop\n";
             active = false;
@@ -1470,12 +1532,13 @@ namespace mxvk {
             framebuffer_resized_ = true;
             return;
         }
+        image_fences_[image_index] = frame_fence;
         swapchain_image_initialized[image_index] = true;
 
         VkPresentInfoKHR present_info{};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = &signal_semaphore;
+        present_info.pWaitSemaphores = &present_semaphore;
         present_info.swapchainCount = 1;
         present_info.pSwapchains = &swapchain;
         present_info.pImageIndices = &image_index;
@@ -1495,6 +1558,8 @@ namespace mxvk {
         if (text_renderer_) {
             text_renderer_->clearQueue();
         }
+
+        current_frame_ = (current_frame_ + 1U) % max_frames_in_flight;
     }
 
     bool VK_Window::validationEnabled() const {
@@ -1697,10 +1762,12 @@ namespace mxvk {
         }
 
         if (text_pipeline_ != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying text pipeline\n";
             vkDestroyPipeline(device, text_pipeline_, nullptr);
             text_pipeline_ = VK_NULL_HANDLE;
         }
         if (text_pipeline_layout_ != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying text pipeline layout\n";
             vkDestroyPipelineLayout(device, text_pipeline_layout_, nullptr);
             text_pipeline_layout_ = VK_NULL_HANDLE;
         }
@@ -2025,10 +2092,12 @@ namespace mxvk {
         }
 
         if (sprite_pipeline_ != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite pipeline\n";
             vkDestroyPipeline(device, sprite_pipeline_, nullptr);
             sprite_pipeline_ = VK_NULL_HANDLE;
         }
         if (sprite_pipeline_layout_ != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite pipeline layout\n";
             vkDestroyPipelineLayout(device, sprite_pipeline_layout_, nullptr);
             sprite_pipeline_layout_ = VK_NULL_HANDLE;
         }

@@ -652,19 +652,23 @@ namespace mxvk {
         }
 
         if (vertexBuffer_ != VK_NULL_HANDLE) {
+            logMXModelStep("destroying vertex buffer");
             vkDestroyBuffer(device, vertexBuffer_, nullptr);
             vertexBuffer_ = VK_NULL_HANDLE;
         }
         if (vertexBufferMemory_ != VK_NULL_HANDLE) {
+            logMXModelStep("freeing vertex buffer memory");
             vkFreeMemory(device, vertexBufferMemory_, nullptr);
             vertexBufferMemory_ = VK_NULL_HANDLE;
         }
 
         if (indexBuffer_ != VK_NULL_HANDLE) {
+            logMXModelStep("destroying index buffer");
             vkDestroyBuffer(device, indexBuffer_, nullptr);
             indexBuffer_ = VK_NULL_HANDLE;
         }
         if (indexBufferMemory_ != VK_NULL_HANDLE) {
+            logMXModelStep("freeing index buffer memory");
             vkFreeMemory(device, indexBufferMemory_, nullptr);
             indexBufferMemory_ = VK_NULL_HANDLE;
         }

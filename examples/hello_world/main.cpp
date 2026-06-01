@@ -50,11 +50,15 @@ namespace example {
                 return;
             }
 
-            vkWaitForFences(device, 1, &in_flight, VK_TRUE, UINT64_MAX);
+            VkFence &frame_fence = in_flight_fences_[current_frame_];
+            VkSemaphore &acquire_semaphore = image_available_[current_frame_];
+            VkSemaphore &present_semaphore = render_finished_[current_frame_];
+
+            vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
 
             uint32_t image_index = 0;
             const VkResult acquire_result =
-                vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_available, VK_NULL_HANDLE, &image_index);
+                vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, &image_index);
             if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
                 framebuffer_resized_ = true;
                 return;
@@ -66,8 +70,12 @@ namespace example {
                 image_index >= command_buffers.size() ||
                 image_index >= swapchain_images.size() ||
                 image_index >= swapchain_image_views.size() ||
-                image_index >= render_finished.size()) {
+                image_index >= image_fences_.size()) {
                 throw mxvk::Exception("Swapchain image index out of bounds");
+            }
+
+            if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
+                vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);
             }
 
             const VkCommandBuffer cmd = command_buffers[image_index];
@@ -190,11 +198,9 @@ namespace example {
                 throw mxvk::Exception("Failed to end command buffer");
             }
 
-            const VkSemaphore signal_semaphore = render_finished[image_index];
-
             VkSemaphoreSubmitInfo wait_semaphore_info{};
             wait_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            wait_semaphore_info.semaphore = image_available;
+            wait_semaphore_info.semaphore = acquire_semaphore;
             wait_semaphore_info.value = 0;
             wait_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             wait_semaphore_info.deviceIndex = 0;
@@ -206,7 +212,7 @@ namespace example {
 
             VkSemaphoreSubmitInfo signal_semaphore_info{};
             signal_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            signal_semaphore_info.semaphore = signal_semaphore;
+            signal_semaphore_info.semaphore = present_semaphore;
             signal_semaphore_info.value = 0;
             signal_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
             signal_semaphore_info.deviceIndex = 0;
@@ -220,17 +226,18 @@ namespace example {
             submit_info.signalSemaphoreInfoCount = 1;
             submit_info.pSignalSemaphoreInfos = &signal_semaphore_info;
 
-            vkResetFences(device, 1, &in_flight);
-            if (vkQueueSubmit2(graphics_queue, 1, &submit_info, in_flight) != VK_SUCCESS) {
+            vkResetFences(device, 1, &frame_fence);
+            if (vkQueueSubmit2(graphics_queue, 1, &submit_info, frame_fence) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to submit draw command");
             }
+            image_fences_[image_index] = frame_fence;
             swapchain_image_initialized[image_index] = true;
 
             VkSwapchainKHR present_swapchain = swapchain;
             VkPresentInfoKHR present_info{};
             present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
             present_info.waitSemaphoreCount = 1;
-            present_info.pWaitSemaphores = &signal_semaphore;
+            present_info.pWaitSemaphores = &present_semaphore;
             present_info.swapchainCount = 1;
             present_info.pSwapchains = &present_swapchain;
             present_info.pImageIndices = &image_index;
@@ -241,6 +248,8 @@ namespace example {
             } else if (present_result != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to present swapchain image");
             }
+
+            current_frame_ = (current_frame_ + 1U) % static_cast<uint32_t>(image_available_.size());
         }
 
       private:
