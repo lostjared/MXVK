@@ -59,6 +59,13 @@ namespace mxvk {
          * @param validiation Enables validation-related behavior when true.
          * @return true on success, false otherwise.
          */
+
+        // no copy
+        VK_Window(const VK_Window &) = delete;
+        VK_Window(VK_Window &&) = delete;
+        VK_Window &operator=(const VK_Window &) = delete;
+        VK_Window &operator=(VK_Window &&) = delete;
+
         virtual bool initVulkan(bool validiation);
 
         /**
