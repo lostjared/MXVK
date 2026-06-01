@@ -1,2 +1,147 @@
 # MXVK
-Vulkan Engine
+
+MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on practical 2D and 3D application development.
+It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage.
+
+## What This Project Is
+
+- A static library (`mxvk`) for Vulkan-based rendering.
+- A set of examples under `examples/` that exercise key features:
+	- dynamic rendering and custom pipelines
+	- sprite rendering and shader effects
+	- text rendering
+	- model rendering
+	- game loops and input handling
+	- optional OpenCV camera/video workflows
+
+## Core Dependencies
+
+The root CMake configuration checks for and uses:
+
+- C++20 compiler
+- SDL3
+- SDL3_ttf
+- Vulkan 1.4+
+- PNG
+- ZLIB
+- glm
+- glslc (shader compiler)
+- Optional: OpenCV (when building with `-DCV=ON`)
+
+## Build
+
+From repository root:
+
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
+
+Useful CMake options:
+
+- `-DVALIDATION=ON` enables Vulkan validation layers.
+- `-DDEBUG_MODE=ON` enables debug compile flags.
+- `-DCV=ON` enables OpenCV-based examples and capture support.
+
+Example:
+
+```bash
+cmake -S . -B build -DVALIDATION=ON -DCV=ON
+cmake --build build -j
+```
+
+## Command Line Arguments
+
+Most examples use the shared parser in `mxvk/argz.hpp` via `proc_args(...)`.
+
+Supported options:
+
+- `-h`
+	- Show help and exit.
+- `-p <path>`, `--path <path>`
+	- Asset root path (defaults to `.` when omitted).
+- `-r <WxH>`, `--resolution <WxH>`
+	- Window resolution, e.g. `-r 1280x720`.
+- `-f`, `--fullscreen`
+	- Launch in fullscreen mode.
+- `--filename <file>`
+	- Optional input/model/video filename (used by specific examples).
+- `--texture <file>`
+	- Optional texture filename.
+- `-S <path>`, `--shader-path <path>`
+	- Shader SPIR-V folder path.
+- `--camera <index>`
+	- Camera index for OpenCV capture examples.
+
+General run pattern:
+
+```bash
+./build/examples/<example>/<example> [options]
+```
+
+Examples:
+
+```bash
+./build/examples/sprite_example/sprite_example -r 1920x1080 -f
+./build/examples/model_example/model_example -p ./examples/model_example
+./build/examples/opencv_example/opencv_example --camera 0 -r 1280x720
+./build/examples/opencv_model/opencv_model --filename ./models/torus.mxmod.z --camera 0
+```
+
+## Examples
+
+Current example executables:
+
+### `hello_world`
+- Demonstrates a minimal custom Vulkan pipeline in an `mxvk::VK_Window` subclass.
+- Shows how to handle swapchain recreation hooks and render loop integration.
+
+### `static_example`
+- Similar to `hello_world`, but focused on a static shader-driven fullscreen render path.
+- Useful for understanding custom rendering hooks and command recording.
+
+### `sprite_example`
+- Demonstrates sprite loading from PNG and full-window sprite rendering.
+- Includes text drawing and custom sprite shader usage.
+
+### `text_example`
+- Minimal example for text rendering with `setFont(...)` and `printText(...)`.
+
+### `model_example`
+- Demonstrates `VKAbstractModel` loading and rendering of 3D assets.
+- Uses uniform buffers and camera/projection transforms.
+
+### `tux_example`
+- Renders a 3D model with a textured animated background and on-screen text.
+
+### `asteroids`
+- Full game example with game state management, controller/keyboard input, particles, and HUD.
+- Good reference for a complete gameplay loop on top of MXVK.
+
+### `puzzle`
+- Puzzle game example ported to MXVK/SDL3.
+- Demonstrates menu/game/scores state flow, sprite-based gameplay grid, and text UI.
+
+### `opencv_example` (requires `-DCV=ON`)
+- Displays camera or video-file frames on a sprite in real time.
+- Uses `--camera` and/or `--filename` to select source.
+
+### `opencv_model` (requires `-DCV=ON`)
+- Streams camera frames into a model texture.
+- Demonstrates live texture updates on 3D geometry with model rendering.
+
+## Project Layout
+
+- `mxvk/`
+	- Engine source, headers, and built-in shaders.
+- `examples/`
+	- Runnable examples and sample assets.
+- `models/`
+	- Model assets used by model-based examples.
+- `volk/`
+	- Vulkan function loader submodule/source.
+
+## Notes
+
+- The example CMake files copy required runtime assets into each example's output directory after build.
+- If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
