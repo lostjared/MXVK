@@ -76,7 +76,7 @@ Supported options:
 General run pattern:
 
 ```bash
-./build/examples/<example>/<example> [options]
+./<example> [options]
 ```
 
 Examples (in each subproject build directory):
