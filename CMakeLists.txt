@@ -135,13 +135,22 @@ else()
 message(STATUS "Found Vulkan")
 endif()
 find_package(PNG REQUIRED)
+find_package(SDL3_ttf REQUIRED)
+find_package(OpenCV REQUIRED)
 add_subdirectory(volk)
-add_library(mxvk STATIC mxvk/src/mxvk.cpp mxvk/src/mxvk_png.cpp)
+add_library(mxvk STATIC
+    mxvk/src/mxvk.cpp
+    mxvk/src/mxvk_png.cpp
+    mxvk/src/mxvk_sprite.cpp
+    mxvk/src/mxvk_text.cpp
+    mxvk/src/mxvk_cv.cpp
+)
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxvk>
+    ${OpenCV_INCLUDE_DIRS}
 )
-target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 Vulkan::Vulkan PNG::PNG)
+target_link_libraries(mxvk PUBLIC volk SDL3::SDL3 SDL3_ttf::SDL3_ttf Vulkan::Vulkan PNG::PNG ${OpenCV_LIBS})
 add_subdirectory(examples/hello_world)
 add_subdirectory(examples/static_example)
