@@ -45,14 +45,11 @@ void main() {
     vec3 fillDir = normalize(vec3(0.3, -0.6, 0.5));
     float fillDiff = max(dot(normal, fillDir), 0.0);
     vec3 fill = 0.30 * fillDiff * baseColor * vec3(0.6, 0.7, 1.0);
-
     vec3 skyCol = vec3(0.42, 0.37, 0.28);
     vec3 groundCol = vec3(0.28, 0.30, 0.38);
     float hemi = dot(normal, vec3(0.0, 1.0, 0.0)) * 0.5 + 0.5;
     vec3 ambient = mix(groundCol, skyCol, hemi) * baseColor;
-
     float baseline = 0.45 + diffuse * 0.15;
     vec3 result = (ambient + fill + lampLight) * baseline;
-
     outColor = vec4(result, 1.0);
 }
