@@ -187,4 +187,8 @@ Current example executables:
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/8ffc652d-e3bf-4cab-821c-0e58de6f46d2" />
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/41f583b6-ecda-4c13-8d90-82290e9512a9" />
+
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/f7daf971-5588-41b5-ae7b-b3768a2ce611" />
+
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
