@@ -20,7 +20,7 @@ namespace example {
       public:
         ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-                            assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path) {
+              assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot_ + "/data/tux.obj") : filename;
             const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
