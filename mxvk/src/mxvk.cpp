@@ -441,6 +441,12 @@ namespace mxvk {
             break;
         }
     }
+    void VK_Window::setClearColor(float r, float g, float b, float a) {
+        clear_color_.float32[0] = std::clamp(r, 0.0f, 1.0f);
+        clear_color_.float32[1] = std::clamp(g, 0.0f, 1.0f);
+        clear_color_.float32[2] = std::clamp(b, 0.0f, 1.0f);
+        clear_color_.float32[3] = std::clamp(a, 0.0f, 1.0f);
+    }
 
     void VK_Window::loop() {
         SDL_Event e;
@@ -703,11 +709,12 @@ namespace mxvk {
         vkGetPhysicalDeviceFeatures2(physical_device, &features2);
 
         std::cout << std::format(
-            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}, fillModeNonSolid={}\n",
+            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}, fillModeNonSolid={}, samplerAnisotropy={}\n",
             supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false",
             supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false",
             features2.features.shaderFloat64 == VK_TRUE ? "true" : "false",
-            features2.features.fillModeNonSolid == VK_TRUE ? "true" : "false");
+            features2.features.fillModeNonSolid == VK_TRUE ? "true" : "false",
+            features2.features.samplerAnisotropy == VK_TRUE ? "true" : "false");
 
         if (supported_vulkan13_features.synchronization2 != VK_TRUE) {
             std::cout << "vk: synchronization2 is unsupported on selected physical device\n";
@@ -726,6 +733,7 @@ namespace mxvk {
         enabled_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         enabled_features2.features.shaderFloat64 = features2.features.shaderFloat64;
         enabled_features2.features.fillModeNonSolid = features2.features.fillModeNonSolid;
+        enabled_features2.features.samplerAnisotropy = features2.features.samplerAnisotropy;
 
         enabled_features2.pNext = &vulkan13_features;
 
@@ -1432,7 +1440,7 @@ namespace mxvk {
         }
 
         VkClearValue clear_value{};
-        clear_value.color = {{0.0F, 0.0F, 0.0F, 1.0F}};
+        clear_value.color = clear_color_;
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;

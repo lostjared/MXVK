@@ -111,6 +111,14 @@ namespace mxvk {
         [[nodiscard]] glm::vec3 modelCenterOffset() const { return modelCenterOffset_; }
         /** @brief Access the computed render scale used for normalization. */
         [[nodiscard]] float modelRenderScale() const { return modelRenderScale_; }
+        /** @brief Per-axis extent (max - min) of the source mesh's bounding box. */
+        [[nodiscard]] glm::vec3 modelAxisExtent() const { return modelAxisExtent_; }
+
+        /**
+         * @brief Enable or disable backface culling for this model pipeline.
+         * @param enabled True to cull backfaces, false to disable culling.
+         */
+        void setBackfaceCulling(bool enabled);
 
       private:
         struct TextureEntry {
@@ -139,9 +147,11 @@ namespace mxvk {
 
         glm::vec3 modelCenterOffset_{0.0f, 0.0f, 0.0f};
         float modelRenderScale_ = 1.0f;
+        glm::vec3 modelAxisExtent_{1.0f, 1.0f, 1.0f};
 
         std::string vertexShaderPath_{};
         std::string fragmentShaderPath_{};
+        bool backfaceCullingEnabled_ = false;
 
         VK_Window *window_ = nullptr;
 

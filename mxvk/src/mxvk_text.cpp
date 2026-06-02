@@ -217,44 +217,107 @@ namespace mxvk {
             // Cache miss -- render with SDL_ttf and upload to GPU
             // SDL3_ttf: TTF_RenderText_Blended requires an explicit length (0 = null-terminated)
             SDL_Surface *textSurface = TTF_RenderText_Blended(font, text.c_str(), 0, col);
-            if (!textSurface)
+            if (!textSurface) {
                 return;
+            }
 
             SDL_Surface *rgbaSurface = convertToRGBA(textSurface);
             SDL_DestroySurface(textSurface);
-            if (!rgbaSurface)
+            if (!rgbaSurface) {
                 return;
+            }
 
             quad.width = rgbaSurface->w;
             quad.height = rgbaSurface->h;
 
-            createImage(rgbaSurface->w, rgbaSurface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, quad.textImage, quad.textImageMemory);
+            VkImage uploadedImage = VK_NULL_HANDLE;
+            VkDeviceMemory uploadedImageMemory = VK_NULL_HANDLE;
+            VkImageView uploadedImageView = VK_NULL_HANDLE;
+            VkBuffer stagingBuffer = VK_NULL_HANDLE;
+            VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+            const VkDeviceSize imageSize = static_cast<VkDeviceSize>(rgbaSurface->w) * static_cast<VkDeviceSize>(rgbaSurface->h) * 4u;
 
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingMemory;
-            VkDeviceSize imageSize = rgbaSurface->w * rgbaSurface->h * 4;
+            auto cleanupUploadResources = [&]() {
+                if (stagingBuffer != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(device, stagingBuffer, nullptr);
+                    stagingBuffer = VK_NULL_HANDLE;
+                }
+                if (stagingMemory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, stagingMemory, nullptr);
+                    stagingMemory = VK_NULL_HANDLE;
+                }
+                if (uploadedImageView != VK_NULL_HANDLE) {
+                    vkDestroyImageView(device, uploadedImageView, nullptr);
+                    uploadedImageView = VK_NULL_HANDLE;
+                }
+                if (uploadedImage != VK_NULL_HANDLE) {
+                    vkDestroyImage(device, uploadedImage, nullptr);
+                    uploadedImage = VK_NULL_HANDLE;
+                }
+                if (uploadedImageMemory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, uploadedImageMemory, nullptr);
+                    uploadedImageMemory = VK_NULL_HANDLE;
+                }
+            };
 
-            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         stagingBuffer, stagingMemory);
+            bool uploadSucceeded = false;
+            try {
+                createImage(rgbaSurface->w, rgbaSurface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uploadedImage, uploadedImageMemory);
 
-            void *data;
-            VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
-            memcpy(data, rgbaSurface->pixels, imageSize);
-            vkUnmapMemory(device, stagingMemory);
+                createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             stagingBuffer, stagingMemory);
 
-            transitionImageLayout(quad.textImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            copyBufferToImage(stagingBuffer, quad.textImage, rgbaSurface->w, rgbaSurface->h);
-            transitionImageLayout(quad.textImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                void *data = nullptr;
+                VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
+                memcpy(data, rgbaSurface->pixels, static_cast<size_t>(imageSize));
+                vkUnmapMemory(device, stagingMemory);
 
-            vkDestroyBuffer(device, stagingBuffer, nullptr);
-            vkFreeMemory(device, stagingMemory, nullptr);
+                if (!transitionImageLayout(uploadedImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+                    SDL_DestroySurface(rgbaSurface);
+                    cleanupUploadResources();
+                    return;
+                }
+                if (!copyBufferToImage(stagingBuffer, uploadedImage, static_cast<uint32_t>(rgbaSurface->w), static_cast<uint32_t>(rgbaSurface->h))) {
+                    SDL_DestroySurface(rgbaSurface);
+                    cleanupUploadResources();
+                    return;
+                }
+                if (!transitionImageLayout(uploadedImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+                    SDL_DestroySurface(rgbaSurface);
+                    cleanupUploadResources();
+                    return;
+                }
 
-            quad.textImageView = createImageView(quad.textImage, VK_FORMAT_R8G8B8A8_UNORM);
+                uploadedImageView = createImageView(uploadedImage, VK_FORMAT_R8G8B8A8_UNORM);
+                uploadSucceeded = true;
+            } catch (...) {
+                SDL_DestroySurface(rgbaSurface);
+                cleanupUploadResources();
+                throw;
+            }
 
             SDL_DestroySurface(rgbaSurface);
+
+            if (!uploadSucceeded) {
+                cleanupUploadResources();
+                return;
+            }
+
+            if (stagingBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, stagingBuffer, nullptr);
+                stagingBuffer = VK_NULL_HANDLE;
+            }
+            if (stagingMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, stagingMemory, nullptr);
+                stagingMemory = VK_NULL_HANDLE;
+            }
+
+            quad.textImage = uploadedImage;
+            quad.textImageMemory = uploadedImageMemory;
+            quad.textImageView = uploadedImageView;
 
             // Store in cache
             textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
@@ -396,7 +459,7 @@ namespace mxvk {
         throw mxvk::Exception("Failed to find suitable memory type!");
     }
 
-    void VK_Text::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+    bool VK_Text::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
@@ -430,10 +493,10 @@ namespace mxvk {
         }
 
         vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-        endSingleTimeCommands(commandBuffer);
+        return endSingleTimeCommands(commandBuffer);
     }
 
-    void VK_Text::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+    bool VK_Text::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
@@ -449,7 +512,7 @@ namespace mxvk {
 
         vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        endSingleTimeCommands(commandBuffer);
+        return endSingleTimeCommands(commandBuffer);
     }
 
     VkCommandBuffer VK_Text::beginSingleTimeCommands() {
@@ -471,7 +534,7 @@ namespace mxvk {
         return commandBuffer;
     }
 
-    void VK_Text::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    bool VK_Text::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
         VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
 
         VkSubmitInfo submitInfo{};
@@ -479,10 +542,24 @@ namespace mxvk {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffer;
 
-        VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
-        VK_CHECK_RESULT(vkQueueWaitIdle(graphicsQueue));
+        const VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        if (submitResult == VK_ERROR_DEVICE_LOST) {
+            vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+            std::cerr << "mxvk: Device lost during text command submit; skipping upload\n";
+            return false;
+        }
+        VK_CHECK_RESULT(submitResult);
+
+        const VkResult waitResult = vkQueueWaitIdle(graphicsQueue);
+        if (waitResult == VK_ERROR_DEVICE_LOST) {
+            vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+            std::cerr << "mxvk: Device lost while waiting text queue idle; skipping upload\n";
+            return false;
+        }
+        VK_CHECK_RESULT(waitResult);
 
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+        return true;
     }
 
     void VK_Text::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,

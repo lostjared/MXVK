@@ -110,6 +110,17 @@ namespace mxvk {
         createPipelines();
     }
 
+    void VKAbstractModel::setBackfaceCulling(bool enabled) {
+        if (backfaceCullingEnabled_ == enabled) {
+            return;
+        }
+
+        backfaceCullingEnabled_ = enabled;
+        if (window_ != nullptr) {
+            createPipelines();
+        }
+    }
+
     void VKAbstractModel::updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo) {
         if (imageIndex >= uniformBuffersMapped_.size()) {
             return;
@@ -304,6 +315,7 @@ namespace mxvk {
         if (vertices.empty()) {
             modelCenterOffset_ = glm::vec3(0.0f);
             modelRenderScale_ = 1.0f;
+            modelAxisExtent_ = glm::vec3(1.0f);
             return;
         }
 
@@ -328,7 +340,8 @@ namespace mxvk {
             -0.5f * (minY + maxY),
             -0.5f * (minZ + maxZ));
 
-        const float maxExtent = std::max(maxX - minX, std::max(maxY - minY, maxZ - minZ));
+        modelAxisExtent_ = glm::vec3(maxX - minX, maxY - minY, maxZ - minZ);
+        const float maxExtent = std::max(modelAxisExtent_.x, std::max(modelAxisExtent_.y, modelAxisExtent_.z));
         modelRenderScale_ = (maxExtent > 1e-6f) ? (2.5f / maxExtent) : 1.0f;
     }
 
@@ -775,6 +788,15 @@ namespace mxvk {
             return;
         }
 
+        VkPhysicalDeviceFeatures deviceFeatures{};
+        vkGetPhysicalDeviceFeatures(window_->getPhysicalDevice(), &deviceFeatures);
+        VkPhysicalDeviceProperties deviceProperties{};
+        vkGetPhysicalDeviceProperties(window_->getPhysicalDevice(), &deviceProperties);
+        const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
+        const float anisotropyLevel = anisotropySupported
+                                          ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
+                                          : 1.0f;
+
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -782,8 +804,8 @@ namespace mxvk {
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_FALSE;
-        samplerInfo.maxAnisotropy = 1.0f;
+        samplerInfo.anisotropyEnable = anisotropySupported ? VK_TRUE : VK_FALSE;
+        samplerInfo.maxAnisotropy = anisotropyLevel;
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
         samplerInfo.compareEnable = VK_FALSE;
@@ -1035,7 +1057,7 @@ namespace mxvk {
             rasterizer.depthClampEnable = VK_FALSE;
             rasterizer.rasterizerDiscardEnable = VK_FALSE;
             rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-            rasterizer.cullMode = VK_CULL_MODE_NONE;
+            rasterizer.cullMode = backfaceCullingEnabled_ ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE;
             rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
             rasterizer.depthBiasEnable = VK_FALSE;
             rasterizer.lineWidth = 1.0f;
@@ -1049,7 +1071,7 @@ namespace mxvk {
             depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
             depthStencil.depthTestEnable = VK_TRUE;
             depthStencil.depthWriteEnable = VK_TRUE;
-            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
             VkPipelineColorBlendAttachmentState blendAttachment{};
             blendAttachment.colorWriteMask =

@@ -109,6 +109,15 @@ namespace mxvk {
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
 
+        /**
+         * @brief Set the per-frame color attachment clear color.
+         * @param r Red channel [0, 1].
+         * @param g Green channel [0, 1].
+         * @param b Blue channel [0, 1].
+         * @param a Alpha channel [0, 1].
+         */
+        void setClearColor(float r, float g, float b, float a = 1.0f);
+
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
 
@@ -361,6 +370,7 @@ namespace mxvk {
         bool font_configured_ = false;
         std::string font_path_{};
         int font_size_ = 24;
+        VkClearColorValue clear_color_{{0.0f, 0.0f, 0.0f, 1.0f}};
     };
 
 } // namespace mxvk
