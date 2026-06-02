@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -146,6 +147,43 @@ namespace mxvk {
         }
 
         return module;
+    }
+
+    std::string VK_Window::resolveRuntimeShaderPath(const std::string &shaderFileName, const char *fallbackDir) const {
+        if (shaderFileName.empty()) {
+            throw mxvk::Exception("Shader file name is empty");
+        }
+
+        std::vector<std::filesystem::path> candidates{};
+
+        if (!font_path_.empty()) {
+            const std::filesystem::path fontPath(font_path_);
+            if (fontPath.has_parent_path()) {
+                candidates.push_back(fontPath.parent_path() / shaderFileName);
+            }
+        }
+
+        if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
+            const std::filesystem::path executableDir(basePath);
+            candidates.push_back(executableDir / "data" / shaderFileName);
+            candidates.push_back(executableDir / shaderFileName);
+        }
+
+        candidates.push_back(std::filesystem::path("data") / shaderFileName);
+
+        if (fallbackDir != nullptr && fallbackDir[0] != '\0') {
+            candidates.push_back(std::filesystem::path(fallbackDir) / shaderFileName);
+        }
+
+        std::error_code existsError{};
+        for (const std::filesystem::path &candidate : candidates) {
+            if (std::filesystem::exists(candidate, existsError)) {
+                return candidate.string();
+            }
+            existsError.clear();
+        }
+
+        throw mxvk::Exception(std::format("Failed to locate shader file '{}'", shaderFileName));
     }
 
     VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation) {
@@ -1838,9 +1876,8 @@ namespace mxvk {
 
         destroyTextPipeline();
 
-        const std::string shader_dir = std::string(MXVK_TEXT_SHADER_DIR);
-        const std::vector<char> vert_shader = loadSpv(shader_dir + "/text.vert.spv");
-        const std::vector<char> frag_shader = loadSpv(shader_dir + "/text.frag.spv");
+        const std::vector<char> vert_shader = loadSpv(resolveRuntimeShaderPath("text.vert.spv", MXVK_TEXT_SHADER_DIR));
+        const std::vector<char> frag_shader = loadSpv(resolveRuntimeShaderPath("text.frag.spv", MXVK_TEXT_SHADER_DIR));
 
         const VkShaderModule vert_module = createShaderModule(device, vert_shader);
         VkShaderModule frag_module = VK_NULL_HANDLE;
@@ -2171,9 +2208,8 @@ namespace mxvk {
 
         destroySpritePipeline();
 
-        const std::string shader_dir = std::string(MXVK_SPRITE_SHADER_DIR);
-        const std::vector<char> vert_shader = loadSpv(shader_dir + "/sprite.vert.spv");
-        const std::vector<char> frag_shader = loadSpv(shader_dir + "/sprite.frag.spv");
+        const std::vector<char> vert_shader = loadSpv(resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR));
+        const std::vector<char> frag_shader = loadSpv(resolveRuntimeShaderPath("sprite.frag.spv", MXVK_SPRITE_SHADER_DIR));
 
         const VkShaderModule vert_module = createShaderModule(device, vert_shader);
         VkShaderModule frag_module = VK_NULL_HANDLE;

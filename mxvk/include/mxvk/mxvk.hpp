@@ -287,6 +287,7 @@ namespace mxvk {
         void cleanupSwapchain(bool preserveCommandPool = true);
         void recreateSwapchain();
         void drawFrame();
+        [[nodiscard]] std::string resolveRuntimeShaderPath(const std::string &shaderFileName, const char *fallbackDir) const;
         void createSpriteDescriptorSetLayout();
         void createSpritePipeline();
         void destroySpritePipeline();

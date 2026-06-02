@@ -175,6 +175,7 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_text.cpp
     mxvk/src/mxvk_model.cpp
     mxvk/src/mxvk_abstract_model.cpp
+    mxvk/src/mxvk_cfg.cpp
 )
 if(MIXER)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_sound.cpp)
@@ -294,6 +295,57 @@ if(EXAMPLES)
         add_subdirectory(examples/opencv_example)
         add_subdirectory(examples/opencv_model)
     endif()
+
+    function(mxvk_copy_runtime_shaders target_name)
+        if(NOT TARGET ${target_name})
+            return()
+        endif()
+
+        string(MAKE_C_IDENTIFIER "${target_name}" target_name_id)
+        set(copy_target "mxvk_copy_runtime_shaders_${target_name_id}")
+
+        add_custom_target(${copy_target} ALL
+            COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${target_name}>/data
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_VERTEX_SPV}
+                $<TARGET_FILE_DIR:${target_name}>/data/sprite.vert.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_FRAGMENT_SPV}
+                $<TARGET_FILE_DIR:${target_name}>/data/sprite.frag.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_TEXT_VERTEX_SPV}
+                $<TARGET_FILE_DIR:${target_name}>/data/text.vert.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_TEXT_FRAGMENT_SPV}
+                $<TARGET_FILE_DIR:${target_name}>/data/text.frag.spv
+            COMMENT "Copying MXVK sprite/text runtime shaders to ${target_name} data directory"
+            VERBATIM
+        )
+
+        add_dependencies(${copy_target} mxvk_shaders)
+    endfunction()
+
+    set(mxvk_example_targets
+        hello_world
+        static_example
+        sprite_example
+        text_example
+        model_example
+        tux_example
+        asteroids
+        pong
+        puzzle
+        Pool3D
+        fractal_zoom
+        console_demo
+    )
+    if(CV)
+        list(APPEND mxvk_example_targets opencv_example opencv_model)
+    endif()
+
+    foreach(example_target IN LISTS mxvk_example_targets)
+        mxvk_copy_runtime_shaders(${example_target})
+    endforeach()
 else()
     message(STATUS "Examples OFF")
 endif()
