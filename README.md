@@ -152,6 +152,6 @@ Current example executables:
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/28dc95f8-d24b-4d70-ba95-b71eb50b8ebf" />
 
-
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/8ffc652d-e3bf-4cab-821c-0e58de6f46d2" />
 
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
