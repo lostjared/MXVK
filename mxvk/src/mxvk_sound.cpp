@@ -1,6 +1,6 @@
 /**
  * @file mxvk_sound.cpp
- * @brief Implementation of mxvk::Mixer SDL3_mixer audio manager.
+ * @brief Implementation of mxvk::VK_Mixer SDL3_mixer audio manager.
  */
 
 #include "mxvk/mxvk_sound.hpp"
@@ -14,19 +14,19 @@
 
 namespace mxvk {
 
-    std::size_t Mixer::toIndex(const int value) {
+    std::size_t VK_Mixer::toIndex(const int value) {
         return static_cast<std::size_t>(value);
     }
 
-    Mixer::Mixer() {
+    VK_Mixer::VK_Mixer() {
         init();
     }
 
-    Mixer::~Mixer() noexcept {
+    VK_Mixer::~VK_Mixer() noexcept {
         cleanup();
     }
 
-    void Mixer::init() {
+    void VK_Mixer::init() {
         if (init_) {
             return;
         }
@@ -50,7 +50,7 @@ namespace mxvk {
         init_ = true;
     }
 
-    int Mixer::loadMusic(const std::string &filename) {
+    int VK_Mixer::loadMusic(const std::string &filename) {
         if (filename.empty()) {
             throw mxvk::Exception("Music filename cannot be empty");
         }
@@ -79,7 +79,7 @@ namespace mxvk {
         return static_cast<int>(music_files_.size() - 1);
     }
 
-    int Mixer::loadWav(const std::string &filename) {
+    int VK_Mixer::loadWav(const std::string &filename) {
         if (filename.empty()) {
             throw mxvk::Exception("WAV filename cannot be empty");
         }
@@ -108,7 +108,7 @@ namespace mxvk {
         return static_cast<int>(wav_files_.size() - 1);
     }
 
-    int Mixer::playMusic(int id, int value) {
+    int VK_Mixer::playMusic(int id, int value) {
         if (!init_) {
             return -1;
         }
@@ -126,7 +126,7 @@ namespace mxvk {
         return MIX_PlayTrack(track, 0) ? 0 : -1;
     }
 
-    int Mixer::playWav(int id, int value, int channel) {
+    int VK_Mixer::playWav(int id, int value, int channel) {
         if (!init_) {
             return -1;
         }
@@ -156,7 +156,7 @@ namespace mxvk {
         return MIX_PlayTrack(track, 0) ? target : -1;
     }
 
-    [[nodiscard]] bool Mixer::isPlaying(int channel) const {
+    [[nodiscard]] bool VK_Mixer::isPlaying(int channel) const {
         if (!init_ || channel < 0 || channel >= static_cast<int>(wav_tracks_.size())) {
             return false;
         }
@@ -168,7 +168,7 @@ namespace mxvk {
         return MIX_TrackPlaying(track);
     }
 
-    void Mixer::stopMusic() {
+    void VK_Mixer::stopMusic() {
         if (!init_ || mixer_ == nullptr) {
             return;
         }
@@ -181,7 +181,7 @@ namespace mxvk {
         MIX_StopAllTracks(mixer_.get(), 0);
     }
 
-    void Mixer::cleanup() {
+    void VK_Mixer::cleanup() {
         if (!init_) {
             return;
         }

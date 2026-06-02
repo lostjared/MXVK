@@ -18,25 +18,25 @@
 namespace mxvk {
 
     /**
-     * @class Mixer
+     * @class VK_Mixer
      * @brief SDL3_mixer-based audio manager.
      *
      * Provides facilities for loading WAV sound chunks and streamed music
      * tracks, playing them, and querying playback state.
      * Only available when the library is built with MIXER enabled.
      */
-    class Mixer {
+    class VK_Mixer {
       public:
         /** @brief Initialise SDL3_mixer and open the audio device. */
-        Mixer();
+        VK_Mixer();
 
         /** @brief Halt all playback and free all loaded audio resources. */
-        ~Mixer() noexcept;
+        ~VK_Mixer() noexcept;
 
-        Mixer(const Mixer &) = delete;
-        Mixer &operator=(const Mixer &) = delete;
-        Mixer(Mixer &&) = delete;
-        Mixer &operator=(Mixer &&) = delete;
+        VK_Mixer(const VK_Mixer &) = delete;
+        VK_Mixer &operator=(const VK_Mixer &) = delete;
+        VK_Mixer(VK_Mixer &&) = delete;
+        VK_Mixer &operator=(VK_Mixer &&) = delete;
 
         /** @brief Open the audio device (called automatically by constructor). */
         void init();
@@ -99,7 +99,16 @@ namespace mxvk {
 
         [[nodiscard]] static std::size_t toIndex(int value);
     };
+
+    // Backward-compatible alias.
+    using Mixer = VK_Mixer;
+
 } // namespace mxvk
+
+namespace mx {
+    using VK_Mixer = mxvk::VK_Mixer;
+    using Mixer = mxvk::VK_Mixer;
+} // namespace mx
 
 #endif
 #endif
