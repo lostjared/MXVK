@@ -19,6 +19,7 @@ namespace mxvk {
         window_ = &window;
         window_->setFont(fontPath, fontSize);
         panel_sprite_ = nullptr;
+        cursor_sprite_ = nullptr;
         visible_ = false;
         fade_active_ = false;
         fade_alpha_ = 0.0f;
@@ -103,7 +104,24 @@ namespace mxvk {
     }
 
     void VK_Console::printLine(const std::string &line) {
-        lines_.push_back(line);
+        std::size_t start = 0;
+        while (start <= line.size()) {
+            const std::size_t nl = line.find('\n', start);
+            if (nl == std::string::npos) {
+                lines_.push_back(line.substr(start));
+                break;
+            }
+
+            lines_.push_back(line.substr(start, nl - start));
+            start = nl + 1;
+
+            // Preserve a trailing newline as an empty visual line.
+            if (start == line.size()) {
+                lines_.push_back(std::string{});
+                break;
+            }
+        }
+
         while (lines_.size() > max_lines_) {
             lines_.pop_front();
         }
@@ -275,6 +293,27 @@ namespace mxvk {
         SDL_DestroySurface(surface);
     }
 
+    void VK_Console::ensureCursorSprite() {
+        if (cursor_sprite_ != nullptr || window_ == nullptr) {
+            return;
+        }
+
+        SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+        if (surface == nullptr) {
+            return;
+        }
+
+        const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+        SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGBA(fmt, nullptr, 210, 255, 220, 255));
+        try {
+            cursor_sprite_ = window_->createSprite(surface);
+        } catch (...) {
+            cursor_sprite_ = nullptr;
+        }
+
+        SDL_DestroySurface(surface);
+    }
+
     void VK_Console::updatePanelLayout() {
         if (window_ == nullptr) {
             return;
@@ -415,6 +454,7 @@ namespace mxvk {
 
         updatePanelLayout();
         ensurePanelSprite();
+        ensureCursorSprite();
         if (panel_sprite_ != nullptr) {
             const VkExtent2D extent = window_->getSwapchainExtent();
             const int screen_h = static_cast<int>(extent.height);
@@ -475,11 +515,36 @@ namespace mxvk {
 
         cursor_pos_ = std::min(cursor_pos_, input_.size());
 
-        std::string line = prompt_ + input_;
-        if (cursor_visible_) {
-            line.insert(prompt_.size() + cursor_pos_, 1, '_');
-        }
+        const std::string line = prompt_ + input_;
         window_->printText(line, panel_x_ + padding, input_y, scaledColor(prompt_color_));
+
+        if (cursor_visible_ && cursor_sprite_ != nullptr) {
+            int prefix_width = 0;
+            int prefix_height = 0;
+            const std::string prefix = prompt_ + input_.substr(0, cursor_pos_);
+            if (!window_->getTextDimensions(prefix, prefix_width, prefix_height)) {
+                prefix_width = static_cast<int>((prompt_.size() + cursor_pos_) * static_cast<std::size_t>(glyph_w));
+            }
+
+            // Draw a VS Code-like thin insertion caret at the text boundary.
+            const int cursor_w = 2;
+            const int cursor_x = std::max(panel_x_ + padding, panel_x_ + padding + prefix_width - 1);
+            const int cursor_y = input_y + 2;
+            const int cursor_h = std::max(4, line_height - 4);
+
+            SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (surface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                const int cursor_alpha = static_cast<int>(std::lround(220.0 * alpha));
+                SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGBA(fmt, nullptr, 210, 255, 220, static_cast<Uint8>(std::clamp(cursor_alpha, 0, 255))));
+                cursor_sprite_->updateTexture(surface);
+                SDL_DestroySurface(surface);
+            }
+
+            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
+            const int sprite_y = std::max(0, screen_h - cursor_y - cursor_h);
+            cursor_sprite_->drawSpriteRect(cursor_x, sprite_y, cursor_w, cursor_h);
+        }
     }
 
 } // namespace mxvk

@@ -86,6 +86,7 @@ namespace mxvk {
         void scrollUp(std::size_t amount = 1);
         void scrollDown(std::size_t amount = 1);
         void ensurePanelSprite();
+        void ensureCursorSprite();
         void updatePanelLayout();
         [[nodiscard]] std::size_t maxScrollOffset() const noexcept;
         [[nodiscard]] static std::vector<std::string> tokenize(const std::string &line);
@@ -93,6 +94,7 @@ namespace mxvk {
 
         VK_Window *window_ = nullptr;
         VK_Sprite *panel_sprite_ = nullptr;
+        VK_Sprite *cursor_sprite_ = nullptr;
         bool visible_ = false;
         bool fade_active_ = false;
         float fade_alpha_ = 0.0f;

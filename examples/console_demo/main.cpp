@@ -50,7 +50,7 @@ namespace example {
                 }
 
                 if (args[0] == "about") {
-                    out << "console_demo: MXVK Vulkan console sample.";
+                    out << "console_demo: MXVK Vulkan console sample.\n(C) 2026 LostSideDead Software\n";
                     return true;
                 }
 
