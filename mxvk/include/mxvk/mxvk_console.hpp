@@ -94,6 +94,12 @@ namespace mxvk {
         VK_Window *window_ = nullptr;
         VK_Sprite *panel_sprite_ = nullptr;
         bool visible_ = false;
+        bool fade_active_ = false;
+        float fade_alpha_ = 0.0f;
+        float fade_start_alpha_ = 0.0f;
+        float fade_target_alpha_ = 0.0f;
+        Uint64 fade_start_ns_ = 0;
+        Uint64 fade_duration_ns_ = 220000000ULL;
         bool cursor_visible_ = true;
         Uint64 last_cursor_toggle_ns_ = 0;
         std::size_t cursor_pos_ = 0;

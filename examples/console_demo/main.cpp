@@ -25,7 +25,7 @@ namespace example {
             background_ = createSprite(base_path + "/data/background.png", sprite_vert_path, shader_path);
             console_.attach(*this, base_path + "/data/font.ttf", 20);
             console_.setPrompt("mxvk> ");
-            console_.printLine("Press ` to open/close the console.");
+            console_.printLine("Press F3 to open/close the console.");
             console_.printLine("Type 'help' for built-in commands.");
 
             console_.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
@@ -80,7 +80,7 @@ namespace example {
 
             if (!console_.isVisible()) {
                 printText("MXVK Console Demo", 14, 12, SDL_Color{255, 255, 255, 255});
-                printText("Press ` to toggle console. Press ESC to quit when console is hidden.",
+                printText("Press F3 to toggle console. Press ESC to quit when console is hidden.",
                           14,
                           38,
                           SDL_Color{180, 180, 220, 255});

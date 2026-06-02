@@ -9,6 +9,7 @@
 #include "mxvk/mxvk_sprite.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <sstream>
 
@@ -19,6 +20,11 @@ namespace mxvk {
         window_->setFont(fontPath, fontSize);
         panel_sprite_ = nullptr;
         visible_ = false;
+        fade_active_ = false;
+        fade_alpha_ = 0.0f;
+        fade_start_alpha_ = 0.0f;
+        fade_target_alpha_ = 0.0f;
+        fade_start_ns_ = 0;
         history_index_ = -1;
         cursor_pos_ = 0;
         input_.clear();
@@ -37,14 +43,23 @@ namespace mxvk {
     }
 
     void VK_Console::setVisible(const bool value) noexcept {
-        visible_ = value;
-        if (visible_) {
+        if (value) {
+            visible_ = true;
+            fade_start_alpha_ = fade_alpha_;
+            fade_target_alpha_ = 1.0f;
+            fade_start_ns_ = SDL_GetTicksNS();
+            fade_active_ = true;
             if (window_ != nullptr) {
                 SDL_StartTextInput(window_->getSDLWindow());
             }
             follow_tail_ = true;
             scroll_offset_ = 0;
         } else {
+            visible_ = false;
+            fade_start_alpha_ = fade_alpha_;
+            fade_target_alpha_ = 0.0f;
+            fade_start_ns_ = SDL_GetTicksNS();
+            fade_active_ = true;
             if (window_ != nullptr) {
                 SDL_StopTextInput(window_->getSDLWindow());
             }
@@ -52,19 +67,11 @@ namespace mxvk {
     }
 
     void VK_Console::show() noexcept {
-        visible_ = true;
-        if (window_ != nullptr) {
-            SDL_StartTextInput(window_->getSDLWindow());
-        }
-        follow_tail_ = true;
-        scroll_offset_ = 0;
+        setVisible(true);
     }
 
     void VK_Console::hide() noexcept {
-        visible_ = false;
-        if (window_ != nullptr) {
-            SDL_StopTextInput(window_->getSDLWindow());
-        }
+        setVisible(false);
     }
 
     void VK_Console::toggle() noexcept {
@@ -76,7 +83,7 @@ namespace mxvk {
     }
 
     bool VK_Console::isVisible() const noexcept {
-        return visible_;
+        return visible_ || fade_alpha_ > 0.0f || fade_active_;
     }
 
     void VK_Console::setMaxLines(const std::size_t maxLines) {
@@ -291,7 +298,7 @@ namespace mxvk {
     }
 
     void VK_Console::handleEvent(const SDL_Event &event) {
-        if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_GRAVE) {
+        if (event.type == SDL_EVENT_KEY_DOWN && (event.key.key == SDLK_F3)) {
             toggle();
             return;
         }
@@ -374,9 +381,37 @@ namespace mxvk {
     }
 
     void VK_Console::draw() {
-        if (!visible_ || window_ == nullptr) {
+        if (window_ == nullptr) {
             return;
         }
+
+        if (fade_active_) {
+            const Uint64 now = SDL_GetTicksNS();
+            const double elapsed = static_cast<double>(now - fade_start_ns_);
+            const double duration = static_cast<double>(fade_duration_ns_);
+            const float t = static_cast<float>(std::clamp(elapsed / std::max(1.0, duration), 0.0, 1.0));
+            fade_alpha_ = fade_start_alpha_ + ((fade_target_alpha_ - fade_start_alpha_) * t);
+            if (t >= 1.0f) {
+                fade_alpha_ = fade_target_alpha_;
+                fade_active_ = false;
+            }
+        }
+
+        if (!(visible_ || fade_alpha_ > 0.0f)) {
+            return;
+        }
+
+        const float alpha = std::clamp(fade_alpha_, 0.0f, 1.0f);
+        if (alpha <= 0.0f) {
+            return;
+        }
+
+        const auto scaledColor = [alpha](const SDL_Color &src) {
+            SDL_Color out = src;
+            const int scaled = static_cast<int>(std::lround(static_cast<double>(src.a) * alpha));
+            out.a = static_cast<Uint8>(std::clamp(scaled, 0, 255));
+            return out;
+        };
 
         updatePanelLayout();
         ensurePanelSprite();
@@ -384,6 +419,16 @@ namespace mxvk {
             const VkExtent2D extent = window_->getSwapchainExtent();
             const int screen_h = static_cast<int>(extent.height);
             const int sprite_y = std::max(0, screen_h - panel_y_ - panel_h_);
+
+            SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (surface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                const int panel_alpha = static_cast<int>(std::lround(170.0 * alpha));
+                SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGBA(fmt, nullptr, 0, 0, 0, static_cast<Uint8>(std::clamp(panel_alpha, 0, 255))));
+                panel_sprite_->updateTexture(surface);
+                SDL_DestroySurface(surface);
+            }
+
             panel_sprite_->drawSpriteRect(panel_x_, sprite_y, panel_w_, panel_h_);
         }
 
@@ -397,7 +442,7 @@ namespace mxvk {
         const int padding = 10;
 
         int y = panel_y_ + padding;
-        window_->printText("MXVK Console (` to toggle)", panel_x_ + padding, y, info_color_);
+        window_->printText("MXVK Console (F3 to toggle)", panel_x_ + padding, y, scaledColor(info_color_));
         y += line_height;
 
         const int input_y = panel_y_ + panel_h_ - padding - line_height;
@@ -414,12 +459,12 @@ namespace mxvk {
         const std::size_t start = (lines_.size() > visible_lines) ? (lines_.size() - visible_lines - scroll_offset_) : 0;
         const std::size_t end = std::min(lines_.size(), start + visible_lines);
         for (std::size_t i = start; i < end; ++i) {
-            window_->printText(lines_[i], panel_x_ + padding, y, text_color_);
+            window_->printText(lines_[i], panel_x_ + padding, y, scaledColor(text_color_));
             y += line_height;
         }
 
         if (scroll_offset_ > 0) {
-            window_->printText(std::format("^ {} line(s) newer below", scroll_offset_), panel_x_ + padding, input_y - line_height, info_color_);
+            window_->printText(std::format("^ {} line(s) newer below", scroll_offset_), panel_x_ + padding, input_y - line_height, scaledColor(info_color_));
         }
 
         const Uint64 now = SDL_GetTicksNS();
@@ -434,7 +479,7 @@ namespace mxvk {
         if (cursor_visible_) {
             line.insert(prompt_.size() + cursor_pos_, 1, '_');
         }
-        window_->printText(line, panel_x_ + padding, input_y, prompt_color_);
+        window_->printText(line, panel_x_ + padding, input_y, scaledColor(prompt_color_));
     }
 
 } // namespace mxvk
