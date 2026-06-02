@@ -82,7 +82,6 @@ namespace example {
                                      ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
                                      : 1.0f;
 
-            // Legacy glitch_cube rotation cadence was +50 degrees per second.
             const float rotationAngle = elapsedSeconds * glm::radians(50.0f);
 
             mxvk::UniformBufferObject ubo{};

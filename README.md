@@ -100,6 +100,7 @@ Examples (in each subproject build directory):
 ./Pool3D 
 ./fractal_zoom
 ./console_demo -r 1280x720
+./glitch_cube -r 1280x720
 ./opencv_example --camera 0 -r 1280x720
 ./opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
@@ -129,6 +130,13 @@ Current example executables:
 
 ### `tux_example`
 - Renders a 3D model with a textured animated background and on-screen text.
+
+### `glitch_cube`
+- MXVK Vulkan port of the legacy `gl_glitch_cube` demo from MX2.
+- Uses `VKAbstractModel` with GLSL 450 shaders (`model.vert/.frag`) and runtime-compiled SPIR-V.
+- Controls:
+	- `Space` toggles rotation axis behavior.
+	- `PageUp`/`PageDown` scales the cube larger/smaller at runtime.
 
 ### `asteroids`
 - Full game example with game state management, controller/keyboard input, particles, and HUD.
