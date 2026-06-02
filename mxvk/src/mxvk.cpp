@@ -321,6 +321,19 @@ namespace mxvk {
 
         std::vector<const char *> enabled_extensions(extensions, extensions + extension_count);
 
+#if defined(MXVK_USE_MOLTENVK)
+        const auto append_instance_extension_if_missing = [&enabled_extensions](const char *extension_name) {
+            const bool exists = std::ranges::any_of(
+                enabled_extensions,
+                [extension_name](const char *existing) { return std::strcmp(existing, extension_name) == 0; });
+            if (!exists) {
+                enabled_extensions.push_back(extension_name);
+            }
+        };
+        append_instance_extension_if_missing(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        append_instance_extension_if_missing(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
+
         std::vector<const char *> enabled_layers{};
         VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
         if (validation_enabled) {
@@ -362,6 +375,9 @@ namespace mxvk {
         create_info.pNext = validation_enabled ? &debug_create_info : nullptr;
 
         create_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
+    #if defined(MXVK_USE_MOLTENVK)
+        create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+    #endif
 
         std::cout << "vk: creating Vulkan instance\n";
         if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS) {
@@ -660,7 +676,25 @@ namespace mxvk {
             queue_create_info.pQueuePriorities = &queue_priority;
             queue_create_infos.push_back(queue_create_info);
         }
-        const std::array<const char *, 1> required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        std::vector<const char *> required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+#if defined(MXVK_USE_MOLTENVK)
+        uint32_t device_extension_count = 0;
+        vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, nullptr);
+        std::vector<VkExtensionProperties> device_extensions(device_extension_count);
+        if (device_extension_count > 0U) {
+            vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, device_extensions.data());
+        }
+
+        const bool has_portability_subset = std::ranges::any_of(
+            device_extensions,
+            [](const VkExtensionProperties &ext) {
+                return std::strcmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME) == 0;
+            });
+
+        if (has_portability_subset) {
+            required_device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+        }
+#endif
         VkPhysicalDeviceFeatures2 features2{};
         features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         VkPhysicalDeviceVulkan13Features supported_vulkan13_features{};
