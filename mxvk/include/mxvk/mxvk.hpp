@@ -109,6 +109,9 @@ namespace mxvk {
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
 
+        /** @brief Get the underlying SDL window handle. */
+        [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
+
         /** @brief Get the Vulkan logical device handle. */
         [[nodiscard]] VkDevice getDevice() const noexcept { return device; }
 

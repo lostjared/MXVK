@@ -168,6 +168,7 @@ endif()
 add_subdirectory(volk)
 add_library(mxvk STATIC
     mxvk/src/mxvk.cpp
+    mxvk/src/mxvk_console.cpp
     mxvk/src/mxvk_controller.cpp
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_sprite.cpp
@@ -288,6 +289,7 @@ if(EXAMPLES)
     add_subdirectory(examples/puzzle)
     add_subdirectory(examples/pool_demo)
     add_subdirectory(examples/fractal_zoom)
+    add_subdirectory(examples/console_demo)
     if(CV)
         add_subdirectory(examples/opencv_example)
         add_subdirectory(examples/opencv_model)

@@ -557,9 +557,9 @@ namespace demo {
                 backgroundSprite_->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
                 backgroundSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
                 backgroundSprite_->renderSprites(cmd,
-                                                backgroundSprite_->getPipelineLayout(),
-                                                extent.width,
-                                                extent.height);
+                                                 backgroundSprite_->getPipelineLayout(),
+                                                 extent.width,
+                                                 extent.height);
                 backgroundSprite_->clearQueue();
             }
 
