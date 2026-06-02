@@ -5,8 +5,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <ctime>
 #include <cstring>
+#include <ctime>
 #include <format>
 #include <iomanip>
 #include <iostream>

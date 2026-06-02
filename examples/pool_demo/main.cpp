@@ -19,11 +19,11 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
+#include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
-#include "mxvk/argz.hpp"
 
 namespace {
 
@@ -82,8 +82,19 @@ namespace {
         return dist(eng);
     }
 
-    enum class GameScreen { Intro, Scores, Game, Start };
-    enum class GamePhase { Aiming, Charging, Rolling, Placing, GameOver };
+    enum class GameScreen {
+        Intro,
+        Scores,
+        Game,
+        Start
+    };
+    enum class GamePhase {
+        Aiming,
+        Charging,
+        Rolling,
+        Placing,
+        GameOver
+    };
 
     struct PoolBall {
         glm::vec2 pos{0.0f};
@@ -1612,9 +1623,9 @@ namespace demo {
         SDL_Rect scoresDeleteRect_{0, 0, 0, 0};
     };
 
-} // namespace example
+} // namespace demo
 
-int main(int argc, char **argv) {    
+int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
         std::string assets = args.path.empty() ? POOL_DEMO_ASSET_DIR : args.path;
