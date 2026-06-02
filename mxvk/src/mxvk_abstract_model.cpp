@@ -1105,14 +1105,10 @@ namespace mxvk {
                 throw mxvk::Exception("VKAbstractModel failed to create fill pipeline");
             }
 
-            VkPhysicalDeviceFeatures features{};
-            vkGetPhysicalDeviceFeatures(window_->getPhysicalDevice(), &features);
-            if (features.fillModeNonSolid == VK_TRUE) {
-                rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
-                if (vkCreateGraphicsPipelines(window_->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineWireframe_) != VK_SUCCESS) {
-                    pipelineWireframe_ = VK_NULL_HANDLE;
-                }
-            }
+            // Keep wireframe pipeline disabled by default. The examples render with
+            // filled geometry, and creating a line-mode pipeline requires matching
+            // logical-device feature enablement (fillModeNonSolid).
+            pipelineWireframe_ = VK_NULL_HANDLE;
         } catch (...) {
             if (fragModule != VK_NULL_HANDLE) {
                 vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);

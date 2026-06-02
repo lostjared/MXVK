@@ -631,10 +631,11 @@ namespace mxvk {
         vkGetPhysicalDeviceFeatures2(physical_device, &features2);
 
         std::cout << std::format(
-            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}\n",
+            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}, fillModeNonSolid={}\n",
             supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false",
             supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false",
-            features2.features.shaderFloat64 == VK_TRUE ? "true" : "false");
+            features2.features.shaderFloat64 == VK_TRUE ? "true" : "false",
+            features2.features.fillModeNonSolid == VK_TRUE ? "true" : "false");
 
         if (supported_vulkan13_features.synchronization2 != VK_TRUE) {
             std::cout << "vk: synchronization2 is unsupported on selected physical device\n";
@@ -652,6 +653,7 @@ namespace mxvk {
         VkPhysicalDeviceFeatures2 enabled_features2{};
         enabled_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         enabled_features2.features.shaderFloat64 = features2.features.shaderFloat64;
+        enabled_features2.features.fillModeNonSolid = features2.features.fillModeNonSolid;
 
         enabled_features2.pNext = &vulkan13_features;
 

@@ -25,6 +25,10 @@
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
 
+#ifndef POOL_DEMO_ASSET_DIR
+#define POOL_DEMO_ASSET_DIR "."
+#endif
+
 namespace {
 
     constexpr float kTableW = 12.0f;
@@ -80,6 +84,46 @@ namespace {
         static std::default_random_engine eng(rd());
         std::uniform_real_distribution<float> dist(mn, mx);
         return dist(eng);
+    }
+
+    bool hasPoolAssets(const std::filesystem::path &root) {
+        const std::filesystem::path data = root / "data";
+        return std::filesystem::exists(data / "pooltable_felt.mxmod.z") &&
+               std::filesystem::exists(data / "pooltable_wood.mxmod.z") &&
+               std::filesystem::exists(data / "pooltable_pocket.mxmod.z") &&
+               std::filesystem::exists(data / "table.png");
+    }
+
+    std::string resolveAssetRoot(const std::string &userPath) {
+        std::vector<std::filesystem::path> candidates;
+        if (!userPath.empty() && userPath != "." && userPath != "./") {
+            candidates.emplace_back(userPath);
+        }
+
+        const char *basePath = SDL_GetBasePath();
+        if (basePath != nullptr && basePath[0] != '\0') {
+            candidates.emplace_back(std::filesystem::path(basePath).lexically_normal());
+        }
+
+        candidates.emplace_back(std::filesystem::path(POOL_DEMO_ASSET_DIR).lexically_normal());
+
+        std::error_code ec;
+        const std::filesystem::path cwd = std::filesystem::current_path(ec);
+        if (!ec) {
+            candidates.emplace_back(cwd);
+        }
+
+        for (const auto &candidate : candidates) {
+            if (hasPoolAssets(candidate)) {
+                return candidate.lexically_normal().string();
+            }
+        }
+
+        if (!candidates.empty()) {
+            return candidates.front().lexically_normal().string();
+        }
+
+        return std::string(POOL_DEMO_ASSET_DIR);
     }
 
     enum class GameScreen {
@@ -509,6 +553,16 @@ namespace demo {
                 return;
             }
 
+            if (backgroundSprite_ != nullptr) {
+                backgroundSprite_->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
+                backgroundSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+                backgroundSprite_->renderSprites(cmd,
+                                                backgroundSprite_->getPipelineLayout(),
+                                                extent.width,
+                                                extent.height);
+                backgroundSprite_->clearQueue();
+            }
+
             const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
             const float time = static_cast<float>(SDL_GetTicks()) / 1000.0f;
 
@@ -810,11 +864,6 @@ namespace demo {
         }
 
         void procGame(int width, int height) {
-            if (backgroundSprite_ != nullptr) {
-                backgroundSprite_->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
-                backgroundSprite_->drawSpriteRect(0, 0, width, height);
-            }
-
             const float now = static_cast<float>(SDL_GetTicks()) / 1000.0f;
             float dt = now - lastTime_;
             if (dt > 0.05f) {
@@ -1628,7 +1677,8 @@ namespace demo {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        std::string assets = args.path.empty() ? POOL_DEMO_ASSET_DIR : args.path;
+        std::string assets = resolveAssetRoot(args.path);
+        SDL_Log("pool_demo: using asset root: %s", assets.c_str());
         demo::PoolWindow window(args.width, args.height, args.fullscreen, assets);
         window.loop();
     } catch (const mxvk::Exception &e) {

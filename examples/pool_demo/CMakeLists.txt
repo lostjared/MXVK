@@ -53,7 +53,7 @@ add_custom_target(pool_demo_shaders
 add_dependencies(Pool3D pool_demo_shaders)
 
 target_compile_definitions(Pool3D PRIVATE
-    POOL_DEMO_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    POOL_DEMO_ASSET_DIR="${CMAKE_CURRENT_BINARY_DIR}"
     POOL_DEMO_SHADER_DIR="${POOL_DEMO_SHADER_OUTPUT_DIR}"
 )
 
@@ -71,16 +71,16 @@ endif()
 add_custom_command(TARGET Pool3D POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/data"
-        "$<TARGET_FILE_DIR:Pool3D>/data"
-    COMMENT "Copying data/ assets to build directory"
+        "${CMAKE_CURRENT_BINARY_DIR}/data"
+    COMMENT "Copying data/ assets to pool_demo build directory"
 )
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/font.ttf")
     add_custom_command(TARGET Pool3D POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/font.ttf"
-            "$<TARGET_FILE_DIR:Pool3D>/font.ttf"
-        COMMENT "Copying font.ttf to build directory"
+            "${CMAKE_CURRENT_BINARY_DIR}/font.ttf"
+        COMMENT "Copying font.ttf to pool_demo build directory"
     )
 endif()
 
