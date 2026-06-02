@@ -198,7 +198,7 @@ namespace {
 
 } // namespace
 
-namespace example {
+namespace demo {
 
     class PoolWindow final : public mxvk::VK_Window {
       public:
@@ -1618,7 +1618,7 @@ int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
         std::string assets = args.path.empty() ? POOL_DEMO_ASSET_DIR : args.path;
-        example::PoolWindow window(args.width, args.height, args.fullscreen, assets);
+        demo::PoolWindow window(args.width, args.height, args.fullscreen, assets);
         window.loop();
     } catch (const mxvk::Exception &e) {
         SDL_Log("mxvk: Exception: %s", e.text().c_str());
