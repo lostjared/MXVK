@@ -420,14 +420,17 @@ namespace walk {
 
         void generateCollectibles(std::mt19937 &rng) {
             collectibles_.clear();
-            collectibles_.reserve(maxCollectibles_);
+            const int usableCells = std::max(1, (mazeGridX_ * mazeGridZ_) - 1);
+            const int targetCollectibles = usableCells * collectiblesPerCell_;
+            collectibles_.reserve(static_cast<size_t>(targetCollectibles));
 
             std::vector<Collectible::Type> types;
-            types.reserve(maxCollectibles_);
-            for (int i = 0; i < (maxCollectibles_ / 2); ++i) {
+            types.reserve(static_cast<size_t>(targetCollectibles));
+            const int saturnCount = targetCollectibles / 2;
+            for (int i = 0; i < saturnCount; ++i) {
                 types.push_back(Collectible::Type::Saturn);
             }
-            for (int i = maxCollectibles_ / 2; i < maxCollectibles_; ++i) {
+            for (int i = saturnCount; i < targetCollectibles; ++i) {
                 types.push_back(Collectible::Type::Bird);
             }
             std::shuffle(types.begin(), types.end(), rng);
@@ -438,37 +441,61 @@ namespace walk {
             std::uniform_real_distribution<float> birdRotSpeed(20.0f, 60.0f);
             std::uniform_real_distribution<float> birdHeight(1.5f, 2.5f);
 
-            for (int i = 0; i < maxCollectibles_; ++i) {
-                Collectible obj{};
-                obj.type = types[static_cast<size_t>(i)];
-                if (obj.type == Collectible::Type::Saturn) {
-                    const float scale = saturnScale(rng);
-                    obj.scale = glm::vec3(scale);
-                    obj.rotationSpeed = saturnRotSpeed(rng);
-                    obj.radius = 2.0f * scale;
-                } else {
-                    const float scale = birdScale(rng);
-                    obj.scale = glm::vec3(scale);
-                    obj.rotationSpeed = birdRotSpeed(rng);
-                    obj.radius = 1.5f * scale;
-                }
+            int typeIndex = 0;
+            for (int cellZ = 0; cellZ < mazeGridZ_; ++cellZ) {
+                for (int cellX = 0; cellX < mazeGridX_; ++cellX) {
+                    if (cellX == startCellX_ && cellZ == startCellZ_) {
+                        continue;
+                    }
+                    for (int slot = 0; slot < collectiblesPerCell_; ++slot) {
+                        if (typeIndex >= targetCollectibles) {
+                            break;
+                        }
+                        Collectible obj{};
+                        obj.type = types[static_cast<size_t>(typeIndex)];
+                        if (obj.type == Collectible::Type::Saturn) {
+                            const float scale = saturnScale(rng);
+                            obj.scale = glm::vec3(scale);
+                            obj.rotationSpeed = saturnRotSpeed(rng);
+                            obj.radius = 2.0f * scale;
+                        } else {
+                            const float scale = birdScale(rng);
+                            obj.scale = glm::vec3(scale);
+                            obj.rotationSpeed = birdRotSpeed(rng);
+                            obj.radius = 1.5f * scale;
+                        }
 
-                bool foundSpot = false;
-                for (int attempt = 0; attempt < 24 && !foundSpot; ++attempt) {
-                    const int cellX = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridX_));
-                    const int cellZ = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridZ_));
-                    const float y = (obj.type == Collectible::Type::Bird) ? birdHeight(rng) : 2.5f;
-                    const glm::vec3 candidate = randomPointInCell(cellX, cellZ, obj.radius, y, rng, 0.45f);
-                    if (!checkWallCollision(candidate, obj.radius) && !checkPillarCollision(candidate, obj.radius)) {
-                        obj.position = candidate;
-                        foundSpot = true;
+                        bool foundSpot = false;
+                        glm::vec3 fallback = glm::vec3(0.0f, (obj.type == Collectible::Type::Bird) ? 1.7f : 2.5f, 0.0f);
+                        for (int attempt = 0; attempt < 24 && !foundSpot; ++attempt) {
+                            const float y = (obj.type == Collectible::Type::Bird) ? birdHeight(rng) : 2.5f;
+                            const float margin = (attempt < 18) ? 0.45f : 0.10f;
+                            const glm::vec3 candidate = randomPointInCell(cellX, cellZ, obj.radius, y, rng, margin);
+                            fallback = candidate;
+
+                            bool overlapsOtherCollectible = false;
+                            for (const Collectible &placed : collectibles_) {
+                                const float separation = placed.radius + obj.radius + 0.2f;
+                                if (glm::length(placed.position - candidate) < separation) {
+                                    overlapsOtherCollectible = true;
+                                    break;
+                                }
+                            }
+
+                            if (!overlapsOtherCollectible && !checkWallCollision(candidate, obj.radius) && !checkPillarCollision(candidate, obj.radius)) {
+                                obj.position = candidate;
+                                foundSpot = true;
+                            }
+                        }
+
+                        if (!foundSpot) {
+                            // Keep spawn count fixed: use the last in-cell candidate as a fallback.
+                            obj.position = fallback;
+                        }
+                        collectibles_.push_back(obj);
+                        ++typeIndex;
                     }
                 }
-
-                if (!foundSpot) {
-                    obj.position = glm::vec3(0.0f, (obj.type == Collectible::Type::Bird) ? 1.7f : 2.5f, 0.0f);
-                }
-                collectibles_.push_back(obj);
             }
         }
 
@@ -481,7 +508,7 @@ namespace walk {
         float wallThickness_ = 0.5f;
         int mazeGridX_ = 6;
         int mazeGridZ_ = 6;
-        int maxCollectibles_ = 20;
+        int collectiblesPerCell_ = 2;
         float cellSize_ = 0.0f;
         float eyeHeight_ = 1.7f;
         int startCellX_ = 0;
