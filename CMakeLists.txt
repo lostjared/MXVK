@@ -285,6 +285,7 @@ if(EXAMPLES)
     add_subdirectory(examples/text_example)
     add_subdirectory(examples/model_example)
     add_subdirectory(examples/tux_example)
+    add_subdirectory(examples/glitch_cube)
     add_subdirectory(examples/asteroids)
     add_subdirectory(examples/pong)
     add_subdirectory(examples/puzzle)
@@ -332,6 +333,7 @@ if(EXAMPLES)
         text_example
         model_example
         tux_example
+        glitch_cube
         asteroids
         pong
         puzzle
