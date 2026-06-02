@@ -42,12 +42,25 @@ Useful CMake options:
 - `-DVALIDATION=ON` enables Vulkan validation layers.
 - `-DDEBUG_MODE=ON` enables debug compile flags.
 - `-DCV=ON` enables OpenCV-based examples and capture support.
+- `-DMIXER=ON` enables SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`).
+- `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
+- `-DEXAMPLES=OFF` builds/install only the `mxvk` library and skips all examples.
 
 Example:
 
 ```bash
 cmake -S . -B build -DVALIDATION=ON -DCV=ON
 cmake --build build -j
+```
+
+Additional configure examples:
+
+```bash
+# Build library + examples with audio and JPEG support
+cmake -S . -B build -DMIXER=ON -DJPEG=ON
+
+# Library-only build (faster CI/package build)
+cmake -S . -B build -DEXAMPLES=OFF
 ```
 
 ## Command Line Arguments
@@ -85,6 +98,8 @@ Examples (in each subproject build directory):
 ./model_example -p ./examples/model_example
 ./pong -p ./examples/pong
 ./Pool3D -p ./examples/pool_demo
+./fractal_zoom
+./console_demo -r 1280x720
 ./opencv_example --camera 0 -r 1280x720
 ./opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
@@ -130,6 +145,14 @@ Current example executables:
 ### `puzzle`
 - Puzzle game example ported to MXVK/SDL3.
 - Demonstrates menu/game/scores state flow, sprite-based gameplay grid, and text UI.
+
+### `fractal_zoom`
+- Fullscreen fractal renderer with its own shader pipeline.
+- Demonstrates per-example shader compilation and runtime shader-path wiring.
+
+### `console_demo`
+- Immediate-mode style in-app console and command handling demo.
+- Demonstrates custom post-build asset staging (font/texture/shaders) and runtime data loading.
 
 ### `opencv_example` (requires `-DCV=ON`)
 - Displays camera or video-file frames on a sprite in real time.
