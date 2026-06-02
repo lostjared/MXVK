@@ -1465,6 +1465,9 @@ namespace mxvk {
         scissor.extent = swapchain_extent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+        onRecordCustomRendering(cmd, image_index);
+
+        // Draw 2D overlays after custom scene rendering so HUD/text stays on top.
         if (!sprites_.empty()) {
             if (sprite_pipeline_ != VK_NULL_HANDLE) {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
@@ -1481,8 +1484,6 @@ namespace mxvk {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline_);
             text_renderer_->renderText(cmd, text_pipeline_layout_, swapchain_extent.width, swapchain_extent.height);
         }
-
-        onRecordCustomRendering(cmd, image_index);
 
         vkCmdEndRendering(cmd);
         if (depth_slot < depth_image_initialized.size()) {
