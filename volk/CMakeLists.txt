@@ -3,7 +3,8 @@ add_library(volk STATIC volk.cpp)
 set_target_properties(volk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(volk PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    # Allow #include <volk/volk.h> when using this vendored copy from source.
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
