@@ -288,12 +288,16 @@ class ComputeWindow : public mxvk::VK_Window {
     void endSingleTimeCommands(VkCommandBuffer commandBuffer) const {
         VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
+        VkCommandBufferSubmitInfo commandBufferInfo{};
+        commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferInfo.commandBuffer = commandBuffer;
 
-        VK_CHECK_RESULT(vkQueueSubmit(graphics_queue, 1, &submitInfo, VK_NULL_HANDLE));
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandBufferInfo;
+
+        VK_CHECK_RESULT(vkQueueSubmit2(graphics_queue, 1, &submitInfo, VK_NULL_HANDLE));
         VK_CHECK_RESULT(vkQueueWaitIdle(graphics_queue));
         vkFreeCommandBuffers(device, command_pool, 1, &commandBuffer);
     }
@@ -367,27 +371,15 @@ class ComputeWindow : public mxvk::VK_Window {
             img.memory);
         img.view = createImageView(img.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = img.image;
-        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(
+        transitionImageLayout(
             cmd,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0,
-            0,
-            nullptr,
-            0,
-            nullptr,
-            1,
-            &barrier);
+            img.image,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
     }
 
     void reloadPipeline() {
@@ -551,30 +543,39 @@ class ComputeWindow : public mxvk::VK_Window {
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
 
-        setLayout(
+        transitionImageLayout(
             cmd,
             img.image,
             VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-            VK_ACCESS_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT);
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
-        VkBufferImageCopy region{};
+        VkBufferImageCopy2 region{};
+        region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         region.imageExtent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
-        vkCmdCopyBufferToImage(cmd, stagingBuf_, img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        setLayout(
+        VkCopyBufferToImageInfo2 copyInfo{};
+        copyInfo.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2;
+        copyInfo.srcBuffer = stagingBuf_;
+        copyInfo.dstImage = img.image;
+        copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        copyInfo.regionCount = 1;
+        copyInfo.pRegions = &region;
+        vkCmdCopyBufferToImage2(cmd, &copyInfo);
+
+        transitionImageLayout(
             cmd,
             img.image,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_TRANSFER_WRITE_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 
         endSingleTimeCommands(cmd);
     }
@@ -608,27 +609,15 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void computeBarrier(VkCommandBuffer cmd, VkImage img) const {
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = img;
-        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-        vkCmdPipelineBarrier(
+        transitionImageLayout(
             cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0,
-            0,
-            nullptr,
-            0,
-            nullptr,
-            1,
-            &barrier);
+            img,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
     }
 
     void runComputeFrame() {
@@ -643,73 +632,70 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         {
-            std::array<VkImageMemoryBarrier, 2> barriers{};
-            barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-            barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barriers[0].image = workImg_[srcIdx].image;
-            barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            std::array<VkImageMemoryBarrier2, 2> barriers{};
+            barriers[0] = makeImageBarrier(
+                workImg_[srcIdx].image,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_READ_BIT);
 
-            barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barriers[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-            barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barriers[1].image = histImg_[historyIndex_].image;
-            barriers[1].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            barriers[1].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barriers[1] = makeImageBarrier(
+                histImg_[historyIndex_].image,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
-            vkCmdPipelineBarrier(
-                cmd,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                static_cast<uint32_t>(barriers.size()),
-                barriers.data());
+            VkDependencyInfo dependencyInfo{};
+            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dependencyInfo.pImageMemoryBarriers = barriers.data();
+            vkCmdPipelineBarrier2(cmd, &dependencyInfo);
 
-            VkImageCopy copy{};
+            VkImageCopy2 copy{};
+            copy.sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2;
             copy.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.extent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
-            vkCmdCopyImage(
-                cmd,
+
+            VkCopyImageInfo2 copyInfo{};
+            copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
+            copyInfo.srcImage = workImg_[srcIdx].image;
+            copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            copyInfo.dstImage = histImg_[historyIndex_].image;
+            copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            copyInfo.regionCount = 1;
+            copyInfo.pRegions = &copy;
+            vkCmdCopyImage2(cmd, &copyInfo);
+
+            barriers[0] = makeImageBarrier(
                 workImg_[srcIdx].image,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_READ_BIT,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+
+            barriers[1] = makeImageBarrier(
                 histImg_[historyIndex_].image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1,
-                &copy);
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT);
 
-            barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
-            barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-
-            barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
-            barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barriers[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-            vkCmdPipelineBarrier(
-                cmd,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                static_cast<uint32_t>(barriers.size()),
-                barriers.data());
+            dependencyInfo = {};
+            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dependencyInfo.pImageMemoryBarriers = barriers.data();
+            vkCmdPipelineBarrier2(cmd, &dependencyInfo);
         }
 
         if (historyCount_ < HISTORY_SIZE) {
@@ -721,30 +707,39 @@ class ComputeWindow : public mxvk::VK_Window {
             !spvFiles_.empty() && spvFiles_[currentSpvIndex_].find("metalmedianblend") != std::string::npos;
         dispatchOne(cmd, blendDS_[srcIdx], isMetalMedian ? 2 : 1);
 
-        setLayout(
+        transitionImageLayout(
             cmd,
             outImg_.image,
             VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_ACCESS_TRANSFER_READ_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT);
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_READ_BIT);
 
-        VkBufferImageCopy region{};
+        VkBufferImageCopy2 region{};
+        region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         region.imageExtent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
-        vkCmdCopyImageToBuffer(cmd, outImg_.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readbackBuf_, 1, &region);
 
-        setLayout(
+        VkCopyImageToBufferInfo2 copyInfo{};
+        copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2;
+        copyInfo.srcImage = outImg_.image;
+        copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        copyInfo.dstBuffer = readbackBuf_;
+        copyInfo.regionCount = 1;
+        copyInfo.pRegions = &region;
+        vkCmdCopyImageToBuffer2(cmd, &copyInfo);
+
+        transitionImageLayout(
             cmd,
             outImg_.image,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_TRANSFER_READ_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_WRITE_BIT);
 
         endSingleTimeCommands(cmd);
 
@@ -794,25 +789,50 @@ class ComputeWindow : public mxvk::VK_Window {
         }
     }
 
-    static void setLayout(VkCommandBuffer cmd,
-                          VkImage img,
-                          VkImageLayout oldLayout,
-                          VkImageLayout newLayout,
-                          VkAccessFlags srcAccess,
-                          VkAccessFlags dstAccess,
-                          VkPipelineStageFlags srcStage,
-                          VkPipelineStageFlags dstStage) {
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    static VkImageMemoryBarrier2 makeImageBarrier(VkImage img,
+                                                  VkImageLayout oldLayout,
+                                                  VkImageLayout newLayout,
+                                                  VkPipelineStageFlags2 srcStage,
+                                                  VkAccessFlags2 srcAccess,
+                                                  VkPipelineStageFlags2 dstStage,
+                                                  VkAccessFlags2 dstAccess) {
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.srcStageMask = srcStage;
+        barrier.srcAccessMask = srcAccess;
+        barrier.dstStageMask = dstStage;
+        barrier.dstAccessMask = dstAccess;
         barrier.oldLayout = oldLayout;
         barrier.newLayout = newLayout;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = img;
         barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        barrier.srcAccessMask = srcAccess;
-        barrier.dstAccessMask = dstAccess;
-        vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        return barrier;
+    }
+
+    static void transitionImageLayout(VkCommandBuffer cmd,
+                                      VkImage img,
+                                      VkImageLayout oldLayout,
+                                      VkImageLayout newLayout,
+                                      VkPipelineStageFlags2 srcStage,
+                                      VkAccessFlags2 srcAccess,
+                                      VkPipelineStageFlags2 dstStage,
+                                      VkAccessFlags2 dstAccess) {
+        const VkImageMemoryBarrier2 barrier = makeImageBarrier(
+            img,
+            oldLayout,
+            newLayout,
+            srcStage,
+            srcAccess,
+            dstStage,
+            dstAccess);
+
+        VkDependencyInfo dependencyInfo{};
+        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependencyInfo.imageMemoryBarrierCount = 1;
+        dependencyInfo.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(cmd, &dependencyInfo);
     }
 
     void destroyComputeResources() {
