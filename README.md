@@ -95,9 +95,9 @@ General run pattern:
 Examples (in each subproject build directory):
 ```bash
 ./sprite_example -r 1920x1080 -f
-./model_example -p ./examples/model_example
-./pong -p ./examples/pong
-./Pool3D -p ./examples/pool_demo
+./model_example 
+./pong 
+./Pool3D 
 ./fractal_zoom
 ./console_demo -r 1280x720
 ./opencv_example --camera 0 -r 1280x720
