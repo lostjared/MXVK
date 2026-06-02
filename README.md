@@ -83,6 +83,8 @@ Examples (in each subproject build directory):
 ```bash
 ./sprite_example -r 1920x1080 -f
 ./model_example -p ./examples/model_example
+./pong -p ./examples/pong
+./Pool3D -p ./examples/pool_demo
 ./opencv_example --camera 0 -r 1280x720
 ./opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
@@ -116,6 +118,14 @@ Current example executables:
 ### `asteroids`
 - Full game example with game state management, controller/keyboard input, particles, and HUD.
 - Good reference for a complete gameplay loop on top of MXVK.
+
+### `pong`
+- 3D-styled Pong demo with paddle/ball gameplay implemented on top of MXVK rendering hooks.
+- Demonstrates runtime asset copying, model-based scene elements, and real-time game-state updates.
+
+### `pool_demo` (`Pool3D` executable)
+- 3D pool/billiards demo built directly on MXVK dynamic rendering.
+- Demonstrates multi-model scene composition, per-object transforms, and interactive cue/ball simulation flow.
 
 ### `puzzle`
 - Puzzle game example ported to MXVK/SDL3.
