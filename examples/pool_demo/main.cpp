@@ -23,6 +23,7 @@
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/argz.hpp"
 
 namespace {
 
@@ -1613,20 +1614,11 @@ namespace example {
 
 } // namespace example
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv) {    
     try {
-        const int width = (argc > 1) ? std::atoi(argv[1]) : 1280;
-        const int height = (argc > 2) ? std::atoi(argv[2]) : 720;
-        const bool fullscreen = (argc > 3) && std::string(argv[3]) == "--fullscreen";
-
-        std::filesystem::path assetRoot = ".";
-        if (!std::filesystem::exists(assetRoot / "data" / "background.png")) {
-#ifdef POOL_DEMO_ASSET_DIR
-            assetRoot = POOL_DEMO_ASSET_DIR;
-#endif
-        }
-
-        example::PoolWindow window(width, height, fullscreen, assetRoot.string());
+        Arguments args = proc_args(argc, argv);
+        std::string assets = args.path.empty() ? POOL_DEMO_ASSET_DIR : args.path;
+        example::PoolWindow window(args.width, args.height, args.fullscreen, assets);
         window.loop();
     } catch (const mxvk::Exception &e) {
         SDL_Log("mxvk: Exception: %s", e.text().c_str());
