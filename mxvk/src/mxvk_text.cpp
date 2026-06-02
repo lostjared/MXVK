@@ -41,9 +41,6 @@ namespace mxvk {
     }
 
     void VK_Text::clearCache() {
-        if (!textureCache.empty()) {
-            std::cout << std::format("vk: destroying {} cached text texture(s)\n", textureCache.size());
-        }
         for (auto &[key, cached] : textureCache) {
             if (cached.imageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, cached.imageView, nullptr);
@@ -258,8 +255,6 @@ namespace mxvk {
             quad.textImageView = createImageView(quad.textImage, VK_FORMAT_R8G8B8A8_UNORM);
 
             SDL_DestroySurface(rgbaSurface);
-
-            std::cout << std::format("mxvk: Cached new glyph: \"{}\" ({}x{})\n", text, quad.width, quad.height);
 
             // Store in cache
             textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
