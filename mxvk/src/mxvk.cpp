@@ -375,9 +375,9 @@ namespace mxvk {
         create_info.pNext = validation_enabled ? &debug_create_info : nullptr;
 
         create_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
-    #if defined(MXVK_USE_MOLTENVK)
+#if defined(MXVK_USE_MOLTENVK)
         create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-    #endif
+#endif
 
         std::cout << "vk: creating Vulkan instance\n";
         if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS) {

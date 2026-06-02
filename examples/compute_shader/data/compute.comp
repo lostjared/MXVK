@@ -1,0 +1,50 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Binding 0: output storage image (compute writes here)
+layout(set = 0, binding = 0, rgba8) uniform image2D destTex;
+// Binding 1: current camera / work frame (sampled)
+layout(set = 0, binding = 1) uniform sampler2D sourceTex;
+layout(set = 0, binding = 2) uniform sampler2D historyTex[8];
+
+layout(push_constant) uniform PC {
+    int mode;           
+    int historyCount;   
+    int historyIdx;     
+    int square_size;    
+    int history_dir;    
+} pc;
+
+
+vec3 blur3x3(ivec2 pos, ivec2 imgSize) {
+    vec3 sum = vec3(0.0);
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            ivec2 sp = clamp(pos + ivec2(dx, dy), ivec2(0), imgSize - ivec2(1));
+            sum += texelFetch(sourceTex, sp, 0).rgb;
+        }
+    }
+    return sum / 9.0;
+}
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 sz  = imageSize(destTex);
+    if (pos.x >= sz.x || pos.y >= sz.y) return;
+    if (pc.mode == 0) {
+        imageStore(destTex, pos, vec4(blur3x3(pos, sz), 1.0));
+        return;
+    }
+    vec3 cur = texelFetch(sourceTex, pos, 0).rgb;
+    if (pc.historyCount <= 0) {
+        imageStore(destTex, pos, vec4(cur, 1.0));
+        return;
+    }
+    int idx  = clamp(pc.historyIdx, 0, pc.historyCount - 1);
+    vec3 hist = texelFetch(historyTex[idx], pos, 0).rgb;
+    int safeSquare = max(pc.square_size, 1);
+    int blockRow   = pos.y / safeSquare;
+    float phase    = float(blockRow + pc.historyIdx * pc.history_dir) * 0.3927; // pi/8
+    float blend    = clamp(0.5 + 0.45 * sin(phase), 0.05, 0.95);
+    imageStore(destTex, pos, vec4(mix(cur, hist, blend), 1.0));
+}
