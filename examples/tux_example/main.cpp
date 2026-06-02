@@ -20,9 +20,7 @@ namespace example {
       public:
         ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-              assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path),
-              fallbackWidth_(width),
-              fallbackHeight_(height) {
+                            assetRoot_(path.empty() ? std::string(tux_example_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot_ + "/data/tux.obj") : filename;
             const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
@@ -50,21 +48,6 @@ namespace example {
         }
 
         void proc() override {
-            if (background_ == nullptr) {
-                return;
-            }
-
-            int targetWidth = fallbackWidth_;
-            int targetHeight = fallbackHeight_;
-            if (swapchain_extent.width > 0U && swapchain_extent.height > 0U) {
-                targetWidth = static_cast<int>(swapchain_extent.width);
-                targetHeight = static_cast<int>(swapchain_extent.height);
-            }
-
-            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
-            background_->setShaderParams(elapsedSeconds, 0.0f, 0.0f, 0.0f);
-            background_->drawSpriteRect(0, 0, targetWidth, targetHeight);
-
             printText("Tux Example", 15, 15, {255, 255, 255, 255});
         }
 
@@ -75,6 +58,14 @@ namespace example {
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
             const VkExtent2D extent = getSwapchainExtent();
+
+            if (background_ != nullptr && sprite_pipeline_ != VK_NULL_HANDLE && sprite_pipeline_layout_ != VK_NULL_HANDLE) {
+                background_->setShaderParams(elapsedSeconds, 0.0f, 0.0f, 0.0f);
+                background_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+                background_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+                // Prevent the generic overlay pass from drawing the same full-screen sprite on top.
+                background_->clearQueue();
+            }
 
             const float aspect = (extent.height > 0U)
                                      ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
@@ -96,8 +87,6 @@ namespace example {
         std::string assetRoot_;
         mxvk::VK_Sprite *background_ = nullptr;
         mxvk::VKAbstractModel model_{};
-        int fallbackWidth_ = 1280;
-        int fallbackHeight_ = 720;
         std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
     };
 
