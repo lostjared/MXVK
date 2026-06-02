@@ -49,16 +49,28 @@ target_compile_definitions(model_example PRIVATE
 set(MODEL_EXAMPLE_MODEL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj)
 set(MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/texture_manifest.txt)
 set(MODEL_EXAMPLE_TEXTURE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/sandstone_brick.png)
+set(MODEL_EXAMPLE_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
+
+foreach(_asset
+    ${MODEL_EXAMPLE_MODEL_SOURCE}
+    ${MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE}
+    ${MODEL_EXAMPLE_TEXTURE_SOURCE}
+)
+    if(NOT EXISTS ${_asset})
+        message(FATAL_ERROR "model_example missing required asset: ${_asset}")
+    endif()
+endforeach()
+
 add_custom_command(TARGET model_example POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:model_example>/data
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${MODEL_EXAMPLE_MODEL_SOURCE}
-        $<TARGET_FILE_DIR:model_example>/data/pyramid.obj
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/pyramid.obj
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE}
-        $<TARGET_FILE_DIR:model_example>/data/texture_manifest.txt
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/texture_manifest.txt
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${MODEL_EXAMPLE_TEXTURE_SOURCE}
-        $<TARGET_FILE_DIR:model_example>/data/sandstone_brick.png
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/sandstone_brick.png
     COMMENT "Copying model example assets to runtime output directory"
 )
