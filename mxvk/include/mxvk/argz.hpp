@@ -632,6 +632,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     Arguments args;
     Argz<std::string> parser(argc, argv);
     parser.addOptionSingle('h', "Display help message")
+        .addOptionSingle('v', "Print version")
         .addOptionSingleValue('p', "assets path")
         .addOptionDoubleValue('P', "path", "assets path")
         .addOptionSingleValue('r', "Resolution WidthxHeight")
