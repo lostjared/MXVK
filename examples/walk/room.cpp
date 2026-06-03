@@ -2453,6 +2453,30 @@ namespace walk {
             }
         }
 
+        void event(SDL_Event &e) override {
+            const bool is_left_double_click =
+                (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                 e.button.button == SDL_BUTTON_LEFT &&
+                 e.button.clicks >= 2);
+
+            if (is_left_double_click) {
+                if (SDL_Window *const sdlWindow = getSDLWindow(); sdlWindow != nullptr) {
+                    SDL_RaiseWindow(sdlWindow);
+                    SDL_SetWindowMouseGrab(sdlWindow, true);
+                    SDL_SetWindowRelativeMouseMode(sdlWindow, true);
+                }
+
+                mouseCapture_ = true;
+                firstMouse_ = true;
+                if (!visible()) {
+                    suppressProjectileOnNextLeftDown_ = true;
+                }
+                logEnv("mouse capture enabled (double-click)");
+            }
+
+            mxvk::VK_IOWindow::event(e);
+        }
+
         void console_event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_QUIT) {
                 logEnv("received quit event");
@@ -2465,6 +2489,7 @@ namespace walk {
                     if (mouseCapture_) {
                         mouseCapture_ = false;
                         SDL_SetWindowRelativeMouseMode(getSDLWindow(), false);
+                        suppressProjectileOnNextLeftDown_ = false;
                         logEnv("mouse capture disabled (ESC)");
                     } else {
                         logEnv("exit requested by ESC");
@@ -2515,6 +2540,10 @@ namespace walk {
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT && mouseCapture_) {
+                if (suppressProjectileOnNextLeftDown_) {
+                    suppressProjectileOnNextLeftDown_ = false;
+                    return;
+                }
                 fireProjectile();
             }
         }
@@ -3732,6 +3761,7 @@ namespace walk {
         float pitch_ = 0.0f;
         bool mouseCapture_ = true;
         bool firstMouse_ = true;
+        bool suppressProjectileOnNextLeftDown_ = false;
         bool showFps_ = true;
         float mouseSensitivity_ = 0.15f;
 
