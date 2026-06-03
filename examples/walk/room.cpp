@@ -3711,19 +3711,20 @@ namespace walk {
                 if (lineHitCollectible(previous, bullet.position, collectibleIndex, collectibleImpact)) {
                     createExplosion(collectibleImpact, 5000, false);
                     const Collectible::Type hitType = world_.collectibles()[collectibleIndex].type;
-                    const int removedInCluster = deactivateCollectibleCluster(collectibleIndex, collectibleImpact);
+                    const bool removed = deactivateCollectibleAt(collectibleIndex);
                     resolveCollectibleClusters(2.0f, 3);
                     bullet.active = false;
-                    destroyedCount_ += static_cast<uint32_t>(std::max(removedInCluster, 1));
-                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={} (+{})",
+                    if (removed) {
+                        ++destroyedCount_;
+                    }
+                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
                                        bulletIndex,
                                        collectibleTypeName(hitType),
                                        collectibleIndex,
                                        collectibleImpact.x,
                                        collectibleImpact.y,
                                        collectibleImpact.z,
-                                       destroyedCount_,
-                                       std::max(removedInCluster, 1)));
+                                       destroyedCount_));
                     continue;
                 }
 
@@ -4308,31 +4309,19 @@ namespace walk {
             }
         }
 
-        int deactivateCollectibleCluster(size_t primaryIndex, const glm::vec3 &anchorPoint) {
+        [[nodiscard]] bool deactivateCollectibleAt(size_t index) {
             std::vector<Collectible> &collectibles = world_.collectibles();
-            if (primaryIndex >= collectibles.size()) {
-                return 0;
+            if (index >= collectibles.size()) {
+                return false;
             }
 
-            const glm::vec3 anchor = anchorPoint;
-            const float clusterRadius = std::max(2.5f, collectibles[primaryIndex].radius * 4.0f);
-            const float clusterRadiusSq = clusterRadius * clusterRadius;
-
-            int removed = 0;
-            for (Collectible &obj : collectibles) {
-                if (!obj.active) {
-                    continue;
-                }
-                const glm::vec3 delta = obj.position - anchor;
-                if (glm::dot(delta, delta) > clusterRadiusSq) {
-                    continue;
-                }
-
-                obj.active = false;
-                ++removed;
+            Collectible &obj = collectibles[index];
+            if (!obj.active) {
+                return false;
             }
 
-            return removed;
+            obj.active = false;
+            return true;
         }
 
         std::string assetRoot_;
