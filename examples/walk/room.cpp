@@ -46,6 +46,7 @@ namespace walk {
 
         Type type = Type::Saturn;
         glm::vec3 position{0.0f};
+        glm::vec3 hitCenterOffset{0.0f};
         glm::vec3 rotation{0.0f};
         glm::vec3 scale{1.0f};
         float rotationSpeed = 12.0f;
@@ -164,7 +165,21 @@ namespace walk {
                 if (!collectibles_[i].active) {
                     continue;
                 }
-                if (glm::length(collectibles_[i].position - point) < collectibles_[i].radius) {
+                const Collectible &collectible = collectibles_[i];
+                const glm::vec3 center = collectible.position + collectible.hitCenterOffset;
+                if (collectible.type == Collectible::Type::Bird) {
+                    const glm::vec3 delta = point - center;
+                    const float halfSide = collectible.radius;
+                    if (std::abs(delta.x) <= halfSide &&
+                        std::abs(delta.y) <= halfSide &&
+                        std::abs(delta.z) <= halfSide) {
+                        indexOut = i;
+                        return true;
+                    }
+                    continue;
+                }
+
+                if (glm::length(center - point) < collectible.radius) {
                     indexOut = i;
                     return true;
                 }
@@ -440,7 +455,6 @@ namespace walk {
             std::uniform_real_distribution<float> saturnRotSpeed(5.0f, 15.0f);
             std::uniform_real_distribution<float> birdScale(0.3f, 0.5f);
             std::uniform_real_distribution<float> birdRotSpeed(20.0f, 60.0f);
-            std::uniform_real_distribution<float> birdHeight(1.5f, 2.5f);
 
             int typeIndex = 0;
             for (int cellZ = 0; cellZ < mazeGridZ_; ++cellZ) {
@@ -463,13 +477,13 @@ namespace walk {
                             const float scale = birdScale(rng);
                             obj.scale = glm::vec3(scale);
                             obj.rotationSpeed = birdRotSpeed(rng);
-                            obj.radius = 1.5f * scale;
+                            obj.radius = 0.5f * scale;
                         }
 
                         bool foundSpot = false;
-                        glm::vec3 fallback = glm::vec3(0.0f, (obj.type == Collectible::Type::Bird) ? 1.7f : 2.5f, 0.0f);
+                        glm::vec3 fallback = glm::vec3(0.0f, (obj.type == Collectible::Type::Bird) ? obj.radius : 2.5f, 0.0f);
                         for (int attempt = 0; attempt < 24 && !foundSpot; ++attempt) {
-                            const float y = (obj.type == Collectible::Type::Bird) ? birdHeight(rng) : 2.5f;
+                            const float y = (obj.type == Collectible::Type::Bird) ? obj.radius : 2.5f;
                             const float margin = (attempt < 18) ? 0.45f : 0.10f;
                             const glm::vec3 candidate = randomPointInCell(cellX, cellZ, obj.radius, y, rng, margin);
                             fallback = candidate;
@@ -2426,8 +2440,9 @@ namespace walk {
 
             loadModel(saturnModel_, assetRoot_ + "/data/saturn.mxmod.z",
                       assetRoot_ + "/data/planet.tex", assetRoot_ + "/data", vertPath, objectFragPath);
-            loadModel(birdModel_, assetRoot_ + "/data/bird.mxmod.z",
-                      assetRoot_ + "/data/bird.tex", assetRoot_ + "/data", vertPath, objectFragPath);
+            loadModel(birdModel_, assetRoot_ + "/data/tux.obj",
+                      assetRoot_ + "/data/tux.mtl", assetRoot_ + "/data", vertPath, objectFragPath);
+            normalizeCollectiblesToModel();
 
             pointParticleVertSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
             pointParticleFragSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.frag.spv";
@@ -2702,7 +2717,6 @@ namespace walk {
                 std::uniform_real_distribution<float> saturnRotSpeed(5.0f, 15.0f);
                 std::uniform_real_distribution<float> birdScale(0.3f, 0.5f);
                 std::uniform_real_distribution<float> birdRotSpeed(20.0f, 60.0f);
-                std::uniform_real_distribution<float> birdHeight(1.5f, 2.5f);
 
                 int added = 0;
                 for (int i = 0; i < toAdd; ++i) {
@@ -2712,17 +2726,19 @@ namespace walk {
                         const float scale = saturnScale(rng_);
                         obj.scale = glm::vec3(scale);
                         obj.rotationSpeed = saturnRotSpeed(rng_);
-                        obj.radius = 2.0f * scale;
+                        obj.radius = saturnHitRadiusForScale(scale);
+                        obj.hitCenterOffset = saturnHitCenterOffsetForScale(scale);
                     } else {
                         const float scale = birdScale(rng_);
                         obj.scale = glm::vec3(scale);
                         obj.rotationSpeed = birdRotSpeed(rng_);
-                        obj.radius = 1.5f * scale;
+                        obj.radius = birdHitHalfSideForScale(scale);
+                        obj.hitCenterOffset = birdHitCenterOffsetForScale(scale);
                     }
 
                     bool placed = false;
                     for (int attempt = 0; attempt < 96; ++attempt) {
-                        const float y = (obj.type == Collectible::Type::Bird) ? birdHeight(rng_) : 2.5f;
+                        const float y = (obj.type == Collectible::Type::Bird) ? birdGroundYForScale(obj.scale.x) : 2.5f;
                         glm::vec3 candidate{};
                         if (!sampleNavigablePoint(y, obj.radius, candidate, 1)) {
                             continue;
@@ -2843,6 +2859,7 @@ namespace walk {
                 const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng_())))
                                                          : rng_();
                 world_.generate(seed);
+                normalizeCollectiblesToModel();
                 cameraPos_ = world_.startPosition();
                 yaw_ = chooseBestSpawnYaw(cameraPos_);
                 pitch_ = 0.0f;
@@ -3592,7 +3609,7 @@ namespace walk {
             std::uniform_real_distribution<float> elevationDist(-(pi / 6.0f), pi / 3.0f);
             std::uniform_real_distribution<float> colorDist(0.7f, 1.0f);
 
-            const int count = std::min(requestedCount, 400);
+            const int count = std::min(requestedCount * 2, 800);
             logEnv(std::format("explosion at ({:.2f}, {:.2f}, {:.2f}) particles={} style={}",
                                position.x,
                                position.y,
@@ -3719,16 +3736,153 @@ namespace walk {
         }
 
         [[nodiscard]] bool lineHitCollectible(const glm::vec3 &from, const glm::vec3 &to, size_t &indexOut, glm::vec3 &impactOut) const {
-            constexpr int steps = 5;
-            for (int i = 0; i <= steps; ++i) {
-                const float t = static_cast<float>(i) / static_cast<float>(steps);
-                const glm::vec3 point = from + (to - from) * t;
-                if (world_.checkCollectibleCollision(point, indexOut)) {
-                    impactOut = point;
-                    return true;
+            const glm::vec3 dir = to - from;
+            const float dirLen2 = glm::dot(dir, dir);
+            if (dirLen2 <= 1e-8f) {
+                return false;
+            }
+
+            bool found = false;
+            float bestT = 2.0f;
+            size_t bestIndex = 0;
+
+            const std::vector<Collectible> &collectibles = world_.collectibles();
+            for (size_t i = 0; i < collectibles.size(); ++i) {
+                const Collectible &obj = collectibles[i];
+                if (!obj.active) {
+                    continue;
+                }
+
+                float tHit = 2.0f;
+                bool hit = false;
+
+                if (obj.type == Collectible::Type::Bird) {
+                    const glm::vec3 halfExtents(obj.radius);
+                    const glm::vec3 center = obj.position + obj.hitCenterOffset;
+                    const glm::vec3 boxMin = center - halfExtents;
+                    const glm::vec3 boxMax = center + halfExtents;
+
+                    float tMin = 0.0f;
+                    float tMax = 1.0f;
+                    bool slabMiss = false;
+
+                    for (int axis = 0; axis < 3; ++axis) {
+                        const float origin = from[axis];
+                        const float delta = dir[axis];
+                        const float minB = boxMin[axis];
+                        const float maxB = boxMax[axis];
+
+                        if (std::abs(delta) <= 1e-8f) {
+                            if (origin < minB || origin > maxB) {
+                                slabMiss = true;
+                                break;
+                            }
+                            continue;
+                        }
+
+                        float t0 = (minB - origin) / delta;
+                        float t1 = (maxB - origin) / delta;
+                        if (t0 > t1) {
+                            std::swap(t0, t1);
+                        }
+
+                        tMin = std::max(tMin, t0);
+                        tMax = std::min(tMax, t1);
+                        if (tMin > tMax) {
+                            slabMiss = true;
+                            break;
+                        }
+                    }
+
+                    if (!slabMiss) {
+                        hit = true;
+                        tHit = tMin;
+                    }
+                } else {
+                    const glm::vec3 center = obj.position + obj.hitCenterOffset;
+                    const glm::vec3 m = from - center;
+                    const float a = dirLen2;
+                    const float b = 2.0f * glm::dot(m, dir);
+                    const float c = glm::dot(m, m) - (obj.radius * obj.radius);
+                    const float discriminant = (b * b) - (4.0f * a * c);
+                    if (discriminant >= 0.0f) {
+                        const float sqrtD = std::sqrt(discriminant);
+                        const float invDen = 1.0f / (2.0f * a);
+                        const float t0 = (-b - sqrtD) * invDen;
+                        const float t1 = (-b + sqrtD) * invDen;
+                        if (t0 >= 0.0f && t0 <= 1.0f) {
+                            hit = true;
+                            tHit = t0;
+                        } else if (t1 >= 0.0f && t1 <= 1.0f) {
+                            hit = true;
+                            tHit = t1;
+                        }
+                    }
+                }
+
+                if (hit && tHit >= 0.0f && tHit <= 1.0f && tHit < bestT) {
+                    found = true;
+                    bestT = tHit;
+                    bestIndex = i;
                 }
             }
-            return false;
+
+            if (!found) {
+                return false;
+            }
+
+            indexOut = bestIndex;
+            impactOut = from + (dir * bestT);
+            return true;
+        }
+
+        [[nodiscard]] float birdGroundYForScale(float scale) const {
+            const glm::vec3 extent = birdModel_.modelAxisExtent();
+            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const float modelMinY = -centerOffset.y - (extent.y * 0.5f);
+            const float clampedScale = std::max(scale, 0.0001f);
+            return std::max(0.0f, -modelMinY * clampedScale);
+        }
+
+        [[nodiscard]] float birdHitHalfSideForScale(float scale) const {
+            const glm::vec3 extent = birdModel_.modelAxisExtent();
+            const float modelSide = std::max({extent.x, extent.y, extent.z, 0.0001f});
+            const float clampedScale = std::max(scale, 0.0001f);
+            return 0.5f * modelSide * clampedScale;
+        }
+
+        [[nodiscard]] float saturnHitRadiusForScale(float scale) const {
+            const glm::vec3 extent = saturnModel_.modelAxisExtent();
+            const float modelDiameter = std::max({extent.x, extent.y, extent.z, 0.0001f});
+            const float clampedScale = std::max(scale, 0.0001f);
+            return 0.5f * modelDiameter * clampedScale;
+        }
+
+        [[nodiscard]] glm::vec3 saturnHitCenterOffsetForScale(float scale) const {
+            const glm::vec3 centerOffset = saturnModel_.modelCenterOffset();
+            const float clampedScale = std::max(scale, 0.0001f);
+            return glm::vec3(-centerOffset.x * clampedScale,
+                             -centerOffset.y * clampedScale,
+                             -centerOffset.z * clampedScale);
+        }
+
+        [[nodiscard]] glm::vec3 birdHitCenterOffsetForScale(float scale) const {
+            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const float clampedScale = std::max(scale, 0.0001f);
+            return glm::vec3(0.0f, -centerOffset.y * clampedScale, 0.0f);
+        }
+
+        void normalizeCollectiblesToModel() {
+            for (Collectible &obj : world_.collectibles()) {
+                if (obj.type == Collectible::Type::Bird) {
+                    obj.radius = birdHitHalfSideForScale(obj.scale.x);
+                    obj.hitCenterOffset = birdHitCenterOffsetForScale(obj.scale.x);
+                    obj.position.y = birdGroundYForScale(obj.scale.x);
+                } else {
+                    obj.radius = saturnHitRadiusForScale(obj.scale.x);
+                    obj.hitCenterOffset = saturnHitCenterOffsetForScale(obj.scale.x);
+                }
+            }
         }
 
         std::string assetRoot_;
