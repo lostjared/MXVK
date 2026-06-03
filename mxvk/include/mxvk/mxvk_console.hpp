@@ -80,6 +80,8 @@ namespace mxvk {
         [[nodiscard]] const std::string &inputBuffer() const noexcept;
 
       private:
+        void pushOutputLine(std::string line);
+        void trimOutputToLimits();
         void submitInput();
         void historyUp();
         void historyDown();
@@ -133,9 +135,11 @@ namespace mxvk {
         std::string prompt_ = "> ";
         std::string input_{};
         std::deque<std::string> lines_{};
+        std::size_t total_line_chars_ = 0;
         std::vector<std::string> history_{};
         int history_index_ = -1;
-        std::size_t max_lines_ = 300;
+        std::size_t max_lines_ = 1200;
+        std::size_t max_total_chars_ = 128 * 1024;
         std::size_t max_visible_lines_ = 18;
         SDL_Color text_color_{220, 235, 255, 255};
         SDL_Color prompt_color_{120, 220, 160, 255};

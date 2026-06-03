@@ -93,9 +93,7 @@ namespace mxvk {
 
     void VK_Console::setMaxLines(const std::size_t maxLines) {
         max_lines_ = std::max<std::size_t>(1, maxLines);
-        while (lines_.size() > max_lines_) {
-            lines_.pop_front();
-        }
+        trimOutputToLimits();
         scroll_offset_ = std::min(scroll_offset_, maxScrollOffset());
     }
 
@@ -112,23 +110,21 @@ namespace mxvk {
         while (start <= line.size()) {
             const std::size_t nl = line.find('\n', start);
             if (nl == std::string::npos) {
-                lines_.push_back(line.substr(start));
+                pushOutputLine(line.substr(start));
                 break;
             }
 
-            lines_.push_back(line.substr(start, nl - start));
+            pushOutputLine(line.substr(start, nl - start));
             start = nl + 1;
 
             // Preserve a trailing newline as an empty visual line.
             if (start == line.size()) {
-                lines_.push_back(std::string{});
+                pushOutputLine(std::string{});
                 break;
             }
         }
 
-        while (lines_.size() > max_lines_) {
-            lines_.pop_front();
-        }
+        trimOutputToLimits();
         if (follow_tail_) {
             scroll_offset_ = 0;
         } else {
@@ -137,12 +133,29 @@ namespace mxvk {
     }
 
     void VK_Console::clear() {
+        total_line_chars_ = 0;
         lines_.clear();
         input_.clear();
         cursor_pos_ = 0;
         scroll_offset_ = 0;
         follow_tail_ = true;
         history_index_ = -1;
+    }
+
+    void VK_Console::pushOutputLine(std::string line) {
+        if (max_total_chars_ > 0 && line.size() > max_total_chars_) {
+            line = line.substr(line.size() - max_total_chars_);
+        }
+
+        total_line_chars_ += line.size();
+        lines_.push_back(std::move(line));
+    }
+
+    void VK_Console::trimOutputToLimits() {
+        while (!lines_.empty() && (lines_.size() > max_lines_ || total_line_chars_ > max_total_chars_)) {
+            total_line_chars_ -= lines_.front().size();
+            lines_.pop_front();
+        }
     }
 
     std::size_t VK_Console::maxScrollOffset() const noexcept {
