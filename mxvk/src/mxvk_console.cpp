@@ -105,21 +105,21 @@ namespace mxvk {
         return input_;
     }
 
-    void VK_Console::printLine(const std::string &line) {
+    void VK_Console::printLine(const std::string &line, const SDL_Color color) {
         std::size_t start = 0;
         while (start <= line.size()) {
             const std::size_t nl = line.find('\n', start);
             if (nl == std::string::npos) {
-                pushOutputLine(line.substr(start));
+                pushOutputLine(line.substr(start), color);
                 break;
             }
 
-            pushOutputLine(line.substr(start, nl - start));
+            pushOutputLine(line.substr(start, nl - start), color);
             start = nl + 1;
 
             // Preserve a trailing newline as an empty visual line.
             if (start == line.size()) {
-                pushOutputLine(std::string{});
+                pushOutputLine(std::string{}, color);
                 break;
             }
         }
@@ -143,17 +143,21 @@ namespace mxvk {
     }
 
     void VK_Console::pushOutputLine(std::string line) {
+        pushOutputLine(std::move(line), text_color_);
+    }
+
+    void VK_Console::pushOutputLine(std::string line, const SDL_Color color) {
         if (max_total_chars_ > 0 && line.size() > max_total_chars_) {
             line = line.substr(line.size() - max_total_chars_);
         }
 
         total_line_chars_ += line.size();
-        lines_.push_back(std::move(line));
+        lines_.push_back(OutputLine{std::move(line), color});
     }
 
     void VK_Console::trimOutputToLimits() {
         while (!lines_.empty() && (lines_.size() > max_lines_ || total_line_chars_ > max_total_chars_)) {
-            total_line_chars_ -= lines_.front().size();
+            total_line_chars_ -= lines_.front().text.size();
             lines_.pop_front();
         }
     }
@@ -683,7 +687,7 @@ namespace mxvk {
         const std::size_t start = (lines_.size() > visible_lines) ? (lines_.size() - visible_lines - scroll_offset_) : 0;
         const std::size_t end = std::min(lines_.size(), start + visible_lines);
         for (std::size_t i = start; i < end; ++i) {
-            window_->printText(lines_[i], panel_x_ + padding, y, scaledColor(text_color_));
+            window_->printText(lines_[i].text, panel_x_ + padding, y, scaledColor(lines_[i].color));
             y += line_height;
         }
 

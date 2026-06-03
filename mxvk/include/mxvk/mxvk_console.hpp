@@ -43,8 +43,12 @@ namespace mxvk {
         /** @brief Draw the current console overlay. Call once per frame from `proc()`. */
         void draw();
 
-        /** @brief Append one line to console output. */
-        void printLine(const std::string &line);
+        /**
+         * @brief Append one line to console output.
+         * @param line Text to append. Embedded newlines are split into separate lines.
+         * @param color Optional text color for this output line. Defaults to white.
+         */
+        void printLine(const std::string &line, SDL_Color color = SDL_Color{255, 255, 255, 255});
 
         /** @brief Clear all buffered output lines. */
         void clear();
@@ -80,7 +84,13 @@ namespace mxvk {
         [[nodiscard]] const std::string &inputBuffer() const noexcept;
 
       private:
+        struct OutputLine {
+            std::string text;
+            SDL_Color color;
+        };
+
         void pushOutputLine(std::string line);
+        void pushOutputLine(std::string line, SDL_Color color);
         void trimOutputToLimits();
         void submitInput();
         void historyUp();
@@ -134,7 +144,7 @@ namespace mxvk {
         bool follow_tail_ = true;
         std::string prompt_ = "> ";
         std::string input_{};
-        std::deque<std::string> lines_{};
+        std::deque<OutputLine> lines_{};
         std::size_t total_line_chars_ = 0;
         std::vector<std::string> history_{};
         int history_index_ = -1;
