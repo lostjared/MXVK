@@ -212,6 +212,7 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_model.cpp
     mxvk/src/mxvk_abstract_model.cpp
     mxvk/src/mxvk_cfg.cpp
+    mxvk/src/mxvk_io_window.cpp
 )
 if(MIXER)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_sound.cpp)

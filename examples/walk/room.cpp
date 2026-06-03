@@ -1,26 +1,27 @@
+#include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <format>
-#include <iostream>
-#include <random>
-#include <string>
-#include <vector>
-
-#include <SDL3/SDL.h>
-
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
+#include <iostream>
+#include <random>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_io_window.hpp"
 #include "mxvk/mxvk_png.hpp"
 
 namespace walk {
@@ -2369,14 +2370,22 @@ namespace walk {
         mxvk::VK_Window *window_ = nullptr;
     };
 
-    class WalkWindow final : public mxvk::VK_Window {
+    class WalkWindow final : public mxvk::VK_IOWindow {
       public:
         WalkWindow(const Arguments &args)
-            : mxvk::VK_Window("FPS Maze Room - MXVK", args.width, args.height, args.fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen),
               assetRoot_(args.path.empty() ? std::string(WALK_ASSET_DIR) : args.path),
               modelRoot_(WALK_MODELS_DIR) {
+            logEnv(std::format("initializing window {}x{} (fullscreen={})", args.width, args.height, args.fullscreen ? "true" : "false"));
+            logEnv(std::format("asset root: {}", assetRoot_));
+            logEnv(std::format("model root: {}", modelRoot_));
+
             std::mt19937 rng(static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
             world_.generate(rng());
+            logEnv(std::format("world generated (walls={}, pillars={}, collectibles={})",
+                               world_.walls().size(),
+                               world_.pillars().size(),
+                               world_.collectibles().size()));
             setClearColor(100.0f / 255.0f, 181.0f / 255.0f, 246.0f / 255.0f, 1.0f);
 
             cameraPos_ = world_.startPosition();
@@ -2399,17 +2408,21 @@ namespace walk {
             loadModel(floorModel_, modelRoot_ + "/cube.mxmod.z", groundTexManifest, assetRoot_ + "/data", vertPath, floorFragPath);
             loadModel(bulletModel_, modelRoot_ + "/sphere.mxmod.z", "", "", vertPath, bulletFragPath);
 
+            logEnv("loading wall renderer assets");
             rawWallRenderer_.load(this,
                                   groundTexManifest,
                                   assetRoot_ + "/data",
                                   loadSpv(pillarVertPath),
                                   loadSpv(wallFragPath));
+            logEnv("wall renderer ready");
 
+            logEnv("loading pillar renderer assets");
             rawPillarRenderer_.load(this,
                                     groundTexManifest,
                                     assetRoot_ + "/data",
                                     loadSpv(pillarVertPath),
                                     loadSpv(pillarFragPath));
+            logEnv("pillar renderer ready");
 
             loadModel(saturnModel_, assetRoot_ + "/data/saturn.mxmod.z",
                       assetRoot_ + "/data/planet.tex", assetRoot_ + "/data", vertPath, objectFragPath);
@@ -2419,12 +2432,15 @@ namespace walk {
             pointParticleVertSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
             pointParticleFragSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.frag.spv";
             initializePointParticles();
+            logEnv("point-particle pipeline initialized");
 
             tryOpenFirstGamepad();
             SDL_SetWindowRelativeMouseMode(getSDLWindow(), true);
+            logEnv("mouse capture enabled");
         }
 
         ~WalkWindow() override {
+            logEnv("shutting down walk window");
             if (gamepad_ != nullptr) {
                 SDL_CloseGamepad(gamepad_);
                 gamepad_ = nullptr;
@@ -2437,8 +2453,9 @@ namespace walk {
             }
         }
 
-        void event(SDL_Event &e) override {
+        void console_event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_QUIT) {
+                logEnv("received quit event");
                 exit();
                 return;
             }
@@ -2448,21 +2465,26 @@ namespace walk {
                     if (mouseCapture_) {
                         mouseCapture_ = false;
                         SDL_SetWindowRelativeMouseMode(getSDLWindow(), false);
+                        logEnv("mouse capture disabled (ESC)");
                     } else {
+                        logEnv("exit requested by ESC");
                         exit();
                         return;
                     }
                 } else if (e.key.key == SDLK_F) {
                     showFps_ = !showFps_;
+                    logEnv(std::format("FPS overlay {}", showFps_ ? "enabled" : "disabled"));
                 }
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+                logEnv(std::format("gamepad added (id={})", static_cast<int>(e.gdevice.which)));
                 openGamepad(e.gdevice.which);
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
                 if (gamepad_ != nullptr && e.gdevice.which == gamepadId_) {
+                    logEnv(std::format("gamepad removed (id={})", static_cast<int>(e.gdevice.which)));
                     SDL_CloseGamepad(gamepad_);
                     gamepad_ = nullptr;
                     gamepadId_ = 0;
@@ -2471,11 +2493,13 @@ namespace walk {
 
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
                 if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK || e.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
+                    logEnv("exit requested by gamepad back/start");
                     exit();
                 } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
                     fireProjectile();
                 } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH && cameraPos_.y <= 1.71f) {
                     jumpVelocity_ = 0.3f;
+                    logEnv("jump triggered by gamepad");
                 }
             }
 
@@ -2495,34 +2519,39 @@ namespace walk {
             }
         }
 
-        void proc() override {
+        void console_proc() override {
             tryOpenFirstGamepad();
             const auto now = std::chrono::steady_clock::now();
             const float deltaTime = std::chrono::duration<float>(now - lastTick_).count();
             lastTick_ = now;
             deltaTime_ = std::clamp(deltaTime, 0.0f, 0.05f);
 
-            updatePlayer(deltaTime_);
+            if (!visible()) {
+                updatePlayer(deltaTime_);
+            }
             updateProjectiles(deltaTime_);
             updateExplosions(deltaTime_);
             updateCollectibles(deltaTime_);
 
             const int aliveObjects = world_.activeCollectibles();
-            printText(std::format("Objects left: {}", aliveObjects), 20, 20, {255, 255, 255, 255});
-            printText(std::format("Active Bullets: {}", bullets_.size()), 20, 48, {255, 220, 120, 255});
-            if (showFps_ && deltaTime_ > 0.0001f) {
-                const int fps = static_cast<int>(1.0f / deltaTime_);
-                printText(std::format("FPS: {}", fps), 20, 76, {120, 255, 120, 255});
-            }
+            if (!visible()) {
+                printText(std::format("Objects left: {}", aliveObjects), 20, 20, {255, 255, 255, 255});
+                printText(std::format("Active Bullets: {}", bullets_.size()), 20, 48, {255, 220, 120, 255});
+                if (showFps_ && deltaTime_ > 0.0001f) {
+                    const int fps = static_cast<int>(1.0f / deltaTime_);
+                    printText(std::format("FPS: {}", fps), 20, 76, {120, 255, 120, 255});
+                }
 
-            const VkExtent2D extent = getSwapchainExtent();
-            const int cx = static_cast<int>(extent.width / 2U);
-            const int cy = static_cast<int>(extent.height / 2U);
-            printText("+", cx - 6, cy - 12, {255, 64, 64, 255});
-            printText("3D Room - WASD/Left Stick move, Mouse/Right Stick look, Click/RB shoot, Back/Start quit", 20, static_cast<int>(extent.height) - 36, {210, 210, 210, 255});
+                const VkExtent2D extent = getSwapchainExtent();
+                const int cx = static_cast<int>(extent.width / 2U);
+                const int cy = static_cast<int>(extent.height / 2U);
+                printText("+", cx - 6, cy - 12, {255, 64, 64, 255});
+                printText("3D Room - WASD/Left Stick move, Mouse/Right Stick look, Click/RB shoot, Back/Start quit", 20, static_cast<int>(extent.height) - 36, {210, 210, 210, 255});
+            }
         }
 
         void onSwapchainRecreated() override {
+            logEnv("swapchain recreated; resizing render resources");
             floorModel_.resize(this);
             rawWallRenderer_.resize(this);
             rawPillarRenderer_.resize(this);
@@ -2600,6 +2629,318 @@ namespace walk {
         }
 
       private:
+        bool handleConsoleCommand(const std::vector<std::string> &args, std::ostream &out) override {
+            if (args.empty()) {
+                return true;
+            }
+
+            const std::string &cmd = args[0];
+
+            if (cmd == "spawn_random" || (cmd == "spawn" && args.size() >= 2 && args[1] == "random")) {
+                const int attempts = (args.size() >= 3 && cmd == "spawn") ? parseIntOrDefault(args[2], 128)
+                                                                          : ((args.size() >= 2 && cmd == "spawn_random") ? parseIntOrDefault(args[1], 128) : 128);
+                glm::vec3 candidate = cameraPos_;
+                if (!sampleNavigablePoint(1.7f, 0.68f, candidate, std::max(1, attempts))) {
+                    candidate = world_.startPosition();
+                }
+
+                cameraPos_ = candidate;
+                yaw_ = chooseBestSpawnYaw(cameraPos_);
+                pitch_ = 0.0f;
+                updateCameraVectors();
+
+                out << std::format("Spawned at random location ({:.2f}, {:.2f}, {:.2f})", cameraPos_.x, cameraPos_.y, cameraPos_.z);
+                logEnv("command: spawn_random");
+                return true;
+            }
+
+            if (cmd == "reset" || cmd == "reset_collectibles") {
+                for (Collectible &obj : world_.collectibles()) {
+                    obj.active = true;
+                    obj.rotation = glm::vec3(0.0f);
+                }
+                destroyedCount_ = 0;
+                out << std::format("Collectibles reset. Active collectibles: {}", world_.activeCollectibles());
+                logEnv("command: reset collectibles");
+                return true;
+            }
+
+            if (cmd == "add_collectibles" || cmd == "add_collectables") {
+                const int requested = (args.size() >= 2) ? parseIntOrDefault(args[1], 10) : 10;
+                const int toAdd = std::clamp(requested, 1, 200);
+                std::uniform_int_distribution<int> typeDist(0, 1);
+                std::uniform_real_distribution<float> saturnScale(0.4f, 0.8f);
+                std::uniform_real_distribution<float> saturnRotSpeed(5.0f, 15.0f);
+                std::uniform_real_distribution<float> birdScale(0.3f, 0.5f);
+                std::uniform_real_distribution<float> birdRotSpeed(20.0f, 60.0f);
+                std::uniform_real_distribution<float> birdHeight(1.5f, 2.5f);
+
+                int added = 0;
+                for (int i = 0; i < toAdd; ++i) {
+                    Collectible obj{};
+                    obj.type = (typeDist(rng_) == 0) ? Collectible::Type::Saturn : Collectible::Type::Bird;
+                    if (obj.type == Collectible::Type::Saturn) {
+                        const float scale = saturnScale(rng_);
+                        obj.scale = glm::vec3(scale);
+                        obj.rotationSpeed = saturnRotSpeed(rng_);
+                        obj.radius = 2.0f * scale;
+                    } else {
+                        const float scale = birdScale(rng_);
+                        obj.scale = glm::vec3(scale);
+                        obj.rotationSpeed = birdRotSpeed(rng_);
+                        obj.radius = 1.5f * scale;
+                    }
+
+                    bool placed = false;
+                    for (int attempt = 0; attempt < 96; ++attempt) {
+                        const float y = (obj.type == Collectible::Type::Bird) ? birdHeight(rng_) : 2.5f;
+                        glm::vec3 candidate{};
+                        if (!sampleNavigablePoint(y, obj.radius, candidate, 1)) {
+                            continue;
+                        }
+
+                        bool overlaps = false;
+                        for (const Collectible &existing : world_.collectibles()) {
+                            if (!existing.active) {
+                                continue;
+                            }
+                            const float separation = existing.radius + obj.radius + 0.2f;
+                            if (glm::length(existing.position - candidate) < separation) {
+                                overlaps = true;
+                                break;
+                            }
+                        }
+
+                        if (!overlaps) {
+                            obj.position = candidate;
+                            placed = true;
+                            break;
+                        }
+                    }
+
+                    if (placed) {
+                        world_.collectibles().push_back(obj);
+                        ++added;
+                    }
+                }
+
+                out << std::format("Added {} collectible(s). Active collectibles: {}",
+                                   added,
+                                   world_.activeCollectibles());
+                logEnv(std::format("command: add_collectibles requested={} added={}", toAdd, added));
+                return true;
+            }
+
+            if (cmd == "status") {
+                out << std::format("pos=({:.2f}, {:.2f}, {:.2f}) yaw={:.2f} pitch={:.2f}\n"
+                                   "walls={} pillars={} collectibles(active/total)={}/{} bullets={} particles={} destroyed={}",
+                                   cameraPos_.x,
+                                   cameraPos_.y,
+                                   cameraPos_.z,
+                                   yaw_,
+                                   pitch_,
+                                   world_.walls().size(),
+                                   world_.pillars().size(),
+                                   world_.activeCollectibles(),
+                                   world_.collectibles().size(),
+                                   bullets_.size(),
+                                   explosionParticles_.size(),
+                                   destroyedCount_);
+                return true;
+            }
+
+            if (cmd == "teleport") {
+                if (args.size() < 4) {
+                    out << "Usage: teleport <x> <y> <z>";
+                    return true;
+                }
+
+                float x = 0.0f;
+                float y = 0.0f;
+                float z = 0.0f;
+                if (!tryParseFloat(args[1], x) || !tryParseFloat(args[2], y) || !tryParseFloat(args[3], z)) {
+                    out << "teleport: invalid numeric argument(s)";
+                    return true;
+                }
+
+                const glm::vec3 candidate{x, y, z};
+                if (world_.checkWallCollision(candidate, 0.68f) || world_.checkPillarCollision(candidate, 0.68f)) {
+                    out << "teleport blocked: target intersects wall/pillar";
+                    return true;
+                }
+
+                cameraPos_ = candidate;
+                out << std::format("Teleported to ({:.2f}, {:.2f}, {:.2f})", x, y, z);
+                logEnv("command: teleport");
+                return true;
+            }
+
+            if (cmd == "clear_bullets") {
+                const std::size_t removed = bullets_.size();
+                bullets_.clear();
+                out << std::format("Cleared {} bullet(s)", removed);
+                return true;
+            }
+
+            if (cmd == "clear_fx") {
+                const std::size_t removed = explosionParticles_.size();
+                explosionParticles_.clear();
+                out << std::format("Cleared {} particle effect(s)", removed);
+                return true;
+            }
+
+            if (cmd == "set_fps") {
+                if (args.size() < 2) {
+                    out << std::format("FPS overlay is currently {}. Usage: set_fps <on|off>", showFps_ ? "on" : "off");
+                    return true;
+                }
+                const std::string value = toLowerCopy(args[1]);
+                if (value == "on" || value == "1" || value == "true") {
+                    showFps_ = true;
+                    out << "FPS overlay enabled";
+                    return true;
+                }
+                if (value == "off" || value == "0" || value == "false") {
+                    showFps_ = false;
+                    out << "FPS overlay disabled";
+                    return true;
+                }
+
+                out << "Usage: set_fps <on|off>";
+                return true;
+            }
+
+            if (cmd == "regen_world") {
+                const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng_())))
+                                                         : rng_();
+                world_.generate(seed);
+                cameraPos_ = world_.startPosition();
+                yaw_ = chooseBestSpawnYaw(cameraPos_);
+                pitch_ = 0.0f;
+                updateCameraVectors();
+                bullets_.clear();
+                explosionParticles_.clear();
+                destroyedCount_ = 0;
+
+                out << std::format("Regenerated world with seed {} (walls={}, pillars={}, collectibles={})",
+                                   seed,
+                                   world_.walls().size(),
+                                   world_.pillars().size(),
+                                   world_.collectibles().size());
+                logEnv(std::format("command: regen_world seed={}", seed));
+                return true;
+            }
+
+            return false;
+        }
+
+        void appendConsoleHelp(std::ostream &out) const override {
+            out << "\nWalk debug commands:\n"
+                << "  spawn_random [attempts]          Spawn player at random valid location\n"
+                << "  spawn random [attempts]          Alias for spawn_random\n"
+                << "  reset                            Reset all collectibles to active\n"
+                << "  add_collectibles [count]         Add random collectibles (alias: add_collectables)\n"
+                << "  status                           Print camera/world/debug state\n"
+                << "  teleport <x> <y> <z>             Teleport player if destination is valid\n"
+                << "  clear_bullets                    Remove all active bullets\n"
+                << "  clear_fx                         Remove all active explosion particles\n"
+                << "  set_fps <on|off>                 Toggle FPS overlay\n"
+                << "  regen_world [seed]               Regenerate maze, pillars, and collectibles";
+        }
+
+        void logEnv(const std::string &message) {
+            print(std::format("[walk] {}", message));
+        }
+
+        [[nodiscard]] static std::string toLowerCopy(std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch) {
+                return static_cast<char>(std::tolower(ch));
+            });
+            return value;
+        }
+
+        [[nodiscard]] static int parseIntOrDefault(const std::string &text, const int fallback) {
+            int value = fallback;
+            const auto begin = text.data();
+            const auto end = text.data() + text.size();
+            const auto [ptr, ec] = std::from_chars(begin, end, value);
+            if (ec != std::errc{} || ptr != end) {
+                return fallback;
+            }
+            return value;
+        }
+
+        [[nodiscard]] static bool tryParseFloat(const std::string &text, float &outValue) {
+            try {
+                size_t parsed = 0;
+                const float value = std::stof(text, &parsed);
+                if (parsed != text.size()) {
+                    return false;
+                }
+                outValue = value;
+                return true;
+            } catch (...) {
+                return false;
+            }
+        }
+
+        bool sampleNavigablePoint(const float y, const float radius, glm::vec3 &outPoint, const int maxAttempts) {
+            float minX = -50.0f;
+            float maxX = 50.0f;
+            float minZ = -50.0f;
+            float maxZ = 50.0f;
+
+            bool haveBounds = false;
+            for (const WallSegment &wall : world_.walls()) {
+                if (!haveBounds) {
+                    minX = std::min(wall.start.x, wall.end.x);
+                    maxX = std::max(wall.start.x, wall.end.x);
+                    minZ = std::min(wall.start.z, wall.end.z);
+                    maxZ = std::max(wall.start.z, wall.end.z);
+                    haveBounds = true;
+                } else {
+                    minX = std::min(minX, std::min(wall.start.x, wall.end.x));
+                    maxX = std::max(maxX, std::max(wall.start.x, wall.end.x));
+                    minZ = std::min(minZ, std::min(wall.start.z, wall.end.z));
+                    maxZ = std::max(maxZ, std::max(wall.start.z, wall.end.z));
+                }
+            }
+
+            if (!haveBounds) {
+                outPoint = world_.startPosition();
+                outPoint.y = y;
+                return true;
+            }
+
+            const float margin = std::max(0.8f, radius + 0.5f);
+            minX += margin;
+            maxX -= margin;
+            minZ += margin;
+            maxZ -= margin;
+
+            if (minX > maxX || minZ > maxZ) {
+                outPoint = world_.startPosition();
+                outPoint.y = y;
+                return true;
+            }
+
+            std::uniform_real_distribution<float> distX(minX, maxX);
+            std::uniform_real_distribution<float> distZ(minZ, maxZ);
+            for (int i = 0; i < maxAttempts; ++i) {
+                const glm::vec3 candidate{distX(rng_), y, distZ(rng_)};
+                if (!world_.checkWallCollision(candidate, radius) && !world_.checkPillarCollision(candidate, radius)) {
+                    outPoint = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        [[nodiscard]] static const char *collectibleTypeName(Collectible::Type type) noexcept {
+            return type == Collectible::Type::Saturn ? "saturn" : "bird";
+        }
+
         void loadModel(mxvk::VKAbstractModel &model,
                        const std::string &modelPath,
                        const std::string &textureManifest,
@@ -2607,9 +2948,11 @@ namespace walk {
                        const std::string &vertSpv,
                        const std::string &fragSpv,
                        bool backfaceCulling = false) {
+            logEnv(std::format("loading model '{}'", modelPath));
             model.load(this, modelPath, textureManifest, textureBase, 1.0f);
             model.setBackfaceCulling(backfaceCulling);
             model.setShaders(this, vertSpv, fragSpv);
+            logEnv(std::format("model ready '{}'", modelPath));
         }
 
         void cleanupModels() {
@@ -2894,9 +3237,14 @@ namespace walk {
             }
             gamepad_ = SDL_OpenGamepad(id);
             if (gamepad_ == nullptr) {
+                logEnv(std::format("failed to open gamepad id={}", static_cast<int>(id)));
                 return false;
             }
             gamepadId_ = id;
+            const char *padName = SDL_GetGamepadName(gamepad_);
+            logEnv(std::format("gamepad connected: id={} name='{}'",
+                               static_cast<int>(id),
+                               padName != nullptr ? padName : "unknown"));
             return true;
         }
 
@@ -3096,8 +3444,14 @@ namespace walk {
             bullet.position = cameraPos_;
             bullet.direction = glm::normalize(cameraFront_);
             bullets_.push_back(bullet);
-            std::cout << "Laser bolt fired from (" << bullet.position.x << ", " << bullet.position.y << ", " << bullet.position.z
-                      << ") in direction (" << bullet.direction.x << ", " << bullet.direction.y << ", " << bullet.direction.z << ")\n";
+            logEnv(std::format("projectile fired from ({:.2f}, {:.2f}, {:.2f}) dir=({:.2f}, {:.2f}, {:.2f}) active_bullets={}",
+                               bullet.position.x,
+                               bullet.position.y,
+                               bullet.position.z,
+                               bullet.direction.x,
+                               bullet.direction.y,
+                               bullet.direction.z,
+                               bullets_.size()));
         }
 
         void updateProjectiles(float deltaTime) {
@@ -3129,7 +3483,11 @@ namespace walk {
                 if (bullet.position.y <= 0.0f) {
                     createExplosion(glm::vec3(bullet.position.x, 0.0f, bullet.position.z), 1500, true);
                     bullet.active = false;
-                    std::cout << "Bullet #" << bulletIndex << " hit floor at (" << bullet.position.x << ", 0, " << bullet.position.z << ")\n";
+                    logEnv(std::format("bullet {} hit floor at ({:.2f}, {:.2f}, {:.2f})",
+                                       bulletIndex,
+                                       bullet.position.x,
+                                       0.0f,
+                                       bullet.position.z));
                     continue;
                 }
 
@@ -3137,29 +3495,45 @@ namespace walk {
                 if (lineHitWall(previous, bullet.position, impact)) {
                     createExplosion(impact, 1500, true);
                     bullet.active = false;
-                    std::cout << "Bullet #" << bulletIndex << " hit wall at (" << impact.x << ", " << impact.y << ", " << impact.z << ")\n";
+                    logEnv(std::format("bullet {} hit wall at ({:.2f}, {:.2f}, {:.2f})",
+                                       bulletIndex,
+                                       impact.x,
+                                       impact.y,
+                                       impact.z));
                     continue;
                 }
                 if (lineHitPillar(previous, bullet.position, impact)) {
                     createExplosion(impact, 1500, true);
                     bullet.active = false;
-                    std::cout << "Bullet #" << bulletIndex << " hit pillar at (" << impact.x << ", " << impact.y << ", " << impact.z << ")\n";
+                    logEnv(std::format("bullet {} hit pillar at ({:.2f}, {:.2f}, {:.2f})",
+                                       bulletIndex,
+                                       impact.x,
+                                       impact.y,
+                                       impact.z));
                     continue;
                 }
 
                 size_t objectIndex = 0;
                 if (lineHitCollectible(previous, bullet.position, objectIndex, impact)) {
                     createExplosion(impact, 5000, false);
+                    const Collectible::Type hitType = world_.collectibles()[objectIndex].type;
                     world_.collectibles()[objectIndex].active = false;
                     bullet.active = false;
                     ++destroyedCount_;
-                    std::cout << "Bullet #" << bulletIndex << " hit object " << objectIndex << "!\n";
+                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
+                                       bulletIndex,
+                                       collectibleTypeName(hitType),
+                                       objectIndex,
+                                       impact.x,
+                                       impact.y,
+                                       impact.z,
+                                       destroyedCount_));
                     continue;
                 }
 
                 if (bullet.lifetime >= bullet.maxLifetime) {
                     bullet.active = false;
-                    std::cout << "Bullet #" << bulletIndex << " dissolved after " << bullet.lifetime << " seconds\n";
+                    logEnv(std::format("bullet {} expired after {:.2f}s", bulletIndex, bullet.lifetime));
                 }
             }
 
@@ -3190,6 +3564,12 @@ namespace walk {
             std::uniform_real_distribution<float> colorDist(0.7f, 1.0f);
 
             const int count = std::min(requestedCount, 400);
+            logEnv(std::format("explosion at ({:.2f}, {:.2f}, {:.2f}) particles={} style={}",
+                               position.x,
+                               position.y,
+                               position.z,
+                               count,
+                               isRed ? "impact" : "collectible"));
             for (int i = 0; i < count; ++i) {
                 ExplosionParticle p{};
                 p.position = position;

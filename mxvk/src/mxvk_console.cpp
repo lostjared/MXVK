@@ -20,6 +20,8 @@ namespace mxvk {
         window_->setFont(fontPath, fontSize);
         panel_sprite_ = nullptr;
         cursor_sprite_ = nullptr;
+        scroll_track_sprite_ = nullptr;
+        scroll_thumb_sprite_ = nullptr;
         visible_ = false;
         fade_active_ = false;
         fade_alpha_ = 0.0f;
@@ -31,6 +33,8 @@ namespace mxvk {
         input_.clear();
         scroll_offset_ = 0;
         follow_tail_ = true;
+        scrollbar_dragging_ = false;
+        scrollbar_drag_offset_ = 0;
     }
 
     void VK_Console::setCommandCallback(CommandCallback callback) {
@@ -192,10 +196,6 @@ namespace mxvk {
         }
 
         const std::string &cmd = args.front();
-        if (cmd == "help") {
-            output << "Built-in commands: help, clear";
-            return true;
-        }
         if (cmd == "clear") {
             clear();
             return true;
@@ -314,6 +314,40 @@ namespace mxvk {
         SDL_DestroySurface(surface);
     }
 
+    void VK_Console::ensureScrollSprites() {
+        if (window_ == nullptr) {
+            return;
+        }
+
+        if (scroll_track_sprite_ == nullptr) {
+            SDL_Surface *trackSurface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (trackSurface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                SDL_FillSurfaceRect(trackSurface, nullptr, SDL_MapRGBA(fmt, nullptr, 255, 255, 255, 80));
+                try {
+                    scroll_track_sprite_ = window_->createSprite(trackSurface);
+                } catch (...) {
+                    scroll_track_sprite_ = nullptr;
+                }
+                SDL_DestroySurface(trackSurface);
+            }
+        }
+
+        if (scroll_thumb_sprite_ == nullptr) {
+            SDL_Surface *thumbSurface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (thumbSurface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                SDL_FillSurfaceRect(thumbSurface, nullptr, SDL_MapRGBA(fmt, nullptr, 190, 225, 255, 180));
+                try {
+                    scroll_thumb_sprite_ = window_->createSprite(thumbSurface);
+                } catch (...) {
+                    scroll_thumb_sprite_ = nullptr;
+                }
+                SDL_DestroySurface(thumbSurface);
+            }
+        }
+    }
+
     void VK_Console::updatePanelLayout() {
         if (window_ == nullptr) {
             return;
@@ -336,6 +370,107 @@ namespace mxvk {
         panel_h_ = std::clamp((screen_h * 42) / 100, 180, std::max(180, screen_h - bottom_margin));
     }
 
+    void VK_Console::refreshVisibleLineCount() {
+        if (window_ == nullptr) {
+            return;
+        }
+
+        updatePanelLayout();
+
+        int glyph_w = 8;
+        int glyph_h = 18;
+        if (!window_->getTextDimensions("M", glyph_w, glyph_h)) {
+            glyph_h = 18;
+        }
+
+        const int line_height = std::max(1, glyph_h + 2);
+        const int padding = 10;
+        const int title_y = panel_y_ + padding;
+        const int first_line_y = title_y + line_height;
+        const int input_y = panel_y_ + panel_h_ - padding - line_height;
+        const int available_height = std::max(line_height, input_y - first_line_y - 6);
+
+        content_top_y_ = first_line_y;
+        content_bottom_y_ = first_line_y + available_height;
+        last_visible_line_count_ = std::max<std::size_t>(1, static_cast<std::size_t>(available_height / line_height));
+        if (follow_tail_) {
+            scroll_offset_ = 0;
+        }
+
+        const std::size_t max_offset = maxScrollOffset();
+        scroll_offset_ = std::min(scroll_offset_, max_offset);
+        updateScrollbarGeometry();
+    }
+
+    void VK_Console::updateScrollbarGeometry() {
+        const int padding = 10;
+        scrollbar_w_ = 10;
+        scrollbar_x_ = panel_x_ + panel_w_ - padding - scrollbar_w_;
+        scrollbar_y_ = content_top_y_;
+        scrollbar_h_ = std::max(0, content_bottom_y_ - content_top_y_);
+
+        if (scrollbar_h_ <= 0) {
+            scrollbar_thumb_h_ = 0;
+            scrollbar_thumb_y_ = scrollbar_y_;
+            return;
+        }
+
+        const std::size_t total_lines = lines_.size();
+        const std::size_t visible_lines = std::max<std::size_t>(1, std::min(max_visible_lines_, last_visible_line_count_));
+
+        if (total_lines <= visible_lines) {
+            scrollbar_thumb_h_ = scrollbar_h_;
+            scrollbar_thumb_y_ = scrollbar_y_;
+            return;
+        }
+
+        const std::size_t max_offset = maxScrollOffset();
+        const double visible_ratio = static_cast<double>(visible_lines) / static_cast<double>(total_lines);
+        scrollbar_thumb_h_ = std::clamp(static_cast<int>(std::lround(static_cast<double>(scrollbar_h_) * visible_ratio)), 16, scrollbar_h_);
+
+        const int travel = std::max(0, scrollbar_h_ - scrollbar_thumb_h_);
+        if (travel == 0 || max_offset == 0) {
+            scrollbar_thumb_y_ = scrollbar_y_;
+            return;
+        }
+
+        const double ratio_top = static_cast<double>(scroll_offset_) / static_cast<double>(max_offset);
+        const int offset_px = static_cast<int>(std::lround((1.0 - ratio_top) * static_cast<double>(travel)));
+        scrollbar_thumb_y_ = scrollbar_y_ + std::clamp(offset_px, 0, travel);
+    }
+
+    bool VK_Console::isPointInScrollbar(const int x, const int y) const noexcept {
+        return scrollbar_h_ > 0 && x >= scrollbar_x_ && x < (scrollbar_x_ + scrollbar_w_) && y >= scrollbar_y_ && y < (scrollbar_y_ + scrollbar_h_);
+    }
+
+    bool VK_Console::isPointInScrollbarThumb(const int x, const int y) const noexcept {
+        return scrollbar_thumb_h_ > 0 && x >= scrollbar_x_ && x < (scrollbar_x_ + scrollbar_w_) && y >= scrollbar_thumb_y_ && y < (scrollbar_thumb_y_ + scrollbar_thumb_h_);
+    }
+
+    void VK_Console::updateScrollFromThumbY(const int thumbY) {
+        const std::size_t max_offset = maxScrollOffset();
+        if (max_offset == 0) {
+            scroll_offset_ = 0;
+            follow_tail_ = true;
+            return;
+        }
+
+        const int travel = std::max(0, scrollbar_h_ - scrollbar_thumb_h_);
+        if (travel == 0) {
+            scroll_offset_ = 0;
+            follow_tail_ = true;
+            return;
+        }
+
+        const int clamped_thumb_y = std::clamp(thumbY, scrollbar_y_, scrollbar_y_ + travel);
+        scrollbar_thumb_y_ = clamped_thumb_y;
+        const double ratio_bottom_to_top = static_cast<double>(clamped_thumb_y - scrollbar_y_) / static_cast<double>(travel);
+        const double ratio_top = 1.0 - ratio_bottom_to_top;
+        scroll_offset_ = static_cast<std::size_t>(std::lround(ratio_top * static_cast<double>(max_offset)));
+        scroll_offset_ = std::min(scroll_offset_, max_offset);
+        follow_tail_ = (scroll_offset_ == 0);
+    }
+
     void VK_Console::handleEvent(const SDL_Event &event) {
         if (event.type == SDL_EVENT_KEY_DOWN && (event.key.key == SDLK_F3)) {
             toggle();
@@ -346,12 +481,44 @@ namespace mxvk {
             return;
         }
 
+        refreshVisibleLineCount();
+
         if (event.type == SDL_EVENT_MOUSE_WHEEL) {
             if (event.wheel.y > 0) {
                 scrollUp(static_cast<std::size_t>(event.wheel.y));
             } else if (event.wheel.y < 0) {
                 scrollDown(static_cast<std::size_t>(-event.wheel.y));
             }
+            return;
+        }
+
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT) {
+            const int mx = event.button.x;
+            const int my = event.button.y;
+            if (isPointInScrollbarThumb(mx, my)) {
+                scrollbar_dragging_ = true;
+                scrollbar_drag_offset_ = my - scrollbar_thumb_y_;
+                return;
+            }
+
+            if (isPointInScrollbar(mx, my)) {
+                const std::size_t page = std::max<std::size_t>(1, last_visible_line_count_ - 1);
+                if (my < scrollbar_thumb_y_) {
+                    scrollUp(page);
+                } else if (my >= (scrollbar_thumb_y_ + scrollbar_thumb_h_)) {
+                    scrollDown(page);
+                }
+                return;
+            }
+        }
+
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_UP && event.button.button == SDL_BUTTON_LEFT) {
+            scrollbar_dragging_ = false;
+            return;
+        }
+
+        if (event.type == SDL_EVENT_MOUSE_MOTION && scrollbar_dragging_) {
+            updateScrollFromThumbY(event.motion.y - scrollbar_drag_offset_);
             return;
         }
 
@@ -455,6 +622,7 @@ namespace mxvk {
         updatePanelLayout();
         ensurePanelSprite();
         ensureCursorSprite();
+        ensureScrollSprites();
         if (panel_sprite_ != nullptr) {
             const VkExtent2D extent = window_->getSwapchainExtent();
             const int screen_h = static_cast<int>(extent.height);
@@ -487,6 +655,8 @@ namespace mxvk {
 
         const int input_y = panel_y_ + panel_h_ - padding - line_height;
         const int available_height = std::max(line_height, input_y - y - 6);
+        content_top_y_ = y;
+        content_bottom_y_ = y + available_height;
         last_visible_line_count_ = std::max<std::size_t>(1, static_cast<std::size_t>(available_height / line_height));
         if (follow_tail_) {
             scroll_offset_ = 0;
@@ -494,6 +664,7 @@ namespace mxvk {
 
         const std::size_t max_offset = maxScrollOffset();
         scroll_offset_ = std::min(scroll_offset_, max_offset);
+        updateScrollbarGeometry();
 
         const std::size_t visible_lines = std::min(std::min(max_visible_lines_, last_visible_line_count_), lines_.size());
         const std::size_t start = (lines_.size() > visible_lines) ? (lines_.size() - visible_lines - scroll_offset_) : 0;
@@ -501,6 +672,37 @@ namespace mxvk {
         for (std::size_t i = start; i < end; ++i) {
             window_->printText(lines_[i], panel_x_ + padding, y, scaledColor(text_color_));
             y += line_height;
+        }
+
+        if (scroll_track_sprite_ != nullptr && scrollbar_h_ > 0) {
+            SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (surface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                const int track_alpha = static_cast<int>(std::lround(96.0 * alpha));
+                SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGBA(fmt, nullptr, 255, 255, 255, static_cast<Uint8>(std::clamp(track_alpha, 0, 255))));
+                scroll_track_sprite_->updateTexture(surface);
+                SDL_DestroySurface(surface);
+            }
+
+            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
+            const int track_sprite_y = std::max(0, screen_h - scrollbar_y_ - scrollbar_h_);
+            scroll_track_sprite_->drawSpriteRect(scrollbar_x_, track_sprite_y, scrollbar_w_, scrollbar_h_);
+        }
+
+        if (scroll_thumb_sprite_ != nullptr && scrollbar_thumb_h_ > 0) {
+            SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
+            if (surface != nullptr) {
+                const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
+                const int base_alpha = scrollbar_dragging_ ? 240 : 190;
+                const int thumb_alpha = static_cast<int>(std::lround(static_cast<double>(base_alpha) * alpha));
+                SDL_FillSurfaceRect(surface, nullptr, SDL_MapRGBA(fmt, nullptr, 190, 225, 255, static_cast<Uint8>(std::clamp(thumb_alpha, 0, 255))));
+                scroll_thumb_sprite_->updateTexture(surface);
+                SDL_DestroySurface(surface);
+            }
+
+            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
+            const int thumb_sprite_y = std::max(0, screen_h - scrollbar_thumb_y_ - scrollbar_thumb_h_);
+            scroll_thumb_sprite_->drawSpriteRect(scrollbar_x_, thumb_sprite_y, scrollbar_w_, scrollbar_thumb_h_);
         }
 
         if (scroll_offset_ > 0) {
