@@ -156,74 +156,81 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void initComputeResources() {
-        if (device == VK_NULL_HANDLE) {
-            throw mxvk::Exception("Compute resources require an initialized Vulkan device");
-        }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
-            createDevice();
-        }
-
-        if (!capture_.open(cameraIndex_)) {
-            throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex_));
-        }
-
-        capture_.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
-        capture_.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
-        capture_.set(cv::CAP_PROP_FPS, 60.0);
-
-        cv::Mat frame;
-        if (!capture_.read(frame) || frame.empty()) {
-            throw mxvk::Exception("Failed to read initial camera frame");
-        }
-
-        texWidth_ = frame.cols;
-        texHeight_ = frame.rows;
-
-        const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth_) * texHeight_ * 4;
-
-        createBuffer(
-            imgBytes,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuf_,
-            stagingMem_);
-
-        createBuffer(
-            imgBytes,
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            readbackBuf_,
-            readbackMem_);
-        VK_CHECK_RESULT(vkMapMemory(device, readbackMem_, 0, imgBytes, 0, &readbackMap_));
-
-        {
-            const VkCommandBuffer cmd = beginSingleTimeCommands();
-            allocCImg(workImg_[0], cmd);
-            allocCImg(workImg_[1], cmd);
-            for (ComputeImage &img : histImg_) {
-                allocCImg(img, cmd);
+        try {
+            if (device == VK_NULL_HANDLE) {
+                throw mxvk::Exception("Compute resources require an initialized Vulkan device");
             }
-            allocCImg(outImg_, cmd);
-            endSingleTimeCommands(cmd);
+            if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+                createDevice();
+            }
+
+            if (!capture_.open(cameraIndex_)) {
+                throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex_));
+            }
+
+            capture_.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
+            capture_.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
+            capture_.set(cv::CAP_PROP_FPS, 60.0);
+
+            cv::Mat frame;
+            if (!capture_.read(frame) || frame.empty()) {
+                throw mxvk::Exception("Failed to read initial camera frame");
+            }
+
+            texWidth_ = frame.cols;
+            texHeight_ = frame.rows;
+
+            const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth_) * texHeight_ * 4;
+
+            createBuffer(
+                imgBytes,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingBuf_,
+                stagingMem_);
+
+            createBuffer(
+                imgBytes,
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                readbackBuf_,
+                readbackMem_);
+            VK_CHECK_RESULT(vkMapMemory(device, readbackMem_, 0, imgBytes, 0, &readbackMap_));
+
+            {
+                const VkCommandBuffer cmd = beginSingleTimeCommands();
+                allocCImg(workImg_[0], cmd);
+                allocCImg(workImg_[1], cmd);
+                for (ComputeImage &img : histImg_) {
+                    allocCImg(img, cmd);
+                }
+                allocCImg(outImg_, cmd);
+                endSingleTimeCommands(cmd);
+            }
+
+            VkSamplerCreateInfo samplerInfo{};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerInfo.maxAnisotropy = 1.0F;
+            VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &computeSampler_));
+
+            loadSPV();
+            buildDescriptorSetLayout();
+            buildComputePipeline();
+            buildDescriptorSets();
+
+            displaySprite_ = createSprite(texWidth_, texHeight_);
+        } catch (...) {
+            // Constructor failure bypasses ~ComputeWindow; cleanup partial Vulkan state here.
+            capture_.close();
+            destroyComputeResources();
+            throw;
         }
-
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.maxAnisotropy = 1.0F;
-        VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &computeSampler_));
-
-        loadSPV();
-        buildDescriptorSetLayout();
-        buildComputePipeline();
-        buildDescriptorSets();
-
-        displaySprite_ = createSprite(texWidth_, texHeight_);
     }
 
     [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
