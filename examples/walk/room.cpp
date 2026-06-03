@@ -490,7 +490,7 @@ namespace walk {
 
                             bool overlapsOtherCollectible = false;
                             for (const Collectible &placed : collectibles_) {
-                                const float separation = placed.radius + obj.radius + 0.2f;
+                                const float separation = std::max(5.0f, placed.radius + obj.radius + 0.2f);
                                 if (glm::length(placed.position - candidate) < separation) {
                                     overlapsOtherCollectible = true;
                                     break;
@@ -523,7 +523,7 @@ namespace walk {
         float wallThickness_ = 0.5f;
         int mazeGridX_ = 6;
         int mazeGridZ_ = 6;
-        int collectiblesPerCell_ = 2;
+        int collectiblesPerCell_ = 1;
         float cellSize_ = 0.0f;
         float eyeHeight_ = 1.7f;
         int startCellX_ = 0;
@@ -2673,6 +2673,46 @@ namespace walk {
         }
 
       private:
+        enum class ProjectileHitType {
+            None,
+            Floor,
+            Wall,
+            Pillar,
+        };
+
+        struct ProjectileTraceHit {
+            ProjectileHitType type = ProjectileHitType::None;
+            glm::vec3 impact{0.0f};
+            size_t collectibleIndex = 0;
+        };
+
+        [[nodiscard]] ProjectileTraceHit traceProjectileSegment(const glm::vec3 &from, const glm::vec3 &to) const {
+            const glm::vec3 dir = to - from;
+            const float travel = glm::length(dir);
+            if (travel <= 1e-8f) {
+                return {};
+            }
+
+            constexpr float sampleStride = 0.03f;
+            constexpr float projectileRadius = 0.015f;
+            const int steps = std::max(1, static_cast<int>(std::ceil(travel / sampleStride)));
+            for (int i = 0; i <= steps; ++i) {
+                const float t = static_cast<float>(i) / static_cast<float>(steps);
+                const glm::vec3 point = from + (dir * t);
+                if (pointHitsWall3D(point, projectileRadius)) {
+                    return {ProjectileHitType::Wall, point, 0};
+                }
+                if (pointHitsPillar3D(point, projectileRadius)) {
+                    return {ProjectileHitType::Pillar, point, 0};
+                }
+                if (point.y <= 0.0f) {
+                    return {ProjectileHitType::Floor, point, 0};
+                }
+            }
+
+            return {};
+        }
+
         bool handleConsoleCommand(const std::vector<std::string> &args, std::ostream &out) override {
             if (args.empty()) {
                 return true;
@@ -2699,10 +2739,14 @@ namespace walk {
             }
 
             if (cmd == "reset" || cmd == "reset_collectibles") {
-                for (Collectible &obj : world_.collectibles()) {
+                std::vector<Collectible> &collectibles = world_.collectibles();
+                for (size_t i = 0; i < collectibles.size(); ++i) {
+                    Collectible &obj = collectibles[i];
                     obj.active = true;
                     obj.rotation = glm::vec3(0.0f);
+                    relocateCollectible(i, 2.0f, 128);
                 }
+                resolveCollectibleClusters(2.0f, 4);
                 destroyedCount_ = 0;
                 out << std::format("Collectibles reset. Active collectibles: {}", world_.activeCollectibles());
                 logEnv("command: reset collectibles");
@@ -2739,8 +2783,9 @@ namespace walk {
                     bool placed = false;
                     for (int attempt = 0; attempt < 96; ++attempt) {
                         const float y = (obj.type == Collectible::Type::Bird) ? birdGroundYForScale(obj.scale.x) : 2.5f;
+                        const float placementRadius = placementRadiusForCollectible(obj);
                         glm::vec3 candidate{};
-                        if (!sampleNavigablePoint(y, obj.radius, candidate, 1)) {
+                        if (!sampleNavigablePoint(y, placementRadius, candidate, 1)) {
                             continue;
                         }
 
@@ -2749,7 +2794,7 @@ namespace walk {
                             if (!existing.active) {
                                 continue;
                             }
-                            const float separation = existing.radius + obj.radius + 0.2f;
+                            const float separation = std::max(5.0f, existing.radius + obj.radius + 0.2f);
                             if (glm::length(existing.position - candidate) < separation) {
                                 overlaps = true;
                                 break;
@@ -2772,6 +2817,7 @@ namespace walk {
                 out << std::format("Added {} collectible(s). Active collectibles: {}",
                                    added,
                                    world_.activeCollectibles());
+                resolveCollectibleClusters(2.0f, 4);
                 logEnv(std::format("command: add_collectibles requested={} added={}", toAdd, added));
                 return true;
             }
@@ -3528,102 +3574,49 @@ namespace walk {
                     }),
                     bullet.trail.end());
 
-                if (bullet.position.y <= 0.0f) {
-                    createExplosion(glm::vec3(bullet.position.x, 0.0f, bullet.position.z), 1500, true);
+                size_t collectibleIndex = 0;
+                glm::vec3 collectibleImpact{0.0f};
+                if (lineHitCollectible(previous, bullet.position, collectibleIndex, collectibleImpact)) {
+                    createExplosion(collectibleImpact, 5000, false);
+                    const Collectible::Type hitType = world_.collectibles()[collectibleIndex].type;
+                    const int removedInCluster = deactivateCollectibleCluster(collectibleIndex, collectibleImpact);
+                    resolveCollectibleClusters(2.0f, 3);
                     bullet.active = false;
-                    logEnv(std::format("bullet {} hit floor at ({:.2f}, {:.2f}, {:.2f})",
+                    destroyedCount_ += static_cast<uint32_t>(std::max(removedInCluster, 1));
+                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={} (+{})",
                                        bulletIndex,
-                                       bullet.position.x,
-                                       0.0f,
-                                       bullet.position.z));
+                                       collectibleTypeName(hitType),
+                                       collectibleIndex,
+                                       collectibleImpact.x,
+                                       collectibleImpact.y,
+                                       collectibleImpact.z,
+                                       destroyedCount_,
+                                       std::max(removedInCluster, 1)));
                     continue;
                 }
 
-                glm::vec3 wallImpact{0.0f};
-                glm::vec3 pillarImpact{0.0f};
-                glm::vec3 collectibleImpact{0.0f};
-                size_t collectibleIndex = 0;
+                const ProjectileTraceHit segmentHit = traceProjectileSegment(previous, bullet.position);
+                if (segmentHit.type != ProjectileHitType::None) {
 
-                const bool hitWall = lineHitWall(previous, bullet.position, wallImpact);
-                const bool hitPillar = lineHitPillar(previous, bullet.position, pillarImpact);
-                const bool hitCollectible = lineHitCollectible(previous, bullet.position, collectibleIndex, collectibleImpact);
-
-                if (hitWall || hitPillar || hitCollectible) {
-                    enum class HitType {
-                        Wall,
-                        Pillar,
-                        Collectible,
-                    };
-
-                    auto distanceSqFromStart = [&previous](const glm::vec3 &point) {
-                        const glm::vec3 delta = point - previous;
-                        return glm::dot(delta, delta);
-                    };
-
-                    float nearestDistanceSq = std::numeric_limits<float>::max();
-                    HitType nearestType = HitType::Wall;
-
-                    if (hitWall) {
-                        nearestDistanceSq = distanceSqFromStart(wallImpact);
-                        nearestType = HitType::Wall;
-                    }
-                    if (hitPillar) {
-                        const float d = distanceSqFromStart(pillarImpact);
-                        if (d < nearestDistanceSq) {
-                            nearestDistanceSq = d;
-                            nearestType = HitType::Pillar;
-                        }
-                    }
-                    if (hitCollectible) {
-                        const float d = distanceSqFromStart(collectibleImpact);
-                        if (d < nearestDistanceSq) {
-                            nearestDistanceSq = d;
-                            nearestType = HitType::Collectible;
-                        }
-                    }
-
-                    if (hitCollectible && (hitWall || hitPillar)) {
-                        const float collectibleDistance = std::sqrt(distanceSqFromStart(collectibleImpact));
-                        float nearestObstacleDistance = std::numeric_limits<float>::max();
-                        if (hitWall) {
-                            nearestObstacleDistance = std::min(nearestObstacleDistance, std::sqrt(distanceSqFromStart(wallImpact)));
-                        }
-                        if (hitPillar) {
-                            nearestObstacleDistance = std::min(nearestObstacleDistance, std::sqrt(distanceSqFromStart(pillarImpact)));
-                        }
-
-                        constexpr float collectibleDepthBias = 0.35f;
-                        if (collectibleDistance <= (nearestObstacleDistance + collectibleDepthBias)) {
-                            nearestType = HitType::Collectible;
-                        }
-                    }
-
-                    if (nearestType == HitType::Collectible) {
-                        createExplosion(collectibleImpact, 5000, false);
-                        const Collectible::Type hitType = world_.collectibles()[collectibleIndex].type;
-                        world_.collectibles()[collectibleIndex].active = false;
+                    if (segmentHit.type == ProjectileHitType::Floor) {
+                        createExplosion(glm::vec3(segmentHit.impact.x, 0.0f, segmentHit.impact.z), 1500, true);
                         bullet.active = false;
-                        ++destroyedCount_;
-                        logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
+                        logEnv(std::format("bullet {} hit floor at ({:.2f}, {:.2f}, {:.2f})",
                                            bulletIndex,
-                                           collectibleTypeName(hitType),
-                                           collectibleIndex,
-                                           collectibleImpact.x,
-                                           collectibleImpact.y,
-                                           collectibleImpact.z,
-                                           destroyedCount_));
+                                           segmentHit.impact.x,
+                                           0.0f,
+                                           segmentHit.impact.z));
                         continue;
                     }
 
-                    const glm::vec3 &impact = (nearestType == HitType::Pillar) ? pillarImpact : wallImpact;
-                    createExplosion(impact, 1500, true);
+                    createExplosion(segmentHit.impact, 1500, true);
                     bullet.active = false;
                     logEnv(std::format("bullet {} hit {} at ({:.2f}, {:.2f}, {:.2f})",
                                        bulletIndex,
-                                       (nearestType == HitType::Pillar) ? "pillar" : "wall",
-                                       impact.x,
-                                       impact.y,
-                                       impact.z));
+                                       (segmentHit.type == ProjectileHitType::Pillar) ? "pillar" : "wall",
+                                       segmentHit.impact.x,
+                                       segmentHit.impact.y,
+                                       segmentHit.impact.z));
                     continue;
                 }
 
@@ -3645,6 +3638,12 @@ namespace walk {
                 if (obj.rotation.y > 360.0f) {
                     obj.rotation.y -= 360.0f;
                 }
+            }
+
+            collectibleClusterResolveTimer_ += deltaTime;
+            if (collectibleClusterResolveTimer_ >= 0.75f) {
+                collectibleClusterResolveTimer_ = 0.0f;
+                resolveCollectibleClusters(2.0f, 2);
             }
         }
 
@@ -3769,13 +3768,13 @@ namespace walk {
             for (int i = 0; i <= steps; ++i) {
                 const float t = static_cast<float>(i) / static_cast<float>(steps);
                 const glm::vec3 point = from + (dir * t);
-                if (world_.checkWallCollision(point, bulletRadius)) {
+                if (pointHitsWall3D(point, bulletRadius)) {
                     float lo = previousT;
                     float hi = t;
                     for (int iter = 0; iter < 10; ++iter) {
                         const float mid = 0.5f * (lo + hi);
                         const glm::vec3 midPoint = from + (dir * mid);
-                        if (world_.checkWallCollision(midPoint, bulletRadius)) {
+                        if (pointHitsWall3D(midPoint, bulletRadius)) {
                             hi = mid;
                         } else {
                             lo = mid;
@@ -3803,13 +3802,13 @@ namespace walk {
             for (int i = 0; i <= steps; ++i) {
                 const float t = static_cast<float>(i) / static_cast<float>(steps);
                 const glm::vec3 point = from + (dir * t);
-                if (world_.checkPillarCollision(point, bulletRadius)) {
+                if (pointHitsPillar3D(point, bulletRadius)) {
                     float lo = previousT;
                     float hi = t;
                     for (int iter = 0; iter < 10; ++iter) {
                         const float mid = 0.5f * (lo + hi);
                         const glm::vec3 midPoint = from + (dir * mid);
-                        if (world_.checkPillarCollision(midPoint, bulletRadius)) {
+                        if (pointHitsPillar3D(midPoint, bulletRadius)) {
                             hi = mid;
                         } else {
                             lo = mid;
@@ -3926,6 +3925,51 @@ namespace walk {
             return true;
         }
 
+        [[nodiscard]] bool pointHitsWall3D(const glm::vec3 &point, float radius) const {
+            const float halfThickness = (world_.wallThickness() * 0.5f) + radius;
+            const float halfThicknessSq = halfThickness * halfThickness;
+            for (const WallSegment &wall : world_.walls()) {
+                if (point.y < 0.0f || point.y > wall.height) {
+                    continue;
+                }
+
+                const glm::vec2 start(wall.start.x, wall.start.z);
+                const glm::vec2 end(wall.end.x, wall.end.z);
+                const glm::vec2 seg = end - start;
+                const float segLen2 = glm::dot(seg, seg);
+                if (segLen2 <= 1e-8f) {
+                    continue;
+                }
+
+                const glm::vec2 p(point.x, point.z);
+                const glm::vec2 toPoint = p - start;
+                const float t = glm::clamp(glm::dot(toPoint, seg) / segLen2, 0.0f, 1.0f);
+                const glm::vec2 closest = start + (seg * t);
+                const glm::vec2 d = p - closest;
+                if (glm::dot(d, d) <= halfThicknessSq) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool pointHitsPillar3D(const glm::vec3 &point, float radius) const {
+            for (const PillarInstance &pillar : world_.pillars()) {
+                if (point.y < 0.0f || point.y > pillar.height) {
+                    continue;
+                }
+
+                const glm::vec2 p(point.x, point.z);
+                const glm::vec2 c(pillar.position.x, pillar.position.z);
+                const float hitRadius = pillar.radius + radius;
+                const glm::vec2 d = p - c;
+                if (glm::dot(d, d) <= (hitRadius * hitRadius)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         [[nodiscard]] float birdGroundYForScale(float scale) const {
             const glm::vec3 extent = birdModel_.modelAxisExtent();
             const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
@@ -3962,6 +4006,24 @@ namespace walk {
             return glm::vec3(0.0f, -centerOffset.y * clampedScale, 0.0f);
         }
 
+        [[nodiscard]] float birdSpawnClearanceRadiusForScale(float scale) const {
+            const glm::vec3 extent = birdModel_.modelAxisExtent();
+            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const float clampedScale = std::max(scale, 0.0001f);
+
+            const float halfXFromOrigin = (extent.x * 0.5f) + std::abs(centerOffset.x);
+            const float halfZFromOrigin = (extent.z * 0.5f) + std::abs(centerOffset.z);
+            const float horizontalRadius = std::max(halfXFromOrigin, halfZFromOrigin) * clampedScale;
+            return horizontalRadius + 0.05f;
+        }
+
+        [[nodiscard]] float placementRadiusForCollectible(const Collectible &obj) const {
+            if (obj.type == Collectible::Type::Bird) {
+                return std::max(obj.radius, birdSpawnClearanceRadiusForScale(obj.scale.x));
+            }
+            return obj.radius;
+        }
+
         void normalizeCollectiblesToModel() {
             for (Collectible &obj : world_.collectibles()) {
                 if (obj.type == Collectible::Type::Bird) {
@@ -3973,6 +4035,172 @@ namespace walk {
                     obj.hitCenterOffset = saturnHitCenterOffsetForScale(obj.scale.x);
                 }
             }
+
+            resolveCollectibleEnvironmentCollisions();
+            resolveCollectibleOverlaps();
+            resolveCollectibleClusters(2.0f, 5);
+        }
+
+        [[nodiscard]] bool overlapsCollectibleAt(const glm::vec3 &candidate,
+                                                 float radius,
+                                                 size_t ignoreIndex,
+                                                 bool includeInactive) const {
+            const std::vector<Collectible> &collectibles = world_.collectibles();
+            for (size_t i = 0; i < collectibles.size(); ++i) {
+                if (i == ignoreIndex) {
+                    continue;
+                }
+                const Collectible &other = collectibles[i];
+                if (!includeInactive && !other.active) {
+                    continue;
+                }
+
+                const float separation = std::max(5.0f, other.radius + radius + 0.2f);
+                if (glm::length(other.position - candidate) < separation) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool relocateCollectible(size_t index, float minMoveDistance, int maxAttempts) {
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            if (index >= collectibles.size()) {
+                return false;
+            }
+
+            Collectible &obj = collectibles[index];
+            const glm::vec3 oldPosition = obj.position;
+            const float y = (obj.type == Collectible::Type::Bird) ? birdGroundYForScale(obj.scale.x) : 2.5f;
+            const float placementRadius = placementRadiusForCollectible(obj);
+
+            for (int attempt = 0; attempt < maxAttempts; ++attempt) {
+                glm::vec3 candidate{};
+                if (!sampleNavigablePoint(y, placementRadius, candidate, 4)) {
+                    continue;
+                }
+                if (glm::length(candidate - oldPosition) < minMoveDistance) {
+                    continue;
+                }
+                if (overlapsCollectibleAt(candidate, obj.radius, index, false)) {
+                    continue;
+                }
+
+                obj.position = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
+        void resolveCollectibleEnvironmentCollisions() {
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            for (size_t i = 0; i < collectibles.size(); ++i) {
+                if (!collectibles[i].active) {
+                    continue;
+                }
+
+                const float placementRadius = placementRadiusForCollectible(collectibles[i]);
+                if (!world_.checkWallCollision(collectibles[i].position, placementRadius) &&
+                    !world_.checkPillarCollision(collectibles[i].position, placementRadius)) {
+                    continue;
+                }
+
+                relocateCollectible(i, 2.0f, 512);
+            }
+        }
+
+        void resolveCollectibleOverlaps() {
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            for (size_t i = 0; i < collectibles.size(); ++i) {
+                if (!collectibles[i].active) {
+                    continue;
+                }
+                if (!overlapsCollectibleAt(collectibles[i].position, collectibles[i].radius, i, false)) {
+                    continue;
+                }
+                relocateCollectible(i, 1.5f, 320);
+            }
+        }
+
+        void resolveCollectibleClusters(float minVisualSeparation, int passes) {
+            if (minVisualSeparation <= 0.0f || passes <= 0) {
+                return;
+            }
+
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            const float minVisualSeparationSq = minVisualSeparation * minVisualSeparation;
+            for (int pass = 0; pass < passes; ++pass) {
+                bool movedAny = false;
+                for (size_t i = 0; i < collectibles.size(); ++i) {
+                    if (!collectibles[i].active) {
+                        continue;
+                    }
+
+                    for (size_t j = i + 1; j < collectibles.size(); ++j) {
+                        if (!collectibles[j].active) {
+                            continue;
+                        }
+
+                        const glm::vec3 delta = collectibles[j].position - collectibles[i].position;
+                        if (glm::dot(delta, delta) >= minVisualSeparationSq) {
+                            continue;
+                        }
+
+                        if (relocateCollectible(j, minVisualSeparation, 512)) {
+                            movedAny = true;
+                        }
+                    }
+                }
+
+                if (!movedAny) {
+                    break;
+                }
+            }
+        }
+
+        void disperseNearbyCollectibles(const glm::vec3 &center, float radius, size_t ignoreIndex) {
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            for (size_t i = 0; i < collectibles.size(); ++i) {
+                if (i == ignoreIndex) {
+                    continue;
+                }
+                if (!collectibles[i].active) {
+                    continue;
+                }
+                if (glm::length(collectibles[i].position - center) > radius) {
+                    continue;
+                }
+
+                relocateCollectible(i, std::max(3.0f, radius), 256);
+            }
+        }
+
+        int deactivateCollectibleCluster(size_t primaryIndex, const glm::vec3 &anchorPoint) {
+            std::vector<Collectible> &collectibles = world_.collectibles();
+            if (primaryIndex >= collectibles.size()) {
+                return 0;
+            }
+
+            const glm::vec3 anchor = anchorPoint;
+            const float clusterRadius = std::max(2.5f, collectibles[primaryIndex].radius * 4.0f);
+            const float clusterRadiusSq = clusterRadius * clusterRadius;
+
+            int removed = 0;
+            for (Collectible &obj : collectibles) {
+                if (!obj.active) {
+                    continue;
+                }
+                const glm::vec3 delta = obj.position - anchor;
+                if (glm::dot(delta, delta) > clusterRadiusSq) {
+                    continue;
+                }
+
+                obj.active = false;
+                ++removed;
+            }
+
+            return removed;
         }
 
         std::string assetRoot_;
@@ -4012,6 +4240,7 @@ namespace walk {
         float deltaTime_ = 0.0f;
         float jumpVelocity_ = 0.0f;
         float gravity_ = 0.015f;
+        float collectibleClusterResolveTimer_ = 0.0f;
         uint32_t destroyedCount_ = 0;
 
         SDL_Gamepad *gamepad_ = nullptr;
