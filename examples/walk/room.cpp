@@ -3410,30 +3410,32 @@ namespace walk {
             if (gamepad_ != nullptr && SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_LEFT_STICK)) {
                 sprint = true;
             }
-            const float cameraSpeed = 0.1f;
+            const float cameraSpeed = 0.2f;
             const float speed = sprint ? cameraSpeed * 2.0f : cameraSpeed;
+            const float frameScale = deltaTime * 60.0f;
+            const float moveStep = speed * frameScale;
 
             if (keys[SDL_SCANCODE_W]) {
-                desired += horizontalFront * speed;
+                desired += horizontalFront * moveStep;
             }
             if (keys[SDL_SCANCODE_S]) {
-                desired -= horizontalFront * speed;
+                desired -= horizontalFront * moveStep;
             }
             if (keys[SDL_SCANCODE_A]) {
-                desired -= right * speed;
+                desired -= right * moveStep;
             }
             if (keys[SDL_SCANCODE_D]) {
-                desired += right * speed;
+                desired += right * moveStep;
             }
 
             if (gamepad_ != nullptr) {
                 const Sint16 leftX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTX);
                 const Sint16 leftY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY);
                 if (std::abs(leftX) > stickDeadZone_) {
-                    desired += speed * (static_cast<float>(leftX) / 32768.0f) * right;
+                    desired += moveStep * (static_cast<float>(leftX) / 32768.0f) * right;
                 }
                 if (std::abs(leftY) > stickDeadZone_) {
-                    desired -= speed * (static_cast<float>(leftY) / 32768.0f) * horizontalFront;
+                    desired -= moveStep * (static_cast<float>(leftY) / 32768.0f) * horizontalFront;
                 }
 
                 const Sint16 rightX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX);
@@ -3537,43 +3539,91 @@ namespace walk {
                     continue;
                 }
 
-                glm::vec3 impact{0.0f};
-                if (lineHitWall(previous, bullet.position, impact)) {
-                    createExplosion(impact, 1500, true);
-                    bullet.active = false;
-                    logEnv(std::format("bullet {} hit wall at ({:.2f}, {:.2f}, {:.2f})",
-                                       bulletIndex,
-                                       impact.x,
-                                       impact.y,
-                                       impact.z));
-                    continue;
-                }
-                if (lineHitPillar(previous, bullet.position, impact)) {
-                    createExplosion(impact, 1500, true);
-                    bullet.active = false;
-                    logEnv(std::format("bullet {} hit pillar at ({:.2f}, {:.2f}, {:.2f})",
-                                       bulletIndex,
-                                       impact.x,
-                                       impact.y,
-                                       impact.z));
-                    continue;
-                }
+                glm::vec3 wallImpact{0.0f};
+                glm::vec3 pillarImpact{0.0f};
+                glm::vec3 collectibleImpact{0.0f};
+                size_t collectibleIndex = 0;
 
-                size_t objectIndex = 0;
-                if (lineHitCollectible(previous, bullet.position, objectIndex, impact)) {
-                    createExplosion(impact, 5000, false);
-                    const Collectible::Type hitType = world_.collectibles()[objectIndex].type;
-                    world_.collectibles()[objectIndex].active = false;
+                const bool hitWall = lineHitWall(previous, bullet.position, wallImpact);
+                const bool hitPillar = lineHitPillar(previous, bullet.position, pillarImpact);
+                const bool hitCollectible = lineHitCollectible(previous, bullet.position, collectibleIndex, collectibleImpact);
+
+                if (hitWall || hitPillar || hitCollectible) {
+                    enum class HitType {
+                        Wall,
+                        Pillar,
+                        Collectible,
+                    };
+
+                    auto distanceSqFromStart = [&previous](const glm::vec3 &point) {
+                        const glm::vec3 delta = point - previous;
+                        return glm::dot(delta, delta);
+                    };
+
+                    float nearestDistanceSq = std::numeric_limits<float>::max();
+                    HitType nearestType = HitType::Wall;
+
+                    if (hitWall) {
+                        nearestDistanceSq = distanceSqFromStart(wallImpact);
+                        nearestType = HitType::Wall;
+                    }
+                    if (hitPillar) {
+                        const float d = distanceSqFromStart(pillarImpact);
+                        if (d < nearestDistanceSq) {
+                            nearestDistanceSq = d;
+                            nearestType = HitType::Pillar;
+                        }
+                    }
+                    if (hitCollectible) {
+                        const float d = distanceSqFromStart(collectibleImpact);
+                        if (d < nearestDistanceSq) {
+                            nearestDistanceSq = d;
+                            nearestType = HitType::Collectible;
+                        }
+                    }
+
+                    if (hitCollectible && (hitWall || hitPillar)) {
+                        const float collectibleDistance = std::sqrt(distanceSqFromStart(collectibleImpact));
+                        float nearestObstacleDistance = std::numeric_limits<float>::max();
+                        if (hitWall) {
+                            nearestObstacleDistance = std::min(nearestObstacleDistance, std::sqrt(distanceSqFromStart(wallImpact)));
+                        }
+                        if (hitPillar) {
+                            nearestObstacleDistance = std::min(nearestObstacleDistance, std::sqrt(distanceSqFromStart(pillarImpact)));
+                        }
+
+                        constexpr float collectibleDepthBias = 0.35f;
+                        if (collectibleDistance <= (nearestObstacleDistance + collectibleDepthBias)) {
+                            nearestType = HitType::Collectible;
+                        }
+                    }
+
+                    if (nearestType == HitType::Collectible) {
+                        createExplosion(collectibleImpact, 5000, false);
+                        const Collectible::Type hitType = world_.collectibles()[collectibleIndex].type;
+                        world_.collectibles()[collectibleIndex].active = false;
+                        bullet.active = false;
+                        ++destroyedCount_;
+                        logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
+                                           bulletIndex,
+                                           collectibleTypeName(hitType),
+                                           collectibleIndex,
+                                           collectibleImpact.x,
+                                           collectibleImpact.y,
+                                           collectibleImpact.z,
+                                           destroyedCount_));
+                        continue;
+                    }
+
+                    const glm::vec3 &impact = (nearestType == HitType::Pillar) ? pillarImpact : wallImpact;
+                    createExplosion(impact, 1500, true);
                     bullet.active = false;
-                    ++destroyedCount_;
-                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
+                    logEnv(std::format("bullet {} hit {} at ({:.2f}, {:.2f}, {:.2f})",
                                        bulletIndex,
-                                       collectibleTypeName(hitType),
-                                       objectIndex,
+                                       (nearestType == HitType::Pillar) ? "pillar" : "wall",
                                        impact.x,
                                        impact.y,
-                                       impact.z,
-                                       destroyedCount_));
+                                       impact.z));
                     continue;
                 }
 
@@ -3706,31 +3756,69 @@ namespace walk {
         }
 
         [[nodiscard]] bool lineHitWall(const glm::vec3 &from, const glm::vec3 &to, glm::vec3 &impactOut) const {
-            constexpr int steps = 5;
+            const glm::vec3 dir = to - from;
+            constexpr float bulletRadius = 0.015f;
+            const float travel = glm::length(dir);
+            if (travel <= 1e-8f) {
+                return false;
+            }
+
+            constexpr float sampleStride = 0.05f;
+            const int steps = std::max(1, static_cast<int>(std::ceil(travel / sampleStride)));
+            float previousT = 0.0f;
             for (int i = 0; i <= steps; ++i) {
                 const float t = static_cast<float>(i) / static_cast<float>(steps);
-                const glm::vec3 point = from + (to - from) * t;
-                if (world_.checkWallCollision(point, 0.1f)) {
-                    impactOut = point;
+                const glm::vec3 point = from + (dir * t);
+                if (world_.checkWallCollision(point, bulletRadius)) {
+                    float lo = previousT;
+                    float hi = t;
+                    for (int iter = 0; iter < 10; ++iter) {
+                        const float mid = 0.5f * (lo + hi);
+                        const glm::vec3 midPoint = from + (dir * mid);
+                        if (world_.checkWallCollision(midPoint, bulletRadius)) {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                        }
+                    }
+                    impactOut = from + (dir * hi);
                     return true;
                 }
+                previousT = t;
             }
             return false;
         }
 
         [[nodiscard]] bool lineHitPillar(const glm::vec3 &from, const glm::vec3 &to, glm::vec3 &impactOut) const {
-            constexpr int steps = 5;
+            const glm::vec3 dir = to - from;
+            constexpr float bulletRadius = 0.015f;
+            const float travel = glm::length(dir);
+            if (travel <= 1e-8f) {
+                return false;
+            }
+
+            constexpr float sampleStride = 0.05f;
+            const int steps = std::max(1, static_cast<int>(std::ceil(travel / sampleStride)));
+            float previousT = 0.0f;
             for (int i = 0; i <= steps; ++i) {
                 const float t = static_cast<float>(i) / static_cast<float>(steps);
-                const glm::vec3 point = from + (to - from) * t;
-                for (const PillarInstance &pillar : world_.pillars()) {
-                    const glm::vec2 p2d(point.x, point.z);
-                    const glm::vec2 c2d(pillar.position.x, pillar.position.z);
-                    if (glm::length(p2d - c2d) < pillar.radius && point.y > 0.0f && point.y < pillar.height) {
-                        impactOut = point;
-                        return true;
+                const glm::vec3 point = from + (dir * t);
+                if (world_.checkPillarCollision(point, bulletRadius)) {
+                    float lo = previousT;
+                    float hi = t;
+                    for (int iter = 0; iter < 10; ++iter) {
+                        const float mid = 0.5f * (lo + hi);
+                        const glm::vec3 midPoint = from + (dir * mid);
+                        if (world_.checkPillarCollision(midPoint, bulletRadius)) {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                        }
                     }
+                    impactOut = from + (dir * hi);
+                    return true;
                 }
+                previousT = t;
             }
             return false;
         }
@@ -3738,6 +3826,7 @@ namespace walk {
         [[nodiscard]] bool lineHitCollectible(const glm::vec3 &from, const glm::vec3 &to, size_t &indexOut, glm::vec3 &impactOut) const {
             const glm::vec3 dir = to - from;
             const float dirLen2 = glm::dot(dir, dir);
+            constexpr float bulletRadius = 0.015f;
             if (dirLen2 <= 1e-8f) {
                 return false;
             }
@@ -3757,7 +3846,7 @@ namespace walk {
                 bool hit = false;
 
                 if (obj.type == Collectible::Type::Bird) {
-                    const glm::vec3 halfExtents(obj.radius);
+                    const glm::vec3 halfExtents(obj.radius + bulletRadius);
                     const glm::vec3 center = obj.position + obj.hitCenterOffset;
                     const glm::vec3 boxMin = center - halfExtents;
                     const glm::vec3 boxMax = center + halfExtents;
@@ -3803,7 +3892,8 @@ namespace walk {
                     const glm::vec3 m = from - center;
                     const float a = dirLen2;
                     const float b = 2.0f * glm::dot(m, dir);
-                    const float c = glm::dot(m, m) - (obj.radius * obj.radius);
+                    const float hitRadius = obj.radius + bulletRadius;
+                    const float c = glm::dot(m, m) - (hitRadius * hitRadius);
                     const float discriminant = (b * b) - (4.0f * a * c);
                     if (discriminant >= 0.0f) {
                         const float sqrtD = std::sqrt(discriminant);
