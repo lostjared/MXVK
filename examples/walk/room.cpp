@@ -2878,7 +2878,7 @@ namespace walk {
         }
 
         void logEnv(const std::string &message) {
-            print(std::format("[walk] {}", message));
+            print(std::format("[walk] {}", message), {255 ,100,255,255});
         }
 
         [[nodiscard]] static std::string toLowerCopy(std::string value) {

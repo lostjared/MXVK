@@ -84,8 +84,8 @@ namespace mxvk {
         console_event(e);
     }
 
-    void VK_IOWindow::print(const std::string &text) {
-        console_.printLine(text);
+    void VK_IOWindow::print(const std::string &text, SDL_Color col) {
+        console_.printLine(text, col);
     }
 
     void VK_IOWindow::proc() {
