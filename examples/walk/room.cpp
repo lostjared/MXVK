@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <filesystem>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
@@ -583,6 +584,18 @@ namespace walk {
             createUniformBuffers();
             createDescriptorPool();
             createDescriptorSets();
+            createPipeline();
+        }
+
+        /// @brief Hot-swap the fragment shader without rebuilding geometry or descriptors.
+        /// @param newFragSpv Compiled SPIR-V bytecode for the new fragment shader.
+        void reloadFragShader(const std::vector<char> &newFragSpv) {
+            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
+                return;
+            }
+            vkDeviceWaitIdle(window_->getDevice());
+            fragmentSpv_ = newFragSpv;
+            destroyPipeline();
             createPipeline();
         }
 
@@ -1557,6 +1570,18 @@ namespace walk {
             createPipeline();
         }
 
+        /// @brief Hot-swap the fragment shader without rebuilding geometry or descriptors.
+        /// @param newFragSpv Compiled SPIR-V bytecode for the new fragment shader.
+        void reloadFragShader(const std::vector<char> &newFragSpv) {
+            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
+                return;
+            }
+            vkDeviceWaitIdle(window_->getDevice());
+            fragSpv_ = newFragSpv;
+            destroyPipeline();
+            createPipeline();
+        }
+
         void cleanup(mxvk::VK_Window *window) {
             if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
                 return;
@@ -2419,6 +2444,14 @@ namespace walk {
             const std::string particleFragPath = std::string(WALK_SHADER_DIR) + "/particle.frag.spv";
             const std::string groundTexManifest = assetRoot_ + "/data/ground.tex";
 
+            modelVertSpv_  = vertPath;
+            pillarVertSpv_ = pillarVertPath;
+            wallFragSpv_   = wallFragPath;
+            floorFragSpv_  = floorFragPath;
+            pillarFragSpv_ = pillarFragPath;
+            objectFragSpv_ = objectFragPath;
+            bulletFragSpv_ = bulletFragPath;
+
             loadModel(floorModel_, modelRoot_ + "/cube.mxmod.z", groundTexManifest, assetRoot_ + "/data", vertPath, floorFragPath);
             loadModel(bulletModel_, modelRoot_ + "/sphere.mxmod.z", "", "", vertPath, bulletFragPath);
 
@@ -2923,6 +2956,86 @@ namespace walk {
                 return true;
             }
 
+            if (cmd == "set_wall" || cmd == "set_floor" || cmd == "set_pillar" || cmd == "set_object" || cmd == "set_bullet") {
+                if (args.size() < 2) {
+                    out << std::format("Usage: {} <shader.spv|full/path/to/shader.spv>", cmd);
+                    return true;
+                }
+
+                const std::string shaderPath = resolveShaderPath(args[1]);
+                std::vector<char> shaderBytes;
+                try {
+                    shaderBytes = loadSpv(shaderPath);
+                } catch (const mxvk::Exception &e) {
+                    out << std::format("{}: failed to load shader '{}': {}", cmd, shaderPath, e.text());
+                    return true;
+                }
+
+                if (shaderBytes.empty()) {
+                    out << std::format("{}: shader '{}' is empty", cmd, shaderPath);
+                    return true;
+                }
+
+                if (cmd == "set_wall") {
+                    wallFragSpv_ = shaderPath;
+                    rawWallRenderer_.reloadFragShader(shaderBytes);
+                    out << std::format("Wall shader reloaded from {}", shaderPath);
+                } else if (cmd == "set_floor") {
+                    floorFragSpv_ = shaderPath;
+                    floorModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    out << std::format("Floor shader reloaded from {}", shaderPath);
+                } else if (cmd == "set_pillar") {
+                    pillarFragSpv_ = shaderPath;
+                    rawPillarRenderer_.reloadFragShader(shaderBytes);
+                    out << std::format("Pillar shader reloaded from {}", shaderPath);
+                } else if (cmd == "set_object") {
+                    objectFragSpv_ = shaderPath;
+                    saturnModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    birdModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    out << std::format("Object shader reloaded from {}", shaderPath);
+                } else if (cmd == "set_bullet") {
+                    bulletFragSpv_ = shaderPath;
+                    bulletModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    out << std::format("Bullet shader reloaded from {}", shaderPath);
+                }
+
+                logEnv(std::format("command: {} shader={}", cmd, shaderPath));
+                return true;
+            }
+
+            if (cmd == "list_shaders") {
+                const std::array<std::pair<std::string_view, std::string>, 11> shaders{{
+                    {"wall.frag", resolveShaderPath("wall.frag.spv")},
+                    {"floor.frag", resolveShaderPath("floor.frag.spv")},
+                    {"pillar.frag", resolveShaderPath("pillar.frag.spv")},
+                    {"object.frag", resolveShaderPath("object.frag.spv")},
+                    {"bullet.frag", resolveShaderPath("bullet.frag.spv")},
+                    {"particle.frag", resolveShaderPath("particle.frag.spv")},
+                    {"particle_points.frag", resolveShaderPath("particle_points.frag.spv")},
+                    {"bubble.frag", resolveShaderPath("bubble.frag.spv")},
+                    {"floor_kale.frag", resolveShaderPath("floor_kale.frag.spv")},
+                    {"floor_swirl.frag", resolveShaderPath("floor_swirl.frag.spv")},
+                    {"floor_twist.frag", resolveShaderPath("floor_twist.frag.spv")},
+                }};
+
+                out << "Available shaders:\n";
+                for (const auto &[name, path] : shaders) {
+                    out << std::format("  {:<20} {}\n", name, path);
+                }
+                out << std::format("Current bindings:\n"
+                                   "  wall     {}\n"
+                                   "  floor    {}\n"
+                                   "  pillar   {}\n"
+                                   "  object   {}\n"
+                                   "  bullet   {}\n",
+                                   wallFragSpv_,
+                                   floorFragSpv_,
+                                   pillarFragSpv_,
+                                   objectFragSpv_,
+                                   bulletFragSpv_);
+                return true;
+            }
+
             return false;
         }
 
@@ -2937,11 +3050,30 @@ namespace walk {
                 << "  clear_bullets                    Remove all active bullets\n"
                 << "  clear_fx                         Remove all active explosion particles\n"
                 << "  set_fps <on|off>                 Toggle FPS overlay\n"
+                << "  set_wall <shader.spv>            Reload wall fragment shader\n"
+                << "  set_floor <shader.spv>           Reload floor fragment shader\n"
+                << "  set_pillar <shader.spv>          Reload pillar fragment shader\n"
+                << "  set_object <shader.spv>          Reload object fragment shader\n"
+                << "  set_bullet <shader.spv>          Reload bullet fragment shader\n"
+                << "  list_shaders                     Print available shaders and current bindings\n"
                 << "  regen_world [seed]               Regenerate maze, pillars, and collectibles";
         }
 
         void logEnv(const std::string &message) {
             print(std::format("[walk] {}", message), {255 ,100,255,255});
+        }
+
+        /// @brief Resolve a shader SPV name to a full path.
+        ///
+        /// Looks in the compiled shader output directory first; if the file is not
+        /// found there, the provided @p name is returned as-is so callers can pass
+        /// absolute paths directly.
+        [[nodiscard]] std::string resolveShaderPath(const std::string &name) const {
+            const std::string buildPath = std::string(WALK_SHADER_DIR) + "/" + name;
+            if (std::filesystem::exists(buildPath)) {
+                return buildPath;
+            }
+            return name;
         }
 
         [[nodiscard]] static std::string toLowerCopy(std::string value) {
@@ -4222,6 +4354,13 @@ namespace walk {
         size_t maxPointVertices_ = 200000;
         std::string pointParticleVertSpv_{};
         std::string pointParticleFragSpv_{};
+    std::string modelVertSpv_{};
+    std::string pillarVertSpv_{};
+    std::string wallFragSpv_{};
+    std::string floorFragSpv_{};
+    std::string pillarFragSpv_{};
+    std::string objectFragSpv_{};
+    std::string bulletFragSpv_{};
 
         std::vector<Projectile> bullets_{};
         std::vector<ExplosionParticle> explosionParticles_{};
@@ -4268,3 +4407,4 @@ int main(int argc, char **argv) {
 
     return EXIT_SUCCESS;
 }
+

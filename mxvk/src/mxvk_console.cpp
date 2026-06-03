@@ -94,6 +94,7 @@ namespace mxvk {
     void VK_Console::setMaxLines(const std::size_t maxLines) {
         max_lines_ = std::max<std::size_t>(1, maxLines);
         trimOutputToLimits();
+        invalidateWrappedCache();
         scroll_offset_ = std::min(scroll_offset_, maxScrollOffset());
     }
 
@@ -125,6 +126,7 @@ namespace mxvk {
         }
 
         trimOutputToLimits();
+        invalidateWrappedCache();
         if (follow_tail_) {
             scroll_offset_ = 0;
         } else {
@@ -135,6 +137,7 @@ namespace mxvk {
     void VK_Console::clear() {
         total_line_chars_ = 0;
         lines_.clear();
+        invalidateWrappedCache();
         input_.clear();
         cursor_pos_ = 0;
         scroll_offset_ = 0;
@@ -153,6 +156,7 @@ namespace mxvk {
 
         total_line_chars_ += line.size();
         lines_.push_back(OutputLine{std::move(line), color});
+        wrapped_cache_dirty_ = true;
     }
 
     void VK_Console::trimOutputToLimits() {
@@ -160,13 +164,127 @@ namespace mxvk {
             total_line_chars_ -= lines_.front().text.size();
             lines_.pop_front();
         }
+        wrapped_cache_dirty_ = true;
     }
 
     std::size_t VK_Console::maxScrollOffset() const noexcept {
-        if (lines_.size() <= last_visible_line_count_) {
+        const int width = usableTextWidth();
+        ensureWrappedCache(width);
+        const std::size_t total_rows = wrapped_cache_line_count_;
+        if (total_rows <= last_visible_line_count_) {
             return 0;
         }
-        return lines_.size() - last_visible_line_count_;
+        return total_rows - last_visible_line_count_;
+    }
+
+    int VK_Console::measureTextWidth(const std::string &text) const {
+        if (window_ == nullptr || text.empty()) {
+            return 0;
+        }
+
+        int width = 0;
+        int height = 0;
+        if (!window_->getTextDimensions(text, width, height)) {
+            return 0;
+        }
+        return width;
+    }
+
+    int VK_Console::usableTextWidth() const {
+        constexpr int padding = 10;
+        const int reserved_scrollbar = (scrollbar_h_ > 0) ? (scrollbar_w_ + padding) : 0;
+        return std::max(1, panel_w_ - (padding * 2) - reserved_scrollbar);
+    }
+
+    void VK_Console::invalidateWrappedCache() {
+        wrapped_cache_dirty_ = true;
+        wrapped_cache_width_ = -1;
+    }
+
+    void VK_Console::ensureWrappedCache(const int maxWidth) const {
+        if (!wrapped_cache_dirty_ && wrapped_cache_width_ == maxWidth) {
+            return;
+        }
+
+        wrapped_cache_.clear();
+        wrapped_cache_line_count_ = 0;
+        wrapped_cache_width_ = maxWidth;
+        wrapped_cache_dirty_ = false;
+
+        for (const OutputLine &line : lines_) {
+            const std::vector<std::string> rows = wrapTextToWidth(line.text, maxWidth);
+            wrapped_cache_line_count_ += rows.size();
+            for (const std::string &row : rows) {
+                wrapped_cache_.push_back(OutputLine{row, line.color});
+            }
+        }
+    }
+
+    std::vector<std::string> VK_Console::wrapTextToWidth(const std::string &text, const int maxWidth) const {
+        std::vector<std::string> wrapped;
+        if (text.empty()) {
+            wrapped.emplace_back();
+            return wrapped;
+        }
+
+        if (maxWidth <= 0) {
+            wrapped.push_back(text);
+            return wrapped;
+        }
+
+        auto appendChunk = [&](std::string chunk) {
+            if (!chunk.empty() || wrapped.empty()) {
+                wrapped.push_back(std::move(chunk));
+            }
+        };
+
+        std::string current;
+        std::size_t index = 0;
+        while (index < text.size()) {
+            const std::size_t tokenStart = index;
+            const bool isSpace = (text[index] == ' ' || text[index] == '\t');
+            while (index < text.size() && ((text[index] == ' ' || text[index] == '\t') == isSpace)) {
+                ++index;
+            }
+
+            const std::string token = text.substr(tokenStart, index - tokenStart);
+            const std::string combined = current + token;
+            if (!current.empty() && measureTextWidth(combined) > maxWidth) {
+                appendChunk(std::move(current));
+                current.clear();
+            }
+
+            if (measureTextWidth(current + token) <= maxWidth) {
+                current += token;
+                continue;
+            }
+
+            if (!current.empty()) {
+                appendChunk(std::move(current));
+                current.clear();
+            }
+
+            std::string fragment;
+            for (char ch : token) {
+                const std::string candidate = fragment + ch;
+                if (!fragment.empty() && measureTextWidth(candidate) > maxWidth) {
+                    appendChunk(std::move(fragment));
+                    fragment.clear();
+                }
+                fragment.push_back(ch);
+                if (measureTextWidth(fragment) > maxWidth) {
+                    const char last = fragment.back();
+                    fragment.pop_back();
+                    appendChunk(std::move(fragment));
+                    fragment.clear();
+                    fragment.push_back(last);
+                }
+            }
+            current += fragment;
+        }
+
+        appendChunk(std::move(current));
+        return wrapped;
     }
 
     void VK_Console::scrollUp(const std::size_t amount) {
@@ -432,7 +550,8 @@ namespace mxvk {
             return;
         }
 
-        const std::size_t total_lines = lines_.size();
+        ensureWrappedCache(usableTextWidth());
+        const std::size_t total_lines = wrapped_cache_line_count_;
         const std::size_t visible_lines = std::max<std::size_t>(1, std::min(max_visible_lines_, last_visible_line_count_));
 
         if (total_lines <= visible_lines) {
@@ -665,6 +784,8 @@ namespace mxvk {
 
         const int line_height = std::max(1, glyph_h + 2);
         const int padding = 10;
+        const int text_width = usableTextWidth();
+        ensureWrappedCache(text_width);
 
         int y = panel_y_ + padding;
         window_->printText("MXVK Console (F3 to toggle)", panel_x_ + padding, y, scaledColor(info_color_));
@@ -683,11 +804,11 @@ namespace mxvk {
         scroll_offset_ = std::min(scroll_offset_, max_offset);
         updateScrollbarGeometry();
 
-        const std::size_t visible_lines = std::min(std::min(max_visible_lines_, last_visible_line_count_), lines_.size());
-        const std::size_t start = (lines_.size() > visible_lines) ? (lines_.size() - visible_lines - scroll_offset_) : 0;
-        const std::size_t end = std::min(lines_.size(), start + visible_lines);
+        const std::size_t visible_lines = std::min(std::min(max_visible_lines_, last_visible_line_count_), wrapped_cache_.size());
+        const std::size_t start = (wrapped_cache_.size() > visible_lines) ? (wrapped_cache_.size() - visible_lines - scroll_offset_) : 0;
+        const std::size_t end = std::min(wrapped_cache_.size(), start + visible_lines);
         for (std::size_t i = start; i < end; ++i) {
-            window_->printText(lines_[i].text, panel_x_ + padding, y, scaledColor(lines_[i].color));
+            window_->printText(wrapped_cache_[i].text, panel_x_ + padding, y, scaledColor(wrapped_cache_[i].color));
             y += line_height;
         }
 

@@ -103,6 +103,11 @@ namespace mxvk {
         void updatePanelLayout();
         void refreshVisibleLineCount();
         void updateScrollbarGeometry();
+        void invalidateWrappedCache();
+        void ensureWrappedCache(int maxWidth) const;
+        [[nodiscard]] int measureTextWidth(const std::string &text) const;
+        [[nodiscard]] int usableTextWidth() const;
+        [[nodiscard]] std::vector<std::string> wrapTextToWidth(const std::string &text, int maxWidth) const;
         [[nodiscard]] bool isPointInScrollbar(int x, int y) const noexcept;
         [[nodiscard]] bool isPointInScrollbarThumb(int x, int y) const noexcept;
         void updateScrollFromThumbY(int thumbY);
@@ -146,6 +151,10 @@ namespace mxvk {
         std::string input_{};
         std::deque<OutputLine> lines_{};
         std::size_t total_line_chars_ = 0;
+        mutable bool wrapped_cache_dirty_ = true;
+        mutable int wrapped_cache_width_ = -1;
+        mutable std::vector<OutputLine> wrapped_cache_{};
+        mutable std::size_t wrapped_cache_line_count_ = 0;
         std::vector<std::string> history_{};
         int history_index_ = -1;
         std::size_t max_lines_ = 1200;
