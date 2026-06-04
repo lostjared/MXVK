@@ -67,6 +67,8 @@ namespace walk {
         float speed = 100.0f;
         float lifetime = 0.0f;
         float maxLifetime = 10.0f;
+        float distanceTraveled = 0.0f;
+        float maxDistance = 160.0f;
         bool active = true;
         std::vector<TrailPoint> trail{};
         float trailTimer = 0.0f;
@@ -2712,7 +2714,8 @@ namespace walk {
                 glm::mat4 world = glm::translate(glm::mat4(1.0f), bullet.position);
                 world = glm::scale(world, glm::vec3(0.07f, 0.07f, 0.20f));
                 const float fadeProgress = glm::clamp(bullet.lifetime / bullet.maxLifetime, 0.0f, 1.0f);
-                const float alpha = 1.0f - fadeProgress;
+                const float distanceProgress = glm::clamp(bullet.distanceTraveled / bullet.maxDistance, 0.0f, 1.0f);
+                const float alpha = std::min(1.0f - fadeProgress, 1.0f - distanceProgress);
                 renderRawModel(cmd, imageIndex, bulletModel_, world, view, proj, glm::vec4(alpha, 0.0f, 0.0f, 0.0f));
             }
             renderPointParticles(cmd, view, proj);
@@ -3802,8 +3805,10 @@ namespace walk {
                 }
 
                 const glm::vec3 previous = bullet.position;
-                bullet.position += bullet.direction * bullet.speed * deltaTime;
+                const glm::vec3 displacement = bullet.direction * bullet.speed * deltaTime;
+                bullet.position += displacement;
                 bullet.lifetime += deltaTime;
+                bullet.distanceTraveled += glm::length(displacement);
                 bullet.trailTimer += deltaTime;
                 if (bullet.trailTimer >= 0.02f) {
                     Projectile::TrailPoint point{};
@@ -3870,6 +3875,12 @@ namespace walk {
                 if (bullet.lifetime >= bullet.maxLifetime) {
                     bullet.active = false;
                     logEnv(std::format("bullet {} expired after {:.2f}s", bulletIndex, bullet.lifetime));
+                    continue;
+                }
+
+                if (bullet.distanceTraveled >= bullet.maxDistance) {
+                    bullet.active = false;
+                    logEnv(std::format("bullet {} faded after traveling {:.2f} units", bulletIndex, bullet.distanceTraveled));
                 }
             }
 
