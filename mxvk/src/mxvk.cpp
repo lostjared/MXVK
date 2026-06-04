@@ -281,8 +281,8 @@ namespace mxvk {
         window.reset();
 
         if (sdl_initialized) {
-            std::cout << "SDL3: shutting down SDL video subsystem\n";
-            SDL_QuitSubSystem(SDL_INIT_VIDEO);
+            std::cout << "SDL3: shutting down SDL video/gamepad subsystems\n";
+            SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
             sdl_initialized = false;
         }
 
@@ -514,21 +514,23 @@ namespace mxvk {
         }
 
         if (!sdl_initialized) {
-            std::cout << "SDL3: initializing video subsystem\n";
-            if (!SDL_Init(SDL_INIT_VIDEO)) {
+            constexpr SDL_InitFlags sdlInitFlags = SDL_INIT_VIDEO | SDL_INIT_GAMEPAD;
+            std::cout << "SDL3: initializing video/gamepad subsystems\n";
+            if (!SDL_Init(sdlInitFlags)) {
                 std::cerr << "mxvk: Error on SDL init: " << SDL_GetError() << "\n";
                 return false;
             }
             sdl_initialized = true;
-            std::cout << "SDL3: video subsystem initialized\n";
+            SDL_SetGamepadEventsEnabled(true);
+            std::cout << "SDL3: video/gamepad subsystems initialized\n";
         }
 
         std::cout << "SDL3: creating SDL window with Vulkan capability\n";
         SDL_Window *raw_window = SDL_CreateWindow(title.c_str(), width, height, flags);
         if (raw_window == nullptr) {
             std::cerr << std::format("Error creating window: {}\n", SDL_GetError());
-            std::cout << "SDL3: rolling back SDL video subsystem after window creation failure\n";
-            SDL_QuitSubSystem(SDL_INIT_VIDEO);
+            std::cout << "SDL3: rolling back SDL video/gamepad subsystems after window creation failure\n";
+            SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
             sdl_initialized = false;
             return false;
         }

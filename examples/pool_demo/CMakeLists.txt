@@ -1,5 +1,9 @@
-find_package(SDL3 REQUIRED)
-find_package(SDL3_ttf REQUIRED)
+if(NOT TARGET SDL3::SDL3)
+    find_package(SDL3 REQUIRED)
+endif()
+if(NOT TARGET SDL3_ttf::SDL3_ttf)
+    find_package(SDL3_ttf REQUIRED)
+endif()
 find_package(Threads REQUIRED)
 
 if(MINGW)
@@ -63,10 +67,6 @@ target_link_libraries(Pool3D PRIVATE
     SDL3_ttf::SDL3_ttf
     Threads::Threads
 )
-
-if(MINGW)
-    target_link_libraries(Pool3D PRIVATE SDL3::SDL3main)
-endif()
 
 add_custom_command(TARGET Pool3D POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
