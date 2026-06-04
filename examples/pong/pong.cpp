@@ -621,6 +621,11 @@ namespace {
                 return;
             }
 
+            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_BACK)) {
+                exit();
+                return;
+            }
+
             constexpr float paddleMoveSpeed = 2.0f;
 
             const float leftY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY)));
