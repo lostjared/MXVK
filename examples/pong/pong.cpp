@@ -573,6 +573,16 @@ namespace {
             paddle.position.y = std::clamp(paddle.position.y, -1.0f + halfPaddleHeight, 1.0f - halfPaddleHeight);
         }
 
+        [[nodiscard]] static float normalizeAxisWithDeadzone(float axisValue) {
+            const float magnitude = std::abs(axisValue);
+            if (magnitude <= controllerDeadzone_) {
+                return 0.0f;
+            }
+
+            const float normalized = (magnitude - controllerDeadzone_) / (controllerMax_ - controllerDeadzone_);
+            return std::copysign(std::clamp(normalized, 0.0f, 1.0f), axisValue);
+        }
+
         void updateFromKeyboard(float deltaTime) {
             const bool *keyState = SDL_GetKeyboardState(nullptr);
             if (keyState == nullptr) {
@@ -611,11 +621,11 @@ namespace {
                 return;
             }
 
-            const float leftY = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY));
-            if (std::abs(leftY) > controllerDeadzone_) {
-                paddle1_.position.y -= (leftY / controllerMax_) * 2.0f * deltaTime;
-                clampPaddle(paddle1_);
-            }
+            constexpr float paddleMoveSpeed = 2.0f;
+
+            const float leftY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY)));
+            paddle1_.position.y -= leftY * paddleMoveSpeed * deltaTime;
+            clampPaddle(paddle1_);
 
             if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_DPAD_UP)) {
                 paddle1_.position.y += 2.0f * deltaTime;
@@ -625,14 +635,10 @@ namespace {
             }
             clampPaddle(paddle1_);
 
-            const float rightX = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX));
-            const float rightY = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY));
-            if (std::abs(rightX) > controllerDeadzone_) {
-                gridYRotation_ += (rightX / controllerMax_) * rotationSpeed_ * deltaTime;
-            }
-            if (std::abs(rightY) > controllerDeadzone_) {
-                gridRotation_ += (rightY / controllerMax_) * rotationSpeed_ * deltaTime;
-            }
+            const float rightX = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX)));
+            const float rightY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY)));
+            gridRotation_ += rightX * rotationSpeed_ * deltaTime;
+            gridYRotation_ -= rightY * rotationSpeed_ * deltaTime;
 
             const float leftTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFT_TRIGGER));
             const float rightTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
