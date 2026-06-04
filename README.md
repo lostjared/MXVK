@@ -37,6 +37,23 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
+If you clone/move the repo to a different machine or path, run a fresh configure first.
+CMake-generated build files contain absolute paths and can fail with errors like
+`No rule to make target .../examples/.../*.frag` when a previous build directory is reused.
+
+```bash
+cmake --fresh -S . -B build
+cmake --build build -j
+```
+
+If your CMake version does not support `--fresh`, remove the build directory manually:
+
+```bash
+rm -rf build
+cmake -S . -B build
+cmake --build build -j
+```
+
 Useful CMake options:
 
 - `-DVALIDATION=ON` enables Vulkan validation layers.
