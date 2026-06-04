@@ -2475,6 +2475,8 @@ namespace walk {
                       assetRoot_ + "/data/planet.tex", assetRoot_ + "/data", vertPath, objectFragPath);
             loadModel(birdModel_, assetRoot_ + "/data/tux.obj",
                       assetRoot_ + "/data/tux.mtl", assetRoot_ + "/data", vertPath, objectFragPath);
+            loadModel(blasterModel_, assetRoot_ + "/data/blaster.obj",
+                      assetRoot_ + "/data/blaster.mtl", assetRoot_ + "/data", vertPath, objectFragPath);
             normalizeCollectiblesToModel();
 
             pointParticleVertSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
@@ -2634,6 +2636,7 @@ namespace walk {
             rawPillarRenderer_.resize(this);
             saturnModel_.resize(this);
             birdModel_.resize(this);
+            blasterModel_.resize(this);
             bulletModel_.resize(this);
             rebuildPointParticlePipeline();
         }
@@ -2687,6 +2690,16 @@ namespace walk {
                 } else {
                     renderRawModel(cmd, imageIndex, birdModel_, world, view, proj, glm::vec4(cameraPos_, 0.0f));
                 }
+            }
+
+            if (!visible()) {
+                renderRawModel(cmd,
+                               imageIndex,
+                               blasterModel_,
+                               blasterWorldTransform(),
+                               view,
+                               proj,
+                               glm::vec4(cameraPos_, 0.0f));
             }
 
             for (const Projectile &bullet : bullets_) {
@@ -3186,6 +3199,7 @@ namespace walk {
 
             saturnModel_.cleanup(this);
             birdModel_.cleanup(this);
+            blasterModel_.cleanup(this);
             bulletModel_.cleanup(this);
         }
 
@@ -3544,6 +3558,68 @@ namespace walk {
             cameraFront_ = glm::normalize(front);
         }
 
+        void buildCameraBasis(glm::vec3 &forward, glm::vec3 &right, glm::vec3 &up) const {
+            forward = cameraFront_;
+            if (glm::length(forward) <= 1e-5f) {
+                forward = glm::vec3(0.0f, 0.0f, -1.0f);
+            } else {
+                forward = glm::normalize(forward);
+            }
+
+            right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+            if (glm::length(right) <= 1e-5f) {
+                right = glm::vec3(1.0f, 0.0f, 0.0f);
+            } else {
+                right = glm::normalize(right);
+            }
+
+            up = glm::cross(right, forward);
+            if (glm::length(up) <= 1e-5f) {
+                up = glm::vec3(0.0f, 1.0f, 0.0f);
+            } else {
+                up = glm::normalize(up);
+            }
+        }
+
+        [[nodiscard]] glm::vec3 blasterMuzzleTipPosition() const {
+            glm::vec3 forward(0.0f);
+            glm::vec3 right(0.0f);
+            glm::vec3 up(0.0f);
+            buildCameraBasis(forward, right, up);
+            return cameraPos_ + (forward * 0.55f) + (right * 0.18f) - (up * 0.12f);
+        }
+
+        [[nodiscard]] glm::vec3 projectileSpawnPosition() const {
+            glm::vec3 forward(0.0f);
+            glm::vec3 right(0.0f);
+            glm::vec3 up(0.0f);
+            buildCameraBasis(forward, right, up);
+            constexpr float projectileForwardOffset = 0.015f;
+            return blasterMuzzleTipPosition() + (forward * projectileForwardOffset);
+        }
+
+        [[nodiscard]] glm::mat4 blasterWorldTransform() const {
+            glm::vec3 forward(0.0f);
+            glm::vec3 right(0.0f);
+            glm::vec3 up(0.0f);
+            buildCameraBasis(forward, right, up);
+
+            constexpr float blasterScale = 0.45f;
+            constexpr glm::vec3 localMuzzle(0.95f, 0.09f, 0.0f);
+            const glm::vec3 desiredMuzzle = blasterMuzzleTipPosition();
+            const glm::vec3 origin = desiredMuzzle
+                                     - (forward * (localMuzzle.x * blasterScale))
+                                     - (up * (localMuzzle.y * blasterScale))
+                                     - (right * (localMuzzle.z * blasterScale));
+
+            glm::mat4 world(1.0f);
+            world[0] = glm::vec4(forward * blasterScale, 0.0f);
+            world[1] = glm::vec4(up * blasterScale, 0.0f);
+            world[2] = glm::vec4(right * blasterScale, 0.0f);
+            world[3] = glm::vec4(origin, 1.0f);
+            return world;
+        }
+
         [[nodiscard]] float viewDistanceInDirection(const glm::vec3 &origin, const glm::vec3 &direction) const {
             const glm::vec3 dir = glm::normalize(glm::vec3(direction.x, 0.0f, direction.z));
             constexpr float maxDistance = 14.0f;
@@ -3666,8 +3742,10 @@ namespace walk {
         }
 
         void fireProjectile() {
+            emitMuzzleParticles();
+
             Projectile bullet{};
-            bullet.position = cameraPos_;
+            bullet.position = projectileSpawnPosition();
             bullet.direction = glm::normalize(cameraFront_);
             bullets_.push_back(bullet);
             logEnv(std::format("projectile fired from ({:.2f}, {:.2f}, {:.2f}) dir=({:.2f}, {:.2f}, {:.2f}) active_bullets={}",
@@ -3678,6 +3756,42 @@ namespace walk {
                                bullet.direction.y,
                                bullet.direction.z,
                                bullets_.size()));
+        }
+
+        void emitMuzzleParticles() {
+            glm::vec3 forward(0.0f);
+            glm::vec3 right(0.0f);
+            glm::vec3 up(0.0f);
+            buildCameraBasis(forward, right, up);
+
+            const glm::vec3 muzzle = blasterMuzzleTipPosition();
+            std::uniform_real_distribution<float> lateralJitter(-0.20f, 0.20f);
+            std::uniform_real_distribution<float> verticalJitter(-0.12f, 0.12f);
+            std::uniform_real_distribution<float> speedDist(8.0f, 26.0f);
+            std::uniform_real_distribution<float> lifeDist(0.06f, 0.16f);
+            std::uniform_real_distribution<float> warmDist(0.75f, 1.0f);
+
+            constexpr int particleCount = 24;
+            for (int i = 0; i < particleCount; ++i) {
+                ExplosionParticle p{};
+                p.position = muzzle + (forward * 0.01f);
+
+                glm::vec3 dir = forward
+                                + (right * lateralJitter(rng_))
+                                + (up * verticalJitter(rng_));
+                if (glm::length(dir) <= 1e-5f) {
+                    dir = forward;
+                } else {
+                    dir = glm::normalize(dir);
+                }
+
+                const float speed = speedDist(rng_);
+                p.velocity = dir * speed;
+                p.color = glm::vec3(warmDist(rng_), warmDist(rng_) * 0.7f, warmDist(rng_) * 0.18f);
+                p.maxLifetime = lifeDist(rng_);
+                p.size = 0.035f + (speed * 0.003f);
+                explosionParticles_.push_back(p);
+            }
         }
 
         void updateProjectiles(float deltaTime) {
@@ -4333,6 +4447,7 @@ namespace walk {
         RawPillarRenderer rawPillarRenderer_{};
         mxvk::VKAbstractModel saturnModel_{};
         mxvk::VKAbstractModel birdModel_{};
+        mxvk::VKAbstractModel blasterModel_{};
         mxvk::VKAbstractModel bulletModel_{};
 
         VkPipelineLayout pointPipelineLayout_ = VK_NULL_HANDLE;
