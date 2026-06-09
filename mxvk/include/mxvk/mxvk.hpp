@@ -289,7 +289,7 @@ namespace mxvk {
         static std::optional<VkDebugUtilsMessengerCreateInfoEXT> makeDebugMessengerCreateInfo();
         void setupDebugMessenger();
         void cleanupDebugMessenger();
-        bool createSwapchain();
+        bool createSwapchain(VkSwapchainKHR old_swapchain);
         bool createRenderResources();
         bool createSyncObjects();
         void cleanupSyncObjects();
@@ -371,6 +371,7 @@ namespace mxvk {
         std::string font_path_{};
         int font_size_ = 24;
         VkClearColorValue clear_color_{{0.0f, 0.0f, 0.0f, 1.0f}};
+	std::vector<VkSwapchainKHR> retired_swapchains_;
     };
 
 } // namespace mxvk

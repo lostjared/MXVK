@@ -242,8 +242,14 @@ namespace mxvk {
 
         cleanupSyncObjects();
 
+        if (!retired_swapchains_.empty()) {
+            for (VkSwapchainKHR retired : retired_swapchains_) {
+                vkDestroySwapchainKHR(device, retired, nullptr);
+            }
+            retired_swapchains_.clear();
+        }
         std::cout << "vk: tearing down swapchain-dependent resources\n";
-        cleanupSwapchain(false);
+        cleanupSwapchain(true);
 
         if (command_pool != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
             std::cout << "vk: destroying command pool\n";
@@ -459,21 +465,9 @@ namespace mxvk {
                     break;
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                     if (window != nullptr) {
-                        int pixel_w = 0;
-                        int pixel_h = 0;
-                        SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
-                        const bool has_swapchain_extent =
-                            (swapchain_extent.width != 0U) &&
-                            (swapchain_extent.height != 0U);
-                        const bool extent_changed =
-                            !has_swapchain_extent ||
-                            (swapchain_extent.width != static_cast<uint32_t>(pixel_w)) ||
-                            (swapchain_extent.height != static_cast<uint32_t>(pixel_h));
-                        if (extent_changed) {
-                            force_swapchain_recreate_ = false;
-                            last_resize_event_ms_ = SDL_GetTicks();
-                            framebuffer_resized_ = true;
-                        }
+                        framebuffer_resized_ = true;
+                        last_resize_event_ms_ = SDL_GetTicks();
+                        force_swapchain_recreate_ = false;
                     }
                     break;
                 default:
@@ -791,7 +785,7 @@ namespace mxvk {
         }
 
         std::cout << "vk: creating swapchain\n";
-        if (!createSwapchain()) {
+        if (!createSwapchain(VK_NULL_HANDLE)) {
             std::cout << "vk: createSwapchain failed\n";
             return;
         }
@@ -811,7 +805,7 @@ namespace mxvk {
         std::cout << "mxvk: createDevice complete\n";
     }
 
-    bool VK_Window::createSwapchain() {
+    bool VK_Window::createSwapchain(VkSwapchainKHR old_swapchain) {
         std::cout << "vk: entering createSwapchain\n";
         const SwapchainSupport support = querySwapchainSupport(physical_device, surface);
         if (support.formats.empty() || support.present_modes.empty()) {
@@ -849,11 +843,12 @@ namespace mxvk {
             create_info.pQueueFamilyIndices = nullptr;
         }
 
+        
         create_info.preTransform = support.capabilities.currentTransform;
         create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         create_info.presentMode = present_mode;
         create_info.clipped = VK_TRUE;
-        create_info.oldSwapchain = VK_NULL_HANDLE;
+        create_info.oldSwapchain = old_swapchain;
 
         std::cout << "vk: creating swapchain object\n";
         if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain) != VK_SUCCESS) {
@@ -1145,25 +1140,52 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE || window == nullptr) {
             return;
         }
+        int pixel_w = 0;
+        int pixel_h = 0;
+        SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+        VkSurfaceCapabilitiesKHR surface_capabilities{};
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities);
 
-        int w = 0;
-        int h = 0;
-        SDL_GetWindowSizeInPixels(window.get(), &w, &h);
-        if (w == 0 || h == 0) {
-            // Window is minimized; skip recreation until it has a real size.
-            std::cout << "mxvk: resize detected while minimized; deferring swapchain recreation\n";
+        VkExtent2D new_extent{};
+
+        if (surface_capabilities.currentExtent.width != 0xFFFFFFFFU) {
+            new_extent = surface_capabilities.currentExtent;
+        } else {
+            new_extent.width = std::clamp(static_cast<uint32_t>(pixel_w),
+                                          surface_capabilities.minImageExtent.width,
+                                          surface_capabilities.maxImageExtent.width);
+                                          
+            new_extent.height = std::clamp(static_cast<uint32_t>(pixel_h),
+                                           surface_capabilities.minImageExtent.height,
+                                           surface_capabilities.maxImageExtent.height);
+        }
+
+        if (new_extent.width == 0 || new_extent.height == 0) {
+            return;
+        }
+        
+        const uint32_t target_w = std::clamp(static_cast<uint32_t>(pixel_w),
+                                                 surface_capabilities.minImageExtent.width,
+                                                 surface_capabilities.maxImageExtent.width);
+        const uint32_t target_h = std::clamp(static_cast<uint32_t>(pixel_h),
+                                             surface_capabilities.minImageExtent.height,
+                                             surface_capabilities.maxImageExtent.height);
+
+        if (new_extent.width != target_w || new_extent.height != target_h) {
             return;
         }
 
-        if (!force_swapchain_recreate_ &&
-            swapchain != VK_NULL_HANDLE &&
-            swapchain_extent.width == static_cast<uint32_t>(w) &&
-            swapchain_extent.height == static_cast<uint32_t>(h)) {
-            framebuffer_resized_ = false;
+        if (!force_swapchain_recreate_ && swapchain_extent.width == new_extent.width &&
+            swapchain_extent.height == new_extent.height) {
             return;
         }
 
-        std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", w, h);
+        if (!force_swapchain_recreate_ && swapchain_extent.width == new_extent.width &&
+            swapchain_extent.height == new_extent.height) {
+            return;
+        }
+        
+        std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", new_extent.width, new_extent.height);
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
 
@@ -1178,10 +1200,19 @@ namespace mxvk {
         destroySpritePipeline();
         destroyTextPipeline();
         cleanupSyncObjects();
-        cleanupSwapchain(true);
-        if (!createSwapchain() || !createRenderResources() || !createSyncObjects()) {
+        VkSwapchainKHR old_swapchain = swapchain;
+        cleanupSwapchain(false);
+        if (!createSwapchain(old_swapchain) || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
+            if (old_swapchain != VK_NULL_HANDLE) {
+                retired_swapchains_.push_back(old_swapchain);
+                //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+            }
             return;
+        }
+        if (old_swapchain != VK_NULL_HANDLE) {
+            //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+            retired_swapchains_.push_back(old_swapchain);
         }
 
         for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
@@ -1196,22 +1227,12 @@ namespace mxvk {
         std::cout << "mxvk: swapchain recreation complete\n";
     }
 
-    void VK_Window::cleanupSwapchain(bool preserveCommandPool) {
+    void VK_Window::cleanupSwapchain(bool destroy_swapchain_handle) {
         std::cout << "vk: entering cleanupSwapchain\n";
         if (device == VK_NULL_HANDLE) {
             std::cout << "vk: skipping cleanupSwapchain because logical device is null\n";
             return;
         }
-
-        if (preserveCommandPool && command_pool != VK_NULL_HANDLE && !command_buffers.empty()) {
-            std::cout << "vk: freeing command buffers\n";
-            vkFreeCommandBuffers(
-                device,
-                command_pool,
-                static_cast<uint32_t>(command_buffers.size()),
-                command_buffers.data());
-        }
-        command_buffers.clear();
 
         if (!swapchain_image_views.empty()) {
             std::cout << "vk: destroying swapchain image views\n";
@@ -1258,7 +1279,8 @@ namespace mxvk {
         swapchain_image_initialized.clear();
         depth_format = VK_FORMAT_UNDEFINED;
 
-        if (swapchain != VK_NULL_HANDLE) {
+        // This guard prevents destroying the active swapchain during a live resize
+        if (destroy_swapchain_handle && swapchain != VK_NULL_HANDLE) {
             std::cout << "vk: destroying swapchain\n";
             vkDestroySwapchainKHR(device, swapchain, nullptr);
             swapchain = VK_NULL_HANDLE;
@@ -1279,6 +1301,15 @@ namespace mxvk {
         if (pixel_w <= 0 || pixel_h <= 0) {
             framebuffer_resized_ = true;
             return;
+        }
+        
+        if (swapchain_extent.width != 0 && swapchain_extent.height != 0) {
+            if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
+                swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
+                framebuffer_resized_ = true;
+                force_swapchain_recreate_ = true;
+                return;
+            }
         }
 
         if (!ensureRenderResources()) {
@@ -1673,19 +1704,9 @@ namespace mxvk {
             last_resize_event_ms_ = SDL_GetTicks();
             framebuffer_resized_ = true;
         } else if (present_result == VK_SUBOPTIMAL_KHR) {
-            int pixel_w = 0;
-            int pixel_h = 0;
-            if (window != nullptr) {
-                SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
-            }
-            const bool extent_changed =
-                (pixel_w > 0 && pixel_h > 0) &&
-                (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
-                 swapchain_extent.height != static_cast<uint32_t>(pixel_h));
-            if (extent_changed) {
-                last_resize_event_ms_ = SDL_GetTicks();
-                framebuffer_resized_ = true;
-            }
+            last_resize_event_ms_ = SDL_GetTicks();
+            framebuffer_resized_ = true;
+            force_swapchain_recreate_ = true;
         } else if (present_result != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to present swapchain image\n";
         }
@@ -1700,6 +1721,12 @@ namespace mxvk {
         }
 
         current_frame_ = (current_frame_ + 1U) % max_frames_in_flight;
+        if (!retired_swapchains_.empty() && (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR)) {
+            for (VkSwapchainKHR retired : retired_swapchains_) {
+                vkDestroySwapchainKHR(device, retired, nullptr);
+            }
+            retired_swapchains_.clear();
+        }
     }
 
     bool VK_Window::validationEnabled() const {
