@@ -159,8 +159,7 @@ namespace example {
                 mouseY *= static_cast<float>(swapchain_extent.height) / static_cast<float>(logicalHeight);
             }
 
-            const float invertedY = static_cast<float>(swapchain_extent.height) - mouseY;
-            return {static_cast<int>(std::lround(mouseX)), static_cast<int>(std::lround(invertedY))};
+            return {static_cast<int>(std::lround(mouseX)), static_cast<int>(std::lround(mouseY))};
         }
 
         void makeComputerMove() {

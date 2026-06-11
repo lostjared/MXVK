@@ -21,7 +21,7 @@ void main() {
     vec2 pixel_pos = vec2(pc.spritePosX, pc.spritePosY) + in_pos * vec2(pc.spriteSizeW, pc.spriteSizeH);
     vec2 ndc = vec2(
         (pixel_pos.x / max(pc.screenWidth, 1.0)) * 2.0 - 1.0,
-        1.0 - (pixel_pos.y / max(pc.screenHeight, 1.0)) * 2.0);
+        (pixel_pos.y / max(pc.screenHeight, 1.0)) * 2.0 - 1.0);
 
     gl_Position = vec4(ndc, 0.0, 1.0);
     out_uv = vec2(in_uv.x, 1.0 - in_uv.y);
