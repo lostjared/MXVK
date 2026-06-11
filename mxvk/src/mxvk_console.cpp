@@ -759,11 +759,16 @@ namespace mxvk {
         ensurePanelSprite();
         ensureCursorSprite();
         ensureScrollSprites();
-        if (panel_sprite_ != nullptr) {
-            const VkExtent2D extent = window_->getSwapchainExtent();
-            const int screen_h = static_cast<int>(extent.height);
-            const int sprite_y = std::max(0, screen_h - panel_y_ - panel_h_);
+        const auto consoleSpriteY = [this](const int y, const int h) {
+            if (sprite_y_origin_top_left_) {
+                return std::max(0, y);
+            }
 
+            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
+            return std::max(0, screen_h - y - h);
+        };
+
+        if (panel_sprite_ != nullptr) {
             SDL_Surface *surface = SDL_CreateSurface(2, 2, SDL_PIXELFORMAT_RGBA32);
             if (surface != nullptr) {
                 const SDL_PixelFormatDetails *const fmt = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA32);
@@ -773,7 +778,7 @@ namespace mxvk {
                 SDL_DestroySurface(surface);
             }
 
-            panel_sprite_->drawSpriteRect(panel_x_, sprite_y, panel_w_, panel_h_);
+            panel_sprite_->drawSpriteRect(panel_x_, consoleSpriteY(panel_y_, panel_h_), panel_w_, panel_h_);
         }
 
         int glyph_w = 8;
@@ -822,9 +827,7 @@ namespace mxvk {
                 SDL_DestroySurface(surface);
             }
 
-            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
-            const int track_sprite_y = std::max(0, screen_h - scrollbar_y_ - scrollbar_h_);
-            scroll_track_sprite_->drawSpriteRect(scrollbar_x_, track_sprite_y, scrollbar_w_, scrollbar_h_);
+            scroll_track_sprite_->drawSpriteRect(scrollbar_x_, consoleSpriteY(scrollbar_y_, scrollbar_h_), scrollbar_w_, scrollbar_h_);
         }
 
         if (scroll_thumb_sprite_ != nullptr && scrollbar_thumb_h_ > 0) {
@@ -838,9 +841,10 @@ namespace mxvk {
                 SDL_DestroySurface(surface);
             }
 
-            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
-            const int thumb_sprite_y = std::max(0, screen_h - scrollbar_thumb_y_ - scrollbar_thumb_h_);
-            scroll_thumb_sprite_->drawSpriteRect(scrollbar_x_, thumb_sprite_y, scrollbar_w_, scrollbar_thumb_h_);
+            scroll_thumb_sprite_->drawSpriteRect(scrollbar_x_,
+                                                 consoleSpriteY(scrollbar_thumb_y_, scrollbar_thumb_h_),
+                                                 scrollbar_w_,
+                                                 scrollbar_thumb_h_);
         }
 
         if (scroll_offset_ > 0) {
@@ -881,9 +885,7 @@ namespace mxvk {
                 SDL_DestroySurface(surface);
             }
 
-            const int screen_h = static_cast<int>(window_->getSwapchainExtent().height);
-            const int sprite_y = std::max(0, screen_h - cursor_y - cursor_h);
-            cursor_sprite_->drawSpriteRect(cursor_x, sprite_y, cursor_w, cursor_h);
+            cursor_sprite_->drawSpriteRect(cursor_x, consoleSpriteY(cursor_y, cursor_h), cursor_w, cursor_h);
         }
     }
 

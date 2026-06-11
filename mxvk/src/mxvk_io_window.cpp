@@ -7,6 +7,7 @@ namespace mxvk {
     VK_IOWindow::VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION) {
         const std::string base_path = path;
         console_.attach(*this, base_path + "/data/font.ttf", 20);
+        console_.setSpriteYOriginTopLeft(true);
         console_.setPrompt("$> ");
         console_.printLine("Press F3 to open/close the console.");
         console_.printLine("Type 'help' for built-in commands.");

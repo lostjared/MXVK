@@ -27,8 +27,10 @@ set(POOL_DEMO_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
 set(POOL_DEMO_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 set(POOL_DEMO_VERTEX_SHADER ${POOL_DEMO_SHADER_SOURCE_DIR}/vertex.vert)
 set(POOL_DEMO_FRAGMENT_SHADER ${POOL_DEMO_SHADER_SOURCE_DIR}/fragment.frag)
+set(POOL_DEMO_SPRITE_VERTEX_SHADER ${POOL_DEMO_SHADER_SOURCE_DIR}/sprite_vertex.vert)
 set(POOL_DEMO_VERTEX_SPV ${POOL_DEMO_SHADER_OUTPUT_DIR}/model.vert.spv)
 set(POOL_DEMO_FRAGMENT_SPV ${POOL_DEMO_SHADER_OUTPUT_DIR}/model.frag.spv)
+set(POOL_DEMO_SPRITE_VERTEX_SPV ${POOL_DEMO_SHADER_OUTPUT_DIR}/sprite.vert.spv)
 
 add_custom_command(
     OUTPUT ${POOL_DEMO_VERTEX_SPV}
@@ -48,10 +50,20 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${POOL_DEMO_SPRITE_VERTEX_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${POOL_DEMO_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${POOL_DEMO_SPRITE_VERTEX_SHADER} -o ${POOL_DEMO_SPRITE_VERTEX_SPV}
+    DEPENDS ${POOL_DEMO_SPRITE_VERTEX_SHADER}
+    COMMENT "Compiling pool demo sprite vertex shader"
+    VERBATIM
+)
+
 add_custom_target(pool_demo_shaders
     DEPENDS
         ${POOL_DEMO_VERTEX_SPV}
         ${POOL_DEMO_FRAGMENT_SPV}
+        ${POOL_DEMO_SPRITE_VERTEX_SPV}
 )
 
 add_dependencies(Pool3D pool_demo_shaders)
@@ -72,6 +84,12 @@ add_custom_command(TARGET Pool3D POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/data"
         "${CMAKE_CURRENT_BINARY_DIR}/data"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${POOL_DEMO_SPRITE_VERTEX_SPV}
+        "${CMAKE_CURRENT_BINARY_DIR}/data/sprite.vert.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${POOL_DEMO_SPRITE_VERTEX_SPV}
+        "${CMAKE_CURRENT_BINARY_DIR}/data/sprite_vert.spv"
     COMMENT "Copying data/ assets to pool_demo build directory"
 )
 

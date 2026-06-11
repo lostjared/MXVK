@@ -80,6 +80,9 @@ namespace mxvk {
         /** @brief Set max number of lines rendered on screen. */
         void setMaxVisibleLines(std::size_t maxVisibleLines);
 
+        /** @brief Select whether console sprite elements use top-left Y coordinates. */
+        void setSpriteYOriginTopLeft(bool enabled) noexcept { sprite_y_origin_top_left_ = enabled; }
+
         /** @return Current input buffer. */
         [[nodiscard]] const std::string &inputBuffer() const noexcept;
 
@@ -143,6 +146,7 @@ namespace mxvk {
         int scrollbar_thumb_y_ = 0;
         int scrollbar_thumb_h_ = 0;
         bool scrollbar_dragging_ = false;
+        bool sprite_y_origin_top_left_ = false;
         int scrollbar_drag_offset_ = 0;
         std::size_t scroll_offset_ = 0;
         std::size_t last_visible_line_count_ = 16;

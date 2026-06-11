@@ -13,7 +13,7 @@ set(sprite_example_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 
 set(sprite_example_VERTEX_SHADER ${sprite_example_SHADER_SOURCE_DIR}/vertex.vert)
 set(sprite_example_FRAGMENT_SHADER ${sprite_example_SHADER_SOURCE_DIR}/fragment.frag)
-set(sprite_example_VERTEX_SPV ${sprite_example_SHADER_OUTPUT_DIR}/vertex.vert.spv)
+set(sprite_example_VERTEX_SPV ${sprite_example_SHADER_OUTPUT_DIR}/sprite.vert.spv)
 set(sprite_example_FRAGMENT_SPV ${sprite_example_SHADER_OUTPUT_DIR}/fragment.frag.spv)
 
 add_custom_command(
@@ -43,15 +43,28 @@ add_custom_target(sprite_example_shaders
 add_dependencies(sprite_example sprite_example_shaders)
 target_compile_definitions(sprite_example PRIVATE
     sprite_example_SHADER_DIR="${sprite_example_SHADER_OUTPUT_DIR}"
-    sprite_example_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    sprite_example_ASSET_DIR="$<TARGET_FILE_DIR:sprite_example>"
 )
 
 set(sprite_example_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/font.ttf)
+set(sprite_example_IMAGE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/intro.png)
 
 add_custom_command(TARGET sprite_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:sprite_example>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:sprite_example>/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${sprite_example_FONT_SOURCE}
         $<TARGET_FILE_DIR:sprite_example>/data/font.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${sprite_example_IMAGE_SOURCE}
+        $<TARGET_FILE_DIR:sprite_example>/data/intro.png
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${sprite_example_VERTEX_SPV}
+        $<TARGET_FILE_DIR:sprite_example>/data/sprite.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${sprite_example_VERTEX_SPV}
+        $<TARGET_FILE_DIR:sprite_example>/data/sprite_vert.spv
     COMMENT "Copying sprite example font.ttf to runtime output directory"
 )

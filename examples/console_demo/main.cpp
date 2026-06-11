@@ -24,6 +24,7 @@ namespace example {
 
             background_ = createSprite(base_path + "/data/background.png", sprite_vert_path, shader_path);
             console_.attach(*this, base_path + "/data/font.ttf", 20);
+            console_.setSpriteYOriginTopLeft(true);
             console_.setPrompt("mxvk> ");
             console_.printLine("Press F3 to open/close the console.");
             console_.printLine("Type 'help' for built-in commands.");
