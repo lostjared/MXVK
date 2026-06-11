@@ -1773,7 +1773,7 @@ namespace walk {
         }
 
         void loadTexture(const std::string &textureManifestPath, const std::string &textureBasePath) {
-            SDL_Surface *surface = mxvk::LoadPNG((textureBasePath + "/ground.png").c_str());
+            SDL_Surface *surface = mxvk::LoadPNG((textureBasePath + "/wall_bricks.png").c_str());
             if (surface == nullptr) {
                 throw mxvk::Exception("walk: failed to load raw wall texture");
             }
@@ -4522,4 +4522,3 @@ int main(int argc, char **argv) {
 
     return EXIT_SUCCESS;
 }
-
