@@ -105,6 +105,8 @@ namespace mxvk {
          * @param col Text color.
          */
         void printText(const std::string &text, int x, int y, const SDL_Color &col);
+        void printText(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *font);
+        void printText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font);
 
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
@@ -159,6 +161,8 @@ namespace mxvk {
          * @return true when measurement succeeded.
          */
         [[nodiscard]] bool getTextDimensions(const std::string &text, int &width, int &height);
+        [[nodiscard]] bool getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *font);
+        [[nodiscard]] bool getTextDimensions(const std::string &text, int &width, int &height, const Font &font);
 
         /**
          * @brief Create a sprite from a PNG file and register it with this window.

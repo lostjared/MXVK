@@ -425,6 +425,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(asteroids)
     add_subdirectory(examples/pong)
     mxvk_configure_mingw_target(pong)
+    add_subdirectory(examples/tictactoe)
+    mxvk_configure_mingw_target(tictactoe)
     add_subdirectory(examples/puzzle)
     mxvk_configure_mingw_target(puzzle)
     add_subdirectory(examples/pool_demo)
@@ -449,28 +451,33 @@ if(EXAMPLES)
             return()
         endif()
 
+        get_target_property(target_runtime_dir ${target_name} RUNTIME_OUTPUT_DIRECTORY)
+        if(NOT target_runtime_dir)
+            get_target_property(target_runtime_dir ${target_name} BINARY_DIR)
+        endif()
+
         string(MAKE_C_IDENTIFIER "${target_name}" target_name_id)
         set(copy_target "mxvk_copy_runtime_shaders_${target_name_id}")
 
-        add_custom_target(${copy_target} ALL
-            COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${target_name}>/data
+        add_custom_target(${copy_target}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${target_runtime_dir}/data
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_VERTEX_SPV}
-                $<TARGET_FILE_DIR:${target_name}>/data/sprite.vert.spv
+                ${target_runtime_dir}/data/sprite.vert.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_FRAGMENT_SPV}
-                $<TARGET_FILE_DIR:${target_name}>/data/sprite.frag.spv
+                ${target_runtime_dir}/data/sprite.frag.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_TEXT_VERTEX_SPV}
-                $<TARGET_FILE_DIR:${target_name}>/data/text.vert.spv
+                ${target_runtime_dir}/data/text.vert.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_TEXT_FRAGMENT_SPV}
-                $<TARGET_FILE_DIR:${target_name}>/data/text.frag.spv
+                ${target_runtime_dir}/data/text.frag.spv
             COMMENT "Copying MXVK sprite/text runtime shaders to ${target_name} data directory"
             VERBATIM
         )
-
         add_dependencies(${copy_target} mxvk_shaders)
+        add_dependencies(${target_name} ${copy_target})
     endfunction()
 
     set(mxvk_example_targets
@@ -483,6 +490,7 @@ if(EXAMPLES)
         glitch_cube
         asteroids
         pong
+        tictactoe
         puzzle
         Pool3D
         fractal_zoom

@@ -156,13 +156,6 @@ namespace mxvk {
 
         std::vector<std::filesystem::path> candidates{};
 
-        if (!font_path_.empty()) {
-            const std::filesystem::path fontPath(font_path_);
-            if (fontPath.has_parent_path()) {
-                candidates.push_back(fontPath.parent_path() / shaderFileName);
-            }
-        }
-
         if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
             const std::filesystem::path executableDir(basePath);
             candidates.push_back(executableDir / "data" / shaderFileName);
@@ -170,6 +163,13 @@ namespace mxvk {
         }
 
         candidates.push_back(std::filesystem::path("data") / shaderFileName);
+
+        if (!font_path_.empty()) {
+            const std::filesystem::path fontPath(font_path_);
+            if (fontPath.has_parent_path()) {
+                candidates.push_back(fontPath.parent_path() / shaderFileName);
+            }
+        }
 
         if (fallbackDir != nullptr && fallbackDir[0] != '\0') {
             candidates.push_back(std::filesystem::path(fallbackDir) / shaderFileName);
@@ -842,7 +842,6 @@ namespace mxvk {
             create_info.queueFamilyIndexCount = 0;
             create_info.pQueueFamilyIndices = nullptr;
         }
-
         
         create_info.preTransform = support.capabilities.currentTransform;
         create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -1849,6 +1848,27 @@ namespace mxvk {
         text_renderer_->printTextG_Solid(text, x, y, col);
     }
 
+    void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *font) {
+        if (text.empty()) {
+            return;
+        }
+
+        if (font == nullptr) {
+            throw mxvk::Exception("printText requires a non-null TTF_Font");
+        }
+
+        if (!font_configured_) {
+            throw mxvk::Exception("printText with an explicit font still requires setFont() to initialize the text renderer");
+        }
+
+        ensureTextRenderer();
+        text_renderer_->printTextG_Solid(text, x, y, col, font);
+    }
+
+    void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font) {
+        printText(text, x, y, col, font.get());
+    }
+
     void VK_Window::clearTextQueue() {
         if (text_renderer_) {
             text_renderer_->clearQueue();
@@ -1869,6 +1889,32 @@ namespace mxvk {
             return false;
         }
         return text_renderer_->getTextDimensions(text, width, height);
+    }
+
+    bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *font) {
+        if (font == nullptr) {
+            width = 0;
+            height = 0;
+            return false;
+        }
+
+        if (!font_configured_) {
+            throw mxvk::Exception("getTextDimensions with an explicit font still requires setFont() to initialize the text renderer");
+        }
+
+        if (!text_renderer_) {
+            ensureTextRenderer();
+        }
+        if (!text_renderer_) {
+            width = 0;
+            height = 0;
+            return false;
+        }
+        return text_renderer_->getTextDimensions(text, width, height, font);
+    }
+
+    bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height, const Font &font) {
+        return getTextDimensions(text, width, height, font.get());
     }
 
     void VK_Window::ensureTextRenderer() {

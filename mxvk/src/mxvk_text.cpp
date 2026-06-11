@@ -6,6 +6,58 @@
 #include <iostream>
 
 namespace mxvk {
+    Font::Font(const std::string &fontPath, int fontSize) {
+        reset(fontPath, fontSize);
+    }
+
+    Font::~Font() {
+        reset();
+    }
+
+    Font::Font(Font &&other) noexcept
+        : font_(std::exchange(other.font_, nullptr)),
+          ownsTtfInit_(std::exchange(other.ownsTtfInit_, false)) {}
+
+    Font &Font::operator=(Font &&other) noexcept {
+        if (this != &other) {
+            reset();
+            font_ = std::exchange(other.font_, nullptr);
+            ownsTtfInit_ = std::exchange(other.ownsTtfInit_, false);
+        }
+        return *this;
+    }
+
+    void Font::reset() {
+        if (font_ != nullptr) {
+            TTF_CloseFont(font_);
+            font_ = nullptr;
+        }
+        if (ownsTtfInit_) {
+            TTF_Quit();
+            ownsTtfInit_ = false;
+        }
+    }
+
+    void Font::reset(const std::string &fontPath, int fontSize) {
+        if (fontPath.empty() || fontSize <= 0) {
+            throw mxvk::Exception("Font requires a non-empty path and positive font size");
+        }
+
+        reset();
+
+        if (!TTF_Init()) {
+            throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
+        }
+
+        TTF_Font *newFont = TTF_OpenFont(fontPath.c_str(), fontSize);
+        if (newFont == nullptr) {
+            TTF_Quit();
+            throw mxvk::Exception("Failed to load font: " + std::string(SDL_GetError()));
+        }
+
+        font_ = newFont;
+        ownsTtfInit_ = true;
+    }
 
     VK_Text::VK_Text(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue,
                      VkCommandPool cmdPool, const std::string &fontPath, int fontSize)
@@ -128,12 +180,7 @@ namespace mxvk {
         return descriptorSet;
     }
 
-    void VK_Text::initFont(const std::string &fontPath, int fontSize) {
-        font = TTF_OpenFont(fontPath.c_str(), fontSize);
-        if (!font) {
-            throw mxvk::Exception("Failed to load font: " + std::string(SDL_GetError()));
-        }
-
+    void VK_Text::initSampler() {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -149,6 +196,16 @@ namespace mxvk {
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
         VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &fontSampler));
+    }
+
+    void VK_Text::initFont(const std::string &fontPath, int fontSize) {
+        font = TTF_OpenFont(fontPath.c_str(), fontSize);
+        if (!font) {
+            throw mxvk::Exception("Failed to load font: " + std::string(SDL_GetError()));
+        }
+        if (fontSampler == VK_NULL_HANDLE) {
+            initSampler();
+        }
         std::cout << std::format("mxvk: Font loaded: {} @ {}pt\n", fontPath, fontSize);
     }
 
@@ -191,8 +248,24 @@ namespace mxvk {
     }
 
     void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col) {
-        if (text.empty() || !font)
+        printTextG_SolidWithFont(text, x, y, col, font);
+    }
+
+    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont) {
+        printTextG_SolidWithFont(text, x, y, col, textFont);
+    }
+
+    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, const Font &textFont) {
+        printTextG_SolidWithFont(text, x, y, col, textFont.get());
+    }
+
+    void VK_Text::printTextG_SolidWithFont(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont) {
+        if (text.empty() || !textFont)
             return;
+
+        if (fontSampler == VK_NULL_HANDLE) {
+            initSampler();
+        }
 
         TextQuad quad;
         quad.device = device;
@@ -202,7 +275,7 @@ namespace mxvk {
         quad.color = col;
         quad.ownsTexture = false; // cache owns all textures
 
-        CacheKey key{text, col.r, col.g, col.b, col.a};
+        CacheKey key{text, textFont, col.r, col.g, col.b, col.a};
         auto it = textureCache.find(key);
 
         if (it != textureCache.end()) {
@@ -216,7 +289,7 @@ namespace mxvk {
         } else {
             // Cache miss -- render with SDL_ttf and upload to GPU
             // SDL3_ttf: TTF_RenderText_Blended requires an explicit length (0 = null-terminated)
-            SDL_Surface *textSurface = TTF_RenderText_Blended(font, text.c_str(), 0, col);
+            SDL_Surface *textSurface = TTF_RenderText_Blended(textFont, text.c_str(), 0, col);
             if (!textSurface) {
                 return;
             }
@@ -436,14 +509,22 @@ namespace mxvk {
     }
 
     bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height) {
-        if (text.empty() || !font) {
+        return getTextDimensions(text, width, height, font);
+    }
+
+    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *textFont) {
+        if (text.empty() || !textFont) {
             width = 0;
             height = 0;
             return false;
         }
 
         // SDL3_ttf: TTF_GetStringSize replaces TTF_SizeText; length=0 for null-terminated
-        return TTF_GetStringSize(font, text.c_str(), 0, &width, &height);
+        return TTF_GetStringSize(textFont, text.c_str(), 0, &width, &height);
+    }
+
+    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height, const Font &textFont) {
+        return getTextDimensions(text, width, height, textFont.get());
     }
 
     uint32_t VK_Text::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {

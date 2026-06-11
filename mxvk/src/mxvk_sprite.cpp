@@ -4,6 +4,7 @@
  */
 #include "mxvk/mxvk_sprite.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include <filesystem>
 
 namespace mxvk {
 
@@ -615,7 +616,7 @@ namespace mxvk {
             customPipelineLayout = VK_NULL_HANDLE;
         }
 
-        std::string vertPath = vertexShaderPath.empty() ? "data/sprite_vert.spv" : vertexShaderPath;
+        std::string vertPath = vertexShaderPath.empty() ? "sprite.vert.spv" : vertexShaderPath;
         auto vertShaderCode = readShaderFile(vertPath);
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
 
@@ -1493,7 +1494,30 @@ namespace mxvk {
     }
 
     std::vector<char> VK_Sprite::readShaderFile(const std::string &filename) {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        std::vector<std::filesystem::path> candidates{};
+        const std::filesystem::path requested(filename);
+
+        if (requested.is_absolute() || requested.has_parent_path()) {
+            candidates.push_back(requested);
+        } else {
+            if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
+                const std::filesystem::path executableDir(basePath);
+                candidates.push_back(executableDir / "data" / requested);
+                candidates.push_back(executableDir / requested);
+            }
+            candidates.push_back(std::filesystem::path("data") / requested);
+            candidates.push_back(requested);
+        }
+
+        std::ifstream file;
+        for (const std::filesystem::path &candidate : candidates) {
+            file.open(candidate, std::ios::ate | std::ios::binary);
+            if (file.is_open()) {
+                break;
+            }
+            file.clear();
+        }
+
         if (!file.is_open()) {
             throw mxvk::Exception("Failed to open shader file: " + filename);
         }

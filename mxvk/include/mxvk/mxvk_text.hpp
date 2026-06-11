@@ -22,6 +22,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #ifndef VK_CHECK_RESULT
@@ -37,6 +38,36 @@
 namespace mxvk {
 
     /**
+     * @class Font
+     * @brief Small RAII wrapper for an SDL_ttf font handle.
+     *
+     * This is optional convenience for APIs that accept a font object. Existing
+     * code can continue using VK_Text::setFont() and printText() unchanged.
+     */
+    class Font {
+      public:
+        Font() = default;
+        Font(const std::string &fontPath, int fontSize);
+        ~Font();
+
+        Font(const Font &) = delete;
+        Font &operator=(const Font &) = delete;
+
+        Font(Font &&other) noexcept;
+        Font &operator=(Font &&other) noexcept;
+
+        [[nodiscard]] TTF_Font *get() const noexcept { return font_; }
+        [[nodiscard]] explicit operator bool() const noexcept { return font_ != nullptr; }
+
+        void reset();
+        void reset(const std::string &fontPath, int fontSize);
+
+      private:
+        TTF_Font *font_ = nullptr;
+        bool ownsTtfInit_ = false;
+    };
+
+    /**
      * @class VKText
      * @brief Renders SDL_ttf text into Vulkan image textures.
      *
@@ -49,6 +80,7 @@ namespace mxvk {
     /// Cache key combining text content and colour.
     struct CacheKey {
         std::string text;
+        TTF_Font *font = nullptr;
         uint8_t r, g, b, a;
         bool operator==(const CacheKey &other) const = default;
     };
@@ -57,6 +89,7 @@ namespace mxvk {
     struct CacheKeyHash {
         size_t operator()(const CacheKey &k) const {
             size_t h = std::hash<std::string>{}(k.text);
+            h ^= std::hash<TTF_Font *>{}(k.font) + 0x9e3779b9 + (h << 6) + (h >> 2);
             h ^= std::hash<uint8_t>{}(k.r) + 0x9e3779b9 + (h << 6) + (h >> 2);
             h ^= std::hash<uint8_t>{}(k.g) + 0x9e3779b9 + (h << 6) + (h >> 2);
             h ^= std::hash<uint8_t>{}(k.b) + 0x9e3779b9 + (h << 6) + (h >> 2);
@@ -104,6 +137,8 @@ namespace mxvk {
          * @param col  Text colour.
          */
         void printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col);
+        void printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont);
+        void printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, const Font &textFont);
 
         /**
          * @brief Record all queued text quads into a command buffer.
@@ -139,6 +174,8 @@ namespace mxvk {
          * @return @c true if measurement succeeded.
          */
         bool getTextDimensions(const std::string &text, int &width, int &height);
+        bool getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *textFont);
+        bool getTextDimensions(const std::string &text, int &width, int &height, const Font &textFont);
 
         VkSampler fontSampler = VK_NULL_HANDLE; ///< Sampler used for all text textures.
       private:
@@ -245,6 +282,8 @@ namespace mxvk {
         std::unordered_map<CacheKey, CachedTexture, CacheKeyHash> textureCache;
 
         void initFont(const std::string &fontPath, int fontSize);
+        void initSampler();
+        void printTextG_SolidWithFont(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont);
         void createDescriptorPool();
         void createDescriptorPool(uint32_t maxSets);
         void growDescriptorPool();
