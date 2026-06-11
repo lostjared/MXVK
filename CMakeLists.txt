@@ -459,20 +459,66 @@ if(EXAMPLES)
         string(MAKE_C_IDENTIFIER "${target_name}" target_name_id)
         set(copy_target "mxvk_copy_runtime_shaders_${target_name_id}")
 
-        add_custom_target(${copy_target}
+        set(copy_commands
             COMMAND ${CMAKE_COMMAND} -E make_directory ${target_runtime_dir}/data
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_VERTEX_SPV}
                 ${target_runtime_dir}/data/sprite.vert.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_VERTEX_SPV}
+                ${target_runtime_dir}/data/sprite_vert.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_FRAGMENT_SPV}
                 ${target_runtime_dir}/data/sprite.frag.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_FRAGMENT_SPV}
+                ${target_runtime_dir}/data/sprite_frag.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_TEXT_VERTEX_SPV}
                 ${target_runtime_dir}/data/text.vert.spv
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_TEXT_VERTEX_SPV}
+                ${target_runtime_dir}/data/text_vert.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_TEXT_FRAGMENT_SPV}
                 ${target_runtime_dir}/data/text.frag.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_TEXT_FRAGMENT_SPV}
+                ${target_runtime_dir}/data/text_frag.spv
+        )
+
+        get_target_property(target_source_dir ${target_name} SOURCE_DIR)
+        if(target_source_dir AND EXISTS "${target_source_dir}/data")
+            list(APPEND copy_commands
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_VERTEX_SPV}
+                    ${target_source_dir}/data/sprite.vert.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_VERTEX_SPV}
+                    ${target_source_dir}/data/sprite_vert.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_FRAGMENT_SPV}
+                    ${target_source_dir}/data/sprite.frag.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_FRAGMENT_SPV}
+                    ${target_source_dir}/data/sprite_frag.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_TEXT_VERTEX_SPV}
+                    ${target_source_dir}/data/text.vert.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_TEXT_VERTEX_SPV}
+                    ${target_source_dir}/data/text_vert.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_TEXT_FRAGMENT_SPV}
+                    ${target_source_dir}/data/text.frag.spv
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${mxvk_TEXT_FRAGMENT_SPV}
+                    ${target_source_dir}/data/text_frag.spv
+            )
+        endif()
+
+        add_custom_target(${copy_target}
+            ${copy_commands}
             COMMENT "Copying MXVK sprite/text runtime shaders to ${target_name} data directory"
             VERBATIM
         )
@@ -495,9 +541,10 @@ if(EXAMPLES)
         Pool3D
         fractal_zoom
         console_demo
+        walk_example
     )
     if(CV)
-        list(APPEND mxvk_example_targets opencv_example opencv_model)
+        list(APPEND mxvk_example_targets compute_shader opencv_example opencv_model)
     endif()
 
     foreach(example_target IN LISTS mxvk_example_targets)

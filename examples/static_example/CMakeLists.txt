@@ -35,9 +35,17 @@ add_custom_command(
 )
 
 add_custom_target(static_example_shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${static_example_VERTEX_SPV}
+        ${static_example_SHADER_SOURCE_DIR}/triangle.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${static_example_FRAGMENT_SPV}
+        ${static_example_SHADER_SOURCE_DIR}/triangle.frag.spv
     DEPENDS
         ${static_example_VERTEX_SPV}
         ${static_example_FRAGMENT_SPV}
+    COMMENT "Copying static_example SPIR-V shaders to local shaders directory"
+    VERBATIM
 )
 
 add_dependencies(static_example static_example_shaders)

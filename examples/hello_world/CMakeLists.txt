@@ -35,9 +35,17 @@ add_custom_command(
 )
 
 add_custom_target(hello_world_shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${HELLO_WORLD_VERTEX_SPV}
+        ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${HELLO_WORLD_FRAGMENT_SPV}
+        ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.frag.spv
     DEPENDS
         ${HELLO_WORLD_VERTEX_SPV}
         ${HELLO_WORLD_FRAGMENT_SPV}
+    COMMENT "Copying hello_world SPIR-V shaders to local shaders directory"
+    VERBATIM
 )
 
 add_dependencies(hello_world hello_world_shaders)
