@@ -12,6 +12,7 @@ endif()
 set(compute_shader_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)
 set(compute_shader_SHADER_OUTPUT_DIR $<TARGET_FILE_DIR:compute_shader>)
 set(compute_shader_INDEX_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/index.txt)
+set(compute_shader_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/font.ttf)
 
 set(compute_shader_COMPUTE_SHADER ${compute_shader_SHADER_SOURCE_DIR}/compute.comp)
 set(compute_shader_COMPUTE_SPV ${CMAKE_CURRENT_BINARY_DIR}/compute.spv)
@@ -72,6 +73,9 @@ add_custom_command(TARGET compute_shader POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_INDEX_SOURCE}
         $<TARGET_FILE_DIR:compute_shader>/index.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${compute_shader_FONT_SOURCE}
+        $<TARGET_FILE_DIR:compute_shader>/font.ttf
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_COMPUTE_SPV}
         $<TARGET_FILE_DIR:compute_shader>/compute.spv
