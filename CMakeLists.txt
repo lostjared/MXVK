@@ -435,6 +435,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(fractal_zoom)
     add_subdirectory(examples/console_demo)
     mxvk_configure_mingw_target(console_demo)
+    add_subdirectory(examples/matrix)
+    mxvk_configure_mingw_target(matrix)
     add_subdirectory(examples/walk)
     mxvk_configure_mingw_target(walk_example)
     if(CV)
@@ -541,6 +543,7 @@ if(EXAMPLES)
         Pool3D
         fractal_zoom
         console_demo
+        matrix
         walk_example
     )
     if(CV)
