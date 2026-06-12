@@ -9,8 +9,10 @@ set(fractal_zoom_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 
 set(fractal_zoom_VERTEX_SHADER ${fractal_zoom_SHADER_SOURCE_DIR}/fractal.vert)
 set(fractal_zoom_FRAGMENT_SHADER ${fractal_zoom_SHADER_SOURCE_DIR}/fractal.frag)
+set(fractal_zoom_APPLE_FRAGMENT_SHADER ${fractal_zoom_SHADER_SOURCE_DIR}/fractal_float.frag)
 set(fractal_zoom_VERTEX_SPV ${fractal_zoom_SHADER_OUTPUT_DIR}/fractal.vert.spv)
 set(fractal_zoom_FRAGMENT_SPV ${fractal_zoom_SHADER_OUTPUT_DIR}/fractal.frag.spv)
+set(fractal_zoom_APPLE_FRAGMENT_SPV ${fractal_zoom_SHADER_OUTPUT_DIR}/fractal_float.frag.spv)
 
 add_custom_command(
     OUTPUT ${fractal_zoom_VERTEX_SPV}
@@ -30,10 +32,20 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${fractal_zoom_APPLE_FRAGMENT_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${fractal_zoom_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${fractal_zoom_APPLE_FRAGMENT_SHADER} -o ${fractal_zoom_APPLE_FRAGMENT_SPV}
+    DEPENDS ${fractal_zoom_APPLE_FRAGMENT_SHADER}
+    COMMENT "Compiling fractal_zoom Apple fragment shader"
+    VERBATIM
+)
+
 add_custom_target(fractal_zoom_shaders
     DEPENDS
         ${fractal_zoom_VERTEX_SPV}
         ${fractal_zoom_FRAGMENT_SPV}
+        ${fractal_zoom_APPLE_FRAGMENT_SPV}
 )
 
 add_dependencies(fractal_zoom fractal_zoom_shaders)

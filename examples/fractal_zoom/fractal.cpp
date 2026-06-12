@@ -18,6 +18,13 @@
 namespace example {
 
     class FractalWindow : public mxvk::VK_Window {
+        using FractalScalar =
+#if defined(MXVK_USE_MOLTENVK)
+            float;
+#else
+            double;
+#endif
+
       public:
         FractalWindow([[maybe_unused]] const std::string &path, int width, int height, bool fullscreen)
             : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION) {
@@ -97,12 +104,13 @@ namespace example {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fractal_pipeline_);
 
             const FractalPushConstants push_constants{
-                center_x_,
-                center_y_,
-                zoom_,
-                std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count(),
-                static_cast<double>(extent.width),
-                static_cast<double>(extent.height),
+                static_cast<FractalScalar>(center_x_),
+                static_cast<FractalScalar>(center_y_),
+                static_cast<FractalScalar>(zoom_),
+                static_cast<FractalScalar>(
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count()),
+                static_cast<FractalScalar>(extent.width),
+                static_cast<FractalScalar>(extent.height),
                 max_iterations_,
                 palette_index_,
                 1,
@@ -261,7 +269,12 @@ namespace example {
             destroyFractalPipeline();
 
             const std::string vert_path = std::string(fractal_zoom_SHADER_DIR) + "/fractal.vert.spv";
-            const std::string frag_path = std::string(fractal_zoom_SHADER_DIR) + "/fractal.frag.spv";
+            const std::string frag_path =
+#if defined(MXVK_USE_MOLTENVK)
+                std::string(fractal_zoom_SHADER_DIR) + "/fractal_float.frag.spv";
+#else
+                std::string(fractal_zoom_SHADER_DIR) + "/fractal.frag.spv";
+#endif
             const std::vector<char> vert_bytes = loadSpv(vert_path);
             const std::vector<char> frag_bytes = loadSpv(frag_path);
 
@@ -406,12 +419,21 @@ namespace example {
         }
 
         struct FractalPushConstants {
-            double center_x;
-            double center_y;
-            double zoom;
-            double time;
-            double resolution_x;
-            double resolution_y;
+#if defined(MXVK_USE_MOLTENVK)
+            FractalScalar center_x;
+            FractalScalar center_y;
+            FractalScalar zoom;
+            FractalScalar time;
+            FractalScalar resolution_x;
+            FractalScalar resolution_y;
+#else
+            FractalScalar center_x;
+            FractalScalar center_y;
+            FractalScalar zoom;
+            FractalScalar time;
+            FractalScalar resolution_x;
+            FractalScalar resolution_y;
+#endif
             int max_iterations;
             int palette;
             int aa_samples;
