@@ -247,6 +247,8 @@ namespace {
         float fallSeconds_ = 0.65f;
         float moveRepeatTimer_ = 0.0f;
         float softDropRepeatTimer_ = 0.0f;
+        float gamepadMoveRepeatTimer_ = 0.0f;
+        float gamepadSoftDropRepeatTimer_ = 0.0f;
         bool gameOver_ = false;
         bool hardDropHeld_ = false;
         bool rotateHeld_ = false;
@@ -390,6 +392,8 @@ namespace {
                 gamepadMoveDirection_ = 0;
                 gamepadMoveHeldSeconds_ = 0.0f;
                 gamepadSoftDropHeld_ = false;
+                gamepadMoveRepeatTimer_ = 0.0f;
+                gamepadSoftDropRepeatTimer_ = 0.0f;
                 return;
             }
 
@@ -403,22 +407,22 @@ namespace {
             if (moveDirection == 0) {
                 gamepadMoveDirection_ = 0;
                 gamepadMoveHeldSeconds_ = 0.0f;
-                moveRepeatTimer_ = 0.0f;
+                gamepadMoveRepeatTimer_ = 0.0f;
             } else {
                 if (moveDirection != gamepadMoveDirection_) {
                     gamepadMoveDirection_ = moveDirection;
                     gamepadMoveHeldSeconds_ = 0.0f;
-                    moveRepeatTimer_ = 0.0f;
+                    gamepadMoveRepeatTimer_ = 0.0f;
                     movePiece(gamepadMoveDirection_, 0);
                 } else {
                     gamepadMoveHeldSeconds_ += deltaSeconds;
                     const float threshold = (gamepadMoveHeldSeconds_ < gamepadMoveInitialDelaySeconds_)
                                                 ? gamepadMoveInitialDelaySeconds_
                                                 : gamepadMoveRepeatSeconds_;
-                    moveRepeatTimer_ += deltaSeconds;
-                    if (moveRepeatTimer_ >= threshold) {
+                    gamepadMoveRepeatTimer_ += deltaSeconds;
+                    if (gamepadMoveRepeatTimer_ >= threshold) {
                         movePiece(gamepadMoveDirection_, 0);
-                        moveRepeatTimer_ = 0.0f;
+                        gamepadMoveRepeatTimer_ = 0.0f;
                     }
                 }
             }
@@ -426,13 +430,13 @@ namespace {
             const bool softDropDown = leftY > gamepadDeadzone_;
             if (!softDropDown) {
                 gamepadSoftDropHeld_ = false;
-                softDropRepeatTimer_ = 0.0f;
+                gamepadSoftDropRepeatTimer_ = 0.0f;
             } else {
                 const float threshold = gamepadSoftDropHeld_ ? gamepadSoftDropRepeatSeconds_ : gamepadSoftDropInitialDelaySeconds_;
-                softDropRepeatTimer_ += deltaSeconds;
-                if (softDropRepeatTimer_ >= threshold) {
+                gamepadSoftDropRepeatTimer_ += deltaSeconds;
+                if (gamepadSoftDropRepeatTimer_ >= threshold) {
                     softDrop();
-                    softDropRepeatTimer_ = 0.0f;
+                    gamepadSoftDropRepeatTimer_ = 0.0f;
                     lastFall_ = std::chrono::steady_clock::now();
                     gamepadSoftDropHeld_ = true;
                 }
