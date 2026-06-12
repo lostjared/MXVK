@@ -86,6 +86,7 @@ class ComputeWindow : public mxvk::VK_Window {
             tickAnimState();
             runComputeFrame();
         }
+        updateFpsOverlay(frameUploaded);
     }
 
     void onSwapchainRecreated() override {
@@ -175,6 +176,10 @@ class ComputeWindow : public mxvk::VK_Window {
     int currentDir_ = 1;
     float alpha_ = 1.0F;
     bool captureUploadPathLogged_ = false;
+    double currentFps_ = 0.0;
+    uint32_t fpsFrameCount_ = 0;
+    std::chrono::steady_clock::time_point fpsSampleTime_{std::chrono::steady_clock::now()};
+    std::string fpsText_ = "FPS: --";
 
     std::vector<std::string> spvFiles_{};
     int currentSpvIndex_ = 0;
@@ -197,6 +202,22 @@ class ComputeWindow : public mxvk::VK_Window {
         }
     }
 
+    [[nodiscard]] double configureCameraFps() {
+        static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
+
+        for (const double requestedFps : fpsChoices) {
+            capture_.set(cv::CAP_PROP_FPS, requestedFps);
+            const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+            if (reportedFps > 0.0 && reportedFps + 0.5 >= requestedFps) {
+                return reportedFps;
+            }
+        }
+
+        capture_.set(cv::CAP_PROP_FPS, fpsChoices.back());
+        const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+        return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
+    }
+
     void initComputeResources() {
         try {
             if (device == VK_NULL_HANDLE) {
@@ -205,6 +226,7 @@ class ComputeWindow : public mxvk::VK_Window {
             if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
                 createDevice();
             }
+            setFont(assetRoot_ + "/font.ttf", 20);
 
             if (!capture_.open(cameraIndex_)) {
                 throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex_));
@@ -212,7 +234,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
             capture_.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
             capture_.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
-            capture_.set(cv::CAP_PROP_FPS, 60.0);
+            const double selectedFps = configureCameraFps();
+            std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
+                      << selectedFps << " fps\n";
 
             cv::Mat frame;
             if (!capture_.read(frame) || frame.empty()) {
@@ -268,6 +292,23 @@ class ComputeWindow : public mxvk::VK_Window {
             destroyComputeResources();
             throw;
         }
+    }
+
+    void updateFpsOverlay(bool frameUploaded) {
+        if (frameUploaded) {
+            ++fpsFrameCount_;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        const double elapsed = std::chrono::duration<double>(now - fpsSampleTime_).count();
+        if (elapsed >= 0.25) {
+            currentFps_ = static_cast<double>(fpsFrameCount_) / elapsed;
+            fpsFrameCount_ = 0;
+            fpsSampleTime_ = now;
+            fpsText_ = std::format("FPS: {:.1f}", currentFps_);
+        }
+
+        printText(fpsText_, 15, 15, SDL_Color{255, 255, 255, 255});
     }
 
     [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {

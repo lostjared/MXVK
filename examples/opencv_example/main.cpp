@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <format>
@@ -39,6 +40,22 @@ namespace example {
                 return capture_.open(input_filename_);
             }
             return capture_.open(camera_index_);
+        }
+
+        [[nodiscard]] double configureCameraFps() {
+            static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
+
+            for (const double requestedFps : fpsChoices) {
+                capture_.set(cv::CAP_PROP_FPS, requestedFps);
+                const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+                if (reportedFps > 0.0 && reportedFps + 0.5 >= requestedFps) {
+                    return reportedFps;
+                }
+            }
+
+            capture_.set(cv::CAP_PROP_FPS, fpsChoices.back());
+            const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+            return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
         }
 
         [[nodiscard]] bool createOrRefreshCameraSprite() {
@@ -131,9 +148,10 @@ namespace example {
                 fallback_width_ = capture_.get(cv::CAP_PROP_FRAME_WIDTH);
                 fallback_height_ = capture_.get(cv::CAP_PROP_FRAME_HEIGHT);
                 fallback_height_ = args.height;
-                capture_.set(cv::CAP_PROP_FPS, fps);
+                fps = configureCameraFps();
+            } else {
+                fps = capture_.get(cv::CAP_PROP_FPS);
             }
-            fps = capture_.get(cv::CAP_PROP_FPS);
             std::cout << "mxvk_cv: Capture opened at: " << fallback_width_ << "x" << fallback_height_ << " @ " << fps << " fps\n";
             initializeCameraRendering();
         }
@@ -161,6 +179,8 @@ namespace example {
                             std::cerr << "opencv_example: failed to upload restarted stream frame\n";
                         }
                     }
+                } else {
+                    fps = configureCameraFps();
                 }
                 return;
             }

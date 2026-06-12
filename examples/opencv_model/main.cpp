@@ -4,6 +4,7 @@
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -49,10 +50,10 @@ namespace example {
 
                 capture_.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth_));
                 capture_.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight_));
+                fps_ = configureCameraFps();
 
                 fallbackWidth_ = static_cast<int>(capture_.get(cv::CAP_PROP_FRAME_WIDTH));
                 fallbackHeight_ = static_cast<int>(capture_.get(cv::CAP_PROP_FRAME_HEIGHT));
-                fps_ = capture_.get(cv::CAP_PROP_FPS);
 
                 std::cout << "opencv_model: model='" << modelPath_ << "' capture="
                           << fallbackWidth_ << "x" << fallbackHeight_ << " @ " << fps_ << " fps\n";
@@ -142,6 +143,9 @@ namespace example {
                 if (!capture_.open(cameraIndex_)) {
                     return;
                 }
+                capture_.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth_));
+                capture_.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight_));
+                fps_ = configureCameraFps();
                 if (!capture_.readToModelTexture(model_, true)) {
                     return;
                 }
@@ -175,6 +179,22 @@ namespace example {
         }
 
       private:
+        [[nodiscard]] double configureCameraFps() {
+            static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
+
+            for (const double requestedFps : fpsChoices) {
+                capture_.set(cv::CAP_PROP_FPS, requestedFps);
+                const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+                if (reportedFps > 0.0 && reportedFps + 0.5 >= requestedFps) {
+                    return reportedFps;
+                }
+            }
+
+            capture_.set(cv::CAP_PROP_FPS, fpsChoices.back());
+            const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+            return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
+        }
+
         [[nodiscard]] static std::string resolveModelPath(const std::string &filename, const std::string &assetRoot) {
             if (filename.empty()) {
                 return {};
