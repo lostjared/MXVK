@@ -10,6 +10,7 @@ It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text r
 	- dynamic rendering and custom pipelines
 	- sprite rendering and shader effects
 	- text rendering
+	- Matrix-style digital rain rendering
 	- model rendering
 	- game loops and input handling
 	- simple gameplay examples and UI state flow
@@ -123,6 +124,7 @@ Examples (in each subproject build directory):
 ./Pool3D 
 ./fractal_zoom
 ./console_demo -r 1280x720
+./matrix
 ./glitch_cube -r 1280x720
 ./opencv_example --camera 0 -r 1280x720
 ./opencv_model --filename ./models/torus.mxmod.z --camera 0
@@ -146,6 +148,10 @@ Current example executables:
 
 ### `text_example`
 - Minimal example for text rendering with `setFont(...)` and `printText(...)`.
+
+### `matrix`
+- Matrix-style digital rain demo built with `SDL_ttf` glyph rendering and a sprite-backed framebuffer.
+- Uses the bundled `data/keifont.ttf` runtime asset and `Space` to randomize the streams.
 
 ### `model_example`
 - Demonstrates `VKAbstractModel` loading and rendering of 3D assets.
