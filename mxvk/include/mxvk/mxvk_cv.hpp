@@ -12,6 +12,11 @@
 #include "mxvk_sprite.hpp"
 #include <memory>
 #include <opencv2/opencv.hpp>
+#ifdef MXVK_CUDA
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/cudaarithm.hpp>
+#include <opencv2/cudaimgproc.hpp>
+#endif
 
 namespace mxvk {
 
@@ -119,6 +124,7 @@ namespace mxvk {
          * @return @c true if a frame was available.
          */
         bool read();
+        bool readToSprite(VK_Sprite &targetSprite);
 
         /**
          * @brief Capture the next frame into a cv::Mat.
@@ -142,9 +148,28 @@ namespace mxvk {
         double get(unsigned int option);
 
       private:
+#ifdef MXVK_CUDA
+        bool initializeCuda();
+        bool readCuda();
+#endif
+
         std::unique_ptr<VK_Sprite> sprite; ///< Backing Vulkan sprite (owned).
         cv::VideoCapture cap;              ///< OpenCV capture device.
         cv::Mat frame;                     ///< Most recent decoded frame.
+#ifdef MXVK_CUDA
+        bool cudaChecked_ = false;
+        bool cudaAvailable_ = false;
+        bool cudaMappedInput_ = false;
+        bool cudaPipelineLogged_ = false;
+        bool cudaFlipYForVulkan_ = true;
+        cv::cuda::Stream cudaStream_{};
+        cv::cuda::GpuMat gpuFrame_{};
+        cv::cuda::GpuMat gpuRgba_{};
+        cv::cuda::GpuMat gpuVulkanRgba_{};
+        cv::cuda::HostMem mappedFrame_{cv::cuda::HostMem::SHARED};
+        cv::cuda::HostMem pinnedRgba_{cv::cuda::HostMem::PAGE_LOCKED};
+        cv::Mat pinnedRgbaMat_{};
+#endif
     };
 } // namespace mxvk
 

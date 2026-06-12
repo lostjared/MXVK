@@ -27,6 +27,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef MXVK_CUDA
+#include <cuda_runtime_api.h>
+#include <opencv2/core/cuda.hpp>
+#endif
 
 #ifndef VK_CHECK_RESULT
 #define VK_CHECK_RESULT(f)                                                                                                                \
@@ -138,6 +142,11 @@ namespace mxvk {
          * @param pitch  Row stride in bytes (0 = auto).
          */
         void updateTexture(const void *pixels, int width, int height, int pitch = 0);
+
+#ifdef MXVK_CUDA
+        /** @brief Replace the sprite texture directly from CUDA device memory. */
+        bool updateTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream);
+#endif
 
         /**
          * @brief Set up to four custom shader float parameters.
@@ -320,6 +329,24 @@ namespace mxvk {
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
         void createSpriteTexture(SDL_Surface *surface);
         void updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height);
+#ifdef MXVK_CUDA
+        void destroyCudaInterop();
+        bool ensureCudaInterop();
+        bool transitionCudaImageForWrite();
+        void recordCudaReadyBarrier(VkCommandBuffer cmdBuffer);
+        void createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory);
+        VkDeviceSize cudaExportMemorySize = 0;
+        cudaExternalMemory_t cudaExternalMemory = nullptr;
+        cudaMipmappedArray_t cudaMipmappedArray = nullptr;
+        cudaArray_t cudaArray = nullptr;
+        bool cudaInteropEnabled = false;
+        bool cudaInteropUnavailableLogged = false;
+        bool cudaUploadLogged = false;
+        bool cudaWriteTransitionLogged = false;
+        bool cudaSampleBarrierLogged = false;
+        bool cudaImageNeedsShaderBarrier = false;
+        VkImageLayout cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
         VkShaderModule createShaderModule(const std::vector<char> &code);
         std::vector<char> readShaderFile(const std::string &filename);
 

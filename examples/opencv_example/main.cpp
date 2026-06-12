@@ -85,11 +85,8 @@ namespace example {
                 throw mxvk::Exception("opencv_example: failed to create capture sprite");
             }
 
-            cv::Mat frame;
-            if (capture_.read(frame)) {
-                if (!uploadFrameToSprite(frame)) {
-                    std::cerr << "opencv_example: failed to upload initial camera frame\n";
-                }
+            if (camera_sprite_ != nullptr && !capture_.readToSprite(*camera_sprite_)) {
+                std::cerr << "opencv_example: failed to upload initial camera frame\n";
             }
         }
 
@@ -136,22 +133,15 @@ namespace example {
         }
 
         void proc() override {
-            cv::Mat frame;
-            if (!capture_.read(frame)) {
+            if (camera_sprite_ == nullptr || !capture_.readToSprite(*camera_sprite_)) {
                 if (using_file_) {
                     capture_.close();
                     if (openCaptureSource()) {
-                        if (capture_.read(frame)) {
-                            if (!uploadFrameToSprite(frame)) {
-                                std::cerr << "opencv_example: failed to upload restarted stream frame\n";
-                            }
+                        if (camera_sprite_ != nullptr && !capture_.readToSprite(*camera_sprite_)) {
+                            std::cerr << "opencv_example: failed to upload restarted stream frame\n";
                         }
                     }
                 }
-                return;
-            }
-
-            if (!uploadFrameToSprite(frame)) {
                 return;
             }
 

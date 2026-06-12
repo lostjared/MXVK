@@ -678,8 +678,6 @@ namespace mxvk {
             queue_create_info.pQueuePriorities = &queue_priority;
             queue_create_infos.push_back(queue_create_info);
         }
-        std::vector<const char *> required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-#if defined(MXVK_USE_MOLTENVK)
         uint32_t device_extension_count = 0;
         vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, nullptr);
         std::vector<VkExtensionProperties> device_extensions(device_extension_count);
@@ -687,6 +685,28 @@ namespace mxvk {
             vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, device_extensions.data());
         }
 
+        const auto has_device_extension = [&device_extensions](const char *extension_name) {
+            return std::ranges::any_of(
+                device_extensions,
+                [extension_name](const VkExtensionProperties &ext) {
+                    return std::strcmp(ext.extensionName, extension_name) == 0;
+                });
+        };
+
+        std::vector<const char *> required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+#if defined(MXVK_CUDA) && defined(__linux__)
+        if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)) {
+            if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)) {
+                required_device_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+            }
+            required_device_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+            std::cout << "vk: enabling external memory FD support for CUDA interop\n";
+        } else {
+            std::cout << "vk: external memory FD support unavailable; CUDA texture interop will fall back\n";
+        }
+#endif
+
+#if defined(MXVK_USE_MOLTENVK)
         const bool has_portability_subset = std::ranges::any_of(
             device_extensions,
             [](const VkExtensionProperties &ext) {

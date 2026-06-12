@@ -5,6 +5,10 @@
 #include "mxvk/mxvk_sprite.hpp"
 #include "mxvk/mxvk_png.hpp"
 #include <filesystem>
+#ifdef MXVK_CUDA
+#include <opencv2/core/cuda_stream_accessor.hpp>
+#include <unistd.h>
+#endif
 
 namespace mxvk {
 
@@ -33,6 +37,9 @@ namespace mxvk {
         drawQueue.clear();
 
         destroyStagingResources();
+#ifdef MXVK_CUDA
+        destroyCudaInterop();
+#endif
         if (quadVertexBuffer != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite quad vertex buffer\n";
             vkDestroyBuffer(device, quadVertexBuffer, nullptr);
@@ -85,6 +92,9 @@ namespace mxvk {
 
     void VK_Sprite::destroySpriteResources() {
         destroyStagingResources();
+#ifdef MXVK_CUDA
+        destroyCudaInterop();
+#endif
 
         if (descriptorPool != VK_NULL_HANDLE) {
             vkDestroyDescriptorPool(device, descriptorPool, nullptr);
@@ -857,9 +867,20 @@ namespace mxvk {
             setVertexShaderPath(vertexShaderPath);
         }
 
+#ifdef MXVK_CUDA
+        try {
+            createCudaExportableImage(width, height, spriteImage, spriteImageMemory);
+        } catch (const std::exception &ex) {
+            std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
+            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+        }
+#else
         createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+#endif
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingMemory;
@@ -877,6 +898,9 @@ namespace mxvk {
         transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, spriteImage, width, height);
         transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+        cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
@@ -919,6 +943,9 @@ namespace mxvk {
             if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
                 vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX);
             }
+#ifdef MXVK_CUDA
+            destroyCudaInterop();
+#endif
             if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
@@ -973,6 +1000,9 @@ namespace mxvk {
             if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
                 vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX);
             }
+#ifdef MXVK_CUDA
+            destroyCudaInterop();
+#endif
             if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
@@ -1075,12 +1105,305 @@ namespace mxvk {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &uploadCmdBuffer;
         VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, uploadFence));
+#ifdef MXVK_CUDA
+        cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        cudaImageNeedsShaderBarrier = false;
+#endif
     }
 
+#ifdef MXVK_CUDA
+    void VK_Sprite::destroyCudaInterop() {
+        if (cudaInteropEnabled || cudaExternalMemory != nullptr || cudaMipmappedArray != nullptr) {
+            std::cout << "mxvk: CUDA interop: destroying imported Vulkan texture resources\n";
+        }
+        if (cudaMipmappedArray != nullptr) {
+            cudaFreeMipmappedArray(cudaMipmappedArray);
+            cudaMipmappedArray = nullptr;
+            cudaArray = nullptr;
+        }
+        if (cudaExternalMemory != nullptr) {
+            cudaDestroyExternalMemory(cudaExternalMemory);
+            cudaExternalMemory = nullptr;
+        }
+        cudaInteropEnabled = false;
+        cudaImageNeedsShaderBarrier = false;
+        cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        cudaExportMemorySize = 0;
+        cudaUploadLogged = false;
+        cudaWriteTransitionLogged = false;
+        cudaSampleBarrierLogged = false;
+    }
+
+    void VK_Sprite::createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory) {
+        std::cout << std::format("mxvk: CUDA interop init: requesting exportable Vulkan image {}x{} RGBA8 OPAQUE_FD\n", width, height);
+        VkExternalMemoryImageCreateInfo externalImageInfo{};
+        externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+        externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.pNext = &externalImageInfo;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = width;
+        imageInfo.extent.height = height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
+
+        VkMemoryRequirements memRequirements{};
+        vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+        VkExportMemoryAllocateInfo exportMemoryInfo{};
+        exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.pNext = &exportMemoryInfo;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        try {
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
+            VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+            cudaExportMemorySize = memRequirements.size;
+            cudaInteropUnavailableLogged = false;
+            std::cout << std::format(
+                "mxvk: CUDA interop init: exportable Vulkan image allocated (memorySize={} bytes, memoryType={})\n",
+                static_cast<unsigned long long>(cudaExportMemorySize), allocInfo.memoryTypeIndex);
+        } catch (...) {
+            if (imageMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, imageMemory, nullptr);
+                imageMemory = VK_NULL_HANDLE;
+            }
+            if (image != VK_NULL_HANDLE) {
+                vkDestroyImage(device, image, nullptr);
+                image = VK_NULL_HANDLE;
+            }
+            throw;
+        }
+    }
+
+    bool VK_Sprite::ensureCudaInterop() {
+        if (cudaInteropEnabled) {
+            return true;
+        }
+        if (spriteImage == VK_NULL_HANDLE || spriteImageMemory == VK_NULL_HANDLE || cudaExportMemorySize == 0) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA interop init: sprite image is not exportable; using CPU/pinned fallback\n";
+                cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        if (vkGetMemoryFdKHR == nullptr) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA interop init: vkGetMemoryFdKHR was not loaded; using CPU/pinned fallback\n";
+                cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetFdInfoKHR fdInfo{};
+        fdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+        fdInfo.memory = spriteImageMemory;
+        fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        int memoryFd = -1;
+        const VkResult fdResult = vkGetMemoryFdKHR(device, &fdInfo, &memoryFd);
+        if (fdResult != VK_SUCCESS) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: vkGetMemoryFdKHR failed ({})\n", static_cast<int>(fdResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        std::cout << std::format("mxvk: CUDA interop init: exported Vulkan image memory fd={}\n", memoryFd);
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+        externalMemoryDesc.handle.fd = memoryFd;
+        externalMemoryDesc.size = cudaExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(&cudaExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            close(memoryFd);
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: cudaImportExternalMemory failed: {}\n",
+                                         cudaGetErrorString(cudaResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            cudaExternalMemory = nullptr;
+            return false;
+        }
+        std::cout << std::format("mxvk: CUDA interop init: imported external memory into CUDA ({} bytes)\n",
+                                 static_cast<unsigned long long>(cudaExportMemorySize));
+
+        cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
+        arrayDesc.offset = 0;
+        arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
+        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(spriteWidth), static_cast<size_t>(spriteHeight), 0);
+        arrayDesc.flags = cudaArrayColorAttachment;
+        arrayDesc.numLevels = 1;
+
+        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&cudaMipmappedArray, cudaExternalMemory, &arrayDesc);
+        if (cudaResult != cudaSuccess) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: {}\n",
+                                         cudaGetErrorString(cudaResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            destroyCudaInterop();
+            return false;
+        }
+        std::cout << std::format("mxvk: CUDA interop init: mapped CUDA mipmapped array {}x{} uchar4\n", spriteWidth, spriteHeight);
+
+        cudaResult = cudaGetMipmappedArrayLevel(&cudaArray, cudaMipmappedArray, 0);
+        if (cudaResult != cudaSuccess) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: cudaGetMipmappedArrayLevel failed: {}\n",
+                                         cudaGetErrorString(cudaResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            destroyCudaInterop();
+            return false;
+        }
+
+        cudaInteropEnabled = true;
+        std::cout << "mxvk: CUDA interop init: direct CUDA-to-Vulkan texture upload is ready\n";
+        return true;
+    }
+
+    bool VK_Sprite::transitionCudaImageForWrite() {
+        if (cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) {
+            return true;
+        }
+
+        const VkImageLayout oldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                                            ? VK_IMAGE_LAYOUT_UNDEFINED
+                                            : cudaImageLayout;
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = spriteImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_ACCESS_SHADER_READ_BIT : 0;
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                                                  ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                                                  : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        endSingleTimeCommands(commandBuffer);
+
+        cudaImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        if (!cudaWriteTransitionLogged) {
+            std::cout << "mxvk: CUDA interop sync: Vulkan image transitions to GENERAL before CUDA writes\n";
+            cudaWriteTransitionLogged = true;
+        }
+        return true;
+    }
+
+    void VK_Sprite::recordCudaReadyBarrier(VkCommandBuffer cmdBuffer) {
+        if (!cudaImageNeedsShaderBarrier) {
+            return;
+        }
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = spriteImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        cudaImageNeedsShaderBarrier = false;
+        if (!cudaSampleBarrierLogged) {
+            std::cout << "mxvk: CUDA interop sync: Vulkan records GENERAL -> SHADER_READ_ONLY barrier before sampling\n";
+            cudaSampleBarrierLogged = true;
+        }
+    }
+
+    bool VK_Sprite::updateTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
+        if (!spriteLoaded) {
+            return false;
+        }
+        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols != spriteWidth || rgba.rows != spriteHeight) {
+            return false;
+        }
+        if (!ensureCudaInterop() || !transitionCudaImageForWrite()) {
+            return false;
+        }
+
+        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        if (!cudaUploadLogged) {
+            std::cout << std::format("mxvk: CUDA interop upload: copying {}x{} RGBA GpuMat to Vulkan image array (pitch={} bytes)\n",
+                                     rgba.cols, rgba.rows, static_cast<unsigned long long>(rgba.step));
+            cudaUploadLogged = true;
+        }
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
+            cudaArray, 0, 0, rgba.ptr(), rgba.step,
+            static_cast<size_t>(rgba.cols) * 4, static_cast<size_t>(rgba.rows),
+            cudaMemcpyDeviceToDevice, cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << std::format("mxvk: CUDA interop texture copy failed: {}\n", cudaGetErrorString(cudaResult));
+            return false;
+        }
+
+        cudaResult = cudaStreamSynchronize(cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << std::format("mxvk: CUDA interop texture sync failed: {}\n", cudaGetErrorString(cudaResult));
+            return false;
+        }
+
+        cudaImageNeedsShaderBarrier = true;
+        return true;
+    }
+#endif
+
     void VK_Sprite::createSpriteTexture(SDL_Surface *surface) {
+#ifdef MXVK_CUDA
+        try {
+            createCudaExportableImage(surface->w, surface->h, spriteImage, spriteImageMemory);
+        } catch (const std::exception &ex) {
+            std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
+            createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+        }
+#else
         createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+#endif
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingMemory;
@@ -1106,6 +1429,9 @@ namespace mxvk {
         transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, spriteImage, surface->w, surface->h);
         transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+        cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
@@ -1167,6 +1493,9 @@ namespace mxvk {
                                   uint32_t screenWidth, uint32_t screenHeight) {
         if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated)
             return;
+#ifdef MXVK_CUDA
+        recordCudaReadyBarrier(cmdBuffer);
+#endif
         if (descriptorSet == VK_NULL_HANDLE) {
             descriptorSet = createDescriptorSet(spriteImageView);
         }
