@@ -123,8 +123,13 @@ namespace {
             rng_.seed(rd());
             setFont(tetris_FONT_PATH, 22);
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            tryOpenFirstGamepad();
             background_ = createSprite(dataRoot_ + "/psychedelic_background.png");
             gameOverSprite_ = createSprite(dataRoot_ + "/gameover.png");
+            introSprite_ = createSprite(dataRoot_ + "/intro.png",
+                                        std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
+                                        std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
+            introStart_ = std::chrono::steady_clock::now();
             initModels();
             resetGame();
         }
@@ -133,6 +138,7 @@ namespace {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+            closeGamepad();
             cleanupModels();
         }
 
@@ -145,10 +151,36 @@ namespace {
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_QUIT) {
                 exit();
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+                if (!openGamepad(e.gdevice.which)) {
+                    tryOpenFirstGamepad();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                if (gamepad_ != nullptr && e.gdevice.which == gamepadId_) {
+                    closeGamepad();
+                    tryOpenFirstGamepad();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) {
+                    exit();
+                    return;
+                }
+                handleGamepadButtonDown(e.gbutton.button);
             }
         }
 
         void proc() override {
+            tryOpenFirstGamepad();
+            updateIntroState();
             updateInput();
             updateGame();
             drawHud();
@@ -183,6 +215,7 @@ namespace {
             }
 
             drawFrame(cmd, imageIndex, view, proj);
+            drawIntroOverlay(cmd, extent);
             drawGameOverOverlay(cmd, extent);
         }
 
@@ -196,10 +229,15 @@ namespace {
         std::array<BlockModel, 4> activeModels_{};
         std::vector<BlockModel> frameModels_{};
         mxvk::VK_Sprite *background_ = nullptr;
+        mxvk::VK_Sprite *introSprite_ = nullptr;
         mxvk::VK_Sprite *gameOverSprite_ = nullptr;
+        SDL_Gamepad *gamepad_ = nullptr;
+        SDL_JoystickID gamepadId_ = 0;
+        std::chrono::steady_clock::time_point introStart_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lastFall_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lastInputUpdate_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lineClearStart_{std::chrono::steady_clock::now()};
+        bool introActive_ = true;
         float gridYaw_ = 0.0f;
         float gridPitch_ = 0.0f;
         float gridRoll_ = 0.0f;
@@ -217,6 +255,19 @@ namespace {
         bool escapeHeld_ = false;
         bool lineClearActive_ = false;
         std::array<bool, boardHeight> clearingRows_{};
+        static constexpr float introHoldSeconds_ = 5.0f;
+        static constexpr float introFadeSeconds_ = 1.0f;
+        static constexpr Sint16 gamepadDeadzone_ = 10000;
+        static constexpr float gamepadMoveInitialDelaySeconds_ = 0.22f;
+        static constexpr float gamepadMoveRepeatSeconds_ = 0.12f;
+        static constexpr float gamepadSoftDropInitialDelaySeconds_ = 0.18f;
+        static constexpr float gamepadSoftDropRepeatSeconds_ = 0.08f;
+        static constexpr float gamepadStickRotateSpeed_ = 120.0f;
+        static constexpr float gamepadStickPitchSpeed_ = 100.0f;
+        static constexpr float gamepadStickScale_ = 1.0f / 32768.0f;
+        int gamepadMoveDirection_ = 0;
+        float gamepadMoveHeldSeconds_ = 0.0f;
+        bool gamepadSoftDropHeld_ = false;
 
         void initModels() {
             frameModels_.reserve(boardWidth + (boardHeight * 2) + 2);
@@ -319,9 +370,163 @@ namespace {
                 return;
             }
 
+            if (introActive_) {
+                const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
+                if (escapeDown && !escapeHeld_) {
+                    exit();
+                }
+                escapeHeld_ = escapeDown;
+                return;
+            }
+
             handleHeldViewRotation(keys, deltaSeconds);
             handleHeldPieceMovement(keys, deltaSeconds);
             handleOneShotKeys(keys);
+            handleGamepadInput(deltaSeconds);
+        }
+
+        void handleGamepadInput(float deltaSeconds) {
+            if (gamepad_ == nullptr || introActive_ || gameOver_ || lineClearActive_) {
+                gamepadMoveDirection_ = 0;
+                gamepadMoveHeldSeconds_ = 0.0f;
+                gamepadSoftDropHeld_ = false;
+                return;
+            }
+
+            const Sint16 leftX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTX);
+            const Sint16 leftY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY);
+            const Sint16 rightX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX);
+            const Sint16 rightY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY);
+
+            const int moveDirection = (leftX < -gamepadDeadzone_) ? -1 : (leftX > gamepadDeadzone_) ? 1
+                                                                                                    : 0;
+            if (moveDirection == 0) {
+                gamepadMoveDirection_ = 0;
+                gamepadMoveHeldSeconds_ = 0.0f;
+                moveRepeatTimer_ = 0.0f;
+            } else {
+                if (moveDirection != gamepadMoveDirection_) {
+                    gamepadMoveDirection_ = moveDirection;
+                    gamepadMoveHeldSeconds_ = 0.0f;
+                    moveRepeatTimer_ = 0.0f;
+                    movePiece(gamepadMoveDirection_, 0);
+                } else {
+                    gamepadMoveHeldSeconds_ += deltaSeconds;
+                    const float threshold = (gamepadMoveHeldSeconds_ < gamepadMoveInitialDelaySeconds_)
+                                                ? gamepadMoveInitialDelaySeconds_
+                                                : gamepadMoveRepeatSeconds_;
+                    moveRepeatTimer_ += deltaSeconds;
+                    if (moveRepeatTimer_ >= threshold) {
+                        movePiece(gamepadMoveDirection_, 0);
+                        moveRepeatTimer_ = 0.0f;
+                    }
+                }
+            }
+
+            const bool softDropDown = leftY > gamepadDeadzone_;
+            if (!softDropDown) {
+                gamepadSoftDropHeld_ = false;
+                softDropRepeatTimer_ = 0.0f;
+            } else {
+                const float threshold = gamepadSoftDropHeld_ ? gamepadSoftDropRepeatSeconds_ : gamepadSoftDropInitialDelaySeconds_;
+                softDropRepeatTimer_ += deltaSeconds;
+                if (softDropRepeatTimer_ >= threshold) {
+                    softDrop();
+                    softDropRepeatTimer_ = 0.0f;
+                    lastFall_ = std::chrono::steady_clock::now();
+                    gamepadSoftDropHeld_ = true;
+                }
+            }
+
+            if (std::abs(rightX) > gamepadDeadzone_) {
+                gridYaw_ += static_cast<float>(rightX) * gamepadStickScale_ * gamepadStickRotateSpeed_ * deltaSeconds;
+            }
+            if (std::abs(rightY) > gamepadDeadzone_) {
+                gridPitch_ = std::clamp(gridPitch_ - static_cast<float>(rightY) * gamepadStickScale_ * gamepadStickPitchSpeed_ * deltaSeconds,
+                                        -70.0f,
+                                        70.0f);
+            }
+
+            constexpr float gamepadZoomSpeed = 3.2f;
+            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                cameraDistance_ = std::min(9.0f, cameraDistance_ + gamepadZoomSpeed * deltaSeconds);
+            }
+            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+                cameraDistance_ = std::max(1.65f, cameraDistance_ - gamepadZoomSpeed * deltaSeconds);
+            }
+        }
+
+        void handleGamepadButtonDown(Uint8 button) {
+            if (gamepad_ == nullptr) {
+                return;
+            }
+
+            if (gameOver_) {
+                if (button == SDL_GAMEPAD_BUTTON_START) {
+                    resetGame();
+                }
+                return;
+            }
+
+            if (introActive_ || lineClearActive_) {
+                return;
+            }
+
+            if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                rotatePiece();
+            } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
+                hardDrop();
+            }
+        }
+
+        bool openGamepad(SDL_JoystickID id) {
+            if (gamepad_ != nullptr && gamepadId_ == id) {
+                return true;
+            }
+            closeGamepad();
+            gamepad_ = SDL_OpenGamepad(id);
+            if (gamepad_ == nullptr) {
+                return false;
+            }
+            gamepadId_ = id;
+            return true;
+        }
+
+        void closeGamepad() {
+            if (gamepad_ != nullptr) {
+                SDL_CloseGamepad(gamepad_);
+                gamepad_ = nullptr;
+                gamepadId_ = 0;
+            }
+        }
+
+        void tryOpenFirstGamepad() {
+            if (gamepad_ != nullptr) {
+                return;
+            }
+            int count = 0;
+            SDL_JoystickID *ids = SDL_GetGamepads(&count);
+            if (ids == nullptr || count <= 0) {
+                if (ids != nullptr) {
+                    SDL_free(ids);
+                }
+                return;
+            }
+            openGamepad(ids[0]);
+            SDL_free(ids);
+        }
+
+        void updateIntroState() {
+            if (!introActive_) {
+                return;
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - introStart_).count();
+            if (elapsed >= (introHoldSeconds_ + introFadeSeconds_)) {
+                introActive_ = false;
+                lastFall_ = now;
+            }
         }
 
         void handleHeldViewRotation(const bool *keys, float deltaSeconds) {
@@ -492,6 +697,9 @@ namespace {
         }
 
         void updateGame() {
+            if (introActive_) {
+                return;
+            }
             if (gameOver_) {
                 return;
             }
@@ -581,7 +789,10 @@ namespace {
             clearingRows_.fill(false);
             lineClearActive_ = false;
             if (cleared > 0) {
-                score_ += cleared;
+                score_ += cleared * 10;
+                if (cleared > 1) {
+                    score_ += 5;
+                }
                 linesCleared_ += cleared;
                 fallSeconds_ = std::max(0.16f, fallSeconds_ - static_cast<float>(cleared) * 0.025f);
             }
@@ -631,6 +842,23 @@ namespace {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
             background_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
             background_->clearQueue();
+        }
+
+        void drawIntroOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
+            if (!introActive_ || introSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+                return;
+            }
+
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - introStart_).count();
+            const float fadeProgress = std::clamp((elapsed - introHoldSeconds_) / introFadeSeconds_, 0.0f, 1.0f);
+            const float alpha = 1.0f - fadeProgress;
+
+            introSprite_->setShaderParams(elapsed, 0.0f, 0.0f, alpha);
+            introSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+            introSprite_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            introSprite_->clearQueue();
         }
 
         void drawGameOverOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
@@ -702,6 +930,9 @@ namespace {
         }
 
         void drawHud() {
+            if (introActive_) {
+                return;
+            }
             printText(std::format("Score: {}", score_), 15, 15, SDL_Color{255, 255, 255, 255});
             printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, SDL_Color{255, 220, 120, 255});
             if (gameOver_) {
