@@ -15,6 +15,10 @@ It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text r
 	- simple gameplay examples and UI state flow
 	- optional OpenCV camera/video workflows
 
+## Demo Video
+
+View on YouTube: https://youtu.be/Y3PyGg3qBUA
+
 ## Core Dependencies
 
 The root CMake configuration checks for and uses:
