@@ -205,6 +205,10 @@ Current example executables:
 - Puzzle game example ported to MXVK/SDL3.
 - Demonstrates menu/game/scores state flow, sprite-based gameplay grid, and text UI.
 
+### `tetris`
+- 3D Tetris game in MXVK
+- Puzzle game
+
 ### `fractal_zoom`
 - Fullscreen fractal renderer with its own shader pipeline.
 - Demonstrates per-example shader compilation and runtime shader-path wiring.
@@ -252,5 +256,6 @@ Current example executables:
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/045f4929-337e-4e28-a828-2a2d27be1665" />
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/bde0541a-3c5e-47f3-9ab0-e62757d524a9" />
 
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
