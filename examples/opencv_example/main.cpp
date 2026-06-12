@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include <chrono>
 #include <cstdlib>
 #include <format>
 #include <iostream>
@@ -28,6 +29,10 @@ namespace example {
         mxvk::VK_Sprite *camera_sprite_ = nullptr;
         int fallback_width_ = 1280;
         int fallback_height_ = 720;
+        double current_fps_ = 0.0;
+        uint32_t fps_frame_count_ = 0;
+        std::chrono::steady_clock::time_point fps_sample_time_{std::chrono::steady_clock::now()};
+        std::string fps_text_ = "FPS: --";
 
         [[nodiscard]] bool openCaptureSource() {
             if (using_file_) {
@@ -90,10 +95,25 @@ namespace example {
             }
         }
 
+        void updateFpsOverlay() {
+            ++fps_frame_count_;
+            const auto now = std::chrono::steady_clock::now();
+            const double elapsed = std::chrono::duration<double>(now - fps_sample_time_).count();
+            if (elapsed >= 0.25) {
+                current_fps_ = static_cast<double>(fps_frame_count_) / elapsed;
+                fps_frame_count_ = 0;
+                fps_sample_time_ = now;
+                fps_text_ = std::format("FPS: {:.1f}", current_fps_);
+            }
+
+            printText(fps_text_, 15, 15, SDL_Color{255, 255, 255, 255});
+        }
+
       public:
         ExampleWindow(const Arguments &args, const std::string &text) : mxvk::VK_Window(text, args.width, args.height, args.fullscreen, MXVK_VALIDATION) {
             current_path = args.path.empty() ? std::string(opencv_example_ASSET_DIR) : args.path;
             shader_path_ = args.shaderPath.empty() ? std::string(opencv_example_SHADER_DIR) : args.shaderPath;
+            setFont(current_path + "/data/font.ttf", 20);
             input_filename_ = args.filename;
             camera_index_ = args.camera_index;
             using_file_ = !input_filename_.empty();
@@ -155,6 +175,7 @@ namespace example {
             if (camera_sprite_) {
                 camera_sprite_->drawSpriteRect(0, 0, target_w, target_h);
             }
+            updateFpsOverlay();
         }
     };
 } // namespace example

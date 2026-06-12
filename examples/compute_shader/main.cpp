@@ -9,6 +9,7 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -82,15 +83,17 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         if (frameUploaded) {
-                tickAnimState();
-                runComputeFrame();
+            tickAnimState();
+            runComputeFrame();
         }
+    }
 
-        if (displaySprite_ != nullptr) {
-            const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : texWidth_;
-            const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : texHeight_;
-            displaySprite_->drawSpriteRect(0, 0, width, height);
-        }
+    void onSwapchainRecreated() override {
+        rebuildDisplayPipeline();
+    }
+
+    void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t imageIndex) override {
+        renderComputeOutput(cmd);
     }
 
     void event(SDL_Event &e) override {
@@ -145,9 +148,6 @@ class ComputeWindow : public mxvk::VK_Window {
 
     VkBuffer stagingBuf_ = VK_NULL_HANDLE;
     VkDeviceMemory stagingMem_ = VK_NULL_HANDLE;
-    VkBuffer readbackBuf_ = VK_NULL_HANDLE;
-    VkDeviceMemory readbackMem_ = VK_NULL_HANDLE;
-    void *readbackMap_ = nullptr;
 
     VkDescriptorSetLayout compDSLayout_ = VK_NULL_HANDLE;
     VkPipelineLayout compPipeLayout_ = VK_NULL_HANDLE;
@@ -157,7 +157,15 @@ class ComputeWindow : public mxvk::VK_Window {
     std::array<VkDescriptorSet, 2> blurDS_{};
     std::array<VkDescriptorSet, 2> blendDS_{};
 
-    mxvk::VK_Sprite *displaySprite_ = nullptr;
+    VkDescriptorSetLayout displayDSLayout_ = VK_NULL_HANDLE;
+    VkDescriptorPool displayDSPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet displayDS_ = VK_NULL_HANDLE;
+    VkPipelineLayout displayPipeLayout_ = VK_NULL_HANDLE;
+    VkPipeline displayPipeline_ = VK_NULL_HANDLE;
+    VkBuffer displayVertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory displayVertexMemory_ = VK_NULL_HANDLE;
+    VkBuffer displayIndexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory displayIndexMemory_ = VK_NULL_HANDLE;
 
     int historyIndex_ = 0;
     int historyCount_ = 0;
@@ -223,14 +231,6 @@ class ComputeWindow : public mxvk::VK_Window {
                 stagingBuf_,
                 stagingMem_);
 
-            createBuffer(
-                imgBytes,
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                readbackBuf_,
-                readbackMem_);
-            VK_CHECK_RESULT(vkMapMemory(device, readbackMem_, 0, imgBytes, 0, &readbackMap_));
-
             {
                 const VkCommandBuffer cmd = beginSingleTimeCommands();
 #ifdef MXVK_CUDA
@@ -261,8 +261,7 @@ class ComputeWindow : public mxvk::VK_Window {
             buildDescriptorSetLayout();
             buildComputePipeline();
             buildDescriptorSets();
-
-            displaySprite_ = createSprite(texWidth_, texHeight_);
+            createDisplayResources();
         } catch (...) {
             // Constructor failure bypasses ~ComputeWindow; cleanup partial Vulkan state here.
             capture_.close();
@@ -758,6 +757,258 @@ class ComputeWindow : public mxvk::VK_Window {
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
+    [[nodiscard]] std::vector<char> readDisplayShader(const std::string &name) const {
+        const std::array<std::string, 3> candidates = {
+            assetRoot_ + "/data/" + name,
+            assetRoot_ + "/" + name,
+            std::string("data/") + name,
+        };
+
+        for (const std::string &path : candidates) {
+            std::ifstream file(path, std::ios::binary);
+            if (file.is_open()) {
+                std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                if (!bytes.empty()) {
+                    return bytes;
+                }
+            }
+        }
+
+        throw mxvk::Exception("Cannot open compute display shader: " + name);
+    }
+
+    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<char> &bytes) const {
+        VkShaderModuleCreateInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        info.codeSize = bytes.size();
+        info.pCode = reinterpret_cast<const uint32_t *>(bytes.data());
+
+        VkShaderModule module = VK_NULL_HANDLE;
+        VK_CHECK_RESULT(vkCreateShaderModule(device, &info, nullptr, &module));
+        return module;
+    }
+
+    void createDisplayBuffers() {
+        if (displayVertexBuffer_ != VK_NULL_HANDLE && displayIndexBuffer_ != VK_NULL_HANDLE) {
+            return;
+        }
+
+        const std::array<float, 16> vertices = {
+            0.0F, 0.0F, 0.0F, 0.0F,
+            1.0F, 0.0F, 1.0F, 0.0F,
+            1.0F, 1.0F, 1.0F, 1.0F,
+            0.0F, 1.0F, 0.0F, 1.0F,
+        };
+        const std::array<uint16_t, 6> indices = {0, 1, 2, 0, 2, 3};
+
+        createBuffer(sizeof(float) * vertices.size(),
+                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     displayVertexBuffer_,
+                     displayVertexMemory_);
+        createBuffer(sizeof(uint16_t) * indices.size(),
+                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     displayIndexBuffer_,
+                     displayIndexMemory_);
+
+        void *mapped = nullptr;
+        VK_CHECK_RESULT(vkMapMemory(device, displayVertexMemory_, 0, sizeof(float) * vertices.size(), 0, &mapped));
+        std::memcpy(mapped, vertices.data(), sizeof(float) * vertices.size());
+        vkUnmapMemory(device, displayVertexMemory_);
+
+        VK_CHECK_RESULT(vkMapMemory(device, displayIndexMemory_, 0, sizeof(uint16_t) * indices.size(), 0, &mapped));
+        std::memcpy(mapped, indices.data(), sizeof(uint16_t) * indices.size());
+        vkUnmapMemory(device, displayIndexMemory_);
+    }
+
+    void createDisplayDescriptorSet() {
+        VkDescriptorSetLayoutBinding binding{};
+        binding.binding = 0;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        binding.descriptorCount = 1;
+        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &binding;
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &displayDSLayout_));
+
+        VkDescriptorPoolSize poolSize{};
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = 1;
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = 1;
+        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &displayDSPool_));
+
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = displayDSPool_;
+        allocInfo.descriptorSetCount = 1;
+        allocInfo.pSetLayouts = &displayDSLayout_;
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &displayDS_));
+
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.sampler = computeSampler_;
+        imageInfo.imageView = outImg_.view;
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = displayDS_;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo = &imageInfo;
+        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+    }
+
+    void rebuildDisplayPipeline() {
+        if (displayPipeline_ != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, displayPipeline_, nullptr);
+            displayPipeline_ = VK_NULL_HANDLE;
+        }
+        if (displayPipeLayout_ != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, displayPipeLayout_, nullptr);
+            displayPipeLayout_ = VK_NULL_HANDLE;
+        }
+        if (displayDSLayout_ == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
+            return;
+        }
+
+        const VkShaderModule vertModule = createShaderModule(readDisplayShader("sprite.vert.spv"));
+        const VkShaderModule fragModule = createShaderModule(readDisplayShader("sprite.frag.spv"));
+
+        VkPipelineShaderStageCreateInfo vertStage{};
+        vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertStage.module = vertModule;
+        vertStage.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragStage{};
+        fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragStage.module = fragModule;
+        fragStage.pName = "main";
+
+        const std::array<VkPipelineShaderStageCreateInfo, 2> stages = {vertStage, fragStage};
+
+        VkVertexInputBindingDescription binding{};
+        binding.binding = 0;
+        binding.stride = sizeof(float) * 4;
+        binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        std::array<VkVertexInputAttributeDescription, 2> attrs{};
+        attrs[0].binding = 0;
+        attrs[0].location = 0;
+        attrs[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attrs[0].offset = 0;
+        attrs[1].binding = 0;
+        attrs[1].location = 1;
+        attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+        attrs[1].offset = sizeof(float) * 2;
+
+        VkPipelineVertexInputStateCreateInfo vertexInput{};
+        vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInput.vertexBindingDescriptionCount = 1;
+        vertexInput.pVertexBindingDescriptions = &binding;
+        vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+        vertexInput.pVertexAttributeDescriptions = attrs.data();
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+        const std::array<VkDynamicState, 2> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        VkPipelineDynamicStateCreateInfo dynamicInfo{};
+        dynamicInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        dynamicInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+        dynamicInfo.pDynamicStates = dynamicStates.data();
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.scissorCount = 1;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.cullMode = VK_CULL_MODE_NONE;
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.lineWidth = 1.0F;
+
+        VkPipelineMultisampleStateCreateInfo multisample{};
+        multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_FALSE;
+        depthStencil.depthWriteEnable = VK_FALSE;
+
+        VkPipelineColorBlendAttachmentState blendAttachment{};
+        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        blendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlend{};
+        colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlend.attachmentCount = 1;
+        colorBlend.pAttachments = &blendAttachment;
+
+        VkPushConstantRange pushRange{};
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.size = sizeof(float) * 12;
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = 1;
+        layoutInfo.pSetLayouts = &displayDSLayout_;
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
+        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &displayPipeLayout_));
+
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = &swapchain_format;
+        if (depth_format != VK_FORMAT_UNDEFINED) {
+            renderingInfo.depthAttachmentFormat = depth_format;
+        }
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.pNext = &renderingInfo;
+        pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+        pipelineInfo.pStages = stages.data();
+        pipelineInfo.pVertexInputState = &vertexInput;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisample;
+        pipelineInfo.pDepthStencilState = &depthStencil;
+        pipelineInfo.pColorBlendState = &colorBlend;
+        pipelineInfo.pDynamicState = &dynamicInfo;
+        pipelineInfo.layout = displayPipeLayout_;
+        pipelineInfo.renderPass = VK_NULL_HANDLE;
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &displayPipeline_));
+
+        vkDestroyShaderModule(device, fragModule, nullptr);
+        vkDestroyShaderModule(device, vertModule, nullptr);
+    }
+
+    void createDisplayResources() {
+        createDisplayBuffers();
+        createDisplayDescriptorSet();
+        rebuildDisplayPipeline();
+        std::cout << "compute_shader: display path active: Vulkan compute output image -> fullscreen sampled draw (no readback, no sprite upload)\n";
+    }
+
     void writeBlendDS(VkDescriptorSet descriptorSet, VkImageView srcView) {
         VkDescriptorImageInfo destInfo{VK_NULL_HANDLE, outImg_.view, VK_IMAGE_LAYOUT_GENERAL};
         VkDescriptorImageInfo srcInfo{computeSampler_, srcView, VK_IMAGE_LAYOUT_GENERAL};
@@ -924,6 +1175,48 @@ class ComputeWindow : public mxvk::VK_Window {
         vkCmdDispatch(cmd, groupX, groupY, 1);
     }
 
+    void renderComputeOutput(VkCommandBuffer cmd) {
+        if (displayPipeline_ == VK_NULL_HANDLE || displayPipeLayout_ == VK_NULL_HANDLE ||
+            displayDS_ == VK_NULL_HANDLE || displayVertexBuffer_ == VK_NULL_HANDLE ||
+            displayIndexBuffer_ == VK_NULL_HANDLE) {
+            return;
+        }
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeline_);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeLayout_,
+                                0, 1, &displayDS_, 0, nullptr);
+
+        const VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(cmd, 0, 1, &displayVertexBuffer_, &offset);
+        vkCmdBindIndexBuffer(cmd, displayIndexBuffer_, 0, VK_INDEX_TYPE_UINT16);
+
+        struct DisplayPC {
+            float screenWidth;
+            float screenHeight;
+            float spritePosX;
+            float spritePosY;
+            float spriteSizeW;
+            float spriteSizeH;
+            float effectsOn;
+            float padding2;
+            float params[4];
+        } pc{
+            static_cast<float>(swapchain_extent.width),
+            static_cast<float>(swapchain_extent.height),
+            0.0F,
+            0.0F,
+            static_cast<float>(swapchain_extent.width),
+            static_cast<float>(swapchain_extent.height),
+            0.0F,
+            0.0F,
+            {0.0F, 0.0F, 0.0F, 0.0F},
+        };
+
+        vkCmdPushConstants(cmd, displayPipeLayout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(DisplayPC), &pc);
+        vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+    }
+
     void computeBarrier(VkCommandBuffer cmd, VkImage img) const {
         transitionImageLayout(
             cmd,
@@ -1027,41 +1320,13 @@ class ComputeWindow : public mxvk::VK_Window {
             cmd,
             outImg_.image,
             VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
             VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_READ_BIT);
-
-        VkBufferImageCopy2 region{};
-        region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
-        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        region.imageExtent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
-
-        VkCopyImageToBufferInfo2 copyInfo{};
-        copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2;
-        copyInfo.srcImage = outImg_.image;
-        copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        copyInfo.dstBuffer = readbackBuf_;
-        copyInfo.regionCount = 1;
-        copyInfo.pRegions = &region;
-        vkCmdCopyImageToBuffer2(cmd, &copyInfo);
-
-        transitionImageLayout(
-            cmd,
-            outImg_.image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_READ_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_WRITE_BIT);
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
         endSingleTimeCommands(cmd);
-
-        if (displaySprite_ != nullptr && readbackMap_ != nullptr) {
-            displaySprite_->updateTexture(readbackMap_, texWidth_, texHeight_, texWidth_ * 4);
-        }
     }
 
     void tickAnimState() {
@@ -1151,17 +1416,49 @@ class ComputeWindow : public mxvk::VK_Window {
         vkCmdPipelineBarrier2(cmd, &dependencyInfo);
     }
 
+    void destroyDisplayResources() {
+        if (displayPipeline_ != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, displayPipeline_, nullptr);
+            displayPipeline_ = VK_NULL_HANDLE;
+        }
+        if (displayPipeLayout_ != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, displayPipeLayout_, nullptr);
+            displayPipeLayout_ = VK_NULL_HANDLE;
+        }
+        if (displayDSPool_ != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, displayDSPool_, nullptr);
+            displayDSPool_ = VK_NULL_HANDLE;
+            displayDS_ = VK_NULL_HANDLE;
+        }
+        if (displayDSLayout_ != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, displayDSLayout_, nullptr);
+            displayDSLayout_ = VK_NULL_HANDLE;
+        }
+        if (displayVertexBuffer_ != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, displayVertexBuffer_, nullptr);
+            displayVertexBuffer_ = VK_NULL_HANDLE;
+        }
+        if (displayVertexMemory_ != VK_NULL_HANDLE) {
+            vkFreeMemory(device, displayVertexMemory_, nullptr);
+            displayVertexMemory_ = VK_NULL_HANDLE;
+        }
+        if (displayIndexBuffer_ != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, displayIndexBuffer_, nullptr);
+            displayIndexBuffer_ = VK_NULL_HANDLE;
+        }
+        if (displayIndexMemory_ != VK_NULL_HANDLE) {
+            vkFreeMemory(device, displayIndexMemory_, nullptr);
+            displayIndexMemory_ = VK_NULL_HANDLE;
+        }
+    }
+
     void destroyComputeResources() {
         if (device == VK_NULL_HANDLE) {
             return;
         }
 
         vkDeviceWaitIdle(device);
-
-        if (readbackMap_ != nullptr) {
-            vkUnmapMemory(device, readbackMem_);
-            readbackMap_ = nullptr;
-        }
+        destroyDisplayResources();
 
         auto destroyImage = [&](ComputeImage &img) {
 #ifdef MXVK_CUDA
@@ -1213,14 +1510,6 @@ class ComputeWindow : public mxvk::VK_Window {
         if (stagingMem_ != VK_NULL_HANDLE) {
             vkFreeMemory(device, stagingMem_, nullptr);
             stagingMem_ = VK_NULL_HANDLE;
-        }
-        if (readbackBuf_ != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, readbackBuf_, nullptr);
-            readbackBuf_ = VK_NULL_HANDLE;
-        }
-        if (readbackMem_ != VK_NULL_HANDLE) {
-            vkFreeMemory(device, readbackMem_, nullptr);
-            readbackMem_ = VK_NULL_HANDLE;
         }
     }
 };

@@ -938,6 +938,13 @@ namespace mxvk {
             throw mxvk::Exception("Failed to convert surface to RGBA in updateTexture");
         }
         if (rgbaSurface->w == spriteWidth && rgbaSurface->h == spriteHeight) {
+#ifdef MXVK_CUDA
+            if (updateTextureCudaHost(rgbaSurface->pixels, static_cast<uint32_t>(rgbaSurface->w), static_cast<uint32_t>(rgbaSurface->h),
+                                      static_cast<uint32_t>(rgbaSurface->pitch))) {
+                SDL_DestroySurface(rgbaSurface);
+                return;
+            }
+#endif
             updateSpriteTexture(rgbaSurface->pixels, rgbaSurface->w, rgbaSurface->h);
         } else {
             if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
@@ -988,8 +995,18 @@ namespace mxvk {
         }
         int srcPitch = (pitch > 0) ? pitch : width * 4;
         if (width == spriteWidth && height == spriteHeight && srcPitch == width * 4) {
+#ifdef MXVK_CUDA
+            if (updateTextureCudaHost(pixels, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(srcPitch))) {
+                return;
+            }
+#endif
             updateSpriteTexture(pixels, width, height);
         } else if (width == spriteWidth && height == spriteHeight) {
+#ifdef MXVK_CUDA
+            if (updateTextureCudaHost(pixels, static_cast<uint32_t>(width), static_cast<uint32_t>(height), static_cast<uint32_t>(srcPitch))) {
+                return;
+            }
+#endif
             std::vector<uint8_t> packed(width * height * 4);
             const uint8_t *src = static_cast<const uint8_t *>(pixels);
             for (int row = 0; row < height; ++row) {
@@ -1064,7 +1081,13 @@ namespace mxvk {
         VK_CHECK_RESULT(vkBeginCommandBuffer(uploadCmdBuffer, &beginInfo));
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        VkImageLayout oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#ifdef MXVK_CUDA
+        if (cudaImageLayout != VK_IMAGE_LAYOUT_UNDEFINED) {
+            oldLayout = cudaImageLayout;
+        }
+#endif
+        barrier.oldLayout = oldLayout;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1074,9 +1097,12 @@ namespace mxvk {
         barrier.subresourceRange.levelCount = 1;
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 1;
-        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_ACCESS_MEMORY_WRITE_BIT : VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_GENERAL)
+                                                  ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
+                                                  : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        vkCmdPipelineBarrier(uploadCmdBuffer, srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
@@ -1356,8 +1382,58 @@ namespace mxvk {
         if (!spriteLoaded) {
             return false;
         }
-        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols != spriteWidth || rgba.rows != spriteHeight) {
+        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
             return false;
+        }
+        if (rgba.cols != spriteWidth || rgba.rows != spriteHeight || spriteImage == VK_NULL_HANDLE ||
+            spriteImageMemory == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE || cudaExportMemorySize == 0) {
+            if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
+                vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX);
+            }
+            vkDeviceWaitIdle(device);
+            destroyCudaInterop();
+            if (spriteImageView != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, spriteImageView, nullptr);
+                spriteImageView = VK_NULL_HANDLE;
+            }
+            if (spriteImage != VK_NULL_HANDLE) {
+                vkDestroyImage(device, spriteImage, nullptr);
+                spriteImage = VK_NULL_HANDLE;
+            }
+            if (spriteImageMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, spriteImageMemory, nullptr);
+                spriteImageMemory = VK_NULL_HANDLE;
+            }
+
+            spriteWidth = rgba.cols;
+            spriteHeight = rgba.rows;
+            try {
+                createCudaExportableImage(static_cast<uint32_t>(spriteWidth), static_cast<uint32_t>(spriteHeight),
+                                          spriteImage, spriteImageMemory);
+                spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
+            } catch (const std::exception &ex) {
+                if (!cudaInteropUnavailableLogged) {
+                    std::cout << std::format("mxvk: CUDA exportable sprite resize unavailable: {}; using CPU/pinned fallback\n", ex.what());
+                    cudaInteropUnavailableLogged = true;
+                }
+                return false;
+            }
+
+            if (descriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+                descriptorPool = VK_NULL_HANDLE;
+                descriptorSet = VK_NULL_HANDLE;
+            }
+            if (extendedDescriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
+                extendedDescriptorPool = VK_NULL_HANDLE;
+                extendedDescriptorSet = VK_NULL_HANDLE;
+            }
+            createDescriptorPool();
+            if (spriteSampler == VK_NULL_HANDLE) {
+                createSampler();
+            }
+            createQuadBuffer();
         }
         if (!ensureCudaInterop() || !transitionCudaImageForWrite()) {
             return false;
@@ -1387,6 +1463,38 @@ namespace mxvk {
         cudaImageNeedsShaderBarrier = true;
         return true;
     }
+
+    bool VK_Sprite::updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch) {
+        if (pixels == nullptr || width == 0 || height == 0) {
+            return false;
+        }
+        const uint32_t rowBytes = width * 4U;
+        if (pitch < rowBytes || static_cast<int>(width) != spriteWidth || static_cast<int>(height) != spriteHeight) {
+            return false;
+        }
+        if (!ensureCudaInterop() || !transitionCudaImageForWrite()) {
+            return false;
+        }
+
+        if (!cudaUploadLogged) {
+            std::cout << std::format(
+                "mxvk: CUDA interop upload: copying {}x{} host RGBA pixels to Vulkan image array (pitch={} bytes)\n",
+                width, height, pitch);
+            cudaUploadLogged = true;
+        }
+
+        const cudaError_t copyResult = cudaMemcpy2DToArray(
+            cudaArray, 0, 0, pixels, pitch,
+            static_cast<size_t>(rowBytes), static_cast<size_t>(height),
+            cudaMemcpyHostToDevice);
+        if (copyResult != cudaSuccess) {
+            std::cout << std::format("mxvk: CUDA interop host texture copy failed: {}\n", cudaGetErrorString(copyResult));
+            return false;
+        }
+
+        cudaImageNeedsShaderBarrier = true;
+        return true;
+    }
 #endif
 
     void VK_Sprite::createSpriteTexture(SDL_Surface *surface) {
@@ -1403,6 +1511,14 @@ namespace mxvk {
         createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+#endif
+
+#ifdef MXVK_CUDA
+        if (updateTextureCudaHost(surface->pixels, static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h),
+                                  static_cast<uint32_t>(surface->pitch))) {
+            spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
+            return;
+        }
 #endif
 
         VkBuffer stagingBuffer;
@@ -1426,7 +1542,14 @@ namespace mxvk {
         }
         vkUnmapMemory(device, stagingMemory);
 
-        transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+#ifdef MXVK_CUDA
+        const VkImageLayout uploadOldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
+                                                  ? VK_IMAGE_LAYOUT_GENERAL
+                                                  : VK_IMAGE_LAYOUT_UNDEFINED;
+#else
+        const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
+        transitionImageLayout(spriteImage, uploadOldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, spriteImage, surface->w, surface->h);
         transitionImageLayout(spriteImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 #ifdef MXVK_CUDA
@@ -1706,6 +1829,11 @@ namespace mxvk {
             barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
             destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         } else {
             throw std::invalid_argument("unsupported layout transition!");

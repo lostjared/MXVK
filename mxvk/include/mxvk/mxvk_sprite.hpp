@@ -333,6 +333,7 @@ namespace mxvk {
         void destroyCudaInterop();
         bool ensureCudaInterop();
         bool transitionCudaImageForWrite();
+        bool updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch);
         void recordCudaReadyBarrier(VkCommandBuffer cmdBuffer);
         void createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory);
         VkDeviceSize cudaExportMemorySize = 0;

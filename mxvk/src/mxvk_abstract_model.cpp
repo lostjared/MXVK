@@ -185,11 +185,7 @@ namespace mxvk {
             texture.image = VK_NULL_HANDLE;
             texture.memory = VK_NULL_HANDLE;
 
-            createImage(uploadWidth, uploadHeight, VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        texture.image, texture.memory);
+            createTextureImage(uploadWidth, uploadHeight, texture);
 
             texture.view = createImageView(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
             texture.width = uploadWidth;
@@ -202,6 +198,12 @@ namespace mxvk {
                 createDescriptorSets();
             }
         }
+
+#ifdef MXVK_CUDA
+        if (updatePrimaryTextureCudaHost(texture, pixels, uploadWidth, uploadHeight, srcRowBytes)) {
+            return true;
+        }
+#endif
 
         const VkDeviceSize stagingSize = static_cast<VkDeviceSize>(tightRowBytes) * uploadHeight;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
@@ -433,8 +435,22 @@ namespace mxvk {
 
             const uint32_t width = static_cast<uint32_t>(surface->w);
             const uint32_t height = static_cast<uint32_t>(surface->h);
-            const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
 
+            TextureEntry tex{};
+            tex.width = width;
+            tex.height = height;
+            createTextureImage(width, height, tex);
+
+#ifdef MXVK_CUDA
+            if (updatePrimaryTextureCudaHost(tex, surface->pixels, width, height, static_cast<uint32_t>(surface->pitch))) {
+                tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+                textures_.push_back(tex);
+                SDL_DestroySurface(surface);
+                continue;
+            }
+#endif
+
+            const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
             createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -446,17 +462,15 @@ namespace mxvk {
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
             vkUnmapMemory(window_->getDevice(), stagingMemory);
 
-            TextureEntry tex{};
-            tex.width = width;
-            tex.height = height;
-            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        tex.image, tex.memory);
-
+#ifdef MXVK_CUDA
+            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
+                                                      ? VK_IMAGE_LAYOUT_GENERAL
+                                                      : VK_IMAGE_LAYOUT_UNDEFINED;
+#else
+            const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_UNDEFINED,
+                                  uploadOldLayout,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, tex.image, width, height);
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
@@ -489,8 +503,22 @@ namespace mxvk {
 
             const uint32_t width = static_cast<uint32_t>(surface->w);
             const uint32_t height = static_cast<uint32_t>(surface->h);
-            const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
 
+            TextureEntry tex{};
+            tex.width = width;
+            tex.height = height;
+            createTextureImage(width, height, tex);
+
+#ifdef MXVK_CUDA
+            if (updatePrimaryTextureCudaHost(tex, surface->pixels, width, height, static_cast<uint32_t>(surface->pitch))) {
+                tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+                textures_.push_back(tex);
+                SDL_DestroySurface(surface);
+                continue;
+            }
+#endif
+
+            const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
             createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -502,17 +530,15 @@ namespace mxvk {
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
             vkUnmapMemory(window_->getDevice(), stagingMemory);
 
-            TextureEntry tex{};
-            tex.width = width;
-            tex.height = height;
-            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        tex.image, tex.memory);
-
+#ifdef MXVK_CUDA
+            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
+                                                      ? VK_IMAGE_LAYOUT_GENERAL
+                                                      : VK_IMAGE_LAYOUT_UNDEFINED;
+#else
+            const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_UNDEFINED,
+                                  uploadOldLayout,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, tex.image, width, height);
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
@@ -540,6 +566,20 @@ namespace mxvk {
         auto *pixel = static_cast<uint32_t *>(surface->pixels);
         *pixel = 0xFFFFFFFFu;
 
+        TextureEntry tex{};
+        tex.width = 1;
+        tex.height = 1;
+        createTextureImage(1, 1, tex);
+
+#ifdef MXVK_CUDA
+        if (updatePrimaryTextureCudaHost(tex, surface->pixels, 1, 1, static_cast<uint32_t>(surface->pitch))) {
+            tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+            textures_.push_back(tex);
+            SDL_DestroySurface(surface);
+            return;
+        }
+#endif
+
         const VkDeviceSize imageSize = 4;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
@@ -552,17 +592,15 @@ namespace mxvk {
         std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
         vkUnmapMemory(window_->getDevice(), stagingMemory);
 
-        TextureEntry tex{};
-        tex.width = 1;
-        tex.height = 1;
-        createImage(1, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    tex.image, tex.memory);
-
+#ifdef MXVK_CUDA
+        const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
+                                                  ? VK_IMAGE_LAYOUT_GENERAL
+                                                  : VK_IMAGE_LAYOUT_UNDEFINED;
+#else
+        const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
         transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              uploadOldLayout,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, tex.image, 1, 1);
         transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
@@ -721,6 +759,33 @@ namespace mxvk {
             memory = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to bind image memory");
         }
+    }
+
+    void VKAbstractModel::createTextureImage(uint32_t width, uint32_t height, TextureEntry &texture) const {
+#ifdef MXVK_CUDA
+        try {
+            createCudaExportableImage(width, height, texture);
+            return;
+        } catch (const std::exception &ex) {
+            logVKAbstractModelStep(std::format(
+                "CUDA exportable model texture unavailable: {}; using standard Vulkan texture",
+                ex.what()));
+            texture.cudaExportMemorySize = 0;
+            texture.cudaInteropEnabled = false;
+            texture.cudaInteropUnavailableLogged = true;
+        }
+#endif
+
+        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    texture.image, texture.memory);
+        texture.width = width;
+        texture.height = height;
+#ifdef MXVK_CUDA
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
     }
 
 #ifdef MXVK_CUDA
@@ -999,6 +1064,38 @@ namespace mxvk {
         }
     }
 
+    bool VKAbstractModel::updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels,
+                                                       uint32_t width, uint32_t height, uint32_t pitch) const {
+        if (pixels == nullptr || width == 0 || height == 0) {
+            return false;
+        }
+        const uint32_t rowBytes = width * 4U;
+        if (pitch < rowBytes || texture.width != width || texture.height != height) {
+            return false;
+        }
+        if (!ensureTextureCudaInterop(texture) || !transitionTextureForCudaWrite(texture)) {
+            return false;
+        }
+
+        if (!texture.cudaUploadLogged) {
+            logVKAbstractModelStep(std::format(
+                "CUDA interop upload: copying {}x{} host RGBA pixels to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes)",
+                width, height, pitch));
+            texture.cudaUploadLogged = true;
+        }
+
+        const cudaError_t cudaResult = cudaMemcpy2DToArray(
+            texture.cudaArray, 0, 0, pixels, pitch,
+            static_cast<size_t>(rowBytes), static_cast<size_t>(height),
+            cudaMemcpyHostToDevice);
+        if (cudaResult != cudaSuccess) {
+            logVKAbstractModelStep(std::format("CUDA interop model host texture copy failed: {}", cudaGetErrorString(cudaResult)));
+            return false;
+        }
+
+        return transitionTextureForShaderRead(texture);
+    }
+
     bool VKAbstractModel::updatePrimaryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
         if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
             return false;
@@ -1113,6 +1210,11 @@ namespace mxvk {
             barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
             destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         }
 

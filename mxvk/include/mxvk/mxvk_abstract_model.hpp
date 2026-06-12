@@ -196,12 +196,15 @@ namespace mxvk {
                          VkImageTiling tiling, VkImageUsageFlags usage,
                          VkMemoryPropertyFlags properties, VkImage &image,
                          VkDeviceMemory &memory) const;
+        void createTextureImage(uint32_t width, uint32_t height, TextureEntry &texture) const;
 #ifdef MXVK_CUDA
         void createCudaExportableImage(uint32_t width, uint32_t height, TextureEntry &texture) const;
         void destroyTextureCudaInterop(TextureEntry &texture) const;
         [[nodiscard]] bool ensureTextureCudaInterop(TextureEntry &texture) const;
         [[nodiscard]] bool transitionTextureForCudaWrite(TextureEntry &texture) const;
         [[nodiscard]] bool transitionTextureForShaderRead(TextureEntry &texture) const;
+        [[nodiscard]] bool updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels,
+                                                        uint32_t width, uint32_t height, uint32_t pitch) const;
         void recreatePrimaryTextureForCuda(TextureEntry &texture, uint32_t width, uint32_t height);
 #endif
         [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const;
