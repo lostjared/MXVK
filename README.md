@@ -179,6 +179,8 @@ Current example executables:
 - MXVK Vulkan port of the legacy `gl_glitch_cube` demo from MX2.
 - Uses `VKAbstractModel` with GLSL 450 shaders (`model.vert/.frag`) and runtime-compiled SPIR-V.
 - Controls:
+	- Drag left mouse to orbit the cube.
+	- Mouse wheel zooms the camera in and out.
 	- `Space` toggles rotation axis behavior.
 	- `PageUp`/`PageDown` scales the cube larger/smaller at runtime.
 

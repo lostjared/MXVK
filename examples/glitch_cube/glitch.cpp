@@ -3,6 +3,7 @@
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <format>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -36,38 +37,72 @@ namespace example {
         }
 
         void event(SDL_Event &e) override {
-            if (e.type != SDL_EVENT_KEY_DOWN) {
+            if (e.type == SDL_EVENT_KEY_DOWN) {
+                switch (e.key.key) {
+                case SDLK_ESCAPE:
+                    exit();
+                    break;
+                case SDLK_SPACE:
+                    rotXFactor_ = (rotXFactor_ > 0.0f) ? 0.0f : 1.0f;
+                    break;
+                case SDLK_PAGEUP:
+                    cubeScale_ += 0.1f;
+                    if (cubeScale_ > 4.0f) {
+                        cubeScale_ = 4.0f;
+                    }
+                    break;
+                case SDLK_PAGEDOWN:
+                    cubeScale_ -= 0.1f;
+                    if (cubeScale_ < 0.2f) {
+                        cubeScale_ = 0.2f;
+                    }
+                    break;
+                default:
+                    break;
+                }
                 return;
             }
 
-            switch (e.key.key) {
-            case SDLK_ESCAPE:
-                exit();
-                break;
-            case SDLK_SPACE:
-                rotXFactor_ = (rotXFactor_ > 0.0f) ? 0.0f : 1.0f;
-                break;
-            case SDLK_PAGEUP:
-                cubeScale_ += 0.1f;
-                if (cubeScale_ > 4.0f) {
-                    cubeScale_ = 4.0f;
-                }
-                break;
-            case SDLK_PAGEDOWN:
-                cubeScale_ -= 0.1f;
-                if (cubeScale_ < 0.2f) {
-                    cubeScale_ = 0.2f;
-                }
-                break;
-            default:
-                break;
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                mouseDragging_ = true;
+                lastMouseX_ = static_cast<int>(e.button.x);
+                lastMouseY_ = static_cast<int>(e.button.y);
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
+                mouseDragging_ = false;
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseDragging_) {
+                const int x = static_cast<int>(e.motion.x);
+                const int y = static_cast<int>(e.motion.y);
+                const int deltaX = x - lastMouseX_;
+                const int deltaY = y - lastMouseY_;
+
+                yawDegrees_ += static_cast<float>(deltaX) * mouseSensitivity_;
+                pitchDegrees_ += static_cast<float>(deltaY) * mouseSensitivity_;
+                pitchDegrees_ = std::clamp(pitchDegrees_, -80.0f, 80.0f);
+
+                lastMouseX_ = x;
+                lastMouseY_ = y;
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+                const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
+                cameraDistance_ -= delta * 0.45f;
+                cameraDistance_ = std::clamp(cameraDistance_, 1.8f, 12.0f);
             }
         }
 
         void proc() override {
-            printText("Press Arrow keys / Page Up Down to move light source Enter to reset", 25, 25, {255, 255, 255, 255});
-            printText("Press Space to rotate cube", 25, 60, {255, 255, 255, 255});
-            printText(std::format("Current scale: {:.1f}", cubeScale_), 25, 95, {230, 245, 255, 255});
+            printText("Drag left mouse to orbit the cube", 25, 25, {255, 255, 255, 255});
+            printText("Mouse wheel zooms the camera", 25, 60, {255, 255, 255, 255});
+            printText("Space toggles the rotation axis", 25, 95, {255, 255, 255, 255});
+            printText("Page Up / Page Down adjust cube scale", 25, 130, {255, 255, 255, 255});
+            printText(std::format("Current scale: {:.1f}", cubeScale_), 25, 165, {230, 245, 255, 255});
         }
 
         void onSwapchainRecreated() override {
@@ -89,7 +124,14 @@ namespace example {
             ubo.model = glm::scale(ubo.model, glm::vec3(model_.modelRenderScale() * cubeScale_));
             ubo.model = glm::translate(ubo.model, model_.modelCenterOffset());
 
-            ubo.view = glm::lookAt(glm::vec3(0.0f, 2.0f, 5.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            const float yawRadians = glm::radians(yawDegrees_);
+            const float pitchRadians = glm::radians(pitchDegrees_);
+            const glm::vec3 cameraPos{
+                cameraDistance_ * std::cos(pitchRadians) * std::sin(yawRadians),
+                cameraDistance_ * std::sin(pitchRadians),
+                cameraDistance_ * std::cos(pitchRadians) * std::cos(yawRadians)};
+
+            ubo.view = glm::lookAt(cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
             ubo.proj[1][1] *= -1.0f;
 
@@ -103,6 +145,13 @@ namespace example {
         float rotXFactor_ = 1.0f;
         float cubeScale_ = 1.0f;
         std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
+        bool mouseDragging_ = false;
+        int lastMouseX_ = 0;
+        int lastMouseY_ = 0;
+        float yawDegrees_ = 0.0f;
+        float pitchDegrees_ = 12.0f;
+        float cameraDistance_ = 5.0f;
+        float mouseSensitivity_ = 0.35f;
     };
 
 } // namespace example
