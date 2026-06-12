@@ -1,8 +1,9 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+
+#include <array>
 #include <chrono>
-#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <iostream>
@@ -11,157 +12,42 @@
 
 namespace example {
     class ExampleWindow : public mxvk::VK_Window {
-        std::string current_path = ".";
-
         struct PushConstants {
             float time;
             float aspect;
         };
 
       public:
-        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION) {
-            current_path = path;
-            createGraphicsPipeline();
+        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen)
+            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION),
+              shader_root_(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
+            setClearColor(0.02F, 0.03F, 0.06F, 1.0F);
         }
 
-        ~ExampleWindow() {
+        ~ExampleWindow() override {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
             destroyGraphicsPipeline();
         }
 
-        void event(SDL_Event &e) override {
-            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
-                exit();
-            }
-        }
-
         void onSwapchainAboutToRecreate() override {
             destroyGraphicsPipeline();
         }
 
-        void onSwapchainRecreated() override {
-            createGraphicsPipeline();
-        }
-
-        void render() override {
-            if (device == VK_NULL_HANDLE || swapchain == VK_NULL_HANDLE || command_buffers.empty()) {
+        void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
+            if (!ensureGraphicsPipeline()) {
                 return;
             }
 
-            VkFence &frame_fence = in_flight_fences_[current_frame_];
-            VkSemaphore &acquire_semaphore = image_available_[current_frame_];
-
-            vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
-
-            uint32_t image_index = 0;
-            const VkResult acquire_result =
-                vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, acquire_semaphore, VK_NULL_HANDLE, &image_index);
-            if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
-                force_swapchain_recreate_ = true;
-                framebuffer_resized_ = true;
-                return;
-            }
-            if (acquire_result != VK_SUCCESS && acquire_result != VK_SUBOPTIMAL_KHR) {
-                throw mxvk::Exception("Failed to acquire swapchain image");
-            }
-            if (
-                image_index >= command_buffers.size() ||
-                image_index >= swapchain_images.size() ||
-                image_index >= swapchain_image_views.size() ||
-                image_index >= image_fences_.size() ||
-                image_index >= render_finished_.size()) {
-                throw mxvk::Exception("Swapchain image index out of bounds");
-            }
-
-            VkSemaphore &present_semaphore = render_finished_[image_index];
-
-            if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
-                vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);
-            }
-
-            const VkCommandBuffer cmd = command_buffers[image_index];
-            vkResetCommandBuffer(cmd, 0);
-
-            VkCommandBufferBeginInfo begin_info{};
-            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
-                throw mxvk::Exception("Failed to begin command buffer");
-            }
-
-            VkClearValue clear_value{};
-            clear_value.color = {{0.02F, 0.03F, 0.06F, 1.0F}};
-
-            VkImageMemoryBarrier2 to_color_barrier{};
-            to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_color_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-            to_color_barrier.srcAccessMask = VK_ACCESS_2_NONE;
-            to_color_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_color_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            to_color_barrier.oldLayout =
-                swapchain_image_initialized[image_index] ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
-            to_color_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            to_color_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_color_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_color_barrier.image = swapchain_images[image_index];
-            to_color_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            to_color_barrier.subresourceRange.baseMipLevel = 0;
-            to_color_barrier.subresourceRange.levelCount = 1;
-            to_color_barrier.subresourceRange.baseArrayLayer = 0;
-            to_color_barrier.subresourceRange.layerCount = 1;
-
-            VkDependencyInfo pre_render_dependency{};
-            pre_render_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            pre_render_dependency.imageMemoryBarrierCount = 1;
-            pre_render_dependency.pImageMemoryBarriers = &to_color_barrier;
-            vkCmdPipelineBarrier2(cmd, &pre_render_dependency);
-
-            VkRenderingAttachmentInfo color_attachment{};
-            color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            color_attachment.imageView = swapchain_image_views[image_index];
-            color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
-            color_attachment.resolveImageView = VK_NULL_HANDLE;
-            color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            color_attachment.clearValue = clear_value;
-
-            VkRenderingInfo rendering_info{};
-            rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-            rendering_info.renderArea.offset = {0, 0};
-            rendering_info.renderArea.extent = swapchain_extent;
-            rendering_info.layerCount = 1;
-            rendering_info.viewMask = 0;
-            rendering_info.colorAttachmentCount = 1;
-            rendering_info.pColorAttachments = &color_attachment;
-            rendering_info.pDepthAttachment = nullptr;
-            rendering_info.pStencilAttachment = nullptr;
-
-            vkCmdBeginRendering(cmd, &rendering_info);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline_);
-
-            VkViewport viewport{};
-            viewport.x = 0.0F;
-            viewport.y = 0.0F;
-            viewport.width = static_cast<float>(swapchain_extent.width);
-            viewport.height = static_cast<float>(swapchain_extent.height);
-            viewport.minDepth = 0.0F;
-            viewport.maxDepth = 1.0F;
-            vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-            VkRect2D scissor{};
-            scissor.offset = {0, 0};
-            scissor.extent = swapchain_extent;
-            vkCmdSetScissor(cmd, 0, 1, &scissor);
 
             const auto now = std::chrono::steady_clock::now();
             const float elapsed_seconds = std::chrono::duration<float>(now - start_time_).count();
+            const VkExtent2D extent = getSwapchainExtent();
             const float aspect =
-                (swapchain_extent.height > 0U)
-                    ? static_cast<float>(swapchain_extent.width) / static_cast<float>(swapchain_extent.height)
-                    : 1.0F;
+                (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0F;
+
             const PushConstants push_constants{elapsed_seconds, aspect};
             vkCmdPushConstants(
                 cmd,
@@ -172,106 +58,12 @@ namespace example {
                 &push_constants);
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
-            vkCmdEndRendering(cmd);
-
-            VkImageMemoryBarrier2 to_present_barrier{};
-            to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_present_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
-            to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
-            to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_present_barrier.image = swapchain_images[image_index];
-            to_present_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            to_present_barrier.subresourceRange.baseMipLevel = 0;
-            to_present_barrier.subresourceRange.levelCount = 1;
-            to_present_barrier.subresourceRange.baseArrayLayer = 0;
-            to_present_barrier.subresourceRange.layerCount = 1;
-
-            VkDependencyInfo post_render_dependency{};
-            post_render_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            post_render_dependency.imageMemoryBarrierCount = 1;
-            post_render_dependency.pImageMemoryBarriers = &to_present_barrier;
-            vkCmdPipelineBarrier2(cmd, &post_render_dependency);
-
-            if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
-                throw mxvk::Exception("Failed to end command buffer");
-            }
-
-            VkSemaphoreSubmitInfo wait_semaphore_info{};
-            wait_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            wait_semaphore_info.semaphore = acquire_semaphore;
-            wait_semaphore_info.value = 0;
-            wait_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            wait_semaphore_info.deviceIndex = 0;
-
-            VkCommandBufferSubmitInfo command_buffer_info{};
-            command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-            command_buffer_info.commandBuffer = cmd;
-            command_buffer_info.deviceMask = 0;
-
-            VkSemaphoreSubmitInfo signal_semaphore_info{};
-            signal_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            signal_semaphore_info.semaphore = present_semaphore;
-            signal_semaphore_info.value = 0;
-            signal_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
-            signal_semaphore_info.deviceIndex = 0;
-
-            VkSubmitInfo2 submit_info{};
-            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-            submit_info.waitSemaphoreInfoCount = 1;
-            submit_info.pWaitSemaphoreInfos = &wait_semaphore_info;
-            submit_info.commandBufferInfoCount = 1;
-            submit_info.pCommandBufferInfos = &command_buffer_info;
-            submit_info.signalSemaphoreInfoCount = 1;
-            submit_info.pSignalSemaphoreInfos = &signal_semaphore_info;
-
-            vkResetFences(device, 1, &frame_fence);
-            if (vkQueueSubmit2(graphics_queue, 1, &submit_info, frame_fence) != VK_SUCCESS) {
-                throw mxvk::Exception("Failed to submit draw command");
-            }
-            image_fences_[image_index] = frame_fence;
-            swapchain_image_initialized[image_index] = true;
-
-            VkSwapchainKHR present_swapchain = swapchain;
-            VkPresentInfoKHR present_info{};
-            present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            present_info.waitSemaphoreCount = 1;
-            present_info.pWaitSemaphores = &present_semaphore;
-            present_info.swapchainCount = 1;
-            present_info.pSwapchains = &present_swapchain;
-            present_info.pImageIndices = &image_index;
-
-            const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
-            if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
-                force_swapchain_recreate_ = true;
-                last_resize_event_ms_ = SDL_GetTicks();
-                framebuffer_resized_ = true;
-            } else if (present_result == VK_SUBOPTIMAL_KHR) {
-                int pixel_w = 0;
-                int pixel_h = 0;
-                if (window != nullptr) {
-                    SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
-                }
-                const bool extent_changed =
-                    (pixel_w > 0 && pixel_h > 0) &&
-                    (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
-                     swapchain_extent.height != static_cast<uint32_t>(pixel_h));
-                if (extent_changed) {
-                    last_resize_event_ms_ = SDL_GetTicks();
-                    framebuffer_resized_ = true;
-                }
-            } else if (present_result != VK_SUCCESS) {
-                throw mxvk::Exception("Failed to present swapchain image");
-            }
-
-            current_frame_ = (current_frame_ + 1U) % static_cast<uint32_t>(image_available_.size());
         }
 
       private:
+        std::string shader_root_;
+        std::chrono::steady_clock::time_point start_time_{std::chrono::steady_clock::now()};
+
         void destroyGraphicsPipeline() {
             if (device == VK_NULL_HANDLE) {
                 pipeline_layout_ = VK_NULL_HANDLE;
@@ -289,9 +81,22 @@ namespace example {
             }
         }
 
+        bool ensureGraphicsPipeline() {
+            if (graphics_pipeline_ != VK_NULL_HANDLE && pipeline_layout_ != VK_NULL_HANDLE) {
+                return true;
+            }
+
+            createGraphicsPipeline();
+            return graphics_pipeline_ != VK_NULL_HANDLE && pipeline_layout_ != VK_NULL_HANDLE;
+        }
+
         void createGraphicsPipeline() {
-            const std::string vert_path = current_path + "/shaders/triangle.vert.spv";
-            const std::string frag_path = current_path + "/shaders/triangle.frag.spv";
+            if (device == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
+                return;
+            }
+
+            const std::string vert_path = shader_root_ + "/triangle.vert.spv";
+            const std::string frag_path = shader_root_ + "/triangle.frag.spv";
             const std::vector<char> vert_bytes = loadSpv(vert_path);
             const std::vector<char> frag_bytes = loadSpv(frag_path);
 
@@ -300,24 +105,24 @@ namespace example {
             try {
                 frag_module = createShaderModule(device, frag_bytes);
 
-                VkPipelineShaderStageCreateInfo vert_stage{};
-                vert_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-                vert_stage.stage = VK_SHADER_STAGE_VERTEX_BIT;
-                vert_stage.module = vert_module;
-                vert_stage.pName = "main";
+                std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages{};
+                shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+                shader_stages[0].module = vert_module;
+                shader_stages[0].pName = "main";
+                shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+                shader_stages[1].module = frag_module;
+                shader_stages[1].pName = "main";
 
-                VkPipelineShaderStageCreateInfo frag_stage{};
-                frag_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-                frag_stage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-                frag_stage.module = frag_module;
-                frag_stage.pName = "main";
-                const VkPipelineShaderStageCreateInfo shader_stages[] = {vert_stage, frag_stage};
                 VkPipelineVertexInputStateCreateInfo vertex_input{};
                 vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
                 VkPipelineInputAssemblyStateCreateInfo input_assembly{};
                 input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
                 input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
                 input_assembly.primitiveRestartEnable = VK_FALSE;
+
                 VkPipelineViewportStateCreateInfo viewport_state{};
                 viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
                 viewport_state.viewportCount = 1;
@@ -361,29 +166,30 @@ namespace example {
                 color_blending.attachmentCount = 1;
                 color_blending.pAttachments = &color_blend_attachment;
 
-                VkPipelineLayoutCreateInfo pipeline_layout_info{};
-                pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
                 VkPushConstantRange push_constant_range{};
                 push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
                 push_constant_range.offset = 0;
                 push_constant_range.size = sizeof(PushConstants);
+
+                VkPipelineLayoutCreateInfo pipeline_layout_info{};
+                pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
                 pipeline_layout_info.pushConstantRangeCount = 1;
                 pipeline_layout_info.pPushConstantRanges = &push_constant_range;
                 if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout_) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create pipeline layout");
                 }
 
-                VkGraphicsPipelineCreateInfo pipeline_info{};
                 VkPipelineRenderingCreateInfo pipeline_rendering_info{};
                 pipeline_rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
                 pipeline_rendering_info.viewMask = 0;
                 pipeline_rendering_info.colorAttachmentCount = 1;
                 pipeline_rendering_info.pColorAttachmentFormats = &swapchain_format;
 
+                VkGraphicsPipelineCreateInfo pipeline_info{};
                 pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
                 pipeline_info.pNext = &pipeline_rendering_info;
-                pipeline_info.stageCount = 2;
-                pipeline_info.pStages = shader_stages;
+                pipeline_info.stageCount = static_cast<uint32_t>(shader_stages.size());
+                pipeline_info.pStages = shader_stages.data();
                 pipeline_info.pVertexInputState = &vertex_input;
                 pipeline_info.pInputAssemblyState = &input_assembly;
                 pipeline_info.pViewportState = &viewport_state;
@@ -398,13 +204,7 @@ namespace example {
                 pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
                 pipeline_info.basePipelineIndex = -1;
 
-                if (vkCreateGraphicsPipelines(
-                        device,
-                        VK_NULL_HANDLE,
-                        1,
-                        &pipeline_info,
-                        nullptr,
-                        &graphics_pipeline_) != VK_SUCCESS) {
+                if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &graphics_pipeline_) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create graphics pipeline");
                 }
             } catch (...) {
@@ -427,15 +227,14 @@ namespace example {
             vkDestroyShaderModule(device, vert_module, nullptr);
         }
 
-        VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
         VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
-        std::chrono::steady_clock::time_point start_time_ = std::chrono::steady_clock::now();
+        VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
     };
 } // namespace example
 
 int main(int argc, char **argv) {
     try {
-        Arguments args = proc_args(argc, argv);
+        const Arguments args = proc_args(argc, argv);
         example::ExampleWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen);
         ex_window.loop();
     } catch (mxvk::Exception &e) {
