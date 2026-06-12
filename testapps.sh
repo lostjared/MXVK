@@ -4,6 +4,7 @@
 ./run.pl text_example
 ./run.pl sprite_example
 ./run.pl static_example
+./run.pl matrix
 ./run.pl console_demo
 ./run.pl fractal_zoom
 ./run.pl model_example
