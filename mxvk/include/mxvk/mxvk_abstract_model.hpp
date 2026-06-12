@@ -14,6 +14,10 @@
 
 #include <string>
 #include <vector>
+#ifdef MXVK_CUDA
+#include <cuda_runtime_api.h>
+#include <opencv2/core/cuda.hpp>
+#endif
 
 namespace mxvk {
 
@@ -85,6 +89,16 @@ namespace mxvk {
          */
         [[nodiscard]] bool updatePrimaryTexture(const void *pixels, int width, int height, int pitch = 0);
 
+#ifdef MXVK_CUDA
+        /**
+         * @brief Upload RGBA8 pixels from CUDA device memory into the primary model texture.
+         *
+         * The Vulkan texture is imported into CUDA as a mipmapped array because
+         * sampled Vulkan images use opaque optimal tiling, not a linear pitched layout.
+         */
+        [[nodiscard]] bool updatePrimaryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream);
+#endif
+
         /**
          * @brief Record draw commands for this model.
          * @param cmd Active command buffer, inside a dynamic rendering scope.
@@ -127,6 +141,18 @@ namespace mxvk {
             VkImageView view = VK_NULL_HANDLE;
             uint32_t width = 0;
             uint32_t height = 0;
+#ifdef MXVK_CUDA
+            VkDeviceSize cudaExportMemorySize = 0;
+            cudaExternalMemory_t cudaExternalMemory = nullptr;
+            cudaMipmappedArray_t cudaMipmappedArray = nullptr;
+            cudaArray_t cudaArray = nullptr;
+            bool cudaInteropEnabled = false;
+            bool cudaInteropUnavailableLogged = false;
+            bool cudaUploadLogged = false;
+            bool cudaWriteTransitionLogged = false;
+            bool cudaShaderTransitionLogged = false;
+            VkImageLayout cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+#endif
         };
 
         MXModel obj_{};
@@ -170,6 +196,14 @@ namespace mxvk {
                          VkImageTiling tiling, VkImageUsageFlags usage,
                          VkMemoryPropertyFlags properties, VkImage &image,
                          VkDeviceMemory &memory) const;
+#ifdef MXVK_CUDA
+        void createCudaExportableImage(uint32_t width, uint32_t height, TextureEntry &texture) const;
+        void destroyTextureCudaInterop(TextureEntry &texture) const;
+        [[nodiscard]] bool ensureTextureCudaInterop(TextureEntry &texture) const;
+        [[nodiscard]] bool transitionTextureForCudaWrite(TextureEntry &texture) const;
+        [[nodiscard]] bool transitionTextureForShaderRead(TextureEntry &texture) const;
+        void recreatePrimaryTextureForCuda(TextureEntry &texture, uint32_t width, uint32_t height);
+#endif
         [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const;
         void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) const;
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const;

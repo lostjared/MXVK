@@ -11,6 +11,10 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#ifdef MXVK_CUDA
+#include <opencv2/core/cuda_stream_accessor.hpp>
+#include <unistd.h>
+#endif
 
 namespace mxvk {
 
@@ -164,6 +168,9 @@ namespace mxvk {
         if (texture.width != uploadWidth || texture.height != uploadHeight) {
             vkDeviceWaitIdle(window_->getDevice());
 
+#ifdef MXVK_CUDA
+            destroyTextureCudaInterop(texture);
+#endif
             if (texture.view != VK_NULL_HANDLE) {
                 vkDestroyImageView(window_->getDevice(), texture.view, nullptr);
             }
@@ -237,6 +244,9 @@ namespace mxvk {
         transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
 
         vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
         vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
@@ -452,6 +462,9 @@ namespace mxvk {
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+            tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
 
             tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
             textures_.push_back(tex);
@@ -505,6 +518,9 @@ namespace mxvk {
             transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+            tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
 
             tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
             textures_.push_back(tex);
@@ -552,6 +568,9 @@ namespace mxvk {
         transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+#ifdef MXVK_CUDA
+        tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+#endif
         tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
         textures_.push_back(tex);
 
@@ -704,6 +723,344 @@ namespace mxvk {
         }
     }
 
+#ifdef MXVK_CUDA
+    void VKAbstractModel::destroyTextureCudaInterop(TextureEntry &texture) const {
+        if (texture.cudaInteropEnabled || texture.cudaExternalMemory != nullptr || texture.cudaMipmappedArray != nullptr) {
+            logVKAbstractModelStep("CUDA interop: destroying imported model texture resources");
+        }
+        if (texture.cudaMipmappedArray != nullptr) {
+            cudaFreeMipmappedArray(texture.cudaMipmappedArray);
+            texture.cudaMipmappedArray = nullptr;
+            texture.cudaArray = nullptr;
+        }
+        if (texture.cudaExternalMemory != nullptr) {
+            cudaDestroyExternalMemory(texture.cudaExternalMemory);
+            texture.cudaExternalMemory = nullptr;
+        }
+        texture.cudaInteropEnabled = false;
+        texture.cudaExportMemorySize = 0;
+        texture.cudaUploadLogged = false;
+        texture.cudaWriteTransitionLogged = false;
+        texture.cudaShaderTransitionLogged = false;
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    void VKAbstractModel::createCudaExportableImage(uint32_t width, uint32_t height, TextureEntry &texture) const {
+        logVKAbstractModelStep(std::format(
+            "CUDA interop init: requesting exportable model texture {}x{} RGBA8 optimal-tiled OPAQUE_FD",
+            width, height));
+
+        VkExternalMemoryImageCreateInfo externalImageInfo{};
+        externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+        externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.pNext = &externalImageInfo;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = width;
+        imageInfo.extent.height = height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        if (vkCreateImage(window_->getDevice(), &imageInfo, nullptr, &texture.image) != VK_SUCCESS) {
+            throw mxvk::Exception("VKAbstractModel failed to create CUDA exportable texture image");
+        }
+
+        VkMemoryRequirements requirements{};
+        vkGetImageMemoryRequirements(window_->getDevice(), texture.image, &requirements);
+
+        VkExportMemoryAllocateInfo exportMemoryInfo{};
+        exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.pNext = &exportMemoryInfo;
+        allocInfo.allocationSize = requirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &texture.memory) != VK_SUCCESS) {
+            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+            texture.image = VK_NULL_HANDLE;
+            throw mxvk::Exception("VKAbstractModel failed to allocate CUDA exportable texture memory");
+        }
+        if (vkBindImageMemory(window_->getDevice(), texture.image, texture.memory, 0) != VK_SUCCESS) {
+            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+            vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+            texture.image = VK_NULL_HANDLE;
+            texture.memory = VK_NULL_HANDLE;
+            throw mxvk::Exception("VKAbstractModel failed to bind CUDA exportable texture memory");
+        }
+
+        texture.width = width;
+        texture.height = height;
+        texture.cudaExportMemorySize = requirements.size;
+        texture.cudaInteropUnavailableLogged = false;
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        logVKAbstractModelStep(std::format(
+            "CUDA interop init: exportable model texture allocated (memorySize={} bytes, memoryType={}); optimal image memory is imported as cudaArray, not wrapped as pitched GpuMat",
+            static_cast<unsigned long long>(requirements.size), allocInfo.memoryTypeIndex));
+    }
+
+    bool VKAbstractModel::ensureTextureCudaInterop(TextureEntry &texture) const {
+        if (texture.cudaInteropEnabled) {
+            return true;
+        }
+        if (window_ == nullptr || texture.memory == VK_NULL_HANDLE || texture.cudaExportMemorySize == 0) {
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep("CUDA interop init: model texture is not exportable; CPU staging fallback remains active");
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        if (vkGetMemoryFdKHR == nullptr) {
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep("CUDA interop init: vkGetMemoryFdKHR was not loaded for model texture");
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetFdInfoKHR fdInfo{};
+        fdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+        fdInfo.memory = texture.memory;
+        fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        int memoryFd = -1;
+        const VkResult fdResult = vkGetMemoryFdKHR(window_->getDevice(), &fdInfo, &memoryFd);
+        if (fdResult != VK_SUCCESS) {
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep(std::format("CUDA interop init: vkGetMemoryFdKHR failed for model texture ({})", static_cast<int>(fdResult)));
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        logVKAbstractModelStep(std::format("CUDA interop init: exported model texture memory fd={}", memoryFd));
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+        externalMemoryDesc.handle.fd = memoryFd;
+        externalMemoryDesc.size = texture.cudaExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(&texture.cudaExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            close(memoryFd);
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaImportExternalMemory failed for model texture: {}",
+                                                   cudaGetErrorString(cudaResult)));
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            texture.cudaExternalMemory = nullptr;
+            return false;
+        }
+        logVKAbstractModelStep(std::format("CUDA interop init: imported model texture external memory into CUDA ({} bytes)",
+                                           static_cast<unsigned long long>(texture.cudaExportMemorySize)));
+
+        cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
+        arrayDesc.offset = 0;
+        arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
+        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(texture.width), static_cast<size_t>(texture.height), 0);
+        arrayDesc.flags = cudaArrayColorAttachment;
+        arrayDesc.numLevels = 1;
+
+        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&texture.cudaMipmappedArray, texture.cudaExternalMemory, &arrayDesc);
+        if (cudaResult != cudaSuccess) {
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed for model texture: {}",
+                                                   cudaGetErrorString(cudaResult)));
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            destroyTextureCudaInterop(texture);
+            return false;
+        }
+        logVKAbstractModelStep(std::format("CUDA interop init: mapped model texture CUDA mipmapped array {}x{} uchar4",
+                                           texture.width, texture.height));
+
+        cudaResult = cudaGetMipmappedArrayLevel(&texture.cudaArray, texture.cudaMipmappedArray, 0);
+        if (cudaResult != cudaSuccess) {
+            if (!texture.cudaInteropUnavailableLogged) {
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaGetMipmappedArrayLevel failed for model texture: {}",
+                                                   cudaGetErrorString(cudaResult)));
+                texture.cudaInteropUnavailableLogged = true;
+            }
+            destroyTextureCudaInterop(texture);
+            return false;
+        }
+
+        texture.cudaInteropEnabled = true;
+        logVKAbstractModelStep("CUDA interop init: direct CUDA-to-model-texture upload is ready");
+        return true;
+    }
+
+    bool VKAbstractModel::transitionTextureForCudaWrite(TextureEntry &texture) const {
+        if (texture.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) {
+            return true;
+        }
+
+        const VkImageLayout oldLayout = (texture.cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                                            ? VK_IMAGE_LAYOUT_UNDEFINED
+                                            : texture.cudaImageLayout;
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = texture.image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_ACCESS_SHADER_READ_BIT : 0;
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                                                  ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                                                  : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        endSingleTimeCommands(commandBuffer);
+
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        if (!texture.cudaWriteTransitionLogged) {
+            logVKAbstractModelStep("CUDA interop sync: model texture transitions to GENERAL before CUDA writes");
+            texture.cudaWriteTransitionLogged = true;
+        }
+        return true;
+    }
+
+    bool VKAbstractModel::transitionTextureForShaderRead(TextureEntry &texture) const {
+        if (texture.cudaImageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            return true;
+        }
+
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = texture.cudaImageLayout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = texture.image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        endSingleTimeCommands(commandBuffer);
+
+        texture.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        if (!texture.cudaShaderTransitionLogged) {
+            logVKAbstractModelStep("CUDA interop sync: model texture transitions GENERAL -> SHADER_READ_ONLY before sampling");
+            texture.cudaShaderTransitionLogged = true;
+        }
+        return true;
+    }
+
+    void VKAbstractModel::recreatePrimaryTextureForCuda(TextureEntry &texture, uint32_t width, uint32_t height) {
+        vkDeviceWaitIdle(window_->getDevice());
+        destroyTextureCudaInterop(texture);
+        if (texture.view != VK_NULL_HANDLE) {
+            vkDestroyImageView(window_->getDevice(), texture.view, nullptr);
+            texture.view = VK_NULL_HANDLE;
+        }
+        if (texture.image != VK_NULL_HANDLE) {
+            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+            texture.image = VK_NULL_HANDLE;
+        }
+        if (texture.memory != VK_NULL_HANDLE) {
+            vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+            texture.memory = VK_NULL_HANDLE;
+        }
+
+        createCudaExportableImage(width, height, texture);
+        texture.view = createImageView(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
+            vkResetDescriptorPool(window_->getDevice(), descriptorPool_, 0);
+            descriptorSets_.clear();
+            createDescriptorSets();
+        }
+    }
+
+    bool VKAbstractModel::updatePrimaryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
+        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
+            return false;
+        }
+        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
+            return false;
+        }
+
+        if (textures_.empty()) {
+            textures_.push_back(TextureEntry{});
+        }
+
+        TextureEntry &texture = textures_[0];
+        const uint32_t uploadWidth = static_cast<uint32_t>(rgba.cols);
+        const uint32_t uploadHeight = static_cast<uint32_t>(rgba.rows);
+        if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE ||
+            texture.view == VK_NULL_HANDLE || texture.width != uploadWidth ||
+            texture.height != uploadHeight || texture.cudaExportMemorySize == 0) {
+            try {
+                recreatePrimaryTextureForCuda(texture, uploadWidth, uploadHeight);
+            } catch (const std::exception &ex) {
+                if (!texture.cudaInteropUnavailableLogged) {
+                    logVKAbstractModelStep(std::format("CUDA exportable model texture unavailable: {}; CPU staging fallback remains active", ex.what()));
+                    texture.cudaInteropUnavailableLogged = true;
+                }
+                return false;
+            }
+        }
+
+        if (!ensureTextureCudaInterop(texture) || !transitionTextureForCudaWrite(texture)) {
+            return false;
+        }
+
+        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        if (!texture.cudaUploadLogged) {
+            logVKAbstractModelStep(std::format(
+                "CUDA interop upload: copying {}x{} RGBA GpuMat to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes, copy row bytes={})",
+                rgba.cols, rgba.rows,
+                static_cast<unsigned long long>(rgba.step),
+                static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U)));
+            texture.cudaUploadLogged = true;
+        }
+
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
+            texture.cudaArray, 0, 0, rgba.ptr(), rgba.step,
+            static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows),
+            cudaMemcpyDeviceToDevice, cudaStream);
+        if (cudaResult != cudaSuccess) {
+            logVKAbstractModelStep(std::format("CUDA interop model texture copy failed: {}", cudaGetErrorString(cudaResult)));
+            return false;
+        }
+
+        cudaResult = cudaStreamSynchronize(cudaStream);
+        if (cudaResult != cudaSuccess) {
+            logVKAbstractModelStep(std::format("CUDA interop model texture sync failed: {}", cudaGetErrorString(cudaResult)));
+            return false;
+        }
+
+        return transitionTextureForShaderRead(texture);
+    }
+#endif
+
     VkImageView VKAbstractModel::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -752,6 +1109,11 @@ namespace mxvk {
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        } else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         }
 
         vkCmdPipelineBarrier(cmd,
@@ -1199,7 +1561,10 @@ namespace mxvk {
             return;
         }
 
-        for (const TextureEntry &tex : textures_) {
+        for (TextureEntry &tex : textures_) {
+#ifdef MXVK_CUDA
+            destroyTextureCudaInterop(tex);
+#endif
             if (tex.view != VK_NULL_HANDLE) {
                 logVKAbstractModelStep("destroying texture image view");
                 vkDestroyImageView(window_->getDevice(), tex.view, nullptr);

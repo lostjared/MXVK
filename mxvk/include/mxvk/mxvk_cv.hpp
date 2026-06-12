@@ -19,6 +19,7 @@
 #endif
 
 namespace mxvk {
+    class VKAbstractModel;
 
     /**
      * @class MXCapture
@@ -126,6 +127,11 @@ namespace mxvk {
         bool read();
         bool readRgba(cv::Mat &rgba, bool flipY = false);
         bool readToSprite(VK_Sprite &targetSprite);
+        bool readToModelTexture(VKAbstractModel &model, bool flipY = false);
+#ifdef MXVK_CUDA
+        bool readGpuRgba(cv::cuda::GpuMat &rgba, bool flipY = false);
+        cv::cuda::Stream &cudaStream() { return cudaStream_; }
+#endif
 
         /**
          * @brief Capture the next frame into a cv::Mat.

@@ -12,6 +12,12 @@
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
+#ifdef MXVK_CUDA
+#include <cuda_runtime_api.h>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/core/cuda_stream_accessor.hpp>
+#include <unistd.h>
+#endif
 
 #ifndef compute_shader_ASSET_DIR
 #define compute_shader_ASSET_DIR "."
@@ -45,13 +51,39 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void proc() override {
+        bool frameUploaded = false;
+#ifdef MXVK_CUDA
+        cv::cuda::GpuMat gpuFrame;
+        if (capture_.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
+            if (gpuFrame.cols == texWidth_ && gpuFrame.rows == texHeight_) {
+                frameUploaded = uploadGpuToImage(gpuFrame, capture_.cudaStream(), workImg_[0]);
+                if (frameUploaded && !captureUploadPathLogged_) {
+                    std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
+                    captureUploadPathLogged_ = true;
+                }
+            }
+        }
+#endif
+
         cv::Mat frame;
-        if (capture_.readRgba(frame) && !frame.empty()) {
+        if (!frameUploaded && capture_.readRgba(frame) && !frame.empty()) {
             if (frame.cols == texWidth_ && frame.rows == texHeight_) {
-                uploadToImage(frame.ptr(), workImg_[0]);
+                if (!captureUploadPathLogged_) {
+#ifdef MXVK_CUDA
+                    std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
+#else
+                    std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
+#endif
+                    captureUploadPathLogged_ = true;
+                }
+                uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg_[0]);
+                frameUploaded = true;
+            }
+        }
+
+        if (frameUploaded) {
                 tickAnimState();
                 runComputeFrame();
-            }
         }
 
         if (displaySprite_ != nullptr) {
@@ -87,6 +119,16 @@ class ComputeWindow : public mxvk::VK_Window {
         VkImage image = VK_NULL_HANDLE;
         VkDeviceMemory memory = VK_NULL_HANDLE;
         VkImageView view = VK_NULL_HANDLE;
+#ifdef MXVK_CUDA
+        VkDeviceSize cudaExportMemorySize = 0;
+        cudaExternalMemory_t cudaExternalMemory = nullptr;
+        cudaMipmappedArray_t cudaMipmappedArray = nullptr;
+        cudaArray_t cudaArray = nullptr;
+        bool cudaInteropEnabled = false;
+        bool cudaInteropUnavailableLogged = false;
+        bool cudaUploadLogged = false;
+        bool cudaBarrierLogged = false;
+#endif
     };
 
     std::string assetRoot_;
@@ -124,6 +166,7 @@ class ComputeWindow : public mxvk::VK_Window {
     int currentHistIdx_ = 0;
     int currentDir_ = 1;
     float alpha_ = 1.0F;
+    bool captureUploadPathLogged_ = false;
 
     std::vector<std::string> spvFiles_{};
     int currentSpvIndex_ = 0;
@@ -190,7 +233,11 @@ class ComputeWindow : public mxvk::VK_Window {
 
             {
                 const VkCommandBuffer cmd = beginSingleTimeCommands();
+#ifdef MXVK_CUDA
+                allocCImg(workImg_[0], cmd, true);
+#else
                 allocCImg(workImg_[0], cmd);
+#endif
                 allocCImg(workImg_[1], cmd);
                 for (ComputeImage &img : histImg_) {
                     allocCImg(img, cmd);
@@ -337,6 +384,180 @@ class ComputeWindow : public mxvk::VK_Window {
         VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
     }
 
+#ifdef MXVK_CUDA
+    void createCudaExportableImage(ComputeImage &img) {
+        std::cout << "compute_shader: CUDA interop init: requesting exportable compute input image "
+                  << texWidth_ << "x" << texHeight_ << " RGBA8 optimal-tiled OPAQUE_FD\n";
+
+        VkExternalMemoryImageCreateInfo externalImageInfo{};
+        externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+        externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.pNext = &externalImageInfo;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = static_cast<uint32_t>(texWidth_);
+        imageInfo.extent.height = static_cast<uint32_t>(texHeight_);
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &img.image));
+
+        VkMemoryRequirements memRequirements{};
+        vkGetImageMemoryRequirements(device, img.image, &memRequirements);
+
+        VkExportMemoryAllocateInfo exportMemoryInfo{};
+        exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+        exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.pNext = &exportMemoryInfo;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+        try {
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &img.memory));
+            VK_CHECK_RESULT(vkBindImageMemory(device, img.image, img.memory, 0));
+            img.cudaExportMemorySize = memRequirements.size;
+            img.cudaInteropUnavailableLogged = false;
+            std::cout << "compute_shader: CUDA interop init: exportable compute input image allocated (memorySize="
+                      << static_cast<unsigned long long>(memRequirements.size)
+                      << " bytes, memoryType=" << allocInfo.memoryTypeIndex
+                      << "); optimal image memory will be imported as cudaArray\n";
+        } catch (...) {
+            if (img.image != VK_NULL_HANDLE) {
+                vkDestroyImage(device, img.image, nullptr);
+                img.image = VK_NULL_HANDLE;
+            }
+            if (img.memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, img.memory, nullptr);
+                img.memory = VK_NULL_HANDLE;
+            }
+            img.cudaExportMemorySize = 0;
+            throw;
+        }
+    }
+
+    void destroyCudaInterop(ComputeImage &img) {
+        if (img.cudaInteropEnabled || img.cudaExternalMemory != nullptr || img.cudaMipmappedArray != nullptr) {
+            std::cout << "compute_shader: CUDA interop: destroying imported compute input image resources\n";
+        }
+        if (img.cudaMipmappedArray != nullptr) {
+            cudaFreeMipmappedArray(img.cudaMipmappedArray);
+            img.cudaMipmappedArray = nullptr;
+            img.cudaArray = nullptr;
+        }
+        if (img.cudaExternalMemory != nullptr) {
+            cudaDestroyExternalMemory(img.cudaExternalMemory);
+            img.cudaExternalMemory = nullptr;
+        }
+        img.cudaInteropEnabled = false;
+        img.cudaExportMemorySize = 0;
+        img.cudaUploadLogged = false;
+        img.cudaBarrierLogged = false;
+    }
+
+    bool ensureCudaInterop(ComputeImage &img) {
+        if (img.cudaInteropEnabled) {
+            return true;
+        }
+        if (img.memory == VK_NULL_HANDLE || img.cudaExportMemorySize == 0) {
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: compute input image is not exportable\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        if (vkGetMemoryFdKHR == nullptr) {
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: vkGetMemoryFdKHR was not loaded\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetFdInfoKHR fdInfo{};
+        fdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+        fdInfo.memory = img.memory;
+        fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        int memoryFd = -1;
+        const VkResult fdResult = vkGetMemoryFdKHR(device, &fdInfo, &memoryFd);
+        if (fdResult != VK_SUCCESS) {
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: vkGetMemoryFdKHR failed (" << static_cast<int>(fdResult) << ")\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        std::cout << "compute_shader: CUDA interop init: exported compute input image memory fd=" << memoryFd << "\n";
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+        externalMemoryDesc.handle.fd = memoryFd;
+        externalMemoryDesc.size = img.cudaExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(&img.cudaExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            close(memoryFd);
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: cudaImportExternalMemory failed: "
+                          << cudaGetErrorString(cudaResult) << "\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            img.cudaExternalMemory = nullptr;
+            return false;
+        }
+        std::cout << "compute_shader: CUDA interop init: imported compute input image external memory into CUDA ("
+                  << static_cast<unsigned long long>(img.cudaExportMemorySize) << " bytes)\n";
+
+        cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
+        arrayDesc.offset = 0;
+        arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
+        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(texWidth_), static_cast<size_t>(texHeight_), 0);
+        arrayDesc.flags = cudaArrayColorAttachment;
+        arrayDesc.numLevels = 1;
+
+        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&img.cudaMipmappedArray, img.cudaExternalMemory, &arrayDesc);
+        if (cudaResult != cudaSuccess) {
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: "
+                          << cudaGetErrorString(cudaResult) << "\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            destroyCudaInterop(img);
+            return false;
+        }
+        std::cout << "compute_shader: CUDA interop init: mapped compute input CUDA mipmapped array "
+                  << texWidth_ << "x" << texHeight_ << " uchar4\n";
+
+        cudaResult = cudaGetMipmappedArrayLevel(&img.cudaArray, img.cudaMipmappedArray, 0);
+        if (cudaResult != cudaSuccess) {
+            if (!img.cudaInteropUnavailableLogged) {
+                std::cout << "compute_shader: CUDA interop init: cudaGetMipmappedArrayLevel failed: "
+                          << cudaGetErrorString(cudaResult) << "\n";
+                img.cudaInteropUnavailableLogged = true;
+            }
+            destroyCudaInterop(img);
+            return false;
+        }
+
+        img.cudaInteropEnabled = true;
+        std::cout << "compute_shader: CUDA interop init: direct CUDA-to-compute-input upload is ready\n";
+        return true;
+    }
+#endif
+
     [[nodiscard]] VkImageView createImageView(VkImage image,
                                               VkFormat format,
                                               VkImageAspectFlags aspectFlags) const {
@@ -356,7 +577,30 @@ class ComputeWindow : public mxvk::VK_Window {
         return imageView;
     }
 
-    void allocCImg(ComputeImage &img, VkCommandBuffer cmd) {
+    void allocCImg(ComputeImage &img, VkCommandBuffer cmd, bool cudaExportable = false) {
+#ifdef MXVK_CUDA
+        if (cudaExportable) {
+            try {
+                createCudaExportableImage(img);
+            } catch (const std::exception &ex) {
+                std::cout << "compute_shader: CUDA exportable input image unavailable: " << ex.what()
+                          << "; using Vulkan staging fallback\n";
+                createImage(
+                    static_cast<uint32_t>(texWidth_),
+                    static_cast<uint32_t>(texHeight_),
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    img.image,
+                    img.memory);
+            }
+        } else
+#else
+        (void)cudaExportable;
+#endif
+        {
         createImage(
             static_cast<uint32_t>(texWidth_),
             static_cast<uint32_t>(texHeight_),
@@ -367,6 +611,7 @@ class ComputeWindow : public mxvk::VK_Window {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             img.image,
             img.memory);
+        }
         img.view = createImageView(img.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
         transitionImageLayout(
@@ -532,11 +777,26 @@ class ComputeWindow : public mxvk::VK_Window {
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
-    void uploadToImage(const void *data, ComputeImage &img) {
+    void uploadToImage(const void *data, int srcPitch, ComputeImage &img) {
         const VkDeviceSize bytes = static_cast<VkDeviceSize>(texWidth_) * texHeight_ * 4;
+        const int tightPitch = texWidth_ * 4;
+        if (data == nullptr || srcPitch < tightPitch) {
+            return;
+        }
+
         void *mapped = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMem_, 0, bytes, 0, &mapped));
-        std::memcpy(mapped, data, static_cast<size_t>(bytes));
+        if (srcPitch == tightPitch) {
+            std::memcpy(mapped, data, static_cast<size_t>(bytes));
+        } else {
+            const auto *src = static_cast<const uint8_t *>(data);
+            auto *dst = static_cast<uint8_t *>(mapped);
+            for (int row = 0; row < texHeight_; ++row) {
+                std::memcpy(dst + static_cast<size_t>(row) * tightPitch,
+                            src + static_cast<size_t>(row) * srcPitch,
+                            static_cast<size_t>(tightPitch));
+            }
+        }
         vkUnmapMemory(device, stagingMem_);
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
@@ -577,6 +837,64 @@ class ComputeWindow : public mxvk::VK_Window {
 
         endSingleTimeCommands(cmd);
     }
+
+#ifdef MXVK_CUDA
+    bool uploadGpuToImage(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream, ComputeImage &img) {
+        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols != texWidth_ || rgba.rows != texHeight_) {
+            return false;
+        }
+        if (!ensureCudaInterop(img)) {
+            return false;
+        }
+
+        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        if (!img.cudaUploadLogged) {
+            std::cout << "compute_shader: CUDA interop upload: copying "
+                      << rgba.cols << "x" << rgba.rows
+                      << " RGBA GpuMat to Vulkan compute storage image via cudaArray (source pitch="
+                      << static_cast<unsigned long long>(rgba.step)
+                      << " bytes, copy row bytes="
+                      << static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U)
+                      << ")\n";
+            img.cudaUploadLogged = true;
+        }
+
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
+            img.cudaArray, 0, 0, rgba.ptr(), rgba.step,
+            static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows),
+            cudaMemcpyDeviceToDevice, cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << "compute_shader: CUDA interop compute input copy failed: "
+                      << cudaGetErrorString(cudaResult) << "\n";
+            return false;
+        }
+
+        cudaResult = cudaStreamSynchronize(cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << "compute_shader: CUDA interop compute input sync failed: "
+                      << cudaGetErrorString(cudaResult) << "\n";
+            return false;
+        }
+
+        const VkCommandBuffer cmd = beginSingleTimeCommands();
+        transitionImageLayout(
+            cmd,
+            img.image,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+        endSingleTimeCommands(cmd);
+
+        if (!img.cudaBarrierLogged) {
+            std::cout << "compute_shader: CUDA interop sync: CUDA stream synchronized; Vulkan records GENERAL -> GENERAL memory barrier before compute sampling\n";
+            img.cudaBarrierLogged = true;
+        }
+        return true;
+    }
+#endif
 
     void dispatchOne(VkCommandBuffer cmd, VkDescriptorSet descriptorSet, int mode) {
         ComputePC pc{};
@@ -846,6 +1164,9 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         auto destroyImage = [&](ComputeImage &img) {
+#ifdef MXVK_CUDA
+            destroyCudaInterop(img);
+#endif
             if (img.view != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, img.view, nullptr);
             }
