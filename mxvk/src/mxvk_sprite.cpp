@@ -1612,13 +1612,18 @@ namespace mxvk {
         shaderParams = glm::vec4(p1, p2, p3, p4);
     }
 
+    void VK_Sprite::prepareForRendering(VkCommandBuffer cmdBuffer) {
+#ifdef MXVK_CUDA
+        recordCudaReadyBarrier(cmdBuffer);
+#else
+        (void)cmdBuffer;
+#endif
+    }
+
     void VK_Sprite::renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
                                   uint32_t screenWidth, uint32_t screenHeight) {
         if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated)
             return;
-#ifdef MXVK_CUDA
-        recordCudaReadyBarrier(cmdBuffer);
-#endif
         if (descriptorSet == VK_NULL_HANDLE) {
             descriptorSet = createDescriptorSet(spriteImageView);
         }

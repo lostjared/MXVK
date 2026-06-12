@@ -173,6 +173,12 @@ namespace mxvk {
         void renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
                            uint32_t screenWidth, uint32_t screenHeight);
 
+        /**
+         * @brief Record texture barriers that must happen before dynamic rendering begins.
+         * @param cmdBuffer Command buffer currently being recorded outside a rendering instance.
+         */
+        void prepareForRendering(VkCommandBuffer cmdBuffer);
+
         /** @brief Discard all pending draw commands without rendering. */
         void clearQueue();
 

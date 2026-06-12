@@ -1548,6 +1548,12 @@ namespace mxvk {
             vkCmdPipelineBarrier2(cmd, &pre_depth_dependency);
         }
 
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+            if (sprite) {
+                sprite->prepareForRendering(cmd);
+            }
+        }
+
         VkRenderingAttachmentInfo color_attachment{};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         color_attachment.imageView = swapchain_image_views[image_index];
