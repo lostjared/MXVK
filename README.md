@@ -64,7 +64,8 @@ Useful CMake options:
 
 - `-DVALIDATION=ON` enables Vulkan validation layers.
 - `-DDEBUG_MODE=ON` enables debug compile flags.
-- `-DCV=ON` enables OpenCV-based examples and capture support. If CUDA is detected during configure, MXVK also defines `MXVK_CUDA` and links the CUDA toolkit into the library target.
+- `-DWITH_CUDA=AUTO|ON|OFF` controls CUDA acceleration/interop. The default is `AUTO`, which enables CUDA when the toolkit is detected; `ON` requires CUDA; `OFF` disables it.
+- `-DCV=ON` enables OpenCV-based examples and capture support.
 - `-DMIXER=ON` enables SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`).
 - `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
 - `-DEXAMPLES=OFF` builds/install only the `mxvk` library and skips all examples.
