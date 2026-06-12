@@ -70,6 +70,69 @@ namespace mxvk {
     }
 
 #ifdef MXVK_CUDA
+    bool VK_Capture::readRgba(cv::Mat &rgba, bool flipY) {
+        cv::Mat cpuFallbackFrame;
+
+        try {
+            if (initializeCuda()) {
+                if (cudaMappedInput_) {
+                    if (!cap.read(mappedFrame_) || mappedFrame_.empty()) {
+                        return false;
+                    }
+                    cpuFallbackFrame = mappedFrame_.createMatHeader();
+                    const cv::cuda::GpuMat mappedInput = mappedFrame_.createGpuMatHeader();
+                    cv::cuda::cvtColor(mappedInput, gpuRgba_, cv::COLOR_BGR2RGBA, 0, cudaStream_);
+                } else {
+                    if (!cap.read(frame) || frame.empty()) {
+                        return false;
+                    }
+                    cpuFallbackFrame = frame;
+                    gpuFrame_.upload(frame, cudaStream_);
+                    cv::cuda::cvtColor(gpuFrame_, gpuRgba_, cv::COLOR_BGR2RGBA, 0, cudaStream_);
+                }
+
+                if (flipY) {
+                    cv::cuda::flip(gpuRgba_, gpuVulkanRgba_, 0, cudaStream_);
+                } else {
+                    gpuVulkanRgba_ = gpuRgba_;
+                }
+
+                if (!cudaPipelineLogged_) {
+                    std::cout << std::format(
+                        "mxvk_cv: CUDA RGBA path active: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> {} -> download\n",
+                        flipY ? "cv::cuda::flip(Y)" : "no Y flip");
+                    cudaPipelineLogged_ = true;
+                }
+
+                pinnedRgba_.create(gpuVulkanRgba_.size(), gpuVulkanRgba_.type());
+                gpuVulkanRgba_.download(pinnedRgba_, cudaStream_);
+                cudaStream_.waitForCompletion();
+                rgba = pinnedRgba_.createMatHeader();
+                return true;
+            }
+        } catch (const cv::Exception &e) {
+            std::cout << std::format("mxvk_cv: CUDA RGBA path failed; falling back to CPU path: {}\n", e.what());
+            cudaAvailable_ = false;
+            if (cpuFallbackFrame.empty()) {
+                return false;
+            }
+            cv::cvtColor(cpuFallbackFrame, rgba, cv::COLOR_BGR2RGBA);
+            if (flipY) {
+                cv::flip(rgba, rgba, 0);
+            }
+            return true;
+        }
+
+        if (!cap.read(frame) || frame.empty()) {
+            return false;
+        }
+        cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
+        if (flipY) {
+            cv::flip(rgba, rgba, 0);
+        }
+        return true;
+    }
+
     bool VK_Capture::initializeCuda() {
         if (cudaChecked_) {
             return cudaAvailable_;

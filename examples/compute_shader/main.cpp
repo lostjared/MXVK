@@ -46,18 +46,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void proc() override {
         cv::Mat frame;
-        if (capture_.read(frame) && !frame.empty()) {
-            cv::Mat rgba;
-            if (frame.channels() == 4) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-            } else if (frame.channels() == 3) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
-            } else if (frame.channels() == 1) {
-                cv::cvtColor(frame, rgba, cv::COLOR_GRAY2RGBA);
-            }
-
-            if (!rgba.empty() && rgba.cols == texWidth_ && rgba.rows == texHeight_) {
-                uploadToImage(rgba.ptr(), workImg_[0]);
+        if (capture_.readRgba(frame) && !frame.empty()) {
+            if (frame.cols == texWidth_ && frame.rows == texHeight_) {
+                uploadToImage(frame.ptr(), workImg_[0]);
                 tickAnimState();
                 runComputeFrame();
             }

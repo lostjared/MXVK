@@ -61,7 +61,7 @@ namespace example {
                 model_.setShaders(this, vertPath, fragPath);
 
                 cv::Mat frame;
-                if (capture_.read(frame)) {
+                if (capture_.readRgba(frame, true)) {
                     if (!uploadFrameToModelTexture(frame)) {
                         std::cerr << "opencv_model: failed to upload initial camera frame\n";
                     }
@@ -104,12 +104,12 @@ namespace example {
             updateRotationFromKeyboard(deltaSeconds);
 
             cv::Mat frame;
-            if (!capture_.read(frame)) {
+            if (!capture_.readRgba(frame, true)) {
                 capture_.close();
                 if (!capture_.open(cameraIndex_)) {
                     return;
                 }
-                if (!capture_.read(frame)) {
+                if (!capture_.readRgba(frame, true)) {
                     return;
                 }
             }
@@ -188,23 +188,24 @@ namespace example {
             autoSpinRadians_ = wrapAngle(autoSpinRadians_);
         }
 
-        [[nodiscard]] bool uploadFrameToModelTexture(const cv::Mat &frame) {
-            if (frame.empty()) {
+        [[nodiscard]] bool uploadFrameToModelTexture(const cv::Mat &rgba) {
+            if (rgba.empty()) {
                 return false;
             }
 
-            cv::Mat rgba;
-            if (frame.channels() == 4) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-            } else if (frame.channels() == 3) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
-            } else if (frame.channels() == 1) {
-                cv::cvtColor(frame, rgba, cv::COLOR_GRAY2RGBA);
+            if (rgba.channels() == 4) {
+                return model_.updatePrimaryTexture(rgba.ptr(), rgba.cols, rgba.rows, static_cast<int>(rgba.step));
+            }
+
+            cv::Mat converted;
+            if (rgba.channels() == 3) {
+                cv::cvtColor(rgba, converted, cv::COLOR_BGR2RGBA);
+            } else if (rgba.channels() == 1) {
+                cv::cvtColor(rgba, converted, cv::COLOR_GRAY2RGBA);
             } else {
                 return false;
             }
-            cv::flip(rgba, rgba, 0);
-            return model_.updatePrimaryTexture(rgba.ptr(), rgba.cols, rgba.rows, static_cast<int>(rgba.step));
+            return model_.updatePrimaryTexture(converted.ptr(), converted.cols, converted.rows, static_cast<int>(converted.step));
         }
 
         std::string assetRoot_{};

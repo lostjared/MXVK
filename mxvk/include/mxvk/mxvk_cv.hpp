@@ -124,6 +124,7 @@ namespace mxvk {
          * @return @c true if a frame was available.
          */
         bool read();
+        bool readRgba(cv::Mat &rgba, bool flipY = false);
         bool readToSprite(VK_Sprite &targetSprite);
 
         /**
