@@ -417,6 +417,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(text_example)
     add_subdirectory(examples/model_example)
     mxvk_configure_mingw_target(model_example)
+    add_subdirectory(examples/planet)
+    mxvk_configure_mingw_target(planet)
     add_subdirectory(examples/tux_example)
     mxvk_configure_mingw_target(tux_example)
     add_subdirectory(examples/glitch_cube)
@@ -534,6 +536,7 @@ if(EXAMPLES)
         sprite_example
         text_example
         model_example
+        planet
         tux_example
         glitch_cube
         asteroids
