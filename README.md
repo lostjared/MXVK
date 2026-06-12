@@ -12,6 +12,7 @@ It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text r
 	- text rendering
 	- model rendering
 	- game loops and input handling
+	- simple gameplay examples and UI state flow
 	- optional OpenCV camera/video workflows
 
 ## Core Dependencies
@@ -114,6 +115,7 @@ Examples (in each subproject build directory):
 ./sprite_example -r 1920x1080 -f
 ./model_example 
 ./pong 
+./tictactoe
 ./Pool3D 
 ./fractal_zoom
 ./console_demo -r 1280x720
@@ -162,6 +164,11 @@ Current example executables:
 ### `pong`
 - 3D-styled Pong demo with paddle/ball gameplay implemented on top of MXVK rendering hooks.
 - Demonstrates runtime asset copying, model-based scene elements, and real-time game-state updates.
+
+### `tictactoe`
+- Mouse-driven tic-tac-toe example with a simple computer opponent.
+- Shows sprite-based board rendering, text UI, click-to-play interaction, and quick restart flow with `R` or after a finished game.
+- Uses the shared font asset plus a background image staged into the example output directory.
 
 ### `pool_demo` (`Pool3D` executable)
 - 3D pool/billiards demo built directly on MXVK dynamic rendering.
