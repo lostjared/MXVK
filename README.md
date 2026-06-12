@@ -115,19 +115,29 @@ General run pattern:
 ./<example> [options]
 ```
 
-Examples (in each subproject build directory):
+To run a compiled example from the repository root, use `run.pl`:
+
 ```bash
-./sprite_example -r 1920x1080 -f
-./model_example 
-./pong 
-./tictactoe
-./Pool3D 
-./fractal_zoom
-./console_demo -r 1280x720
-./matrix
-./glitch_cube -r 1280x720
-./opencv_example --camera 0 -r 1280x720
-./opencv_model --filename ./models/torus.mxmod.z --camera 0
+./run.pl <example> [extra args...]
+```
+
+`run.pl` looks up the built executable under `build/examples/<example>/` and
+passes the example's asset directory with `-p` automatically.
+
+Examples:
+```bash
+./run.pl sprite_example -r 1920x1080 -f
+./run.pl model_example
+./run.pl planet
+./run.pl pong
+./run.pl tictactoe
+./run.pl pool_demo
+./run.pl fractal_zoom
+./run.pl console_demo -r 1280x720
+./run.pl matrix
+./run.pl glitch_cube -r 1280x720
+./run.pl opencv_example --camera 0 -r 1280x720
+./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
 
 ## Examples
@@ -156,6 +166,10 @@ Current example executables:
 ### `model_example`
 - Demonstrates `VKAbstractModel` loading and rendering of 3D assets.
 - Uses uniform buffers and camera/projection transforms.
+
+### `planet`
+- Planetary ring and satellite rendering demo built on `VKAbstractModel`.
+- Shows textured 3D model rendering with lighting, shader-driven materials, and runtime asset staging.
 
 ### `tux_example`
 - Renders a 3D model with a textured animated background and on-screen text.
