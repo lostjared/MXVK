@@ -223,4 +223,7 @@ Current example executables:
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/f7daf971-5588-41b5-ae7b-b3768a2ce611" />
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/045f4929-337e-4e28-a828-2a2d27be1665" />
+
+
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
