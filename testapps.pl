@@ -18,6 +18,7 @@ my @tests = qw(
     pong
     pool_demo
     puzzle
+    tetris
     tux_example
     walk
 );
