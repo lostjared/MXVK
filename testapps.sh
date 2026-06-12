@@ -13,6 +13,7 @@
 ./run.pl glitch_cube
 ./run.pl tictactoe
 ./run.pl pong
+./run.pl tetris
 ./run.pl pool_demo
 ./run.pl puzzle
 ./run.pl tux_example
