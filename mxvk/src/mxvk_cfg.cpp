@@ -17,7 +17,7 @@ namespace mxvk {
             throw mxvk::Exception(std::format("mxvk: Could not open configuration file: {}", f));
         }
 
-        values_.clear();
+        values.clear();
 
         std::string line, currentSection;
         while (std::getline(in, line)) {
@@ -39,7 +39,7 @@ namespace mxvk {
                 item.key = key;
                 item.value = value;
 
-                values_[currentSection][key] = item;
+                values[currentSection][key] = item;
             }
         }
 
@@ -52,7 +52,7 @@ namespace mxvk {
         }
 
         std::vector<std::string> sectionNames;
-        for (const auto &section : values_) {
+        for (const auto &section : values) {
             sectionNames.push_back(section.first);
         }
         std::ranges::sort(sectionNames);
@@ -61,13 +61,13 @@ namespace mxvk {
             out << "[" << section << "]\n";
 
             std::vector<std::string> keys;
-            for (const auto &pair : values_[section]) {
+            for (const auto &pair : values[section]) {
                 keys.push_back(pair.first);
             }
             std::ranges::sort(keys);
 
             for (const auto &key : keys) {
-                out << key << "=" << values_[section][key].value << "\n";
+                out << key << "=" << values[section][key].value << "\n";
             }
 
             out << "\n";
@@ -77,8 +77,8 @@ namespace mxvk {
     }
 
     VK_ConfigItem VK_Config::itemAtKey(const std::string &section, const std::string &key) const {
-        const auto sectionIt = values_.find(section);
-        if (sectionIt == values_.end()) {
+        const auto sectionIt = values.find(section);
+        if (sectionIt == values.end()) {
             throw mxvk::Exception(std::format("mxvk: Could not find section '{}' in config file.", section));
         }
 
@@ -91,7 +91,7 @@ namespace mxvk {
     }
 
     void VK_Config::setItem(const std::string &section, const std::string &key, const std::string &value) {
-        values_[section][key] = {key, value};
+        values[section][key] = {key, value};
     }
 
     std::vector<std::string> VK_Config::splitByComma(const std::string &str) const {
@@ -108,13 +108,13 @@ namespace mxvk {
         return result;
     }
 
-    VK_Config::VK_Config(const std::string &filePath) : file_name_(filePath) {
+    VK_Config::VK_Config(const std::string &filePath) : file_name(filePath) {
         loadFile(filePath);
     }
 
     VK_Config::~VK_Config() {
-        if (!file_name_.empty()) {
-            saveFile(file_name_);
+        if (!file_name.empty()) {
+            saveFile(file_name);
         }
     }
 

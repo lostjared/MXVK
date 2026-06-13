@@ -41,13 +41,13 @@ class ComputeWindow : public mxvk::VK_Window {
   public:
     explicit ComputeWindow(const Arguments &args)
         : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION),
-          assetRoot_(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path),
-          cameraIndex_(args.camera_index) {
+          assetRoot(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path),
+          cameraIndex(args.camera_index) {
         initComputeResources();
     }
 
     ~ComputeWindow() override {
-        capture_.close();
+        capture.close();
         destroyComputeResources();
     }
 
@@ -55,29 +55,29 @@ class ComputeWindow : public mxvk::VK_Window {
         bool frameUploaded = false;
 #ifdef MXVK_CUDA
         cv::cuda::GpuMat gpuFrame;
-        if (capture_.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
-            if (gpuFrame.cols == texWidth_ && gpuFrame.rows == texHeight_) {
-                frameUploaded = uploadGpuToImage(gpuFrame, capture_.cudaStream(), workImg_[0]);
-                if (frameUploaded && !captureUploadPathLogged_) {
+        if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
+            if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
+                frameUploaded = uploadGpuToImage(gpuFrame, capture.cudaStream(), workImg[0]);
+                if (frameUploaded && !captureUploadPathLogged) {
                     std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
-                    captureUploadPathLogged_ = true;
+                    captureUploadPathLogged = true;
                 }
             }
         }
 #endif
 
         cv::Mat frame;
-        if (!frameUploaded && capture_.readRgba(frame) && !frame.empty()) {
-            if (frame.cols == texWidth_ && frame.rows == texHeight_) {
-                if (!captureUploadPathLogged_) {
+        if (!frameUploaded && capture.readRgba(frame) && !frame.empty()) {
+            if (frame.cols == texWidth && frame.rows == texHeight) {
+                if (!captureUploadPathLogged) {
 #ifdef MXVK_CUDA
                     std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
 #else
                     std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
 #endif
-                    captureUploadPathLogged_ = true;
+                    captureUploadPathLogged = true;
                 }
-                uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg_[0]);
+                uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
                 frameUploaded = true;
             }
         }
@@ -104,15 +104,15 @@ class ComputeWindow : public mxvk::VK_Window {
             return;
         }
 
-        if (e.type == SDL_EVENT_KEY_DOWN && !spvFiles_.empty()) {
+        if (e.type == SDL_EVENT_KEY_DOWN && !spvFiles.empty()) {
             if (e.key.key == SDLK_UP) {
-                currentSpvIndex_ =
-                    (currentSpvIndex_ - 1 + static_cast<int>(spvFiles_.size())) % static_cast<int>(spvFiles_.size());
-                std::cout << "Current index: " << spvFiles_[currentSpvIndex_] << "\n";
+                currentSpvIndex =
+                    (currentSpvIndex - 1 + static_cast<int>(spvFiles.size())) % static_cast<int>(spvFiles.size());
+                std::cout << "Current index: " << spvFiles[currentSpvIndex] << "\n";
                 reloadPipeline();
             } else if (e.key.key == SDLK_DOWN) {
-                currentSpvIndex_ = (currentSpvIndex_ + 1) % static_cast<int>(spvFiles_.size());
-                std::cout << "Current index: " << spvFiles_[currentSpvIndex_] << "\n";
+                currentSpvIndex = (currentSpvIndex + 1) % static_cast<int>(spvFiles.size());
+                std::cout << "Current index: " << spvFiles[currentSpvIndex] << "\n";
                 reloadPipeline();
             }
         }
@@ -135,69 +135,69 @@ class ComputeWindow : public mxvk::VK_Window {
 #endif
     };
 
-    std::string assetRoot_;
-    mxvk::VK_Capture capture_{};
-    int cameraIndex_ = 0;
-    int texWidth_ = 1920;
-    int texHeight_ = 1080;
+    std::string assetRoot;
+    mxvk::VK_Capture capture{};
+    int cameraIndex = 0;
+    int texWidth = 1920;
+    int texHeight = 1080;
 
-    std::array<ComputeImage, 2> workImg_{};
-    std::array<ComputeImage, HISTORY_SIZE> histImg_{};
-    ComputeImage outImg_{};
+    std::array<ComputeImage, 2> workImg{};
+    std::array<ComputeImage, HISTORY_SIZE> histImg{};
+    ComputeImage outImg{};
 
-    VkSampler computeSampler_ = VK_NULL_HANDLE;
+    VkSampler computeSampler = VK_NULL_HANDLE;
 
-    VkBuffer stagingBuf_ = VK_NULL_HANDLE;
-    VkDeviceMemory stagingMem_ = VK_NULL_HANDLE;
+    VkBuffer stagingBuf = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMem = VK_NULL_HANDLE;
 
-    VkDescriptorSetLayout compDSLayout_ = VK_NULL_HANDLE;
-    VkPipelineLayout compPipeLayout_ = VK_NULL_HANDLE;
-    VkPipeline compPipeline_ = VK_NULL_HANDLE;
-    VkDescriptorPool compDSPool_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout compDSLayout = VK_NULL_HANDLE;
+    VkPipelineLayout compPipeLayout = VK_NULL_HANDLE;
+    VkPipeline compPipeline = VK_NULL_HANDLE;
+    VkDescriptorPool compDSPool = VK_NULL_HANDLE;
 
-    std::array<VkDescriptorSet, 2> blurDS_{};
-    std::array<VkDescriptorSet, 2> blendDS_{};
+    std::array<VkDescriptorSet, 2> blurDS{};
+    std::array<VkDescriptorSet, 2> blendDS{};
 
-    VkDescriptorSetLayout displayDSLayout_ = VK_NULL_HANDLE;
-    VkDescriptorPool displayDSPool_ = VK_NULL_HANDLE;
-    VkDescriptorSet displayDS_ = VK_NULL_HANDLE;
-    VkPipelineLayout displayPipeLayout_ = VK_NULL_HANDLE;
-    VkPipeline displayPipeline_ = VK_NULL_HANDLE;
-    VkBuffer displayVertexBuffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory displayVertexMemory_ = VK_NULL_HANDLE;
-    VkBuffer displayIndexBuffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory displayIndexMemory_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout displayDSLayout = VK_NULL_HANDLE;
+    VkDescriptorPool displayDSPool = VK_NULL_HANDLE;
+    VkDescriptorSet displayDS = VK_NULL_HANDLE;
+    VkPipelineLayout displayPipeLayout = VK_NULL_HANDLE;
+    VkPipeline displayPipeline = VK_NULL_HANDLE;
+    VkBuffer displayVertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory displayVertexMemory = VK_NULL_HANDLE;
+    VkBuffer displayIndexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory displayIndexMemory = VK_NULL_HANDLE;
 
-    int historyIndex_ = 0;
-    int historyCount_ = 0;
-    int currentSquare_ = 4;
-    int squareDir_ = 1;
-    int currentHistIdx_ = 0;
-    int currentDir_ = 1;
-    float alpha_ = 1.0F;
-    bool captureUploadPathLogged_ = false;
-    double currentFps_ = 0.0;
-    uint32_t fpsFrameCount_ = 0;
-    std::chrono::steady_clock::time_point fpsSampleTime_{std::chrono::steady_clock::now()};
-    std::string fpsText_ = "FPS: --";
+    int historyIndex = 0;
+    int historyCount = 0;
+    int currentSquare = 4;
+    int squareDir = 1;
+    int currentHistIdx = 0;
+    int currentDir = 1;
+    float alpha = 1.0F;
+    bool captureUploadPathLogged = false;
+    double currentFps = 0.0;
+    uint32_t fpsFrameCount = 0;
+    std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
+    std::string fpsText = "FPS: --";
 
-    std::vector<std::string> spvFiles_{};
-    int currentSpvIndex_ = 0;
+    std::vector<std::string> spvFiles{};
+    int currentSpvIndex = 0;
 
     void loadSPV() {
-        std::ifstream file(assetRoot_ + "/index.txt");
+        std::ifstream file(assetRoot + "/index.txt");
         if (!file.is_open()) {
-            throw mxvk::Exception("Cannot open: " + assetRoot_ + "/index.txt");
+            throw mxvk::Exception("Cannot open: " + assetRoot + "/index.txt");
         }
 
         std::string line;
         while (std::getline(file, line)) {
             if (!line.empty()) {
-                spvFiles_.push_back(line);
+                spvFiles.push_back(line);
             }
         }
 
-        if (spvFiles_.empty()) {
+        if (spvFiles.empty()) {
             throw mxvk::Exception("index.txt contains no entries");
         }
     }
@@ -206,15 +206,15 @@ class ComputeWindow : public mxvk::VK_Window {
         static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
 
         for (const double requestedFps : fpsChoices) {
-            capture_.set(cv::CAP_PROP_FPS, requestedFps);
-            const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+            capture.set(cv::CAP_PROP_FPS, requestedFps);
+            const double reportedFps = capture.get(cv::CAP_PROP_FPS);
             if (reportedFps > 0.0 && reportedFps + 0.5 >= requestedFps) {
                 return reportedFps;
             }
         }
 
-        capture_.set(cv::CAP_PROP_FPS, fpsChoices.back());
-        const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+        capture.set(cv::CAP_PROP_FPS, fpsChoices.back());
+        const double reportedFps = capture.get(cv::CAP_PROP_FPS);
         return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
     }
 
@@ -226,47 +226,47 @@ class ComputeWindow : public mxvk::VK_Window {
             if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
                 createDevice();
             }
-            setFont(assetRoot_ + "/font.ttf", 20);
+            setFont(assetRoot + "/font.ttf", 20);
 
-            if (!capture_.open(cameraIndex_)) {
-                throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex_));
+            if (!capture.open(cameraIndex)) {
+                throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex));
             }
 
-            capture_.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
-            capture_.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
+            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
+            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
             const double selectedFps = configureCameraFps();
             std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
                       << selectedFps << " fps\n";
 
             cv::Mat frame;
-            if (!capture_.read(frame) || frame.empty()) {
+            if (!capture.read(frame) || frame.empty()) {
                 throw mxvk::Exception("Failed to read initial camera frame");
             }
 
-            texWidth_ = frame.cols;
-            texHeight_ = frame.rows;
+            texWidth = frame.cols;
+            texHeight = frame.rows;
 
-            const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth_) * texHeight_ * 4;
+            const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
 
             createBuffer(
                 imgBytes,
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                stagingBuf_,
-                stagingMem_);
+                stagingBuf,
+                stagingMem);
 
             {
                 const VkCommandBuffer cmd = beginSingleTimeCommands();
 #ifdef MXVK_CUDA
-                allocCImg(workImg_[0], cmd, true);
+                allocCImg(workImg[0], cmd, true);
 #else
-                allocCImg(workImg_[0], cmd);
+                allocCImg(workImg[0], cmd);
 #endif
-                allocCImg(workImg_[1], cmd);
-                for (ComputeImage &img : histImg_) {
+                allocCImg(workImg[1], cmd);
+                for (ComputeImage &img : histImg) {
                     allocCImg(img, cmd);
                 }
-                allocCImg(outImg_, cmd);
+                allocCImg(outImg, cmd);
                 endSingleTimeCommands(cmd);
             }
 
@@ -279,7 +279,7 @@ class ComputeWindow : public mxvk::VK_Window {
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
             samplerInfo.maxAnisotropy = 1.0F;
-            VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &computeSampler_));
+            VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &computeSampler));
 
             loadSPV();
             buildDescriptorSetLayout();
@@ -288,7 +288,7 @@ class ComputeWindow : public mxvk::VK_Window {
             createDisplayResources();
         } catch (...) {
             // Constructor failure bypasses ~ComputeWindow; cleanup partial Vulkan state here.
-            capture_.close();
+            capture.close();
             destroyComputeResources();
             throw;
         }
@@ -296,19 +296,19 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void updateFpsOverlay(bool frameUploaded) {
         if (frameUploaded) {
-            ++fpsFrameCount_;
+            ++fpsFrameCount;
         }
 
         const auto now = std::chrono::steady_clock::now();
-        const double elapsed = std::chrono::duration<double>(now - fpsSampleTime_).count();
+        const double elapsed = std::chrono::duration<double>(now - fpsSampleTime).count();
         if (elapsed >= 0.25) {
-            currentFps_ = static_cast<double>(fpsFrameCount_) / elapsed;
-            fpsFrameCount_ = 0;
-            fpsSampleTime_ = now;
-            fpsText_ = std::format("FPS: {:.1f}", currentFps_);
+            currentFps = static_cast<double>(fpsFrameCount) / elapsed;
+            fpsFrameCount = 0;
+            fpsSampleTime = now;
+            fpsText = std::format("FPS: {:.1f}", currentFps);
         }
 
-        printText(fpsText_, 15, 15, SDL_Color{255, 255, 255, 255});
+        printText(fpsText, 15, 15, SDL_Color{255, 255, 255, 255});
     }
 
     [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
@@ -427,7 +427,7 @@ class ComputeWindow : public mxvk::VK_Window {
 #ifdef MXVK_CUDA
     void createCudaExportableImage(ComputeImage &img) {
         std::cout << "compute_shader: CUDA interop init: requesting exportable compute input image "
-                  << texWidth_ << "x" << texHeight_ << " RGBA8 optimal-tiled OPAQUE_FD\n";
+                  << texWidth << "x" << texHeight << " RGBA8 optimal-tiled OPAQUE_FD\n";
 
         VkExternalMemoryImageCreateInfo externalImageInfo{};
         externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
@@ -437,8 +437,8 @@ class ComputeWindow : public mxvk::VK_Window {
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.pNext = &externalImageInfo;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageInfo.extent.width = static_cast<uint32_t>(texWidth_);
-        imageInfo.extent.height = static_cast<uint32_t>(texHeight_);
+        imageInfo.extent.width = static_cast<uint32_t>(texWidth);
+        imageInfo.extent.height = static_cast<uint32_t>(texHeight);
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
@@ -564,7 +564,7 @@ class ComputeWindow : public mxvk::VK_Window {
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;
         arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
-        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(texWidth_), static_cast<size_t>(texHeight_), 0);
+        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(texWidth), static_cast<size_t>(texHeight), 0);
         arrayDesc.flags = cudaArrayColorAttachment;
         arrayDesc.numLevels = 1;
 
@@ -579,7 +579,7 @@ class ComputeWindow : public mxvk::VK_Window {
             return false;
         }
         std::cout << "compute_shader: CUDA interop init: mapped compute input CUDA mipmapped array "
-                  << texWidth_ << "x" << texHeight_ << " uchar4\n";
+                  << texWidth << "x" << texHeight << " uchar4\n";
 
         cudaResult = cudaGetMipmappedArrayLevel(&img.cudaArray, img.cudaMipmappedArray, 0);
         if (cudaResult != cudaSuccess) {
@@ -626,8 +626,8 @@ class ComputeWindow : public mxvk::VK_Window {
                 std::cout << "compute_shader: CUDA exportable input image unavailable: " << ex.what()
                           << "; using Vulkan staging fallback\n";
                 createImage(
-                    static_cast<uint32_t>(texWidth_),
-                    static_cast<uint32_t>(texHeight_),
+                    static_cast<uint32_t>(texWidth),
+                    static_cast<uint32_t>(texHeight),
                     VK_FORMAT_R8G8B8A8_UNORM,
                     VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
@@ -642,8 +642,8 @@ class ComputeWindow : public mxvk::VK_Window {
 #endif
         {
         createImage(
-            static_cast<uint32_t>(texWidth_),
-            static_cast<uint32_t>(texHeight_),
+            static_cast<uint32_t>(texWidth),
+            static_cast<uint32_t>(texHeight),
             VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_TILING_OPTIMAL,
             VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
@@ -667,13 +667,13 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void reloadPipeline() {
         vkDeviceWaitIdle(device);
-        if (compPipeline_ != VK_NULL_HANDLE) {
-            vkDestroyPipeline(device, compPipeline_, nullptr);
-            compPipeline_ = VK_NULL_HANDLE;
+        if (compPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, compPipeline, nullptr);
+            compPipeline = VK_NULL_HANDLE;
         }
-        if (compPipeLayout_ != VK_NULL_HANDLE) {
-            vkDestroyPipelineLayout(device, compPipeLayout_, nullptr);
-            compPipeLayout_ = VK_NULL_HANDLE;
+        if (compPipeLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, compPipeLayout, nullptr);
+            compPipeLayout = VK_NULL_HANDLE;
         }
         buildComputePipeline();
     }
@@ -700,11 +700,11 @@ class ComputeWindow : public mxvk::VK_Window {
         createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         createInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         createInfo.pBindings = bindings.data();
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &createInfo, nullptr, &compDSLayout_));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &createInfo, nullptr, &compDSLayout));
     }
 
     void buildComputePipeline() {
-        const std::string spvPath = assetRoot_ + "/" + spvFiles_[currentSpvIndex_];
+        const std::string spvPath = assetRoot + "/" + spvFiles[currentSpvIndex];
         std::ifstream spvFile(spvPath, std::ios::binary | std::ios::ate);
         if (!spvFile.is_open()) {
             throw mxvk::Exception("Cannot open compute SPIR-V: " + spvPath);
@@ -730,10 +730,10 @@ class ComputeWindow : public mxvk::VK_Window {
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &compDSLayout_;
+        pipelineLayoutInfo.pSetLayouts = &compDSLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &compPipeLayout_));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &compPipeLayout));
 
         VkComputePipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -741,8 +741,8 @@ class ComputeWindow : public mxvk::VK_Window {
         pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         pipelineInfo.stage.module = module;
         pipelineInfo.stage.pName = "main";
-        pipelineInfo.layout = compPipeLayout_;
-        VK_CHECK_RESULT(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &compPipeline_));
+        pipelineInfo.layout = compPipeLayout;
+        VK_CHECK_RESULT(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &compPipeline));
 
         vkDestroyShaderModule(device, module, nullptr);
     }
@@ -757,36 +757,36 @@ class ComputeWindow : public mxvk::VK_Window {
         poolInfo.maxSets = 4;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &compDSPool_));
+        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &compDSPool));
 
         std::array<VkDescriptorSetLayout, 4> layouts{};
-        layouts.fill(compDSLayout_);
+        layouts.fill(compDSLayout);
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = compDSPool_;
+        allocInfo.descriptorPool = compDSPool;
         allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
         allocInfo.pSetLayouts = layouts.data();
 
         std::array<VkDescriptorSet, 4> raw{};
         VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, raw.data()));
-        blurDS_[0] = raw[0];
-        blurDS_[1] = raw[1];
-        blendDS_[0] = raw[2];
-        blendDS_[1] = raw[3];
+        blurDS[0] = raw[0];
+        blurDS[1] = raw[1];
+        blendDS[0] = raw[2];
+        blendDS[1] = raw[3];
 
-        writeBlurDS(blurDS_[0], workImg_[0].view, workImg_[1].view);
-        writeBlurDS(blurDS_[1], workImg_[1].view, workImg_[0].view);
-        writeBlendDS(blendDS_[0], workImg_[0].view);
-        writeBlendDS(blendDS_[1], workImg_[1].view);
+        writeBlurDS(blurDS[0], workImg[0].view, workImg[1].view);
+        writeBlurDS(blurDS[1], workImg[1].view, workImg[0].view);
+        writeBlendDS(blendDS[0], workImg[0].view);
+        writeBlendDS(blendDS[1], workImg[1].view);
     }
 
     void writeBlurDS(VkDescriptorSet descriptorSet, VkImageView destView, VkImageView srcView) {
         VkDescriptorImageInfo destInfo{VK_NULL_HANDLE, destView, VK_IMAGE_LAYOUT_GENERAL};
-        VkDescriptorImageInfo srcInfo{computeSampler_, srcView, VK_IMAGE_LAYOUT_GENERAL};
+        VkDescriptorImageInfo srcInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL};
         std::vector<VkDescriptorImageInfo> historyInfos(
             HISTORY_SIZE,
-            VkDescriptorImageInfo{computeSampler_, srcView, VK_IMAGE_LAYOUT_GENERAL});
+            VkDescriptorImageInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL});
 
         std::array<VkWriteDescriptorSet, 3> writes{};
         writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1,
@@ -800,8 +800,8 @@ class ComputeWindow : public mxvk::VK_Window {
 
     [[nodiscard]] std::vector<char> readDisplayShader(const std::string &name) const {
         const std::array<std::string, 3> candidates = {
-            assetRoot_ + "/data/" + name,
-            assetRoot_ + "/" + name,
+            assetRoot + "/data/" + name,
+            assetRoot + "/" + name,
             std::string("data/") + name,
         };
 
@@ -830,7 +830,7 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void createDisplayBuffers() {
-        if (displayVertexBuffer_ != VK_NULL_HANDLE && displayIndexBuffer_ != VK_NULL_HANDLE) {
+        if (displayVertexBuffer != VK_NULL_HANDLE && displayIndexBuffer != VK_NULL_HANDLE) {
             return;
         }
 
@@ -845,22 +845,22 @@ class ComputeWindow : public mxvk::VK_Window {
         createBuffer(sizeof(float) * vertices.size(),
                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     displayVertexBuffer_,
-                     displayVertexMemory_);
+                     displayVertexBuffer,
+                     displayVertexMemory);
         createBuffer(sizeof(uint16_t) * indices.size(),
                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     displayIndexBuffer_,
-                     displayIndexMemory_);
+                     displayIndexBuffer,
+                     displayIndexMemory);
 
         void *mapped = nullptr;
-        VK_CHECK_RESULT(vkMapMemory(device, displayVertexMemory_, 0, sizeof(float) * vertices.size(), 0, &mapped));
+        VK_CHECK_RESULT(vkMapMemory(device, displayVertexMemory, 0, sizeof(float) * vertices.size(), 0, &mapped));
         std::memcpy(mapped, vertices.data(), sizeof(float) * vertices.size());
-        vkUnmapMemory(device, displayVertexMemory_);
+        vkUnmapMemory(device, displayVertexMemory);
 
-        VK_CHECK_RESULT(vkMapMemory(device, displayIndexMemory_, 0, sizeof(uint16_t) * indices.size(), 0, &mapped));
+        VK_CHECK_RESULT(vkMapMemory(device, displayIndexMemory, 0, sizeof(uint16_t) * indices.size(), 0, &mapped));
         std::memcpy(mapped, indices.data(), sizeof(uint16_t) * indices.size());
-        vkUnmapMemory(device, displayIndexMemory_);
+        vkUnmapMemory(device, displayIndexMemory);
     }
 
     void createDisplayDescriptorSet() {
@@ -874,7 +874,7 @@ class ComputeWindow : public mxvk::VK_Window {
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = 1;
         layoutInfo.pBindings = &binding;
-        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &displayDSLayout_));
+        VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &displayDSLayout));
 
         VkDescriptorPoolSize poolSize{};
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -885,23 +885,23 @@ class ComputeWindow : public mxvk::VK_Window {
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = &poolSize;
         poolInfo.maxSets = 1;
-        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &displayDSPool_));
+        VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &displayDSPool));
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = displayDSPool_;
+        allocInfo.descriptorPool = displayDSPool;
         allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &displayDSLayout_;
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &displayDS_));
+        allocInfo.pSetLayouts = &displayDSLayout;
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &displayDS));
 
         VkDescriptorImageInfo imageInfo{};
-        imageInfo.sampler = computeSampler_;
-        imageInfo.imageView = outImg_.view;
+        imageInfo.sampler = computeSampler;
+        imageInfo.imageView = outImg.view;
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = displayDS_;
+        write.dstSet = displayDS;
         write.dstBinding = 0;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         write.descriptorCount = 1;
@@ -910,15 +910,15 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void rebuildDisplayPipeline() {
-        if (displayPipeline_ != VK_NULL_HANDLE) {
-            vkDestroyPipeline(device, displayPipeline_, nullptr);
-            displayPipeline_ = VK_NULL_HANDLE;
+        if (displayPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, displayPipeline, nullptr);
+            displayPipeline = VK_NULL_HANDLE;
         }
-        if (displayPipeLayout_ != VK_NULL_HANDLE) {
-            vkDestroyPipelineLayout(device, displayPipeLayout_, nullptr);
-            displayPipeLayout_ = VK_NULL_HANDLE;
+        if (displayPipeLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, displayPipeLayout, nullptr);
+            displayPipeLayout = VK_NULL_HANDLE;
         }
-        if (displayDSLayout_ == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
+        if (displayDSLayout == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
             return;
         }
 
@@ -1009,10 +1009,10 @@ class ComputeWindow : public mxvk::VK_Window {
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         layoutInfo.setLayoutCount = 1;
-        layoutInfo.pSetLayouts = &displayDSLayout_;
+        layoutInfo.pSetLayouts = &displayDSLayout;
         layoutInfo.pushConstantRangeCount = 1;
         layoutInfo.pPushConstantRanges = &pushRange;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &displayPipeLayout_));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &displayPipeLayout));
 
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -1035,9 +1035,9 @@ class ComputeWindow : public mxvk::VK_Window {
         pipelineInfo.pDepthStencilState = &depthStencil;
         pipelineInfo.pColorBlendState = &colorBlend;
         pipelineInfo.pDynamicState = &dynamicInfo;
-        pipelineInfo.layout = displayPipeLayout_;
+        pipelineInfo.layout = displayPipeLayout;
         pipelineInfo.renderPass = VK_NULL_HANDLE;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &displayPipeline_));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &displayPipeline));
 
         vkDestroyShaderModule(device, fragModule, nullptr);
         vkDestroyShaderModule(device, vertModule, nullptr);
@@ -1051,12 +1051,12 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void writeBlendDS(VkDescriptorSet descriptorSet, VkImageView srcView) {
-        VkDescriptorImageInfo destInfo{VK_NULL_HANDLE, outImg_.view, VK_IMAGE_LAYOUT_GENERAL};
-        VkDescriptorImageInfo srcInfo{computeSampler_, srcView, VK_IMAGE_LAYOUT_GENERAL};
+        VkDescriptorImageInfo destInfo{VK_NULL_HANDLE, outImg.view, VK_IMAGE_LAYOUT_GENERAL};
+        VkDescriptorImageInfo srcInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL};
 
         std::vector<VkDescriptorImageInfo> historyInfos(HISTORY_SIZE);
         for (int index = 0; index < HISTORY_SIZE; ++index) {
-            historyInfos[index] = {computeSampler_, histImg_[index].view, VK_IMAGE_LAYOUT_GENERAL};
+            historyInfos[index] = {computeSampler, histImg[index].view, VK_IMAGE_LAYOUT_GENERAL};
         }
 
         std::array<VkWriteDescriptorSet, 3> writes{};
@@ -1070,26 +1070,26 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void uploadToImage(const void *data, int srcPitch, ComputeImage &img) {
-        const VkDeviceSize bytes = static_cast<VkDeviceSize>(texWidth_) * texHeight_ * 4;
-        const int tightPitch = texWidth_ * 4;
+        const VkDeviceSize bytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
+        const int tightPitch = texWidth * 4;
         if (data == nullptr || srcPitch < tightPitch) {
             return;
         }
 
         void *mapped = nullptr;
-        VK_CHECK_RESULT(vkMapMemory(device, stagingMem_, 0, bytes, 0, &mapped));
+        VK_CHECK_RESULT(vkMapMemory(device, stagingMem, 0, bytes, 0, &mapped));
         if (srcPitch == tightPitch) {
             std::memcpy(mapped, data, static_cast<size_t>(bytes));
         } else {
             const auto *src = static_cast<const uint8_t *>(data);
             auto *dst = static_cast<uint8_t *>(mapped);
-            for (int row = 0; row < texHeight_; ++row) {
+            for (int row = 0; row < texHeight; ++row) {
                 std::memcpy(dst + static_cast<size_t>(row) * tightPitch,
                             src + static_cast<size_t>(row) * srcPitch,
                             static_cast<size_t>(tightPitch));
             }
         }
-        vkUnmapMemory(device, stagingMem_);
+        vkUnmapMemory(device, stagingMem);
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
 
@@ -1106,11 +1106,11 @@ class ComputeWindow : public mxvk::VK_Window {
         VkBufferImageCopy2 region{};
         region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        region.imageExtent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
+        region.imageExtent = {static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1};
 
         VkCopyBufferToImageInfo2 copyInfo{};
         copyInfo.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2;
-        copyInfo.srcBuffer = stagingBuf_;
+        copyInfo.srcBuffer = stagingBuf;
         copyInfo.dstImage = img.image;
         copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         copyInfo.regionCount = 1;
@@ -1132,7 +1132,7 @@ class ComputeWindow : public mxvk::VK_Window {
 
 #ifdef MXVK_CUDA
     bool uploadGpuToImage(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream, ComputeImage &img) {
-        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols != texWidth_ || rgba.rows != texHeight_) {
+        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols != texWidth || rgba.rows != texHeight) {
             return false;
         }
         if (!ensureCudaInterop(img)) {
@@ -1191,45 +1191,45 @@ class ComputeWindow : public mxvk::VK_Window {
     void dispatchOne(VkCommandBuffer cmd, VkDescriptorSet descriptorSet, int mode) {
         ComputePC pc{};
         pc.mode = mode;
-        pc.historyCount = historyCount_;
-        pc.historyIdx = currentHistIdx_;
-        pc.square_size = currentSquare_;
-        pc.history_dir = currentDir_;
-        pc.alpha = alpha_;
+        pc.historyCount = historyCount;
+        pc.historyIdx = currentHistIdx;
+        pc.square_size = currentSquare;
+        pc.history_dir = currentDir;
+        pc.alpha = alpha;
         pc.do_invert = 0;
         pc.do_swap = 0;
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, compPipeline_);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, compPipeline);
         vkCmdBindDescriptorSets(
             cmd,
             VK_PIPELINE_BIND_POINT_COMPUTE,
-            compPipeLayout_,
+            compPipeLayout,
             0,
             1,
             &descriptorSet,
             0,
             nullptr);
-        vkCmdPushConstants(cmd, compPipeLayout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+        vkCmdPushConstants(cmd, compPipeLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
-        const uint32_t groupX = (static_cast<uint32_t>(texWidth_) + 15) / 16;
-        const uint32_t groupY = (static_cast<uint32_t>(texHeight_) + 15) / 16;
+        const uint32_t groupX = (static_cast<uint32_t>(texWidth) + 15) / 16;
+        const uint32_t groupY = (static_cast<uint32_t>(texHeight) + 15) / 16;
         vkCmdDispatch(cmd, groupX, groupY, 1);
     }
 
     void renderComputeOutput(VkCommandBuffer cmd) {
-        if (displayPipeline_ == VK_NULL_HANDLE || displayPipeLayout_ == VK_NULL_HANDLE ||
-            displayDS_ == VK_NULL_HANDLE || displayVertexBuffer_ == VK_NULL_HANDLE ||
-            displayIndexBuffer_ == VK_NULL_HANDLE) {
+        if (displayPipeline == VK_NULL_HANDLE || displayPipeLayout == VK_NULL_HANDLE ||
+            displayDS == VK_NULL_HANDLE || displayVertexBuffer == VK_NULL_HANDLE ||
+            displayIndexBuffer == VK_NULL_HANDLE) {
             return;
         }
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeline_);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeLayout_,
-                                0, 1, &displayDS_, 0, nullptr);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeline);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeLayout,
+                                0, 1, &displayDS, 0, nullptr);
 
         const VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(cmd, 0, 1, &displayVertexBuffer_, &offset);
-        vkCmdBindIndexBuffer(cmd, displayIndexBuffer_, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindVertexBuffers(cmd, 0, 1, &displayVertexBuffer, &offset);
+        vkCmdBindIndexBuffer(cmd, displayIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
         struct DisplayPC {
             float screenWidth;
@@ -1253,7 +1253,7 @@ class ComputeWindow : public mxvk::VK_Window {
             {0.0F, 0.0F, 0.0F, 0.0F},
         };
 
-        vkCmdPushConstants(cmd, displayPipeLayout_, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        vkCmdPushConstants(cmd, displayPipeLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                            0, sizeof(DisplayPC), &pc);
         vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
     }
@@ -1276,15 +1276,15 @@ class ComputeWindow : public mxvk::VK_Window {
         int dstIdx = 1;
         const int passes = 3 + (std::rand() % 7);
         for (int pass = 0; pass < passes; ++pass) {
-            dispatchOne(cmd, blurDS_[dstIdx], 0);
-            computeBarrier(cmd, workImg_[dstIdx].image);
+            dispatchOne(cmd, blurDS[dstIdx], 0);
+            computeBarrier(cmd, workImg[dstIdx].image);
             std::swap(srcIdx, dstIdx);
         }
 
         {
             std::array<VkImageMemoryBarrier2, 2> barriers{};
             barriers[0] = makeImageBarrier(
-                workImg_[srcIdx].image,
+                workImg[srcIdx].image,
                 VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1293,7 +1293,7 @@ class ComputeWindow : public mxvk::VK_Window {
                 VK_ACCESS_2_TRANSFER_READ_BIT);
 
             barriers[1] = makeImageBarrier(
-                histImg_[historyIndex_].image,
+                histImg[historyIndex].image,
                 VK_IMAGE_LAYOUT_GENERAL,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1311,20 +1311,20 @@ class ComputeWindow : public mxvk::VK_Window {
             copy.sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2;
             copy.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            copy.extent = {static_cast<uint32_t>(texWidth_), static_cast<uint32_t>(texHeight_), 1};
+            copy.extent = {static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1};
 
             VkCopyImageInfo2 copyInfo{};
             copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
-            copyInfo.srcImage = workImg_[srcIdx].image;
+            copyInfo.srcImage = workImg[srcIdx].image;
             copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            copyInfo.dstImage = histImg_[historyIndex_].image;
+            copyInfo.dstImage = histImg[historyIndex].image;
             copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             copyInfo.regionCount = 1;
             copyInfo.pRegions = &copy;
             vkCmdCopyImage2(cmd, &copyInfo);
 
             barriers[0] = makeImageBarrier(
-                workImg_[srcIdx].image,
+                workImg[srcIdx].image,
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 VK_IMAGE_LAYOUT_GENERAL,
                 VK_PIPELINE_STAGE_2_TRANSFER_BIT,
@@ -1333,7 +1333,7 @@ class ComputeWindow : public mxvk::VK_Window {
                 VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 
             barriers[1] = makeImageBarrier(
-                histImg_[historyIndex_].image,
+                histImg[historyIndex].image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_IMAGE_LAYOUT_GENERAL,
                 VK_PIPELINE_STAGE_2_TRANSFER_BIT,
@@ -1348,18 +1348,18 @@ class ComputeWindow : public mxvk::VK_Window {
             vkCmdPipelineBarrier2(cmd, &dependencyInfo);
         }
 
-        if (historyCount_ < HISTORY_SIZE) {
-            ++historyCount_;
+        if (historyCount < HISTORY_SIZE) {
+            ++historyCount;
         }
-        historyIndex_ = (historyIndex_ + 1) % HISTORY_SIZE;
+        historyIndex = (historyIndex + 1) % HISTORY_SIZE;
 
         const bool isMetalMedian =
-            !spvFiles_.empty() && spvFiles_[currentSpvIndex_].find("metalmedianblend") != std::string::npos;
-        dispatchOne(cmd, blendDS_[srcIdx], isMetalMedian ? 2 : 1);
+            !spvFiles.empty() && spvFiles[currentSpvIndex].find("metalmedianblend") != std::string::npos;
+        dispatchOne(cmd, blendDS[srcIdx], isMetalMedian ? 2 : 1);
 
         transitionImageLayout(
             cmd,
-            outImg_.image,
+            outImg.image,
             VK_IMAGE_LAYOUT_GENERAL,
             VK_IMAGE_LAYOUT_GENERAL,
             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
@@ -1371,41 +1371,41 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void tickAnimState() {
-        if (currentDir_ == 1) {
-            if (++currentHistIdx_ >= HISTORY_SIZE - 1) {
-                currentHistIdx_ = HISTORY_SIZE - 1;
-                currentDir_ = -1;
+        if (currentDir == 1) {
+            if (++currentHistIdx >= HISTORY_SIZE - 1) {
+                currentHistIdx = HISTORY_SIZE - 1;
+                currentDir = -1;
             }
-        } else if (--currentHistIdx_ <= 0) {
-            currentHistIdx_ = 0;
-            currentDir_ = 1;
+        } else if (--currentHistIdx <= 0) {
+            currentHistIdx = 0;
+            currentDir = 1;
         }
 
-        if (squareDir_ == 1) {
-            currentSquare_ += 2;
-            if (currentSquare_ >= 64) {
-                currentSquare_ = 64;
-                squareDir_ = 0;
+        if (squareDir == 1) {
+            currentSquare += 2;
+            if (currentSquare >= 64) {
+                currentSquare = 64;
+                squareDir = 0;
             }
         } else {
-            currentSquare_ -= 2;
-            if (currentSquare_ <= 2) {
-                currentSquare_ = 2;
-                squareDir_ = 1;
+            currentSquare -= 2;
+            if (currentSquare <= 2) {
+                currentSquare = 2;
+                squareDir = 1;
             }
         }
 
         static int alphaDir = 1;
         if (alphaDir == 1) {
-            alpha_ += 0.005F;
-            if (alpha_ >= (255.0F / 32.0F)) {
-                alpha_ = 255.0F / 32.0F;
+            alpha += 0.005F;
+            if (alpha >= (255.0F / 32.0F)) {
+                alpha = 255.0F / 32.0F;
                 alphaDir = -1;
             }
         } else {
-            alpha_ -= 0.005F;
-            if (alpha_ <= 1.0F) {
-                alpha_ = 1.0F;
+            alpha -= 0.005F;
+            if (alpha <= 1.0F) {
+                alpha = 1.0F;
                 alphaDir = 1;
             }
         }
@@ -1458,38 +1458,38 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void destroyDisplayResources() {
-        if (displayPipeline_ != VK_NULL_HANDLE) {
-            vkDestroyPipeline(device, displayPipeline_, nullptr);
-            displayPipeline_ = VK_NULL_HANDLE;
+        if (displayPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, displayPipeline, nullptr);
+            displayPipeline = VK_NULL_HANDLE;
         }
-        if (displayPipeLayout_ != VK_NULL_HANDLE) {
-            vkDestroyPipelineLayout(device, displayPipeLayout_, nullptr);
-            displayPipeLayout_ = VK_NULL_HANDLE;
+        if (displayPipeLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, displayPipeLayout, nullptr);
+            displayPipeLayout = VK_NULL_HANDLE;
         }
-        if (displayDSPool_ != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(device, displayDSPool_, nullptr);
-            displayDSPool_ = VK_NULL_HANDLE;
-            displayDS_ = VK_NULL_HANDLE;
+        if (displayDSPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, displayDSPool, nullptr);
+            displayDSPool = VK_NULL_HANDLE;
+            displayDS = VK_NULL_HANDLE;
         }
-        if (displayDSLayout_ != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, displayDSLayout_, nullptr);
-            displayDSLayout_ = VK_NULL_HANDLE;
+        if (displayDSLayout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, displayDSLayout, nullptr);
+            displayDSLayout = VK_NULL_HANDLE;
         }
-        if (displayVertexBuffer_ != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, displayVertexBuffer_, nullptr);
-            displayVertexBuffer_ = VK_NULL_HANDLE;
+        if (displayVertexBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, displayVertexBuffer, nullptr);
+            displayVertexBuffer = VK_NULL_HANDLE;
         }
-        if (displayVertexMemory_ != VK_NULL_HANDLE) {
-            vkFreeMemory(device, displayVertexMemory_, nullptr);
-            displayVertexMemory_ = VK_NULL_HANDLE;
+        if (displayVertexMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, displayVertexMemory, nullptr);
+            displayVertexMemory = VK_NULL_HANDLE;
         }
-        if (displayIndexBuffer_ != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, displayIndexBuffer_, nullptr);
-            displayIndexBuffer_ = VK_NULL_HANDLE;
+        if (displayIndexBuffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, displayIndexBuffer, nullptr);
+            displayIndexBuffer = VK_NULL_HANDLE;
         }
-        if (displayIndexMemory_ != VK_NULL_HANDLE) {
-            vkFreeMemory(device, displayIndexMemory_, nullptr);
-            displayIndexMemory_ = VK_NULL_HANDLE;
+        if (displayIndexMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, displayIndexMemory, nullptr);
+            displayIndexMemory = VK_NULL_HANDLE;
         }
     }
 
@@ -1517,40 +1517,40 @@ class ComputeWindow : public mxvk::VK_Window {
             img = {};
         };
 
-        destroyImage(workImg_[0]);
-        destroyImage(workImg_[1]);
-        for (ComputeImage &img : histImg_) {
+        destroyImage(workImg[0]);
+        destroyImage(workImg[1]);
+        for (ComputeImage &img : histImg) {
             destroyImage(img);
         }
-        destroyImage(outImg_);
+        destroyImage(outImg);
 
-        if (computeSampler_ != VK_NULL_HANDLE) {
-            vkDestroySampler(device, computeSampler_, nullptr);
-            computeSampler_ = VK_NULL_HANDLE;
+        if (computeSampler != VK_NULL_HANDLE) {
+            vkDestroySampler(device, computeSampler, nullptr);
+            computeSampler = VK_NULL_HANDLE;
         }
-        if (compDSPool_ != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(device, compDSPool_, nullptr);
-            compDSPool_ = VK_NULL_HANDLE;
+        if (compDSPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, compDSPool, nullptr);
+            compDSPool = VK_NULL_HANDLE;
         }
-        if (compPipeline_ != VK_NULL_HANDLE) {
-            vkDestroyPipeline(device, compPipeline_, nullptr);
-            compPipeline_ = VK_NULL_HANDLE;
+        if (compPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, compPipeline, nullptr);
+            compPipeline = VK_NULL_HANDLE;
         }
-        if (compPipeLayout_ != VK_NULL_HANDLE) {
-            vkDestroyPipelineLayout(device, compPipeLayout_, nullptr);
-            compPipeLayout_ = VK_NULL_HANDLE;
+        if (compPipeLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, compPipeLayout, nullptr);
+            compPipeLayout = VK_NULL_HANDLE;
         }
-        if (compDSLayout_ != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, compDSLayout_, nullptr);
-            compDSLayout_ = VK_NULL_HANDLE;
+        if (compDSLayout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, compDSLayout, nullptr);
+            compDSLayout = VK_NULL_HANDLE;
         }
-        if (stagingBuf_ != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, stagingBuf_, nullptr);
-            stagingBuf_ = VK_NULL_HANDLE;
+        if (stagingBuf != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, stagingBuf, nullptr);
+            stagingBuf = VK_NULL_HANDLE;
         }
-        if (stagingMem_ != VK_NULL_HANDLE) {
-            vkFreeMemory(device, stagingMem_, nullptr);
-            stagingMem_ = VK_NULL_HANDLE;
+        if (stagingMem != VK_NULL_HANDLE) {
+            vkFreeMemory(device, stagingMem, nullptr);
+            stagingMem = VK_NULL_HANDLE;
         }
     }
 };

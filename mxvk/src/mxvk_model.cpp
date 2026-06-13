@@ -258,36 +258,36 @@ namespace mxvk {
     }
 
     void MXModel::compressIndices() {
-        if (vertices_.empty() || indices_.empty()) {
+        if (verticesData.empty() || indicesData.empty()) {
             return;
         }
 
         std::vector<VKVertex> uniqueVertices{};
-        uniqueVertices.reserve(vertices_.size());
+        uniqueVertices.reserve(verticesData.size());
 
         std::unordered_map<VKVertex, uint32_t, VKVertexHash> vertexMap{};
-        std::vector<uint32_t> remap(vertices_.size(), 0);
+        std::vector<uint32_t> remap(verticesData.size(), 0);
 
-        for (size_t i = 0; i < vertices_.size(); ++i) {
-            const auto it = vertexMap.find(vertices_[i]);
+        for (size_t i = 0; i < verticesData.size(); ++i) {
+            const auto it = vertexMap.find(verticesData[i]);
             if (it != vertexMap.end()) {
                 remap[i] = it->second;
                 continue;
             }
 
             const uint32_t nextIndex = static_cast<uint32_t>(uniqueVertices.size());
-            uniqueVertices.push_back(vertices_[i]);
-            vertexMap.emplace(vertices_[i], nextIndex);
+            uniqueVertices.push_back(verticesData[i]);
+            vertexMap.emplace(verticesData[i], nextIndex);
             remap[i] = nextIndex;
         }
 
-        for (uint32_t &idx : indices_) {
+        for (uint32_t &idx : indicesData) {
             if (idx < static_cast<uint32_t>(remap.size())) {
                 idx = remap[idx];
             }
         }
 
-        vertices_ = std::move(uniqueVertices);
+        verticesData = std::move(uniqueVertices);
     }
 
     void MXModel::load(const std::string &path, float positionScale) {
@@ -299,25 +299,25 @@ namespace mxvk {
 
         if (path.ends_with(".obj")) {
             loadOBJ(path, positionScale);
-            logMXModelStep("load complete (.obj): vertices=" + std::to_string(vertices_.size()) +
-                           ", indices=" + std::to_string(indices_.size()) +
-                           ", submeshes=" + std::to_string(subMeshes_.size()));
+            logMXModelStep("load complete (.obj): vertices=" + std::to_string(verticesData.size()) +
+                           ", indices=" + std::to_string(indicesData.size()) +
+                           ", submeshes=" + std::to_string(subMeshList.size()));
             return;
         }
 
         if (path.ends_with(".mxmod")) {
             loadMXMOD(path, positionScale);
-            logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(vertices_.size()) +
-                           ", indices=" + std::to_string(indices_.size()) +
-                           ", submeshes=" + std::to_string(subMeshes_.size()));
+            logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(verticesData.size()) +
+                           ", indices=" + std::to_string(indicesData.size()) +
+                           ", submeshes=" + std::to_string(subMeshList.size()));
             return;
         }
 
         if (path.ends_with(".mxmod.z")) {
             loadMXMODZ(path, positionScale);
-            logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(vertices_.size()) +
-                           ", indices=" + std::to_string(indices_.size()) +
-                           ", submeshes=" + std::to_string(subMeshes_.size()));
+            logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(verticesData.size()) +
+                           ", indices=" + std::to_string(indicesData.size()) +
+                           ", submeshes=" + std::to_string(subMeshList.size()));
             return;
         }
 
@@ -334,11 +334,11 @@ namespace mxvk {
         std::vector<Vec2> texcoords{};
         std::vector<Vec3> normals{};
 
-        vertices_.clear();
-        indices_.clear();
-        subMeshes_.clear();
-        materials_.clear();
-        mtlLibPath_.clear();
+        verticesData.clear();
+        indicesData.clear();
+        subMeshList.clear();
+        materialList.clear();
+        mtlLibraryPath.clear();
 
         std::vector<VKVertex> currentVerts{};
         std::string currentMaterialName{};
@@ -349,18 +349,18 @@ namespace mxvk {
             }
 
             SubMesh sm{};
-            sm.firstIndex = static_cast<uint32_t>(indices_.size());
+            sm.firstIndex = static_cast<uint32_t>(indicesData.size());
             sm.indexCount = static_cast<uint32_t>(currentVerts.size());
             sm.materialName = currentMaterialName;
 
-            const uint32_t baseVertex = static_cast<uint32_t>(vertices_.size());
-            vertices_.insert(vertices_.end(), currentVerts.begin(), currentVerts.end());
+            const uint32_t baseVertex = static_cast<uint32_t>(verticesData.size());
+            verticesData.insert(verticesData.end(), currentVerts.begin(), currentVerts.end());
 
             for (uint32_t i = 0; i < sm.indexCount; ++i) {
-                indices_.push_back(baseVertex + i);
+                indicesData.push_back(baseVertex + i);
             }
 
-            subMeshes_.push_back(sm);
+            subMeshList.push_back(sm);
             currentVerts.clear();
         };
 
@@ -407,7 +407,7 @@ namespace mxvk {
                 std::string mtlFile{};
                 if (stream >> mtlFile) {
                     const std::filesystem::path objPath(path);
-                    mtlLibPath_ = (objPath.parent_path() / mtlFile).string();
+                    mtlLibraryPath = (objPath.parent_path() / mtlFile).string();
                 }
                 continue;
             }
@@ -487,14 +487,14 @@ namespace mxvk {
 
         finalizeGroup();
 
-        if (!mtlLibPath_.empty()) {
-            loadMTL(mtlLibPath_);
+        if (!mtlLibraryPath.empty()) {
+            loadMTL(mtlLibraryPath);
             std::unordered_map<std::string, uint32_t> materialIndices{};
-            for (uint32_t i = 0; i < static_cast<uint32_t>(materials_.size()); ++i) {
-                materialIndices.emplace(materials_[i].name, i);
+            for (uint32_t i = 0; i < static_cast<uint32_t>(materialList.size()); ++i) {
+                materialIndices.emplace(materialList[i].name, i);
             }
 
-            for (SubMesh &sm : subMeshes_) {
+            for (SubMesh &sm : subMeshList) {
                 const auto it = materialIndices.find(sm.materialName);
                 if (it != materialIndices.end()) {
                     sm.textureIndex = it->second;
@@ -502,19 +502,19 @@ namespace mxvk {
             }
         }
 
-        if (vertices_.empty() || indices_.empty()) {
+        if (verticesData.empty() || indicesData.empty()) {
             throw mxvk::Exception("MXModel::loadOBJ no geometry found in " + path);
         }
 
         const bool hasNormals = !normals.empty();
         if (!hasNormals) {
-            for (size_t i = 0; i + 2 < vertices_.size(); i += 3) {
-                const float ax = vertices_[i + 1].pos[0] - vertices_[i].pos[0];
-                const float ay = vertices_[i + 1].pos[1] - vertices_[i].pos[1];
-                const float az = vertices_[i + 1].pos[2] - vertices_[i].pos[2];
-                const float bx = vertices_[i + 2].pos[0] - vertices_[i].pos[0];
-                const float by = vertices_[i + 2].pos[1] - vertices_[i].pos[1];
-                const float bz = vertices_[i + 2].pos[2] - vertices_[i].pos[2];
+            for (size_t i = 0; i + 2 < verticesData.size(); i += 3) {
+                const float ax = verticesData[i + 1].pos[0] - verticesData[i].pos[0];
+                const float ay = verticesData[i + 1].pos[1] - verticesData[i].pos[1];
+                const float az = verticesData[i + 1].pos[2] - verticesData[i].pos[2];
+                const float bx = verticesData[i + 2].pos[0] - verticesData[i].pos[0];
+                const float by = verticesData[i + 2].pos[1] - verticesData[i].pos[1];
+                const float bz = verticesData[i + 2].pos[2] - verticesData[i].pos[2];
 
                 float nx = ay * bz - az * by;
                 float ny = az * bx - ax * bz;
@@ -527,9 +527,9 @@ namespace mxvk {
                 }
 
                 for (int j = 0; j < 3; ++j) {
-                    vertices_[i + static_cast<size_t>(j)].normal[0] = nx;
-                    vertices_[i + static_cast<size_t>(j)].normal[1] = ny;
-                    vertices_[i + static_cast<size_t>(j)].normal[2] = nz;
+                    verticesData[i + static_cast<size_t>(j)].normal[0] = nx;
+                    verticesData[i + static_cast<size_t>(j)].normal[1] = ny;
+                    verticesData[i + static_cast<size_t>(j)].normal[2] = nz;
                 }
             }
         }
@@ -545,11 +545,11 @@ namespace mxvk {
 
         const MXMODParseResult parsed = parseMXMODStream(file, path, positionScale);
 
-        vertices_ = parsed.vertices;
-        indices_ = parsed.indices;
-        subMeshes_ = parsed.subMeshes;
-        materials_.clear();
-        mtlLibPath_.clear();
+        verticesData = parsed.vertices;
+        indicesData = parsed.indices;
+        subMeshList = parsed.subMeshes;
+        materialList.clear();
+        mtlLibraryPath.clear();
 
         compressIndices();
     }
@@ -569,11 +569,11 @@ namespace mxvk {
         std::istringstream stream(decompressedText);
         const MXMODParseResult parsed = parseMXMODStream(stream, path, positionScale);
 
-        vertices_ = parsed.vertices;
-        indices_ = parsed.indices;
-        subMeshes_ = parsed.subMeshes;
-        materials_.clear();
-        mtlLibPath_.clear();
+        verticesData = parsed.vertices;
+        indicesData = parsed.indices;
+        subMeshList = parsed.subMeshes;
+        materialList.clear();
+        mtlLibraryPath.clear();
 
         compressIndices();
     }
@@ -584,7 +584,7 @@ namespace mxvk {
             commandPool == VK_NULL_HANDLE || graphicsQueue == VK_NULL_HANDLE) {
             throw mxvk::Exception("MXModel::upload requires valid Vulkan handles");
         }
-        if (vertices_.empty() || indices_.empty()) {
+        if (verticesData.empty() || indicesData.empty()) {
             throw mxvk::Exception("MXModel::upload requires loaded geometry");
         }
 
@@ -592,8 +592,8 @@ namespace mxvk {
 
         cleanup(device);
 
-        const VkDeviceSize vertexBufferSize = sizeof(VKVertex) * vertices_.size();
-        const VkDeviceSize indexBufferSize = sizeof(uint32_t) * indices_.size();
+        const VkDeviceSize vertexBufferSize = sizeof(VKVertex) * verticesData.size();
+        const VkDeviceSize indexBufferSize = sizeof(uint32_t) * indicesData.size();
 
         VkBuffer stagingVertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingVertexMemory = VK_NULL_HANDLE;
@@ -611,26 +611,26 @@ namespace mxvk {
 
         void *vertexData = nullptr;
         vkMapMemory(device, stagingVertexMemory, 0, vertexBufferSize, 0, &vertexData);
-        std::memcpy(vertexData, vertices_.data(), static_cast<size_t>(vertexBufferSize));
+        std::memcpy(vertexData, verticesData.data(), static_cast<size_t>(vertexBufferSize));
         vkUnmapMemory(device, stagingVertexMemory);
 
         void *indexData = nullptr;
         vkMapMemory(device, stagingIndexMemory, 0, indexBufferSize, 0, &indexData);
-        std::memcpy(indexData, indices_.data(), static_cast<size_t>(indexBufferSize));
+        std::memcpy(indexData, indicesData.data(), static_cast<size_t>(indexBufferSize));
         vkUnmapMemory(device, stagingIndexMemory);
 
         createBuffer(device, physicalDevice, vertexBufferSize,
                      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     vertexBuffer_, vertexBufferMemory_);
+                     vertexBufferHandle, vertexBufferMemory);
 
         createBuffer(device, physicalDevice, indexBufferSize,
                      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     indexBuffer_, indexBufferMemory_);
+                     indexBufferHandle, indexBufferMemory);
 
-        copyBuffer(device, commandPool, graphicsQueue, stagingVertexBuffer, vertexBuffer_, vertexBufferSize);
-        copyBuffer(device, commandPool, graphicsQueue, stagingIndexBuffer, indexBuffer_, indexBufferSize);
+        copyBuffer(device, commandPool, graphicsQueue, stagingVertexBuffer, vertexBufferHandle, vertexBufferSize);
+        copyBuffer(device, commandPool, graphicsQueue, stagingIndexBuffer, indexBufferHandle, indexBufferSize);
 
         vkDestroyBuffer(device, stagingVertexBuffer, nullptr);
         vkFreeMemory(device, stagingVertexMemory, nullptr);
@@ -645,32 +645,32 @@ namespace mxvk {
             return;
         }
 
-        const bool hadBuffers = vertexBuffer_ != VK_NULL_HANDLE || indexBuffer_ != VK_NULL_HANDLE ||
-                                vertexBufferMemory_ != VK_NULL_HANDLE || indexBufferMemory_ != VK_NULL_HANDLE;
+        const bool hadBuffers = vertexBufferHandle != VK_NULL_HANDLE || indexBufferHandle != VK_NULL_HANDLE ||
+                                vertexBufferMemory != VK_NULL_HANDLE || indexBufferMemory != VK_NULL_HANDLE;
         if (hadBuffers) {
             logMXModelStep("teardown begin");
         }
 
-        if (vertexBuffer_ != VK_NULL_HANDLE) {
+        if (vertexBufferHandle != VK_NULL_HANDLE) {
             logMXModelStep("destroying vertex buffer");
-            vkDestroyBuffer(device, vertexBuffer_, nullptr);
-            vertexBuffer_ = VK_NULL_HANDLE;
+            vkDestroyBuffer(device, vertexBufferHandle, nullptr);
+            vertexBufferHandle = VK_NULL_HANDLE;
         }
-        if (vertexBufferMemory_ != VK_NULL_HANDLE) {
+        if (vertexBufferMemory != VK_NULL_HANDLE) {
             logMXModelStep("freeing vertex buffer memory");
-            vkFreeMemory(device, vertexBufferMemory_, nullptr);
-            vertexBufferMemory_ = VK_NULL_HANDLE;
+            vkFreeMemory(device, vertexBufferMemory, nullptr);
+            vertexBufferMemory = VK_NULL_HANDLE;
         }
 
-        if (indexBuffer_ != VK_NULL_HANDLE) {
+        if (indexBufferHandle != VK_NULL_HANDLE) {
             logMXModelStep("destroying index buffer");
-            vkDestroyBuffer(device, indexBuffer_, nullptr);
-            indexBuffer_ = VK_NULL_HANDLE;
+            vkDestroyBuffer(device, indexBufferHandle, nullptr);
+            indexBufferHandle = VK_NULL_HANDLE;
         }
-        if (indexBufferMemory_ != VK_NULL_HANDLE) {
+        if (indexBufferMemory != VK_NULL_HANDLE) {
             logMXModelStep("freeing index buffer memory");
-            vkFreeMemory(device, indexBufferMemory_, nullptr);
-            indexBufferMemory_ = VK_NULL_HANDLE;
+            vkFreeMemory(device, indexBufferMemory, nullptr);
+            indexBufferMemory = VK_NULL_HANDLE;
         }
 
         if (hadBuffers) {
@@ -679,29 +679,29 @@ namespace mxvk {
     }
 
     void MXModel::draw(VkCommandBuffer cmd) const {
-        if (cmd == VK_NULL_HANDLE || vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE || indices_.empty()) {
+        if (cmd == VK_NULL_HANDLE || vertexBufferHandle == VK_NULL_HANDLE || indexBufferHandle == VK_NULL_HANDLE || indicesData.empty()) {
             return;
         }
 
-        const VkBuffer buffers[] = {vertexBuffer_};
+        const VkBuffer buffers[] = {vertexBufferHandle};
         const VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, buffers, offsets);
-        vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(cmd, indexBufferHandle, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(cmd, indexCount(), 1, 0, 0, 0);
     }
 
     void MXModel::drawSubMesh(VkCommandBuffer cmd, size_t index) const {
-        if (cmd == VK_NULL_HANDLE || index >= subMeshes_.size() ||
-            vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE) {
+        if (cmd == VK_NULL_HANDLE || index >= subMeshList.size() ||
+            vertexBufferHandle == VK_NULL_HANDLE || indexBufferHandle == VK_NULL_HANDLE) {
             return;
         }
 
-        const VkBuffer buffers[] = {vertexBuffer_};
+        const VkBuffer buffers[] = {vertexBufferHandle};
         const VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, buffers, offsets);
-        vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(cmd, indexBufferHandle, 0, VK_INDEX_TYPE_UINT32);
 
-        const SubMesh &sm = subMeshes_[index];
+        const SubMesh &sm = subMeshList[index];
         if (sm.indexCount == 0) {
             return;
         }
@@ -837,8 +837,8 @@ namespace mxvk {
             stream >> tag;
 
             if (tag == "newmtl") {
-                materials_.emplace_back();
-                current = &materials_.back();
+                materialList.emplace_back();
+                current = &materialList.back();
                 stream >> current->name;
                 continue;
             }

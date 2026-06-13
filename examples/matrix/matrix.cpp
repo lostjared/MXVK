@@ -76,25 +76,25 @@ namespace example {
                      const int height,
                      const bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-              assetRoot_(path.empty() ? std::string(matrix_ASSET_DIR) : path),
-              rng_(std::random_device{}()) {
+              assetRoot(path.empty() ? std::string(matrix_ASSET_DIR) : path),
+              rng(std::random_device{}()) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             if (!TTF_Init()) {
                 throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
             }
-            font_.reset(TTF_OpenFont((assetRoot_ + "/data/keifont.ttf").c_str(), fontSize_));
-            if (!font_) {
+            font.reset(TTF_OpenFont((assetRoot + "/data/keifont.ttf").c_str(), fontSize));
+            if (!font) {
                 throw mxvk::Exception("Failed to load matrix font: " + std::string(SDL_GetError()));
             }
-            TTF_SetFontHinting(font_.get(), TTF_HINTING_LIGHT);
+            TTF_SetFontHinting(font.get(), TTF_HINTING_LIGHT);
             loadGlyphs();
             rebuildForExtent();
-            lastFrame_ = Clock::now();
+            lastFrame = Clock::now();
         }
 
         ~MatrixWindow() override {
-            glyphs_.clear();
-            font_.reset();
+            glyphs.clear();
+            font.reset();
             TTF_Quit();
         }
 
@@ -104,8 +104,8 @@ namespace example {
                     exit();
                 } else if (e.key.key == SDLK_SPACE) {
                     randomizeStreams();
-                    if (canvas_ != nullptr) {
-                        SDL_FillSurfaceRect(canvas_.get(), nullptr, SDL_MapSurfaceRGBA(canvas_.get(), 0, 0, 0, 255));
+                    if (canvas != nullptr) {
+                        SDL_FillSurfaceRect(canvas.get(), nullptr, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
                     }
                 }
             }
@@ -114,17 +114,17 @@ namespace example {
         void proc() override {
             rebuildForExtent();
             const auto now = Clock::now();
-            float dt = std::chrono::duration<float>(now - lastFrame_).count();
-            lastFrame_ = now;
+            float dt = std::chrono::duration<float>(now - lastFrame).count();
+            lastFrame = now;
             dt = std::clamp(dt, 0.0f, 1.0f / 15.0f);
 
-            if (rainSprite_ == nullptr || canvas_ == nullptr || glyphs_.empty()) {
+            if (rainSprite == nullptr || canvas == nullptr || glyphs.empty()) {
                 return;
             }
 
             updateRain(dt);
-            rainSprite_->updateTexture(canvas_->pixels, canvas_->w, canvas_->h, canvas_->pitch);
-            rainSprite_->drawSpriteRect(0, 0, canvas_->w, canvas_->h);
+            rainSprite->updateTexture(canvas->pixels, canvas->w, canvas->h, canvas->pitch);
+            rainSprite->drawSpriteRect(0, 0, canvas->w, canvas->h);
         }
 
       private:
@@ -149,13 +149,13 @@ namespace example {
                 "\xEF\xBE\x97", "\xEF\xBE\x98", "\xEF\xBE\x99", "\xEF\xBE\x9A",
                 "\xEF\xBE\x9B", "\xEF\xBE\x9C", "\xEF\xBE\x9D"};
 
-            glyphs_.reserve(symbols.size());
+            glyphs.reserve(symbols.size());
             for (const std::string &symbol : symbols) {
                 Glyph glyph;
                 glyph.symbol = symbol;
-                glyph.levels.reserve(glyphLevels_ + 1);
-                for (int level = 0; level <= glyphLevels_; ++level) {
-                    SDL_Surface *rendered = TTF_RenderText_Blended(font_.get(), symbol.c_str(), 0, matrixColor(level));
+                glyph.levels.reserve(glyphLevels + 1);
+                for (int level = 0; level <= glyphLevels; ++level) {
+                    SDL_Surface *rendered = TTF_RenderText_Blended(font.get(), symbol.c_str(), 0, matrixColor(level));
                     if (rendered == nullptr) {
                         continue;
                     }
@@ -166,7 +166,7 @@ namespace example {
                         glyph.levels.emplace_back(std::move(converted));
                     }
                 }
-                SDL_Surface *renderedHead = TTF_RenderText_Blended(font_.get(), symbol.c_str(), 0, headColor());
+                SDL_Surface *renderedHead = TTF_RenderText_Blended(font.get(), symbol.c_str(), 0, headColor());
                 if (renderedHead != nullptr) {
                     SurfacePtr converted(SDL_ConvertSurface(renderedHead, SDL_PIXELFORMAT_RGBA32));
                     SDL_DestroySurface(renderedHead);
@@ -175,100 +175,100 @@ namespace example {
                         glyph.levels.emplace_back(std::move(converted));
                     }
                 }
-                if (glyph.levels.size() == static_cast<std::size_t>(glyphLevels_ + 2)) {
-                    glyphs_.emplace_back(std::move(glyph));
+                if (glyph.levels.size() == static_cast<std::size_t>(glyphLevels + 2)) {
+                    glyphs.emplace_back(std::move(glyph));
                 }
             }
 
-            if (glyphs_.empty()) {
+            if (glyphs.empty()) {
                 throw mxvk::Exception("Matrix demo could not render any glyphs from keifont.ttf");
             }
 
             int textW = 0;
             int textH = 0;
-            TTF_GetStringSize(font_.get(), "\xEF\xBE\x8F", 0, &textW, &textH);
-            cellW_ = std::max(14, textW + 2);
-            cellH_ = std::max(22, textH - 1);
+            TTF_GetStringSize(font.get(), "\xEF\xBE\x8F", 0, &textW, &textH);
+            cellW = std::max(14, textW + 2);
+            cellH = std::max(22, textH - 1);
         }
 
         void rebuildForExtent() {
             const VkExtent2D extent = getSwapchainExtent();
             const int width = static_cast<int>(extent.width);
             const int height = static_cast<int>(extent.height);
-            if (width <= 0 || height <= 0 || (canvas_ != nullptr && canvas_->w == width && canvas_->h == height)) {
+            if (width <= 0 || height <= 0 || (canvas != nullptr && canvas->w == width && canvas->h == height)) {
                 return;
             }
 
-            canvas_.reset(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
-            if (canvas_ == nullptr) {
+            canvas.reset(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
+            if (canvas == nullptr) {
                 throw mxvk::Exception("Failed to create matrix canvas: " + std::string(SDL_GetError()));
             }
-            SDL_FillSurfaceRect(canvas_.get(), nullptr, SDL_MapSurfaceRGBA(canvas_.get(), 0, 0, 0, 255));
+            SDL_FillSurfaceRect(canvas.get(), nullptr, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
 
-            if (rainSprite_ == nullptr) {
-                rainSprite_ = createSprite(canvas_.get());
+            if (rainSprite == nullptr) {
+                rainSprite = createSprite(canvas.get());
             } else {
-                rainSprite_->updateTexture(canvas_.get());
+                rainSprite->updateTexture(canvas.get());
             }
 
-            columns_ = std::max(1, (width + cellW_ - 1) / cellW_);
-            rows_ = std::max(1, (height + cellH_ - 1) / cellH_);
-            streams_.assign(columns_, {});
+            columns = std::max(1, (width + cellW - 1) / cellW);
+            rows = std::max(1, (height + cellH - 1) / cellH);
+            streams.assign(columns, {});
             randomizeStreams();
         }
 
         void randomizeStreams() {
-            std::uniform_real_distribution<float> headDist(-static_cast<float>(rows_) * 1.5f, 0.0f);
+            std::uniform_real_distribution<float> headDist(-static_cast<float>(rows) * 1.5f, 0.0f);
             std::uniform_real_distribution<float> speedDist(9.0f, 26.0f);
             std::uniform_int_distribution<int> lengthDist(12, 38);
-            std::uniform_int_distribution<int> glyphDist(0, static_cast<int>(glyphs_.size() - 1));
+            std::uniform_int_distribution<int> glyphDist(0, static_cast<int>(glyphs.size() - 1));
             std::uniform_int_distribution<int> shimmerDist(0, 1200);
 
-            for (Stream &stream : streams_) {
-                stream.head = headDist(rng_);
-                stream.speed = speedDist(rng_);
-                stream.length = std::min(std::max(6, rows_), lengthDist(rng_));
-                stream.glyphOffset = glyphDist(rng_);
-                stream.shimmer = shimmerDist(rng_);
+            for (Stream &stream : streams) {
+                stream.head = headDist(rng);
+                stream.speed = speedDist(rng);
+                stream.length = std::min(std::max(6, rows), lengthDist(rng));
+                stream.glyphOffset = glyphDist(rng);
+                stream.shimmer = shimmerDist(rng);
             }
         }
 
         void updateRain(float dt) {
             fadeCanvas(dt);
 
-            for (int column = 0; column < columns_; ++column) {
-                Stream &stream = streams_[column];
+            for (int column = 0; column < columns; ++column) {
+                Stream &stream = streams[column];
                 stream.head += stream.speed * dt;
-                if (stream.head - static_cast<float>(stream.length) > static_cast<float>(rows_) + 3.0f) {
+                if (stream.head - static_cast<float>(stream.length) > static_cast<float>(rows) + 3.0f) {
                     resetStream(stream);
                 }
                 drawStream(column, stream);
             }
-            ++frameCounter_;
+            ++frameCounter;
         }
 
         void resetStream(Stream &stream) {
-            std::uniform_real_distribution<float> headDist(-static_cast<float>(rows_) * 0.8f, -1.0f);
+            std::uniform_real_distribution<float> headDist(-static_cast<float>(rows) * 0.8f, -1.0f);
             std::uniform_real_distribution<float> speedDist(9.0f, 27.0f);
             std::uniform_int_distribution<int> lengthDist(10, 42);
-            std::uniform_int_distribution<int> glyphDist(0, static_cast<int>(glyphs_.size() - 1));
+            std::uniform_int_distribution<int> glyphDist(0, static_cast<int>(glyphs.size() - 1));
             std::uniform_int_distribution<int> shimmerDist(0, 1200);
-            stream.head = headDist(rng_);
-            stream.speed = speedDist(rng_);
-            stream.length = std::min(std::max(8, rows_ + rows_ / 4), lengthDist(rng_));
-            stream.glyphOffset = glyphDist(rng_);
-            stream.shimmer = shimmerDist(rng_);
+            stream.head = headDist(rng);
+            stream.speed = speedDist(rng);
+            stream.length = std::min(std::max(8, rows + rows / 4), lengthDist(rng));
+            stream.glyphOffset = glyphDist(rng);
+            stream.shimmer = shimmerDist(rng);
         }
 
         void fadeCanvas(float dt) {
             const float fade = std::pow(0.50f, dt * 8.0f);
-            if (!SDL_LockSurface(canvas_.get())) {
+            if (!SDL_LockSurface(canvas.get())) {
                 return;
             }
-            auto *pixels = static_cast<Uint8 *>(canvas_->pixels);
-            for (int y = 0; y < canvas_->h; ++y) {
-                Uint8 *row = pixels + y * canvas_->pitch;
-                for (int x = 0; x < canvas_->w; ++x) {
+            auto *pixels = static_cast<Uint8 *>(canvas->pixels);
+            for (int y = 0; y < canvas->h; ++y) {
+                Uint8 *row = pixels + y * canvas->pitch;
+                for (int x = 0; x < canvas->w; ++x) {
                     Uint8 *p = row + x * 4;
                     p[0] = static_cast<Uint8>(static_cast<float>(p[0]) * fade * 0.80f);
                     p[1] = static_cast<Uint8>(static_cast<float>(p[1]) * fade);
@@ -276,55 +276,55 @@ namespace example {
                     p[3] = 255;
                 }
             }
-            SDL_UnlockSurface(canvas_.get());
+            SDL_UnlockSurface(canvas.get());
         }
 
         void drawStream(int column, const Stream &stream) {
             const int headRow = static_cast<int>(std::floor(stream.head));
-            const int x = column * cellW_ + ((column % 5 == 0) ? -1 : 0);
+            const int x = column * cellW + ((column % 5 == 0) ? -1 : 0);
             for (int tail = stream.length; tail >= 0; --tail) {
                 const int row = headRow - tail;
-                if (row < -1 || row >= rows_) {
+                if (row < -1 || row >= rows) {
                     continue;
                 }
 
                 const float age = static_cast<float>(tail) / static_cast<float>(std::max(1, stream.length));
-                int level = glyphLevels_ - static_cast<int>(std::round(age * static_cast<float>(glyphLevels_ + 1)));
+                int level = glyphLevels - static_cast<int>(std::round(age * static_cast<float>(glyphLevels + 1)));
                 if (tail == 0) {
-                    level = glyphLevels_ + 1;
+                    level = glyphLevels + 1;
                 } else if (tail <= 2) {
-                    level = glyphLevels_;
+                    level = glyphLevels;
                 }
-                level = std::clamp(level, 0, glyphLevels_ + 1);
+                level = std::clamp(level, 0, glyphLevels + 1);
 
-                const int glyphIndex = (stream.glyphOffset + row * 17 + column * 11 + stream.shimmer + frameCounter_ / 3 + tail * 5) %
-                                       static_cast<int>(glyphs_.size());
-                const Glyph &glyph = glyphs_[glyphIndex < 0 ? glyphIndex + glyphs_.size() : glyphIndex];
+                const int glyphIndex = (stream.glyphOffset + row * 17 + column * 11 + stream.shimmer + frameCounter / 3 + tail * 5) %
+                                       static_cast<int>(glyphs.size());
+                const Glyph &glyph = glyphs[glyphIndex < 0 ? glyphIndex + glyphs.size() : glyphIndex];
                 if (glyph.levels.empty()) {
                     continue;
                 }
 
-                SDL_Rect dst{x + (cellW_ - glyph.levels[level]->w) / 2, row * cellH_, glyph.levels[level]->w, glyph.levels[level]->h};
-                SDL_BlitSurface(glyph.levels[level].get(), nullptr, canvas_.get(), &dst);
+                SDL_Rect dst{x + (cellW - glyph.levels[level]->w) / 2, row * cellH, glyph.levels[level]->w, glyph.levels[level]->h};
+                SDL_BlitSurface(glyph.levels[level].get(), nullptr, canvas.get(), &dst);
             }
         }
 
-        static constexpr int fontSize_ = 24;
-        static constexpr int glyphLevels_ = 7;
+        static constexpr int fontSize = 24;
+        static constexpr int glyphLevels = 7;
 
-        std::string assetRoot_;
-        FontPtr font_;
-        SurfacePtr canvas_;
-        mxvk::VK_Sprite *rainSprite_ = nullptr;
-        std::vector<Glyph> glyphs_;
-        std::vector<Stream> streams_;
-        std::mt19937 rng_;
-        Clock::time_point lastFrame_{Clock::now()};
-        int columns_ = 0;
-        int rows_ = 0;
-        int cellW_ = 18;
-        int cellH_ = 24;
-        int frameCounter_ = 0;
+        std::string assetRoot;
+        FontPtr font;
+        SurfacePtr canvas;
+        mxvk::VK_Sprite *rainSprite = nullptr;
+        std::vector<Glyph> glyphs;
+        std::vector<Stream> streams;
+        std::mt19937 rng;
+        Clock::time_point lastFrame{Clock::now()};
+        int columns = 0;
+        int rows = 0;
+        int cellW = 18;
+        int cellH = 24;
+        int frameCounter = 0;
     };
 } // namespace example
 

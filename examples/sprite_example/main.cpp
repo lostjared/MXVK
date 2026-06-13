@@ -9,9 +9,9 @@
 namespace example {
     class ExampleWindow : public mxvk::VK_Window {
         std::string current_path = ".";
-        mxvk::VK_Sprite *sprite_ = nullptr;
-        int fallback_width_ = 1280;
-        int fallback_height_ = 720;
+        mxvk::VK_Sprite *sprite = nullptr;
+        int fallback_width = 1280;
+        int fallback_height = 720;
 
       public:
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION) {
@@ -20,12 +20,12 @@ namespace example {
                 current_path = sprite_example_ASSET_DIR;
             }
             setFont(current_path + "/data/font.ttf", 24);
-            fallback_width_ = width;
-            fallback_height_ = height;
+            fallback_width = width;
+            fallback_height = height;
             const std::string image_path = current_path + "/data/intro.png";
             const std::string vertex_shader = current_path + "/data/sprite.vert.spv";
             const std::string fragment_shader = std::string(sprite_example_SHADER_DIR) + "/fragment.frag.spv";
-            sprite_ = createSprite(image_path, vertex_shader, fragment_shader);
+            sprite = createSprite(image_path, vertex_shader, fragment_shader);
         }
 
         void event(SDL_Event &e) override {
@@ -35,16 +35,16 @@ namespace example {
         }
 
         void proc() override {
-            if (sprite_ == nullptr) {
+            if (sprite == nullptr) {
                 return;
             }
-            int target_w = fallback_width_;
-            int target_h = fallback_height_;
+            int target_w = fallback_width;
+            int target_h = fallback_height;
             if (swapchain_extent.width > 0U && swapchain_extent.height > 0U) {
                 target_w = static_cast<int>(swapchain_extent.width);
                 target_h = static_cast<int>(swapchain_extent.height);
             }
-            sprite_->drawSpriteRect(0, 0, target_w, target_h);
+            sprite->drawSpriteRect(0, 0, target_w, target_h);
             printText("Hello, World!", 15, 15, {255, 255, 255, 255});
         }
     };

@@ -346,36 +346,36 @@ namespace mxvk {
         VkCommandPool command_pool = VK_NULL_HANDLE;
         std::vector<VkCommandBuffer> command_buffers{};
 
-        std::array<VkSemaphore, max_frames_in_flight> image_available_{};
-        std::vector<VkSemaphore> render_finished_{};
-        std::array<VkFence, max_frames_in_flight> in_flight_fences_{};
-        std::vector<VkFence> image_fences_{};
-        uint32_t current_frame_ = 0;
+        std::array<VkSemaphore, max_frames_in_flight> image_available{};
+        std::vector<VkSemaphore> render_finished{};
+        std::array<VkFence, max_frames_in_flight> in_flight_fences{};
+        std::vector<VkFence> image_fences{};
+        uint32_t current_frame = 0;
 
         bool sdl_initialized = false;
         bool active = false;
         bool validation_enabled = false;
-        bool framebuffer_resized_ = false;
-        bool force_swapchain_recreate_ = false;
-        uint64_t last_resize_event_ms_ = 0;
-        static constexpr uint64_t resize_settle_delay_ms_ = 150;
+        bool framebuffer_resized = false;
+        bool force_swapchain_recreate = false;
+        uint64_t last_resize_event_ms = 0;
+        static constexpr uint64_t resize_settle_delay_ms = 150;
 
-        std::vector<std::unique_ptr<VK_Sprite>> sprites_{};
-        VkDescriptorSetLayout sprite_descriptor_set_layout_ = VK_NULL_HANDLE;
-        VkPipelineLayout sprite_pipeline_layout_ = VK_NULL_HANDLE;
-        VkPipeline sprite_pipeline_ = VK_NULL_HANDLE;
-        bool sprite_state_dirty_ = false;
+        std::vector<std::unique_ptr<VK_Sprite>> sprites{};
+        VkDescriptorSetLayout sprite_descriptor_set_layout = VK_NULL_HANDLE;
+        VkPipelineLayout sprite_pipeline_layout = VK_NULL_HANDLE;
+        VkPipeline sprite_pipeline = VK_NULL_HANDLE;
+        bool sprite_state_dirty = false;
 
-        std::unique_ptr<VK_Text> text_renderer_{};
-        VkDescriptorSetLayout text_descriptor_set_layout_ = VK_NULL_HANDLE;
-        VkPipelineLayout text_pipeline_layout_ = VK_NULL_HANDLE;
-        VkPipeline text_pipeline_ = VK_NULL_HANDLE;
-        bool text_state_dirty_ = false;
-        bool font_configured_ = false;
-        std::string font_path_{};
-        int font_size_ = 24;
-        VkClearColorValue clear_color_{{0.0f, 0.0f, 0.0f, 1.0f}};
-	std::vector<VkSwapchainKHR> retired_swapchains_;
+        std::unique_ptr<VK_Text> text_renderer{};
+        VkDescriptorSetLayout text_descriptor_set_layout = VK_NULL_HANDLE;
+        VkPipelineLayout text_pipeline_layout = VK_NULL_HANDLE;
+        VkPipeline text_pipeline = VK_NULL_HANDLE;
+        bool text_state_dirty = false;
+        bool font_configured = false;
+        std::string font_path{};
+        int font_size = 24;
+        VkClearColorValue clear_color{{0.0f, 0.0f, 0.0f, 1.0f}};
+	std::vector<VkSwapchainKHR> retired_swapchains;
     };
 
 } // namespace mxvk

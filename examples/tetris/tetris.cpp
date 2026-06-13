@@ -93,39 +93,39 @@ namespace {
     class HighScores {
       public:
         explicit HighScores(std::filesystem::path filePath)
-            : filePath_(std::move(filePath)) {
+            : filePath(std::move(filePath)) {
             load();
         }
 
         void addScore(std::string name, int score) {
             normalizeName(name);
-            entries_.push_back({std::move(name), score});
+            scoreEntries.push_back({std::move(name), score});
             sortAndTrim();
             write();
         }
 
         [[nodiscard]] bool qualifies(int score) const {
-            if (entries_.size() < kMaxEntries) {
+            if (scoreEntries.size() < kMaxEntries) {
                 return true;
             }
-            return score > entries_.back().score;
+            return score > scoreEntries.back().score;
         }
 
         [[nodiscard]] const std::vector<HighScoreEntry> &entries() const {
-            return entries_;
+            return scoreEntries;
         }
 
         [[nodiscard]] int bestScore() const {
-            return entries_.empty() ? 0 : entries_.front().score;
+            return scoreEntries.empty() ? 0 : scoreEntries.front().score;
         }
 
         void write() const {
-            std::ofstream out(filePath_, std::ios::trunc);
+            std::ofstream out(filePath, std::ios::trunc);
             if (!out.is_open()) {
                 return;
             }
 
-            for (const HighScoreEntry &entry : entries_) {
+            for (const HighScoreEntry &entry : scoreEntries) {
                 out << entry.name << ':' << entry.score << '\n';
             }
         }
@@ -134,8 +134,8 @@ namespace {
         static constexpr std::size_t kMaxEntries = 10;
         static constexpr std::size_t kMaxNameBytes = 16;
 
-        std::filesystem::path filePath_;
-        std::vector<HighScoreEntry> entries_{};
+        std::filesystem::path filePath;
+        std::vector<HighScoreEntry> scoreEntries{};
 
         static void normalizeName(std::string &name) {
             if (name.empty()) {
@@ -154,22 +154,22 @@ namespace {
         }
 
         void sortAndTrim() {
-            std::sort(entries_.begin(), entries_.end(), [](const HighScoreEntry &a, const HighScoreEntry &b) {
+            std::sort(scoreEntries.begin(), scoreEntries.end(), [](const HighScoreEntry &a, const HighScoreEntry &b) {
                 if (a.score != b.score) {
                     return a.score > b.score;
                 }
                 return a.name < b.name;
             });
 
-            if (entries_.size() > kMaxEntries) {
-                entries_.resize(kMaxEntries);
+            if (scoreEntries.size() > kMaxEntries) {
+                scoreEntries.resize(kMaxEntries);
             }
         }
 
         void load() {
-            entries_.clear();
+            scoreEntries.clear();
 
-            std::ifstream in(filePath_);
+            std::ifstream in(filePath);
             if (!in.is_open()) {
                 return;
             }
@@ -185,7 +185,7 @@ namespace {
                 entry.name = line.substr(0, separator);
                 entry.score = static_cast<int>(std::strtol(line.substr(separator + 1).c_str(), nullptr, 10));
                 normalizeName(entry.name);
-                entries_.push_back(std::move(entry));
+                scoreEntries.push_back(std::move(entry));
             }
 
             sortAndTrim();
@@ -273,51 +273,51 @@ namespace {
       public:
         TetrisWindow(const std::string &path, int width, int height, bool fullscreen)
             : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION),
-              assetRoot_((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
-              dataRoot_(assetRoot_ + "/data"),
-              highScores_(resolveScoreFilePath()) {
+              assetRoot((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
+              dataRoot(assetRoot + "/data"),
+              highScores(resolveScoreFilePath()) {
             std::random_device rd;
-            rng_.seed(rd());
+            rng.seed(rd());
             setFont(tetris_FONT_PATH, 22);
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             tryOpenFirstGamepad();
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
-            music_ = std::make_unique<mxvk::VK_Mixer>();
-            musicTrack_ = music_->loadMusic(dataRoot_ + "/music.ogg");
+            music = std::make_unique<mxvk::VK_Mixer>();
+            musicTrack = music->loadMusic(dataRoot + "/music.ogg");
             ensureMusicPlaying();
 #endif
-            background_ = createSprite(dataRoot_ + "/psychedelic_background.png");
-            backgroundTransitionSprite_ = createSprite(
-                dataRoot_ + "/psychedelic_background.png",
+            background = createSprite(dataRoot + "/psychedelic_background.png");
+            backgroundTransitionSprite = createSprite(
+                dataRoot + "/psychedelic_background.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_background_transition.frag.spv");
-            menuBackgroundSprite_ = createSprite(
-                dataRoot_ + "/start_screen.png",
+            menuBackgroundSprite = createSprite(
+                dataRoot + "/start_screen.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
-            highScoresBackgroundSprite_ = createSprite(
-                dataRoot_ + "/high_scores_screen.png",
+            highScoresBackgroundSprite = createSprite(
+                dataRoot + "/high_scores_screen.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
-            creditsBackgroundSprite_ = createSprite(
-                dataRoot_ + "/credits_screen.png",
+            creditsBackgroundSprite = createSprite(
+                dataRoot + "/credits_screen.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
-            multiplayerBackgroundSprite_ = createSprite(
-                dataRoot_ + "/multiplayer_screen.png",
+            multiplayerBackgroundSprite = createSprite(
+                dataRoot + "/multiplayer_screen.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
-            previewBorderSprite_ = createSprite(1, 1);
+            previewBorderSprite = createSprite(1, 1);
             const uint32_t whitePixel = 0xFFFFFFFFu;
-            previewBorderSprite_->updateTexture(&whitePixel, 1, 1);
-            for (std::size_t i = 0; i < blockPreviewSprites_.size(); ++i) {
-                blockPreviewSprites_[i] = createSprite(dataRoot_ + "/" + blockTextureFiles[i]);
+            previewBorderSprite->updateTexture(&whitePixel, 1, 1);
+            for (std::size_t i = 0; i < blockPreviewSprites.size(); ++i) {
+                blockPreviewSprites[i] = createSprite(dataRoot + "/" + blockTextureFiles[i]);
             }
-            gameOverSprite_ = createSprite(dataRoot_ + "/gameover.png");
-            introSprite_ = createSprite(dataRoot_ + "/intro.png",
+            gameOverSprite = createSprite(dataRoot + "/gameover.png");
+            introSprite = createSprite(dataRoot + "/intro.png",
                                         std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
                                         std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
-            introStart_ = std::chrono::steady_clock::now();
+            introStart = std::chrono::steady_clock::now();
             initModels();
             initCreditsModel();
             resetGame();
@@ -328,8 +328,8 @@ namespace {
                 vkDeviceWaitIdle(device);
             }
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
-            if (music_) {
-                music_->stopMusic();
+            if (music) {
+                music->stopMusic();
             }
 #endif
             stopNameEntry();
@@ -353,7 +353,7 @@ namespace {
                 if (e.key.repeat) {
                     return;
                 }
-                if (screen_ == AppScreen::GameOver && enteringName_) {
+                if (screen == AppScreen::GameOver && enteringName) {
                     handleNameEntryKey(e.key.key);
                     return;
                 }
@@ -367,7 +367,7 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
-                if (gamepad_ != nullptr && e.gdevice.which == gamepadId_) {
+                if (gamepad != nullptr && e.gdevice.which == gamepadId) {
                     closeGamepad();
                     tryOpenFirstGamepad();
                 }
@@ -375,7 +375,7 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-                if (screen_ == AppScreen::GameOver && enteringName_) {
+                if (screen == AppScreen::GameOver && enteringName) {
                     handleNameEntryButton(e.gbutton.button);
                     return;
                 }
@@ -389,7 +389,7 @@ namespace {
             updateIntroState();
             updateScreenTransition();
             updateInput();
-            if (screen_ == AppScreen::Game) {
+            if (screen == AppScreen::Game) {
                 updateGame();
             }
             drawHud();
@@ -399,35 +399,35 @@ namespace {
             const VkExtent2D extent = getSwapchainExtent();
             drawScreenBackdrop(cmd, extent);
 
-            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
+            if (screen == AppScreen::Game || screen == AppScreen::GameOver) {
                 const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
-                glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.2f, cameraDistance_), glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-                view = glm::rotate(view, glm::radians(gridPitch_), glm::vec3(1.0f, 0.0f, 0.0f));
-                view = glm::rotate(view, glm::radians(gridYaw_), glm::vec3(0.0f, 1.0f, 0.0f));
-                view = glm::rotate(view, glm::radians(gridRoll_), glm::vec3(0.0f, 0.0f, 1.0f));
+                glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.2f, cameraDistance), glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridPitch), glm::vec3(1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridYaw), glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridRoll), glm::vec3(0.0f, 0.0f, 1.0f));
 
                 glm::mat4 proj = glm::perspective(glm::radians(46.0f), aspect, 0.1f, 100.0f);
                 proj[1][1] *= -1.0f;
-                const bool blinkVisible = !lineClearActive_ || isLineClearVisible();
+                const bool blinkVisible = !lineClearActive || isLineClearVisible();
 
-                for (LockedBlock &locked : lockedBlocks_) {
+                for (LockedBlock &locked : lockedBlocks) {
                     if (blinkVisible || !isClearingRow(locked.y)) {
                         drawBlock(cmd, imageIndex, locked.block, locked.x, locked.y, locked.block.color, view, proj);
                     }
                 }
 
-                if (!lineClearActive_) {
-                    for (size_t i = 0; i < activeModels_.size(); ++i) {
-                        const int x = active_.x + active_.blocks[i].x;
-                        const int y = active_.y + active_.blocks[i].y;
-                        drawBlock(cmd, imageIndex, activeModels_[i], x, y, active_.color, view, proj);
+                if (!lineClearActive) {
+                    for (size_t i = 0; i < activeModels.size(); ++i) {
+                        const int x = active.x + active.blocks[i].x;
+                        const int y = active.y + active.blocks[i].y;
+                        drawBlock(cmd, imageIndex, activeModels[i], x, y, active.color, view, proj);
                     }
                 }
 
                 drawFrame(cmd, imageIndex, view, proj);
                 drawNextPiecePreview(cmd, imageIndex, extent);
             }
-            if (screen_ == AppScreen::Credits) {
+            if (screen == AppScreen::Credits) {
                 drawCreditsModel(cmd, imageIndex, extent);
             }
             drawGameScreenTransitionOverlay(cmd, extent);
@@ -436,98 +436,98 @@ namespace {
         }
 
       private:
-        std::string assetRoot_;
-        std::string dataRoot_;
-        std::array<std::array<Cell, boardWidth>, boardHeight> board_{};
-        ActivePiece active_{};
-        std::mt19937 rng_{};
-        std::vector<LockedBlock> lockedBlocks_{};
-        std::array<BlockModel, 4> activeModels_{};
-        std::vector<BlockModel> frameModels_{};
-        mxvk::VK_Sprite *background_ = nullptr;
-        mxvk::VK_Sprite *backgroundTransitionSprite_ = nullptr;
-        mxvk::VK_Sprite *menuBackgroundSprite_ = nullptr;
-        mxvk::VK_Sprite *highScoresBackgroundSprite_ = nullptr;
-        mxvk::VK_Sprite *creditsBackgroundSprite_ = nullptr;
-        mxvk::VK_Sprite *multiplayerBackgroundSprite_ = nullptr;
-        mxvk::VK_Sprite *previewBorderSprite_ = nullptr;
-        std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites_{};
-        mxvk::VK_Sprite *introSprite_ = nullptr;
-        mxvk::VK_Sprite *gameOverSprite_ = nullptr;
-        std::unique_ptr<mxvk::VKAbstractModel> creditsTuxModel_{};
-        HighScores highScores_;
+        std::string assetRoot;
+        std::string dataRoot;
+        std::array<std::array<Cell, boardWidth>, boardHeight> board{};
+        ActivePiece active{};
+        std::mt19937 rng{};
+        std::vector<LockedBlock> lockedBlocks{};
+        std::array<BlockModel, 4> activeModels{};
+        std::vector<BlockModel> frameModels{};
+        mxvk::VK_Sprite *background = nullptr;
+        mxvk::VK_Sprite *backgroundTransitionSprite = nullptr;
+        mxvk::VK_Sprite *menuBackgroundSprite = nullptr;
+        mxvk::VK_Sprite *highScoresBackgroundSprite = nullptr;
+        mxvk::VK_Sprite *creditsBackgroundSprite = nullptr;
+        mxvk::VK_Sprite *multiplayerBackgroundSprite = nullptr;
+        mxvk::VK_Sprite *previewBorderSprite = nullptr;
+        std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites{};
+        mxvk::VK_Sprite *introSprite = nullptr;
+        mxvk::VK_Sprite *gameOverSprite = nullptr;
+        std::unique_ptr<mxvk::VKAbstractModel> creditsTuxModel{};
+        HighScores highScores;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
-        std::unique_ptr<mxvk::VK_Mixer> music_{};
-        int musicTrack_ = -1;
+        std::unique_ptr<mxvk::VK_Mixer> music{};
+        int musicTrack = -1;
 #endif
-        SDL_Gamepad *gamepad_ = nullptr;
-        SDL_JoystickID gamepadId_ = 0;
-        std::chrono::steady_clock::time_point introStart_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point lastFall_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point lastInputUpdate_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point lineClearStart_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point backgroundTransitionStart_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point screenTransitionStart_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point gameOverTransitionStart_{std::chrono::steady_clock::now()};
-        bool introActive_ = true;
-        float gridYaw_ = 0.0f;
-        float gridPitch_ = 0.0f;
-        float gridRoll_ = 0.0f;
-        float cameraDistance_ = 2.45f;
-        int score_ = 0;
-        int linesCleared_ = 0;
-        int level_ = 1;
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepadId = 0;
+        std::chrono::steady_clock::time_point introStart{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point lastFall{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point lastInputUpdate{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point lineClearStart{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point backgroundTransitionStart{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point screenTransitionStart{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point gameOverTransitionStart{std::chrono::steady_clock::now()};
+        bool introActive = true;
+        float gridYaw = 0.0f;
+        float gridPitch = 0.0f;
+        float gridRoll = 0.0f;
+        float cameraDistance = 2.45f;
+        int score = 0;
+        int linesCleared = 0;
+        int level = 1;
         int cursorPos = 0;
-        float fallSeconds_ = 0.65f;
-        float moveRepeatTimer_ = 0.0f;
-        float softDropRepeatTimer_ = 0.0f;
-        float gamepadMoveRepeatTimer_ = 0.0f;
-        float gamepadSoftDropRepeatTimer_ = 0.0f;
-        bool gameOver_ = false;
-        bool enteringName_ = false;
-        bool highScoresAfterSave_ = false;
-        std::size_t nameCharIndex_ = 0;
-        std::string playerName_{};
-        bool hardDropHeld_ = false;
-        bool rotateHeld_ = false;
-        bool resetHeld_ = false;
-        bool enterHeld_ = false;
-        bool escapeHeld_ = false;
-        bool backspaceHeld_ = false;
-        bool menuUpHeld_ = false;
-        bool menuDownHeld_ = false;
-        bool menuEnterHeld_ = false;
-        bool introSkipHeld_ = false;
-        bool introFadeStarted_ = false;
-        bool screenTransitionActive_ = false;
-        bool gameOverTransitionActive_ = false;
-        bool lineClearActive_ = false;
-        bool backgroundTransitionActive_ = false;
-        std::array<bool, boardHeight> clearingRows_{};
-        PieceQueueEntry nextPiece_{};
-        AppScreen screen_ = AppScreen::Intro;
-        AppScreen transitionFromScreen_ = AppScreen::Intro;
-        static constexpr float introHoldSeconds_ = 5.0f;
-        static constexpr float introFadeSeconds_ = 1.0f;
-        static constexpr float screenTransitionSeconds_ = 0.36f;
-        static constexpr float gameOverTransitionSeconds_ = 0.5f;
-        static constexpr float backgroundTransitionSeconds_ = 1.25f;
-        static constexpr Sint16 gamepadDeadzone_ = 10000;
-        static constexpr float gamepadMoveInitialDelaySeconds_ = 0.22f;
-        static constexpr float gamepadMoveRepeatSeconds_ = 0.12f;
-        static constexpr float gamepadSoftDropInitialDelaySeconds_ = 0.18f;
-        static constexpr float gamepadSoftDropRepeatSeconds_ = 0.08f;
-        static constexpr float gamepadStickRotateSpeed_ = 120.0f;
-        static constexpr float gamepadStickPitchSpeed_ = 100.0f;
-        static constexpr float gamepadStickScale_ = 1.0f / 32768.0f;
-        int gamepadMoveDirection_ = 0;
-        float gamepadMoveHeldSeconds_ = 0.0f;
-        bool gamepadSoftDropHeld_ = false;
+        float fallSeconds = 0.65f;
+        float moveRepeatTimer = 0.0f;
+        float softDropRepeatTimer = 0.0f;
+        float gamepadMoveRepeatTimer = 0.0f;
+        float gamepadSoftDropRepeatTimer = 0.0f;
+        bool gameOver = false;
+        bool enteringName = false;
+        bool highScoresAfterSave = false;
+        std::size_t nameCharIndex = 0;
+        std::string playerName{};
+        bool hardDropHeld = false;
+        bool rotateHeld = false;
+        bool resetHeld = false;
+        bool enterHeld = false;
+        bool escapeHeld = false;
+        bool backspaceHeld = false;
+        bool menuUpHeld = false;
+        bool menuDownHeld = false;
+        bool menuEnterHeld = false;
+        bool introSkipHeld = false;
+        bool introFadeStarted = false;
+        bool screenTransitionActive = false;
+        bool gameOverTransitionActive = false;
+        bool lineClearActive = false;
+        bool backgroundTransitionActive = false;
+        std::array<bool, boardHeight> clearingRows{};
+        PieceQueueEntry nextPiece{};
+        AppScreen screen = AppScreen::Intro;
+        AppScreen transitionFromScreen = AppScreen::Intro;
+        static constexpr float introHoldSeconds = 5.0f;
+        static constexpr float introFadeSeconds = 1.0f;
+        static constexpr float screenTransitionSeconds = 0.36f;
+        static constexpr float gameOverTransitionSeconds = 0.5f;
+        static constexpr float backgroundTransitionSeconds = 1.25f;
+        static constexpr Sint16 gamepadDeadzone = 10000;
+        static constexpr float gamepadMoveInitialDelaySeconds = 0.22f;
+        static constexpr float gamepadMoveRepeatSeconds = 0.12f;
+        static constexpr float gamepadSoftDropInitialDelaySeconds = 0.18f;
+        static constexpr float gamepadSoftDropRepeatSeconds = 0.08f;
+        static constexpr float gamepadStickRotateSpeed = 120.0f;
+        static constexpr float gamepadStickPitchSpeed = 100.0f;
+        static constexpr float gamepadStickScale = 1.0f / 32768.0f;
+        int gamepadMoveDirection = 0;
+        float gamepadMoveHeldSeconds = 0.0f;
+        bool gamepadSoftDropHeld = false;
 
         void initModels() {
-            frameModels_.reserve(boardWidth + (boardHeight * 2) + 2);
+            frameModels.reserve(boardWidth + (boardHeight * 2) + 2);
             for (int i = 0; i < boardWidth + (boardHeight * 2) + 2; ++i) {
-                frameModels_.push_back(loadBlockModel(7));
+                frameModels.push_back(loadBlockModel(7));
             }
         }
 
@@ -535,7 +535,7 @@ namespace {
             BlockModel block{};
             block.color = color;
             block.model = std::make_unique<mxvk::VKAbstractModel>();
-            block.model->load(this, dataRoot_ + "/cube.mxmod.z", dataRoot_ + "/" + textureManifests[color], dataRoot_, 1.0f);
+            block.model->load(this, dataRoot + "/cube.mxmod.z", dataRoot + "/" + textureManifests[color], dataRoot, 1.0f);
             block.model->setShaders(this,
                                     std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
                                     std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
@@ -546,39 +546,39 @@ namespace {
             forEachModel([this](mxvk::VKAbstractModel &model) {
                 model.cleanup(this);
             });
-            lockedBlocks_.clear();
+            lockedBlocks.clear();
         }
 
         template <typename Fn>
         void forEachModel(Fn fn) {
-            for (LockedBlock &locked : lockedBlocks_) {
+            for (LockedBlock &locked : lockedBlocks) {
                 if (locked.block.model) {
                     fn(*locked.block.model);
                 }
             }
-            for (BlockModel &block : activeModels_) {
+            for (BlockModel &block : activeModels) {
                 if (block.model) {
                     fn(*block.model);
                 }
             }
-            for (BlockModel &block : frameModels_) {
+            for (BlockModel &block : frameModels) {
                 if (block.model) {
                     fn(*block.model);
                 }
             }
-            if (creditsTuxModel_) {
-                fn(*creditsTuxModel_);
+            if (creditsTuxModel) {
+                fn(*creditsTuxModel);
             }
         }
 
         void initCreditsModel() {
-            creditsTuxModel_ = std::make_unique<mxvk::VKAbstractModel>();
-            creditsTuxModel_->load(this,
-                                   dataRoot_ + "/tux/tux.obj",
-                                   dataRoot_ + "/tux/tux.mtl",
-                                   dataRoot_ + "/tux",
+            creditsTuxModel = std::make_unique<mxvk::VKAbstractModel>();
+            creditsTuxModel->load(this,
+                                   dataRoot + "/tux/tux.obj",
+                                   dataRoot + "/tux/tux.mtl",
+                                   dataRoot + "/tux",
                                    0.35f);
-            creditsTuxModel_->setShaders(this,
+            creditsTuxModel->setShaders(this,
                                          std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
                                          std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
         }
@@ -586,48 +586,48 @@ namespace {
         void resetGame() {
             stopNameEntry();
             clearLockedBlocks();
-            for (auto &row : board_) {
+            for (auto &row : board) {
                 for (Cell &cell : row) {
                     cell.color = -1;
                 }
             }
-            gameOver_ = false;
-            gameOverTransitionActive_ = false;
-            lineClearActive_ = false;
-            backgroundTransitionActive_ = false;
-            clearingRows_.fill(false);
-            score_ = 0;
-            linesCleared_ = 0;
+            gameOver = false;
+            gameOverTransitionActive = false;
+            lineClearActive = false;
+            backgroundTransitionActive = false;
+            clearingRows.fill(false);
+            score = 0;
+            linesCleared = 0;
             updateDifficulty();
-            lastFall_ = std::chrono::steady_clock::now();
-            nextPiece_ = randomPiece();
+            lastFall = std::chrono::steady_clock::now();
+            nextPiece = randomPiece();
             spawnPiece();
         }
 
         void clearLockedBlocks() {
-            for (LockedBlock &locked : lockedBlocks_) {
+            for (LockedBlock &locked : lockedBlocks) {
                 if (locked.block.model) {
                     locked.block.model->cleanup(this);
                 }
             }
-            lockedBlocks_.clear();
+            lockedBlocks.clear();
         }
 
         void spawnPiece() {
-            active_.blocks = nextPiece_.blocks;
-            active_.x = boardWidth / 2;
-            active_.y = boardHeight - 2;
-            active_.color = nextPiece_.color;
-            reloadActiveModels(active_.color);
-            gameOver_ = collides(active_.x, active_.y, active_.blocks);
-            if (gameOver_) {
+            active.blocks = nextPiece.blocks;
+            active.x = boardWidth / 2;
+            active.y = boardHeight - 2;
+            active.color = nextPiece.color;
+            reloadActiveModels(active.color);
+            gameOver = collides(active.x, active.y, active.blocks);
+            if (gameOver) {
                 enterGameOverState();
             }
-            nextPiece_ = randomPiece();
+            nextPiece = randomPiece();
         }
 
         void reloadActiveModels(int color) {
-            for (BlockModel &block : activeModels_) {
+            for (BlockModel &block : activeModels) {
                 if (block.model) {
                     block.model->cleanup(this);
                 }
@@ -637,13 +637,13 @@ namespace {
 
         [[nodiscard]] PieceQueueEntry randomPiece() {
             std::uniform_int_distribution<int> dist(0, static_cast<int>(pieceDefinitions.size()) - 1);
-            const PieceDefinition &definition = pieceDefinitions[dist(rng_)];
+            const PieceDefinition &definition = pieceDefinitions[dist(rng)];
             return PieceQueueEntry{definition.blocks, definition.color};
         }
 
         void updateDifficulty() {
-            const int previousLevel = level_;
-            level_ = (linesCleared_ / 8) + 1;
+            const int previousLevel = level;
+            level = (linesCleared / 8) + 1;
             static constexpr std::array<float, 16> arcadeFallSeconds{
                 0.72f, 0.66f, 0.60f, 0.54f,
                 0.48f, 0.43f, 0.38f, 0.34f,
@@ -651,23 +651,23 @@ namespace {
                 0.18f, 0.16f, 0.14f, 0.12f,
             };
 
-            const std::size_t index = std::min<std::size_t>(arcadeFallSeconds.size() - 1, static_cast<std::size_t>(std::max(level_ - 1, 0)));
-            fallSeconds_ = arcadeFallSeconds[index];
-            if (level_ > previousLevel) {
+            const std::size_t index = std::min<std::size_t>(arcadeFallSeconds.size() - 1, static_cast<std::size_t>(std::max(level - 1, 0)));
+            fallSeconds = arcadeFallSeconds[index];
+            if (level > previousLevel) {
                 triggerBackgroundTransition();
             }
         }
 
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         void ensureMusicPlaying() {
-            if (!music_) {
+            if (!music) {
                 return;
             }
-            if (musicTrack_ < 0) {
+            if (musicTrack < 0) {
                 return;
             }
-            if (!music_->isMusicPlaying(musicTrack_)) {
-                if (music_->playMusic(musicTrack_, -1) != 0) {
+            if (!music->isMusicPlaying(musicTrack)) {
+                if (music->playMusic(musicTrack, -1) != 0) {
                     throw mxvk::Exception("Could not start Tetris background music");
                 }
             }
@@ -678,8 +678,8 @@ namespace {
 
         void updateInput() {
             const auto now = std::chrono::steady_clock::now();
-            float deltaSeconds = std::chrono::duration<float>(now - lastInputUpdate_).count();
-            lastInputUpdate_ = now;
+            float deltaSeconds = std::chrono::duration<float>(now - lastInputUpdate).count();
+            lastInputUpdate = now;
             deltaSeconds = std::clamp(deltaSeconds, 0.0f, 0.05f);
 
             const bool *keys = SDL_GetKeyboardState(nullptr);
@@ -687,38 +687,38 @@ namespace {
                 return;
             }
 
-            if (introActive_) {
+            if (introActive) {
                 const bool enterDown = keys[SDL_SCANCODE_RETURN];
                 const bool spaceDown = keys[SDL_SCANCODE_SPACE];
                 const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
                 const bool skipDown = enterDown || spaceDown;
-                if (skipDown && !introSkipHeld_) {
+                if (skipDown && !introSkipHeld) {
                     const auto now = std::chrono::steady_clock::now();
-                    introStart_ = now - std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(introHoldSeconds_));
-                    introFadeStarted_ = false;
+                    introStart = now - std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(introHoldSeconds));
+                    introFadeStarted = false;
                     requestScreen(AppScreen::Menu);
                 }
-                if (escapeDown && !escapeHeld_) {
+                if (escapeDown && !escapeHeld) {
                     exit();
                 }
-                introSkipHeld_ = skipDown;
-                escapeHeld_ = escapeDown;
+                introSkipHeld = skipDown;
+                escapeHeld = escapeDown;
                 return;
             }
 
-            if (screenTransitionActive_) {
+            if (screenTransitionActive) {
                 return;
             }
 
-            if (screen_ == AppScreen::GameOver) {
-                if (enteringName_) {
+            if (screen == AppScreen::GameOver) {
+                if (enteringName) {
                     return;
                 }
                 handleGameOverKeys(keys);
                 return;
             }
 
-            if (screen_ != AppScreen::Game) {
+            if (screen != AppScreen::Game) {
                 handleMenuKeys(keys);
                 return;
             }
@@ -730,11 +730,11 @@ namespace {
         }
 
         void handleMenuKeys(const bool *keys) {
-            if (screenTransitionActive_) {
-                menuUpHeld_ = keys[SDL_SCANCODE_UP];
-                menuDownHeld_ = keys[SDL_SCANCODE_DOWN];
-                menuEnterHeld_ = keys[SDL_SCANCODE_RETURN];
-                escapeHeld_ = keys[SDL_SCANCODE_ESCAPE];
+            if (screenTransitionActive) {
+                menuUpHeld = keys[SDL_SCANCODE_UP];
+                menuDownHeld = keys[SDL_SCANCODE_DOWN];
+                menuEnterHeld = keys[SDL_SCANCODE_RETURN];
+                escapeHeld = keys[SDL_SCANCODE_ESCAPE];
                 return;
             }
 
@@ -743,16 +743,16 @@ namespace {
             const bool enterDown = keys[SDL_SCANCODE_RETURN];
             const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
 
-            if (screen_ == AppScreen::Menu) {
-                if (upDown && !menuUpHeld_) {
+            if (screen == AppScreen::Menu) {
+                if (upDown && !menuUpHeld) {
                     cursorPos = (cursorPos + 3) % 4;
                 }
-                if (downDown && !menuDownHeld_) {
+                if (downDown && !menuDownHeld) {
                     cursorPos = (cursorPos + 1) % 4;
                 }
             }
-            if (enterDown && !menuEnterHeld_) {
-                if (screen_ == AppScreen::Menu) {
+            if (enterDown && !menuEnterHeld) {
+                if (screen == AppScreen::Menu) {
                     if (cursorPos == 0) {
                         startGame();
                     } else if (cursorPos == 1) {
@@ -762,118 +762,118 @@ namespace {
                     } else if (cursorPos == 3) {
                         goToCredits();
                     }
-                } else if (screen_ == AppScreen::HighScores && highScoresAfterSave_) {
-                    highScoresAfterSave_ = false;
+                } else if (screen == AppScreen::HighScores && highScoresAfterSave) {
+                    highScoresAfterSave = false;
                     restartIntroSequence();
                 } else {
                     goToMenu();
                 }
             }
-            if (escapeDown && !escapeHeld_) {
-                if (screen_ == AppScreen::Menu) {
+            if (escapeDown && !escapeHeld) {
+                if (screen == AppScreen::Menu) {
                     exit();
                 } else {
-                    highScoresAfterSave_ = false;
+                    highScoresAfterSave = false;
                     goToMenu();
                 }
             }
 
-            menuUpHeld_ = upDown;
-            menuDownHeld_ = downDown;
-            menuEnterHeld_ = enterDown;
-            escapeHeld_ = escapeDown;
+            menuUpHeld = upDown;
+            menuDownHeld = downDown;
+            menuEnterHeld = enterDown;
+            escapeHeld = escapeDown;
         }
 
         void handleGamepadInput(float deltaSeconds) {
-            if (gamepad_ == nullptr || introActive_ || (screen_ != AppScreen::Game && screen_ != AppScreen::GameOver) || gameOver_ || lineClearActive_) {
-                gamepadMoveDirection_ = 0;
-                gamepadMoveHeldSeconds_ = 0.0f;
-                gamepadSoftDropHeld_ = false;
-                gamepadMoveRepeatTimer_ = 0.0f;
-                gamepadSoftDropRepeatTimer_ = 0.0f;
+            if (gamepad == nullptr || introActive || (screen != AppScreen::Game && screen != AppScreen::GameOver) || gameOver || lineClearActive) {
+                gamepadMoveDirection = 0;
+                gamepadMoveHeldSeconds = 0.0f;
+                gamepadSoftDropHeld = false;
+                gamepadMoveRepeatTimer = 0.0f;
+                gamepadSoftDropRepeatTimer = 0.0f;
                 return;
             }
 
-            const Sint16 leftX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTX);
-            const Sint16 leftY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY);
-            const Sint16 rightX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX);
-            const Sint16 rightY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY);
+            const Sint16 leftX = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+            const Sint16 leftY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+            const Sint16 rightX = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+            const Sint16 rightY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
 
-            const int moveDirection = (leftX < -gamepadDeadzone_) ? -1 : (leftX > gamepadDeadzone_) ? 1
+            const int moveDirection = (leftX < -gamepadDeadzone) ? -1 : (leftX > gamepadDeadzone) ? 1
                                                                                                     : 0;
             if (moveDirection == 0) {
-                gamepadMoveDirection_ = 0;
-                gamepadMoveHeldSeconds_ = 0.0f;
-                gamepadMoveRepeatTimer_ = 0.0f;
+                gamepadMoveDirection = 0;
+                gamepadMoveHeldSeconds = 0.0f;
+                gamepadMoveRepeatTimer = 0.0f;
             } else {
-                if (moveDirection != gamepadMoveDirection_) {
-                    gamepadMoveDirection_ = moveDirection;
-                    gamepadMoveHeldSeconds_ = 0.0f;
-                    gamepadMoveRepeatTimer_ = 0.0f;
-                    movePiece(gamepadMoveDirection_, 0);
+                if (moveDirection != gamepadMoveDirection) {
+                    gamepadMoveDirection = moveDirection;
+                    gamepadMoveHeldSeconds = 0.0f;
+                    gamepadMoveRepeatTimer = 0.0f;
+                    movePiece(gamepadMoveDirection, 0);
                 } else {
-                    gamepadMoveHeldSeconds_ += deltaSeconds;
-                    const float threshold = (gamepadMoveHeldSeconds_ < gamepadMoveInitialDelaySeconds_)
-                                                ? gamepadMoveInitialDelaySeconds_
-                                                : gamepadMoveRepeatSeconds_;
-                    gamepadMoveRepeatTimer_ += deltaSeconds;
-                    if (gamepadMoveRepeatTimer_ >= threshold) {
-                        movePiece(gamepadMoveDirection_, 0);
-                        gamepadMoveRepeatTimer_ = 0.0f;
+                    gamepadMoveHeldSeconds += deltaSeconds;
+                    const float threshold = (gamepadMoveHeldSeconds < gamepadMoveInitialDelaySeconds)
+                                                ? gamepadMoveInitialDelaySeconds
+                                                : gamepadMoveRepeatSeconds;
+                    gamepadMoveRepeatTimer += deltaSeconds;
+                    if (gamepadMoveRepeatTimer >= threshold) {
+                        movePiece(gamepadMoveDirection, 0);
+                        gamepadMoveRepeatTimer = 0.0f;
                     }
                 }
             }
 
-            const bool softDropDown = leftY > gamepadDeadzone_;
+            const bool softDropDown = leftY > gamepadDeadzone;
             if (!softDropDown) {
-                gamepadSoftDropHeld_ = false;
-                gamepadSoftDropRepeatTimer_ = 0.0f;
+                gamepadSoftDropHeld = false;
+                gamepadSoftDropRepeatTimer = 0.0f;
             } else {
-                const float threshold = gamepadSoftDropHeld_ ? gamepadSoftDropRepeatSeconds_ : gamepadSoftDropInitialDelaySeconds_;
-                gamepadSoftDropRepeatTimer_ += deltaSeconds;
-                if (gamepadSoftDropRepeatTimer_ >= threshold) {
+                const float threshold = gamepadSoftDropHeld ? gamepadSoftDropRepeatSeconds : gamepadSoftDropInitialDelaySeconds;
+                gamepadSoftDropRepeatTimer += deltaSeconds;
+                if (gamepadSoftDropRepeatTimer >= threshold) {
                     softDrop();
-                    gamepadSoftDropRepeatTimer_ = 0.0f;
-                    lastFall_ = std::chrono::steady_clock::now();
-                    gamepadSoftDropHeld_ = true;
+                    gamepadSoftDropRepeatTimer = 0.0f;
+                    lastFall = std::chrono::steady_clock::now();
+                    gamepadSoftDropHeld = true;
                 }
             }
 
-            if (std::abs(rightX) > gamepadDeadzone_) {
-                gridYaw_ += static_cast<float>(rightX) * gamepadStickScale_ * gamepadStickRotateSpeed_ * deltaSeconds;
+            if (std::abs(rightX) > gamepadDeadzone) {
+                gridYaw += static_cast<float>(rightX) * gamepadStickScale * gamepadStickRotateSpeed * deltaSeconds;
             }
-            if (std::abs(rightY) > gamepadDeadzone_) {
-                gridPitch_ = std::clamp(gridPitch_ - static_cast<float>(rightY) * gamepadStickScale_ * gamepadStickPitchSpeed_ * deltaSeconds,
+            if (std::abs(rightY) > gamepadDeadzone) {
+                gridPitch = std::clamp(gridPitch - static_cast<float>(rightY) * gamepadStickScale * gamepadStickPitchSpeed * deltaSeconds,
                                         -70.0f,
                                         70.0f);
             }
 
             constexpr float gamepadZoomSpeed = 3.2f;
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
-                cameraDistance_ = std::min(9.0f, cameraDistance_ + gamepadZoomSpeed * deltaSeconds);
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                cameraDistance = std::min(9.0f, cameraDistance + gamepadZoomSpeed * deltaSeconds);
             }
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
-                cameraDistance_ = std::max(1.65f, cameraDistance_ - gamepadZoomSpeed * deltaSeconds);
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+                cameraDistance = std::max(1.65f, cameraDistance - gamepadZoomSpeed * deltaSeconds);
             }
         }
 
         void handleGamepadButtonDown(Uint8 button) {
-            if (gamepad_ == nullptr) {
+            if (gamepad == nullptr) {
                 return;
             }
-            if (screenTransitionActive_) {
+            if (screenTransitionActive) {
                 return;
             }
 
-            if (introActive_) {
+            if (introActive) {
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
-                    introActive_ = false;
+                    introActive = false;
                     requestScreen(AppScreen::Menu);
                 }
                 return;
             }
 
-            switch (screen_) {
+            switch (screen) {
             case AppScreen::Menu:
                 if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
                     cursorPos = (cursorPos + 3) % 4;
@@ -894,7 +894,7 @@ namespace {
                 }
                 break;
             case AppScreen::Game:
-                if (gameOver_) {
+                if (gameOver) {
                     if (button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_SOUTH) {
                         restartIntroSequence();
                     } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
@@ -902,7 +902,7 @@ namespace {
                     }
                     return;
                 }
-                if (lineClearActive_) {
+                if (lineClearActive) {
                     return;
                 }
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
@@ -915,13 +915,13 @@ namespace {
                 break;
             case AppScreen::GameOver:
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
-                    if (enteringName_) {
+                    if (enteringName) {
                         commitScoreEntry();
                     } else {
                         restartIntroSequence();
                     }
                 } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
-                    highScoresAfterSave_ = false;
+                    highScoresAfterSave = false;
                     goToMenu();
                 }
                 break;
@@ -929,7 +929,7 @@ namespace {
             case AppScreen::HighScores:
             case AppScreen::Credits:
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
-                    highScoresAfterSave_ = false;
+                    highScoresAfterSave = false;
                     goToMenu();
                 }
                 break;
@@ -939,28 +939,28 @@ namespace {
         }
 
         bool openGamepad(SDL_JoystickID id) {
-            if (gamepad_ != nullptr && gamepadId_ == id) {
+            if (gamepad != nullptr && gamepadId == id) {
                 return true;
             }
             closeGamepad();
-            gamepad_ = SDL_OpenGamepad(id);
-            if (gamepad_ == nullptr) {
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
                 return false;
             }
-            gamepadId_ = id;
+            gamepadId = id;
             return true;
         }
 
         void closeGamepad() {
-            if (gamepad_ != nullptr) {
-                SDL_CloseGamepad(gamepad_);
-                gamepad_ = nullptr;
-                gamepadId_ = 0;
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepadId = 0;
             }
         }
 
         void tryOpenFirstGamepad() {
-            if (gamepad_ != nullptr) {
+            if (gamepad != nullptr) {
                 return;
             }
             int count = 0;
@@ -976,99 +976,99 @@ namespace {
         }
 
         void updateIntroState() {
-            if (!introActive_) {
+            if (!introActive) {
                 return;
             }
 
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - introStart_).count();
-            if (!introFadeStarted_ && elapsed >= introHoldSeconds_) {
-                introFadeStarted_ = true;
+            const float elapsed = std::chrono::duration<float>(now - introStart).count();
+            if (!introFadeStarted && elapsed >= introHoldSeconds) {
+                introFadeStarted = true;
                 requestScreen(AppScreen::Menu);
             }
-            if (elapsed >= (introHoldSeconds_ + introFadeSeconds_)) {
-                introActive_ = false;
-                introFadeStarted_ = false;
-                lastFall_ = now;
+            if (elapsed >= (introHoldSeconds + introFadeSeconds)) {
+                introActive = false;
+                introFadeStarted = false;
+                lastFall = now;
             }
         }
 
         void startGame() {
-            const AppScreen previousScreen = screen_;
+            const AppScreen previousScreen = screen;
             resetGame();
-            introActive_ = false;
-            screen_ = AppScreen::Game;
-            screenTransitionActive_ = previousScreen != AppScreen::Game;
-            transitionFromScreen_ = previousScreen;
-            screenTransitionStart_ = std::chrono::steady_clock::now();
-            lastInputUpdate_ = std::chrono::steady_clock::now();
+            introActive = false;
+            screen = AppScreen::Game;
+            screenTransitionActive = previousScreen != AppScreen::Game;
+            transitionFromScreen = previousScreen;
+            screenTransitionStart = std::chrono::steady_clock::now();
+            lastInputUpdate = std::chrono::steady_clock::now();
             resetMenuLatchState();
         }
 
         void restartIntroSequence() {
             resetGame();
-            highScoresAfterSave_ = false;
-            introActive_ = true;
-            introFadeStarted_ = false;
-            introStart_ = std::chrono::steady_clock::now();
-            screen_ = AppScreen::Intro;
-            screenTransitionActive_ = false;
-            transitionFromScreen_ = AppScreen::Intro;
-            lastInputUpdate_ = std::chrono::steady_clock::now();
+            highScoresAfterSave = false;
+            introActive = true;
+            introFadeStarted = false;
+            introStart = std::chrono::steady_clock::now();
+            screen = AppScreen::Intro;
+            screenTransitionActive = false;
+            transitionFromScreen = AppScreen::Intro;
+            lastInputUpdate = std::chrono::steady_clock::now();
             resetMenuLatchState();
-            introSkipHeld_ = true;
+            introSkipHeld = true;
         }
 
         void enterGameOverState() {
-            screen_ = AppScreen::GameOver;
-            gameOverTransitionActive_ = true;
-            gameOverTransitionStart_ = std::chrono::steady_clock::now();
-            nameCharIndex_ = 0;
-            playerName_.clear();
-            enteringName_ = highScores_.qualifies(score_);
-            highScoresAfterSave_ = false;
+            screen = AppScreen::GameOver;
+            gameOverTransitionActive = true;
+            gameOverTransitionStart = std::chrono::steady_clock::now();
+            nameCharIndex = 0;
+            playerName.clear();
+            enteringName = highScores.qualifies(score);
+            highScoresAfterSave = false;
             resetMenuLatchState();
         }
 
         void stopNameEntry() {
-            enteringName_ = false;
-            nameCharIndex_ = 0;
-            playerName_.clear();
+            enteringName = false;
+            nameCharIndex = 0;
+            playerName.clear();
         }
 
         void commitScoreEntry() {
-            highScores_.addScore(playerName_, score_);
+            highScores.addScore(playerName, score);
             stopNameEntry();
-            highScoresAfterSave_ = true;
-            menuEnterHeld_ = true;
+            highScoresAfterSave = true;
+            menuEnterHeld = true;
             goToHighScores();
         }
 
         [[nodiscard]] char currentNameCharacter() const {
-            return nameCharacters[nameCharIndex_ % nameCharacterCount];
+            return nameCharacters[nameCharIndex % nameCharacterCount];
         }
 
         void cycleNameCharacter(int delta) {
-            if (!enteringName_) {
+            if (!enteringName) {
                 return;
             }
             const int count = static_cast<int>(nameCharacterCount);
-            const int next = (static_cast<int>(nameCharIndex_) + delta + count) % count;
-            nameCharIndex_ = static_cast<std::size_t>(next);
+            const int next = (static_cast<int>(nameCharIndex) + delta + count) % count;
+            nameCharIndex = static_cast<std::size_t>(next);
         }
 
         void appendCurrentNameCharacter() {
-            if (!enteringName_ || playerName_.size() >= nameMaxLength) {
+            if (!enteringName || playerName.size() >= nameMaxLength) {
                 return;
             }
-            playerName_ += currentNameCharacter();
+            playerName += currentNameCharacter();
         }
 
         void deleteNameCharacter() {
-            if (!enteringName_ || playerName_.empty()) {
+            if (!enteringName || playerName.empty()) {
                 return;
             }
-            playerName_.pop_back();
+            playerName.pop_back();
         }
 
         void handleNameEntryKey(SDL_Keycode key) {
@@ -1083,7 +1083,7 @@ namespace {
             } else if (key == SDLK_RETURN) {
                 commitScoreEntry();
             } else if (key == SDLK_ESCAPE) {
-                highScoresAfterSave_ = false;
+                highScoresAfterSave = false;
                 goToMenu();
             }
         }
@@ -1103,18 +1103,18 @@ namespace {
         }
 
         void goToMenu() {
-            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
-                gameOver_ = false;
+            if (screen == AppScreen::Game || screen == AppScreen::GameOver) {
+                gameOver = false;
             }
-            gameOverTransitionActive_ = false;
-            highScoresAfterSave_ = false;
+            gameOverTransitionActive = false;
+            highScoresAfterSave = false;
             stopNameEntry();
             cursorPos = 0;
             requestScreen(AppScreen::Menu);
         }
 
         void goToHighScores() {
-            gameOver_ = false;
+            gameOver = false;
             stopNameEntry();
             requestScreen(AppScreen::HighScores);
         }
@@ -1128,63 +1128,63 @@ namespace {
         }
 
         void requestScreen(AppScreen nextScreen) {
-            if (screen_ == nextScreen && !screenTransitionActive_) {
+            if (screen == nextScreen && !screenTransitionActive) {
                 return;
             }
             if (nextScreen == AppScreen::Game) {
-                screenTransitionActive_ = false;
-                screen_ = nextScreen;
+                screenTransitionActive = false;
+                screen = nextScreen;
                 return;
             }
-            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
-                screenTransitionActive_ = false;
-                screen_ = nextScreen;
+            if (screen == AppScreen::Game || screen == AppScreen::GameOver) {
+                screenTransitionActive = false;
+                screen = nextScreen;
                 return;
             }
-            transitionFromScreen_ = screen_;
-            screen_ = nextScreen;
-            screenTransitionActive_ = true;
-            screenTransitionStart_ = std::chrono::steady_clock::now();
+            transitionFromScreen = screen;
+            screen = nextScreen;
+            screenTransitionActive = true;
+            screenTransitionStart = std::chrono::steady_clock::now();
             resetMenuLatchState();
         }
 
         void updateScreenTransition() {
-            if (!screenTransitionActive_) {
+            if (!screenTransitionActive) {
                 return;
             }
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart_).count();
-            if (elapsed >= screenTransitionSeconds_) {
-                screenTransitionActive_ = false;
-                transitionFromScreen_ = screen_;
+            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart).count();
+            if (elapsed >= screenTransitionSeconds) {
+                screenTransitionActive = false;
+                transitionFromScreen = screen;
                 resetMenuLatchState();
             }
         }
 
         float screenFadeAlpha() const {
-            if (!screenTransitionActive_) {
+            if (!screenTransitionActive) {
                 return 1.0f;
             }
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart_).count();
-            return std::clamp(elapsed / screenTransitionSeconds_, 0.0f, 1.0f);
+            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart).count();
+            return std::clamp(elapsed / screenTransitionSeconds, 0.0f, 1.0f);
         }
 
         float gameOverFadeAlpha() const {
-            if (!gameOverTransitionActive_) {
+            if (!gameOverTransitionActive) {
                 return 1.0f;
             }
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - gameOverTransitionStart_).count();
-            return std::clamp(elapsed / gameOverTransitionSeconds_, 0.0f, 1.0f);
+            const float elapsed = std::chrono::duration<float>(now - gameOverTransitionStart).count();
+            return std::clamp(elapsed / gameOverTransitionSeconds, 0.0f, 1.0f);
         }
 
         void resetMenuLatchState() {
-            menuUpHeld_ = false;
-            menuDownHeld_ = false;
-            menuEnterHeld_ = false;
-            introSkipHeld_ = false;
-            backspaceHeld_ = false;
+            menuUpHeld = false;
+            menuDownHeld = false;
+            menuEnterHeld = false;
+            introSkipHeld = false;
+            backspaceHeld = false;
         }
 
         void updateMenuInputLatchState() {
@@ -1192,10 +1192,10 @@ namespace {
             if (keys == nullptr) {
                 return;
             }
-            menuUpHeld_ = keys[SDL_SCANCODE_UP];
-            menuDownHeld_ = keys[SDL_SCANCODE_DOWN];
-            menuEnterHeld_ = keys[SDL_SCANCODE_RETURN];
-            escapeHeld_ = keys[SDL_SCANCODE_ESCAPE];
+            menuUpHeld = keys[SDL_SCANCODE_UP];
+            menuDownHeld = keys[SDL_SCANCODE_DOWN];
+            menuEnterHeld = keys[SDL_SCANCODE_RETURN];
+            escapeHeld = keys[SDL_SCANCODE_ESCAPE];
         }
 
         void handleHeldViewRotation(const bool *keys, float deltaSeconds) {
@@ -1205,43 +1205,43 @@ namespace {
             constexpr float zoomSpeed = 3.2f;
 
             if (keys[SDL_SCANCODE_A]) {
-                gridYaw_ -= yawSpeed * deltaSeconds;
+                gridYaw -= yawSpeed * deltaSeconds;
             }
             if (keys[SDL_SCANCODE_D]) {
-                gridYaw_ += yawSpeed * deltaSeconds;
+                gridYaw += yawSpeed * deltaSeconds;
             }
             if (keys[SDL_SCANCODE_W]) {
-                gridPitch_ = std::clamp(gridPitch_ + pitchSpeed * deltaSeconds, -70.0f, 70.0f);
+                gridPitch = std::clamp(gridPitch + pitchSpeed * deltaSeconds, -70.0f, 70.0f);
             }
             if (keys[SDL_SCANCODE_S]) {
-                gridPitch_ = std::clamp(gridPitch_ - pitchSpeed * deltaSeconds, -70.0f, 70.0f);
+                gridPitch = std::clamp(gridPitch - pitchSpeed * deltaSeconds, -70.0f, 70.0f);
             }
             if (keys[SDL_SCANCODE_Q]) {
-                gridRoll_ -= rollSpeed * deltaSeconds;
+                gridRoll -= rollSpeed * deltaSeconds;
             }
             if (keys[SDL_SCANCODE_E]) {
-                gridRoll_ += rollSpeed * deltaSeconds;
+                gridRoll += rollSpeed * deltaSeconds;
             }
             if (keys[SDL_SCANCODE_PAGEUP]) {
-                cameraDistance_ = std::max(1.65f, cameraDistance_ - zoomSpeed * deltaSeconds);
+                cameraDistance = std::max(1.65f, cameraDistance - zoomSpeed * deltaSeconds);
             }
             if (keys[SDL_SCANCODE_PAGEDOWN]) {
-                cameraDistance_ = std::min(9.0f, cameraDistance_ + zoomSpeed * deltaSeconds);
+                cameraDistance = std::min(9.0f, cameraDistance + zoomSpeed * deltaSeconds);
             }
         }
 
         void handleHeldPieceMovement(const bool *keys, float deltaSeconds) {
-            if (gameOver_ || lineClearActive_) {
-                moveRepeatTimer_ = 0.0f;
-                softDropRepeatTimer_ = 0.0f;
+            if (gameOver || lineClearActive) {
+                moveRepeatTimer = 0.0f;
+                softDropRepeatTimer = 0.0f;
                 return;
             }
 
             constexpr float horizontalRepeatSeconds = 0.14f;
             constexpr float softDropRepeatSeconds = 0.075f;
 
-            moveRepeatTimer_ += deltaSeconds;
-            softDropRepeatTimer_ += deltaSeconds;
+            moveRepeatTimer += deltaSeconds;
+            softDropRepeatTimer += deltaSeconds;
 
             int horizontalDirection = 0;
             if (keys[SDL_SCANCODE_LEFT] && !keys[SDL_SCANCODE_RIGHT]) {
@@ -1251,22 +1251,22 @@ namespace {
             }
 
             if (horizontalDirection != 0) {
-                if (moveRepeatTimer_ >= horizontalRepeatSeconds) {
+                if (moveRepeatTimer >= horizontalRepeatSeconds) {
                     movePiece(horizontalDirection, 0);
-                    moveRepeatTimer_ = 0.0f;
+                    moveRepeatTimer = 0.0f;
                 }
             } else {
-                moveRepeatTimer_ = horizontalRepeatSeconds;
+                moveRepeatTimer = horizontalRepeatSeconds;
             }
 
             if (keys[SDL_SCANCODE_DOWN]) {
-                if (softDropRepeatTimer_ >= softDropRepeatSeconds) {
+                if (softDropRepeatTimer >= softDropRepeatSeconds) {
                     softDrop();
-                    softDropRepeatTimer_ = 0.0f;
-                    lastFall_ = std::chrono::steady_clock::now();
+                    softDropRepeatTimer = 0.0f;
+                    lastFall = std::chrono::steady_clock::now();
                 }
             } else {
-                softDropRepeatTimer_ = softDropRepeatSeconds;
+                softDropRepeatTimer = softDropRepeatSeconds;
             }
         }
 
@@ -1277,33 +1277,33 @@ namespace {
             const bool resetDown = keys[SDL_SCANCODE_R];
             const bool enterDown = keys[SDL_SCANCODE_RETURN];
 
-            if (escapeDown && !escapeHeld_) {
+            if (escapeDown && !escapeHeld) {
                 goToMenu();
             }
-            if (gameOver_ && enterDown && !enterHeld_) {
+            if (gameOver && enterDown && !enterHeld) {
                 restartIntroSequence();
-                escapeHeld_ = escapeDown;
-                hardDropHeld_ = hardDropDown;
-                rotateHeld_ = rotateDown;
-                resetHeld_ = resetDown;
-                enterHeld_ = enterDown;
+                escapeHeld = escapeDown;
+                hardDropHeld = hardDropDown;
+                rotateHeld = rotateDown;
+                resetHeld = resetDown;
+                enterHeld = enterDown;
                 return;
             }
-            if (hardDropDown && !hardDropHeld_) {
+            if (hardDropDown && !hardDropHeld) {
                 hardDrop();
             }
-            if (rotateDown && !rotateHeld_) {
+            if (rotateDown && !rotateHeld) {
                 rotatePiece();
             }
-            if (resetDown && !resetHeld_) {
+            if (resetDown && !resetHeld) {
                 resetGame();
             }
 
-            escapeHeld_ = escapeDown;
-            hardDropHeld_ = hardDropDown;
-            rotateHeld_ = rotateDown;
-            resetHeld_ = resetDown;
-            enterHeld_ = enterDown;
+            escapeHeld = escapeDown;
+            hardDropHeld = hardDropDown;
+            rotateHeld = rotateDown;
+            resetHeld = resetDown;
+            enterHeld = enterDown;
         }
 
         void handleGameOverKeys(const bool *keys) {
@@ -1313,54 +1313,54 @@ namespace {
             const bool highScoresDown = keys[SDL_SCANCODE_H];
             const bool backspaceDown = keys[SDL_SCANCODE_BACKSPACE];
 
-            if (enteringName_) {
-                if (backspaceDown && !backspaceHeld_ && !playerName_.empty()) {
-                    playerName_.pop_back();
+            if (enteringName) {
+                if (backspaceDown && !backspaceHeld && !playerName.empty()) {
+                    playerName.pop_back();
                 }
-                if (enterDown && !enterHeld_) {
+                if (enterDown && !enterHeld) {
                     commitScoreEntry();
-                    backspaceHeld_ = backspaceDown;
-                    enterHeld_ = enterDown;
-                    escapeHeld_ = escapeDown;
-                    resetHeld_ = resetDown;
-                    menuEnterHeld_ = highScoresDown;
+                    backspaceHeld = backspaceDown;
+                    enterHeld = enterDown;
+                    escapeHeld = escapeDown;
+                    resetHeld = resetDown;
+                    menuEnterHeld = highScoresDown;
                     return;
                 }
 
-                backspaceHeld_ = backspaceDown;
-                enterHeld_ = enterDown;
-                escapeHeld_ = escapeDown;
-                resetHeld_ = resetDown;
-                menuEnterHeld_ = highScoresDown;
+                backspaceHeld = backspaceDown;
+                enterHeld = enterDown;
+                escapeHeld = escapeDown;
+                resetHeld = resetDown;
+                menuEnterHeld = highScoresDown;
                 return;
             } else {
-                if (enterDown && !enterHeld_) {
+                if (enterDown && !enterHeld) {
                     restartIntroSequence();
-                    backspaceHeld_ = backspaceDown;
-                    enterHeld_ = enterDown;
-                    escapeHeld_ = escapeDown;
-                    resetHeld_ = resetDown;
-                    menuEnterHeld_ = highScoresDown;
+                    backspaceHeld = backspaceDown;
+                    enterHeld = enterDown;
+                    escapeHeld = escapeDown;
+                    resetHeld = resetDown;
+                    menuEnterHeld = highScoresDown;
                     return;
                 }
             }
 
-            if (resetDown && !resetHeld_) {
+            if (resetDown && !resetHeld) {
                 restartIntroSequence();
             }
-            if (highScoresDown && !menuEnterHeld_) {
+            if (highScoresDown && !menuEnterHeld) {
                 stopNameEntry();
                 goToHighScores();
             }
-            if (escapeDown && !escapeHeld_) {
+            if (escapeDown && !escapeHeld) {
                 goToMenu();
             }
 
-            backspaceHeld_ = backspaceDown;
-            enterHeld_ = enterDown;
-            escapeHeld_ = escapeDown;
-            resetHeld_ = resetDown;
-            menuEnterHeld_ = highScoresDown;
+            backspaceHeld = backspaceDown;
+            enterHeld = enterDown;
+            escapeHeld = escapeDown;
+            resetHeld = resetDown;
+            menuEnterHeld = highScoresDown;
         }
 
         [[nodiscard]] bool collides(int pieceX, int pieceY, const std::array<Block, 4> &blocks) const {
@@ -1373,7 +1373,7 @@ namespace {
                 if (y >= boardHeight) {
                     continue;
                 }
-                if (board_[y][x].color >= 0) {
+                if (board[y][x].color >= 0) {
                     return true;
                 }
             }
@@ -1381,64 +1381,64 @@ namespace {
         }
 
         void movePiece(int dx, int dy) {
-            if (!gameOver_ && !lineClearActive_ && !collides(active_.x + dx, active_.y + dy, active_.blocks)) {
-                active_.x += dx;
-                active_.y += dy;
+            if (!gameOver && !lineClearActive && !collides(active.x + dx, active.y + dy, active.blocks)) {
+                active.x += dx;
+                active.y += dy;
             }
         }
 
         void softDrop() {
-            if (gameOver_ || lineClearActive_) {
+            if (gameOver || lineClearActive) {
                 return;
             }
-            if (collides(active_.x, active_.y - 1, active_.blocks)) {
+            if (collides(active.x, active.y - 1, active.blocks)) {
                 lockPiece();
             } else {
-                --active_.y;
+                --active.y;
             }
         }
 
         void hardDrop() {
-            if (gameOver_ || lineClearActive_) {
+            if (gameOver || lineClearActive) {
                 return;
             }
-            while (!collides(active_.x, active_.y - 1, active_.blocks)) {
-                --active_.y;
+            while (!collides(active.x, active.y - 1, active.blocks)) {
+                --active.y;
             }
             lockPiece();
         }
 
         void rotatePiece() {
-            if (gameOver_ || lineClearActive_) {
+            if (gameOver || lineClearActive) {
                 return;
             }
-            const auto rotated = rotatedBlocks(active_);
-            if (!collides(active_.x, active_.y, rotated)) {
-                active_.blocks = rotated;
+            const auto rotated = rotatedBlocks(active);
+            if (!collides(active.x, active.y, rotated)) {
+                active.blocks = rotated;
                 return;
             }
-            if (!collides(active_.x - 1, active_.y, rotated)) {
-                --active_.x;
-                active_.blocks = rotated;
+            if (!collides(active.x - 1, active.y, rotated)) {
+                --active.x;
+                active.blocks = rotated;
                 return;
             }
-            if (!collides(active_.x + 1, active_.y, rotated)) {
-                ++active_.x;
-                active_.blocks = rotated;
+            if (!collides(active.x + 1, active.y, rotated)) {
+                ++active.x;
+                active.blocks = rotated;
             }
         }
 
         void updateGame() {
-            if (screen_ != AppScreen::Game || introActive_) {
+            if (screen != AppScreen::Game || introActive) {
                 return;
             }
-            if (gameOver_) {
+            if (gameOver) {
                 return;
             }
 
-            if (lineClearActive_) {
+            if (lineClearActive) {
                 const auto now = std::chrono::steady_clock::now();
-                const float elapsed = std::chrono::duration<float>(now - lineClearStart_).count();
+                const float elapsed = std::chrono::duration<float>(now - lineClearStart).count();
                 if (elapsed >= 1.0f) {
                     finalizeLineClear();
                 }
@@ -1446,24 +1446,24 @@ namespace {
             }
 
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - lastFall_).count();
-            if (elapsed >= fallSeconds_) {
+            const float elapsed = std::chrono::duration<float>(now - lastFall).count();
+            if (elapsed >= fallSeconds) {
                 softDrop();
-                lastFall_ = now;
+                lastFall = now;
             }
         }
 
         void lockPiece() {
-            for (const Block &block : active_.blocks) {
-                const int x = active_.x + block.x;
-                const int y = active_.y + block.y;
+            for (const Block &block : active.blocks) {
+                const int x = active.x + block.x;
+                const int y = active.y + block.y;
                 if (x >= 0 && x < boardWidth && y >= 0 && y < boardHeight) {
-                    board_[y][x].color = active_.color;
+                    board[y][x].color = active.color;
                     LockedBlock locked{};
-                    locked.block = loadBlockModel(active_.color);
+                    locked.block = loadBlockModel(active.color);
                     locked.x = x;
                     locked.y = y;
-                    lockedBlocks_.push_back(std::move(locked));
+                    lockedBlocks.push_back(std::move(locked));
                 }
             }
             const auto fullRows = findFullRows();
@@ -1472,7 +1472,7 @@ namespace {
             } else {
                 spawnPiece();
             }
-            lastFall_ = std::chrono::steady_clock::now();
+            lastFall = std::chrono::steady_clock::now();
         }
 
         [[nodiscard]] std::array<bool, boardHeight> findFullRows() const {
@@ -1480,7 +1480,7 @@ namespace {
             for (int y = 0; y < boardHeight; ++y) {
                 bool full = true;
                 for (int x = 0; x < boardWidth; ++x) {
-                    full = full && board_[y][x].color >= 0;
+                    full = full && board[y][x].color >= 0;
                 }
                 fullRows[y] = full;
             }
@@ -1488,14 +1488,14 @@ namespace {
         }
 
         void startLineClear(const std::array<bool, boardHeight> &fullRows) {
-            clearingRows_ = fullRows;
-            lineClearActive_ = true;
-            lineClearStart_ = std::chrono::steady_clock::now();
+            clearingRows = fullRows;
+            lineClearActive = true;
+            lineClearStart = std::chrono::steady_clock::now();
         }
 
         void finalizeLineClear() {
             int cleared = 0;
-            for (bool row : clearingRows_) {
+            for (bool row : clearingRows) {
                 if (row) {
                     ++cleared;
                 }
@@ -1503,39 +1503,39 @@ namespace {
 
             int writeY = 0;
             for (int readY = 0; readY < boardHeight; ++readY) {
-                if (clearingRows_[readY]) {
+                if (clearingRows[readY]) {
                     continue;
                 }
                 if (writeY != readY) {
-                    board_[writeY] = board_[readY];
+                    board[writeY] = board[readY];
                 }
                 ++writeY;
             }
             for (; writeY < boardHeight; ++writeY) {
-                for (Cell &cell : board_[writeY]) {
+                for (Cell &cell : board[writeY]) {
                     cell.color = -1;
                 }
             }
 
-            eraseClearedModels(clearingRows_);
-            clearingRows_.fill(false);
-            lineClearActive_ = false;
+            eraseClearedModels(clearingRows);
+            clearingRows.fill(false);
+            lineClearActive = false;
             if (cleared > 0) {
-                score_ += cleared * 10;
+                score += cleared * 10;
                 if (cleared > 1) {
-                    score_ += 5;
+                    score += 5;
                 }
-                linesCleared_ += cleared;
+                linesCleared += cleared;
                 updateDifficulty();
             }
             spawnPiece();
-            lastFall_ = std::chrono::steady_clock::now();
+            lastFall = std::chrono::steady_clock::now();
         }
 
         void eraseClearedModels(const std::array<bool, boardHeight> &fullRows) {
             std::vector<LockedBlock> remaining{};
-            remaining.reserve(lockedBlocks_.size());
-            for (LockedBlock &locked : lockedBlocks_) {
+            remaining.reserve(lockedBlocks.size());
+            for (LockedBlock &locked : lockedBlocks) {
                 if (locked.y >= 0 && locked.y < boardHeight && fullRows[locked.y]) {
                     if (locked.block.model) {
                         locked.block.model->cleanup(this);
@@ -1552,49 +1552,49 @@ namespace {
                 locked.y -= rowsBelow;
                 remaining.push_back(std::move(locked));
             }
-            lockedBlocks_ = std::move(remaining);
+            lockedBlocks = std::move(remaining);
         }
 
         [[nodiscard]] bool isClearingRow(int y) const {
-            return lineClearActive_ && y >= 0 && y < boardHeight && clearingRows_[y];
+            return lineClearActive && y >= 0 && y < boardHeight && clearingRows[y];
         }
 
         [[nodiscard]] bool isLineClearVisible() const {
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - lineClearStart_).count();
+            const float elapsed = std::chrono::duration<float>(now - lineClearStart).count();
             constexpr float blinkIntervalSeconds = 0.12f;
             return (static_cast<int>(elapsed / blinkIntervalSeconds) % 2) == 0;
         }
 
         void drawIntroOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (!introActive_ || introSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (!introActive || introSprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
 
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - introStart_).count();
-            const float fadeProgress = std::clamp((elapsed - introHoldSeconds_) / introFadeSeconds_, 0.0f, 1.0f);
+            const float elapsed = std::chrono::duration<float>(now - introStart).count();
+            const float fadeProgress = std::clamp((elapsed - introHoldSeconds) / introFadeSeconds, 0.0f, 1.0f);
             const float alpha = 1.0f - fadeProgress;
 
-            introSprite_->setShaderParams(elapsed, 0.0f, 0.0f, alpha);
-            introSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            introSprite_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
-            introSprite_->clearQueue();
+            introSprite->setShaderParams(elapsed, 0.0f, 0.0f, alpha);
+            introSprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            introSprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
+            introSprite->clearQueue();
         }
 
         void drawGameOverOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            const bool shouldShow = (screen_ == AppScreen::Game && gameOver_) || screen_ == AppScreen::GameOver;
-            if (!shouldShow || gameOverSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            const bool shouldShow = (screen == AppScreen::Game && gameOver) || screen == AppScreen::GameOver;
+            if (!shouldShow || gameOverSprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
 
             const float alpha = gameOverFadeAlpha();
-            gameOverSprite_->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
-            gameOverSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            gameOverSprite_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
-            gameOverSprite_->clearQueue();
+            gameOverSprite->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
+            gameOverSprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            gameOverSprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
+            gameOverSprite->clearQueue();
         }
 
         [[nodiscard]] glm::vec3 blockPosition(int x, int y) const {
@@ -1630,11 +1630,11 @@ namespace {
         void drawFrame(VkCommandBuffer cmd, uint32_t imageIndex, const glm::mat4 &view, const glm::mat4 &proj) {
             size_t index = 0;
             for (int y = 0; y < boardHeight; ++y) {
-                drawFrameBlock(cmd, imageIndex, frameModels_[index++], -1, y, view, proj);
-                drawFrameBlock(cmd, imageIndex, frameModels_[index++], boardWidth, y, view, proj);
+                drawFrameBlock(cmd, imageIndex, frameModels[index++], -1, y, view, proj);
+                drawFrameBlock(cmd, imageIndex, frameModels[index++], boardWidth, y, view, proj);
             }
             for (int x = -1; x <= boardWidth; ++x) {
-                drawFrameBlock(cmd, imageIndex, frameModels_[index++], x, -1, view, proj);
+                drawFrameBlock(cmd, imageIndex, frameModels[index++], x, -1, view, proj);
             }
         }
 
@@ -1659,13 +1659,13 @@ namespace {
                 return;
             }
             sprite->drawSpriteRect(x, y, w, h);
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
             sprite->clearQueue();
         }
 
         void drawNextPiecePreview(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
-            if (screen_ != AppScreen::Game || introActive_ || previewBorderSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (screen != AppScreen::Game || introActive || previewBorderSprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
             (void)imageIndex;
@@ -1678,18 +1678,18 @@ namespace {
             const int panelY = 88;
             const int border = 4;
 
-            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY, panelW, border);
-            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY + panelH - border, panelW, border);
-            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY, border, panelH);
-            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX + panelW - border, panelY, border, panelH);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX, panelY, panelW, border);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX, panelY + panelH - border, panelW, border);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX, panelY, border, panelH);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX + panelW - border, panelY, border, panelH);
 
             printText("Next", panelX + 12, panelY - 28, SDL_Color{255, 255, 255, 255});
 
-            int minX = nextPiece_.blocks[0].x;
-            int maxX = nextPiece_.blocks[0].x;
-            int minY = nextPiece_.blocks[0].y;
-            int maxY = nextPiece_.blocks[0].y;
-            for (const Block &block : nextPiece_.blocks) {
+            int minX = nextPiece.blocks[0].x;
+            int maxX = nextPiece.blocks[0].x;
+            int minY = nextPiece.blocks[0].y;
+            int maxY = nextPiece.blocks[0].y;
+            for (const Block &block : nextPiece.blocks) {
                 minX = std::min(minX, block.x);
                 maxX = std::max(maxX, block.x);
                 minY = std::min(minY, block.y);
@@ -1705,10 +1705,10 @@ namespace {
             const float centerY = static_cast<float>(panelY) + static_cast<float>(panelH) * 0.5f;
             const float originX = centerX - pieceW * 0.5f;
             const float originY = centerY - pieceH * 0.5f;
-            mxvk::VK_Sprite *blockSprite = blockPreviewSprites_[static_cast<std::size_t>(nextPiece_.color)];
+            mxvk::VK_Sprite *blockSprite = blockPreviewSprites[static_cast<std::size_t>(nextPiece.color)];
 
-            for (std::size_t i = 0; i < nextPiece_.blocks.size(); ++i) {
-                const Block &pieceBlock = nextPiece_.blocks[i];
+            for (std::size_t i = 0; i < nextPiece.blocks.size(); ++i) {
+                const Block &pieceBlock = nextPiece.blocks[i];
                 const float x = originX + static_cast<float>(pieceBlock.x - minX) * blockSize;
                 const float y = originY + static_cast<float>(pieceBlock.y - minY) * blockSize;
                 drawSpriteRect(blockSprite, cmd, extent, static_cast<int>(x), static_cast<int>(y), blockSize, blockSize);
@@ -1716,7 +1716,7 @@ namespace {
         }
 
         void drawCreditsModel(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
-            if (creditsTuxModel_ == nullptr) {
+            if (creditsTuxModel == nullptr) {
                 return;
             }
 
@@ -1738,12 +1738,12 @@ namespace {
             ubo.view = view;
             ubo.proj = proj;
             ubo.fx = glm::vec4(1.0f, 1.0f, 1.0f, elapsed);
-            creditsTuxModel_->updateUBO(imageIndex, ubo);
-            creditsTuxModel_->render(cmd, imageIndex, false);
+            creditsTuxModel->updateUBO(imageIndex, ubo);
+            creditsTuxModel->render(cmd, imageIndex, false);
         }
 
         void drawHud() {
-            if (introActive_) {
+            if (introActive) {
                 return;
             }
             const VkExtent2D extent = getSwapchainExtent();
@@ -1754,7 +1754,7 @@ namespace {
                 return color;
             };
 
-            switch (screen_) {
+            switch (screen) {
             case AppScreen::Menu: {
                 const int titleY = static_cast<int>(static_cast<float>(extent.height) * 0.18f);
                 const int menuY = static_cast<int>(static_cast<float>(extent.height) * 0.40f);
@@ -1773,7 +1773,7 @@ namespace {
             case AppScreen::HighScores: {
                 const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.16f);
                 printCenteredText("High Scores", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
-                const auto &scores = highScores_.entries();
+                const auto &scores = highScores.entries();
                 const int listLeftX = static_cast<int>(static_cast<float>(extent.width) * 0.34f);
                 const int listRightX = static_cast<int>(static_cast<float>(extent.width) * 0.70f);
                 const int lineHeight = 30;
@@ -1822,10 +1822,10 @@ namespace {
                 };
 
                 printCenteredText("Game Over", centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 0, 255}));
-                printCenteredText(std::format("Final Score: {}", score_), centerX, baseY + 42, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
-                if (enteringName_) {
+                printCenteredText(std::format("Final Score: {}", score), centerX, baseY + 42, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                if (enteringName) {
                     printCenteredText("New high score", centerX, baseY + 82, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
-                    printCenteredText(std::format("Name: {}", playerName_.empty() ? "_" : playerName_),
+                    printCenteredText(std::format("Name: {}", playerName.empty() ? "_" : playerName),
                                       centerX,
                                       baseY + 118,
                                       withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
@@ -1840,17 +1840,17 @@ namespace {
                 break;
             }
             case AppScreen::Game:
-                printText(std::format("Score: {}", score_), 15, 15, withAlpha(SDL_Color{255, 255, 255, 255}));
-                printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, withAlpha(SDL_Color{255, 220, 120, 255}));
-                printText(std::format("Level: {}", level_), 15, 75, withAlpha(SDL_Color{120, 220, 255, 255}));
-                if (gameOver_) {
+                printText(std::format("Score: {}", score), 15, 15, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printText(std::format("Lines Cleared: {}", linesCleared), 15, 45, withAlpha(SDL_Color{255, 220, 120, 255}));
+                printText(std::format("Level: {}", level), 15, 75, withAlpha(SDL_Color{120, 220, 255, 255}));
+                if (gameOver) {
                     const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.58f);
                     const float gameOverAlpha = gameOverFadeAlpha();
                     const auto withGameOverAlpha = [gameOverAlpha](SDL_Color color) {
                         color.a = static_cast<Uint8>(static_cast<float>(color.a) * gameOverAlpha);
                         return color;
                     };
-                    printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                    printCenteredText(std::format("Final Score: {}", score), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
                     printCenteredText("Game over", centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
                 }
                 break;
@@ -1870,31 +1870,31 @@ namespace {
         }
 
         void triggerBackgroundTransition() {
-            backgroundTransitionActive_ = true;
-            backgroundTransitionStart_ = std::chrono::steady_clock::now();
+            backgroundTransitionActive = true;
+            backgroundTransitionStart = std::chrono::steady_clock::now();
         }
 
         void updateBackgroundTransitionState() {
-            if (!backgroundTransitionActive_) {
+            if (!backgroundTransitionActive) {
                 return;
             }
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
-            if (elapsed >= backgroundTransitionSeconds_) {
-                backgroundTransitionActive_ = false;
+            const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart).count();
+            if (elapsed >= backgroundTransitionSeconds) {
+                backgroundTransitionActive = false;
             }
         }
 
         [[nodiscard]] mxvk::VK_Sprite *screenSpriteFor(AppScreen screen) const {
             switch (screen) {
             case AppScreen::Menu:
-                return menuBackgroundSprite_;
+                return menuBackgroundSprite;
             case AppScreen::HighScores:
-                return highScoresBackgroundSprite_;
+                return highScoresBackgroundSprite;
             case AppScreen::Credits:
-                return creditsBackgroundSprite_;
+                return creditsBackgroundSprite;
             case AppScreen::NetworkMultiplayer:
-                return multiplayerBackgroundSprite_;
+                return multiplayerBackgroundSprite;
             case AppScreen::Intro:
             case AppScreen::Game:
             case AppScreen::GameOver:
@@ -1904,56 +1904,56 @@ namespace {
         }
 
         void drawFadedSprite(mxvk::VK_Sprite *sprite, VkCommandBuffer cmd, const VkExtent2D &extent, float alpha) {
-            if (sprite == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (sprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
             sprite->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
             sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
             sprite->clearQueue();
         }
 
         void drawGameScreenTransitionOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (screen_ != AppScreen::Game || !screenTransitionActive_) {
+            if (screen != AppScreen::Game || !screenTransitionActive) {
                 return;
             }
-            drawFadedSprite(screenSpriteFor(transitionFromScreen_), cmd, extent, 1.0f - screenFadeAlpha());
+            drawFadedSprite(screenSpriteFor(transitionFromScreen), cmd, extent, 1.0f - screenFadeAlpha());
         }
 
         void drawScreenBackdrop(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (screen_ == AppScreen::Game) {
-                if (sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (screen == AppScreen::Game) {
+                if (sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                     return;
                 }
                 updateBackgroundTransitionState();
 
-                mxvk::VK_Sprite *sprite = background_;
-                if (backgroundTransitionActive_ && backgroundTransitionSprite_ != nullptr) {
-                    sprite = backgroundTransitionSprite_;
+                mxvk::VK_Sprite *sprite = background;
+                if (backgroundTransitionActive && backgroundTransitionSprite != nullptr) {
+                    sprite = backgroundTransitionSprite;
                 }
                 if (sprite == nullptr) {
                     return;
                 }
 
-                if (sprite == backgroundTransitionSprite_) {
+                if (sprite == backgroundTransitionSprite) {
                     const auto now = std::chrono::steady_clock::now();
-                    const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
+                    const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart).count();
                     sprite->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
                 }
 
                 sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-                sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+                sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
                 sprite->clearQueue();
                 return;
             }
 
             const float alpha = screenFadeAlpha();
-            if (screenTransitionActive_) {
-                drawFadedSprite(screenSpriteFor(transitionFromScreen_), cmd, extent, 1.0f - alpha);
+            if (screenTransitionActive) {
+                drawFadedSprite(screenSpriteFor(transitionFromScreen), cmd, extent, 1.0f - alpha);
             }
-            drawFadedSprite(screenSpriteFor(screen_), cmd, extent, alpha);
+            drawFadedSprite(screenSpriteFor(screen), cmd, extent, alpha);
         }
     };
 

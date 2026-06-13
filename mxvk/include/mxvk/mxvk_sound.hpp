@@ -97,12 +97,12 @@ namespace mxvk {
         using AudioHandle = std::unique_ptr<MIX_Audio, decltype(&MIX_DestroyAudio)>;
         using TrackHandle = std::unique_ptr<MIX_Track, decltype(&MIX_DestroyTrack)>;
 
-        bool init_ = false; ///< Whether the mixer is initialized.
-        MixerHandle mixer_{nullptr, MIX_DestroyMixer};
-        std::vector<AudioHandle> music_files_{};  ///< Loaded music audio files.
-        std::vector<AudioHandle> wav_files_{};    ///< Loaded sound effect audio files.
-        std::vector<TrackHandle> music_tracks_{}; ///< Tracks assigned to music files.
-        std::vector<TrackHandle> wav_tracks_{};   ///< Tracks assigned to wav files.
+        bool initialized = false; ///< Whether the mixer is initialized.
+        MixerHandle mixer{nullptr, MIX_DestroyMixer};
+        std::vector<AudioHandle> music_files{};  ///< Loaded music audio files.
+        std::vector<AudioHandle> wav_files{};    ///< Loaded sound effect audio files.
+        std::vector<TrackHandle> music_tracks{}; ///< Tracks assigned to music files.
+        std::vector<TrackHandle> wav_tracks{};   ///< Tracks assigned to wav files.
 
         [[nodiscard]] static std::size_t toIndex(int value);
     };

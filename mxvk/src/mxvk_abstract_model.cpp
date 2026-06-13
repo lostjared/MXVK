@@ -57,12 +57,12 @@ namespace mxvk {
         }
     } // namespace
 
-    void VKAbstractModel::load(VK_Window *window,
+    void VKAbstractModel::load(VK_Window *targetWindow,
                                const std::string &modelPath,
                                const std::string &textureManifestPath,
                                const std::string &textureBasePath,
                                float scale) {
-        if (window == nullptr) {
+        if (targetWindow == nullptr) {
             throw mxvk::Exception("VKAbstractModel::load requires a valid window");
         }
         if (modelPath.empty()) {
@@ -71,27 +71,27 @@ namespace mxvk {
 
         logVKAbstractModelStep("creation begin: " + modelPath);
 
-        window_ = window;
-        if (!window_->ensureRenderResources()) {
+        windowPtr = targetWindow;
+        if (!windowPtr->ensureRenderResources()) {
             throw mxvk::Exception("VKAbstractModel::load failed because render resources are not ready");
         }
 
-        obj_.load(modelPath, scale);
-        obj_.upload(window_->getDevice(), window_->getPhysicalDevice(), window_->getCommandPool(), window_->getGraphicsQueue());
+        obj.load(modelPath, scale);
+        obj.upload(windowPtr->getDevice(), windowPtr->getPhysicalDevice(), windowPtr->getCommandPool(), windowPtr->getGraphicsQueue());
         computeBoundsAndScale();
         logVKAbstractModelStep("mesh upload complete");
 
-        textures_.clear();
+        textures.clear();
         if (!textureManifestPath.empty()) {
             loadTextures(textureManifestPath, textureBasePath);
         } else {
             loadTexturesFromMTL(textureBasePath.empty() ? std::filesystem::path(modelPath).parent_path().string() : textureBasePath);
         }
-        if (textures_.empty()) {
+        if (textures.empty()) {
             createFallbackTexture();
             logVKAbstractModelStep("using fallback texture");
         }
-        logVKAbstractModelStep("textures ready: " + std::to_string(textures_.size()));
+        logVKAbstractModelStep("textures ready: " + std::to_string(textures.size()));
 
         createTextureSampler();
         createDescriptorSetLayout();
@@ -102,42 +102,42 @@ namespace mxvk {
         logVKAbstractModelStep("creation complete");
     }
 
-    void VKAbstractModel::setShaders(VK_Window *window, const std::string &vertSpv, const std::string &fragSpv) {
-        if (window == nullptr) {
+    void VKAbstractModel::setShaders(VK_Window *targetWindow, const std::string &vertSpv, const std::string &fragSpv) {
+        if (targetWindow == nullptr) {
             throw mxvk::Exception("VKAbstractModel::setShaders requires a valid window");
         }
 
-        window_ = window;
-        vertexShaderPath_ = vertSpv;
-        fragmentShaderPath_ = fragSpv;
+        windowPtr = targetWindow;
+        vertexShaderPath = vertSpv;
+        fragmentShaderPath = fragSpv;
         logVKAbstractModelStep("setShaders: vert=" + vertSpv + ", frag=" + fragSpv);
         createPipelines();
     }
 
     void VKAbstractModel::setBackfaceCulling(bool enabled) {
-        if (backfaceCullingEnabled_ == enabled) {
+        if (backfaceCullingEnabled == enabled) {
             return;
         }
 
-        backfaceCullingEnabled_ = enabled;
-        if (window_ != nullptr) {
+        backfaceCullingEnabled = enabled;
+        if (windowPtr != nullptr) {
             createPipelines();
         }
     }
 
     void VKAbstractModel::updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo) {
-        if (imageIndex >= uniformBuffersMapped_.size()) {
+        if (imageIndex >= uniformBuffersMapped.size()) {
             return;
         }
-        if (uniformBuffersMapped_[imageIndex] == nullptr) {
+        if (uniformBuffersMapped[imageIndex] == nullptr) {
             return;
         }
 
-        std::memcpy(uniformBuffersMapped_[imageIndex], &ubo, sizeof(UniformBufferObject));
+        std::memcpy(uniformBuffersMapped[imageIndex], &ubo, sizeof(UniformBufferObject));
     }
 
     bool VKAbstractModel::updatePrimaryTexture(const void *pixels, int width, int height, int pitch) {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
             return false;
         }
         if (pixels == nullptr || width <= 0 || height <= 0) {
@@ -152,33 +152,33 @@ namespace mxvk {
             return false;
         }
 
-        if (textures_.empty()) {
+        if (textures.empty()) {
             createFallbackTexture();
-            if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
+            if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
                 createDescriptorSets();
             }
         }
 
-        TextureEntry &texture = textures_[0];
+        TextureEntry &texture = textures[0];
         if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE || texture.view == VK_NULL_HANDLE) {
             return false;
         }
 
         bool recreatedTexture = false;
         if (texture.width != uploadWidth || texture.height != uploadHeight) {
-            vkDeviceWaitIdle(window_->getDevice());
+            vkDeviceWaitIdle(windowPtr->getDevice());
 
 #ifdef MXVK_CUDA
             destroyTextureCudaInterop(texture);
 #endif
             if (texture.view != VK_NULL_HANDLE) {
-                vkDestroyImageView(window_->getDevice(), texture.view, nullptr);
+                vkDestroyImageView(windowPtr->getDevice(), texture.view, nullptr);
             }
             if (texture.image != VK_NULL_HANDLE) {
-                vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+                vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
             }
             if (texture.memory != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+                vkFreeMemory(windowPtr->getDevice(), texture.memory, nullptr);
             }
 
             texture.view = VK_NULL_HANDLE;
@@ -192,9 +192,9 @@ namespace mxvk {
             texture.height = uploadHeight;
             recreatedTexture = true;
 
-            if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
-                vkResetDescriptorPool(window_->getDevice(), descriptorPool_, 0);
-                descriptorSets_.clear();
+            if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
+                vkResetDescriptorPool(windowPtr->getDevice(), descriptorPool, 0);
+                descriptorSets.clear();
                 createDescriptorSets();
             }
         }
@@ -213,10 +213,10 @@ namespace mxvk {
                      stagingBuffer, stagingMemory);
 
         void *mapped = nullptr;
-        const VkResult mapResult = vkMapMemory(window_->getDevice(), stagingMemory, 0, stagingSize, 0, &mapped);
+        const VkResult mapResult = vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, stagingSize, 0, &mapped);
         if (mapResult != VK_SUCCESS || mapped == nullptr) {
-            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
             return false;
         }
 
@@ -231,7 +231,7 @@ namespace mxvk {
                 std::memcpy(dst + dstOffset, src + srcOffset, tightRowBytes);
             }
         }
-        vkUnmapMemory(window_->getDevice(), stagingMemory);
+        vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
         if (recreatedTexture) {
             transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
@@ -250,52 +250,52 @@ namespace mxvk {
         texture.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
 
-        vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+        vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
         return true;
     }
 
     void VKAbstractModel::render(VkCommandBuffer cmd, uint32_t imageIndex, bool wireframe) const {
-        if (cmd == VK_NULL_HANDLE || imageIndex >= uniformBuffers_.size() || descriptorSets_.empty()) {
+        if (cmd == VK_NULL_HANDLE || imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
             return;
         }
 
-        const VkPipeline pipeline = (wireframe && pipelineWireframe_ != VK_NULL_HANDLE) ? pipelineWireframe_ : pipelineFill_;
-        if (pipeline == VK_NULL_HANDLE || pipelineLayout_ == VK_NULL_HANDLE) {
+        const VkPipeline pipeline = (wireframe && pipelineWireframe != VK_NULL_HANDLE) ? pipelineWireframe : pipelineFill;
+        if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
             return;
         }
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        const size_t textureCount = std::max<size_t>(1, textures_.size());
-        for (size_t i = 0; i < obj_.subMeshCount(); ++i) {
-            const SubMesh &submesh = obj_.subMesh(i);
+        const size_t textureCount = std::max<size_t>(1, textures.size());
+        for (size_t i = 0; i < obj.subMeshCount(); ++i) {
+            const SubMesh &submesh = obj.subMesh(i);
             const size_t textureIndex = std::min<size_t>(submesh.textureIndex, textureCount - 1U);
             const size_t setIndex = static_cast<size_t>(imageIndex) * textureCount + textureIndex;
-            if (setIndex >= descriptorSets_.size()) {
+            if (setIndex >= descriptorSets.size()) {
                 continue;
             }
 
             vkCmdBindDescriptorSets(cmd,
                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout_,
+                                    pipelineLayout,
                                     0,
                                     1,
-                                    &descriptorSets_[setIndex],
+                                    &descriptorSets[setIndex],
                                     0,
                                     nullptr);
 
-            obj_.drawSubMesh(cmd, i);
+            obj.drawSubMesh(cmd, i);
         }
     }
 
-    void VKAbstractModel::resize(VK_Window *window) {
-        if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+    void VKAbstractModel::resize(VK_Window *targetWindow) {
+        if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
             return;
         }
 
         logVKAbstractModelStep("resize begin");
-        window_ = window;
+        windowPtr = targetWindow;
         destroyPipelines();
         destroyDescriptors();
 
@@ -307,27 +307,27 @@ namespace mxvk {
         logVKAbstractModelStep("resize complete");
     }
 
-    void VKAbstractModel::cleanup(VK_Window *window) {
-        if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+    void VKAbstractModel::cleanup(VK_Window *targetWindow) {
+        if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
             return;
         }
 
         logVKAbstractModelStep("teardown begin");
-        window_ = window;
+        windowPtr = targetWindow;
         destroyPipelines();
         destroyDescriptors();
         destroyTextures();
-        obj_.cleanup(window_->getDevice());
-        window_ = nullptr;
+        obj.cleanup(windowPtr->getDevice());
+        windowPtr = nullptr;
         logVKAbstractModelStep("teardown complete");
     }
 
     void VKAbstractModel::computeBoundsAndScale() {
-        const auto &vertices = obj_.vertices();
+        const auto &vertices = obj.vertices();
         if (vertices.empty()) {
-            modelCenterOffset_ = glm::vec3(0.0f);
-            modelRenderScale_ = 1.0f;
-            modelAxisExtent_ = glm::vec3(1.0f);
+            modelCenterOffsetValue = glm::vec3(0.0f);
+            modelRenderScaleValue = 1.0f;
+            modelAxisExtentValue = glm::vec3(1.0f);
             return;
         }
 
@@ -347,14 +347,14 @@ namespace mxvk {
             maxZ = std::max(maxZ, v.pos[2]);
         }
 
-        modelCenterOffset_ = glm::vec3(
+        modelCenterOffsetValue = glm::vec3(
             -0.5f * (minX + maxX),
             -0.5f * (minY + maxY),
             -0.5f * (minZ + maxZ));
 
-        modelAxisExtent_ = glm::vec3(maxX - minX, maxY - minY, maxZ - minZ);
-        const float maxExtent = std::max(modelAxisExtent_.x, std::max(modelAxisExtent_.y, modelAxisExtent_.z));
-        modelRenderScale_ = (maxExtent > 1e-6f) ? (2.5f / maxExtent) : 1.0f;
+        modelAxisExtentValue = glm::vec3(maxX - minX, maxY - minY, maxZ - minZ);
+        const float maxExtent = std::max(modelAxisExtentValue.x, std::max(modelAxisExtentValue.y, modelAxisExtentValue.z));
+        modelRenderScaleValue = (maxExtent > 1e-6f) ? (2.5f / maxExtent) : 1.0f;
     }
 
     void VKAbstractModel::loadTextures(const std::string &textureManifestPath, const std::string &textureBasePath) {
@@ -444,7 +444,7 @@ namespace mxvk {
 #ifdef MXVK_CUDA
             if (updatePrimaryTextureCudaHost(tex, surface->pixels, width, height, static_cast<uint32_t>(surface->pitch))) {
                 tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-                textures_.push_back(tex);
+                textures.push_back(tex);
                 SDL_DestroySurface(surface);
                 continue;
             }
@@ -458,9 +458,9 @@ namespace mxvk {
                          stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
+            vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
-            vkUnmapMemory(window_->getDevice(), stagingMemory);
+            vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
             const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
@@ -481,16 +481,16 @@ namespace mxvk {
 #endif
 
             tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-            textures_.push_back(tex);
+            textures.push_back(tex);
 
-            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
         }
     }
 
     void VKAbstractModel::loadTexturesFromMTL(const std::string &textureBasePath) {
-        for (const MXMaterial &material : obj_.materials()) {
+        for (const MXMaterial &material : obj.materials()) {
             if (material.map_kd.empty()) {
                 continue;
             }
@@ -512,7 +512,7 @@ namespace mxvk {
 #ifdef MXVK_CUDA
             if (updatePrimaryTextureCudaHost(tex, surface->pixels, width, height, static_cast<uint32_t>(surface->pitch))) {
                 tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-                textures_.push_back(tex);
+                textures.push_back(tex);
                 SDL_DestroySurface(surface);
                 continue;
             }
@@ -526,9 +526,9 @@ namespace mxvk {
                          stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
+            vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
-            vkUnmapMemory(window_->getDevice(), stagingMemory);
+            vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
             const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
@@ -549,10 +549,10 @@ namespace mxvk {
 #endif
 
             tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-            textures_.push_back(tex);
+            textures.push_back(tex);
 
-            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
         }
     }
@@ -574,7 +574,7 @@ namespace mxvk {
 #ifdef MXVK_CUDA
         if (updatePrimaryTextureCudaHost(tex, surface->pixels, 1, 1, static_cast<uint32_t>(surface->pitch))) {
             tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-            textures_.push_back(tex);
+            textures.push_back(tex);
             SDL_DestroySurface(surface);
             return;
         }
@@ -588,9 +588,9 @@ namespace mxvk {
                      stagingBuffer, stagingMemory);
 
         void *mapped = nullptr;
-        vkMapMemory(window_->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
+        vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
         std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(window_->getDevice(), stagingMemory);
+        vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
         const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
@@ -610,10 +610,10 @@ namespace mxvk {
         tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
         tex.view = createImageView(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-        textures_.push_back(tex);
+        textures.push_back(tex);
 
-        vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-        vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+        vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
+        vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
         SDL_DestroySurface(surface);
     }
 
@@ -626,27 +626,27 @@ namespace mxvk {
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateBuffer(window_->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        if (vkCreateBuffer(windowPtr->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create buffer");
         }
 
         VkMemoryRequirements requirements{};
-        vkGetBufferMemoryRequirements(window_->getDevice(), buffer, &requirements);
+        vkGetBufferMemoryRequirements(windowPtr->getDevice(), buffer, &requirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = requirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
+        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            vkDestroyBuffer(windowPtr->getDevice(), buffer, nullptr);
             buffer = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to allocate buffer memory");
         }
 
-        if (vkBindBufferMemory(window_->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-            vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
-            vkFreeMemory(window_->getDevice(), bufferMemory, nullptr);
+        if (vkBindBufferMemory(windowPtr->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+            vkDestroyBuffer(windowPtr->getDevice(), buffer, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), bufferMemory, nullptr);
             buffer = VK_NULL_HANDLE;
             bufferMemory = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to bind buffer memory");
@@ -655,7 +655,7 @@ namespace mxvk {
 
     uint32_t VKAbstractModel::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
         VkPhysicalDeviceMemoryProperties memProperties{};
-        vkGetPhysicalDeviceMemoryProperties(window_->getPhysicalDevice(), &memProperties);
+        vkGetPhysicalDeviceMemoryProperties(windowPtr->getPhysicalDevice(), &memProperties);
 
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
             const bool typeSupported = (typeFilter & (1u << i)) != 0u;
@@ -673,11 +673,11 @@ namespace mxvk {
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = window_->getCommandPool();
+        allocInfo.commandPool = windowPtr->getCommandPool();
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-        if (vkAllocateCommandBuffers(window_->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
+        if (vkAllocateCommandBuffers(windowPtr->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to allocate command buffer");
         }
 
@@ -685,7 +685,7 @@ namespace mxvk {
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
             throw mxvk::Exception("VKAbstractModel failed to begin command buffer");
         }
 
@@ -694,7 +694,7 @@ namespace mxvk {
 
     void VKAbstractModel::endSingleTimeCommands(VkCommandBuffer commandBuffer) const {
         if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
             throw mxvk::Exception("VKAbstractModel failed to end command buffer");
         }
 
@@ -703,16 +703,16 @@ namespace mxvk {
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffer;
 
-        if (vkQueueSubmit(window_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+        if (vkQueueSubmit(windowPtr->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+            vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
             throw mxvk::Exception("VKAbstractModel failed to submit command buffer");
         }
-        if (vkQueueWaitIdle(window_->getGraphicsQueue()) != VK_SUCCESS) {
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+        if (vkQueueWaitIdle(windowPtr->getGraphicsQueue()) != VK_SUCCESS) {
+            vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
             throw mxvk::Exception("VKAbstractModel failed to wait for queue idle");
         }
 
-        vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+        vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
     }
 
     void VKAbstractModel::createImage(uint32_t width, uint32_t height, VkFormat format,
@@ -734,27 +734,27 @@ namespace mxvk {
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        if (vkCreateImage(window_->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
+        if (vkCreateImage(windowPtr->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create image");
         }
 
         VkMemoryRequirements requirements{};
-        vkGetImageMemoryRequirements(window_->getDevice(), image, &requirements);
+        vkGetImageMemoryRequirements(windowPtr->getDevice(), image, &requirements);
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = requirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            vkDestroyImage(window_->getDevice(), image, nullptr);
+        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+            vkDestroyImage(windowPtr->getDevice(), image, nullptr);
             image = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to allocate image memory");
         }
 
-        if (vkBindImageMemory(window_->getDevice(), image, memory, 0) != VK_SUCCESS) {
-            vkDestroyImage(window_->getDevice(), image, nullptr);
-            vkFreeMemory(window_->getDevice(), memory, nullptr);
+        if (vkBindImageMemory(windowPtr->getDevice(), image, memory, 0) != VK_SUCCESS) {
+            vkDestroyImage(windowPtr->getDevice(), image, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), memory, nullptr);
             image = VK_NULL_HANDLE;
             memory = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to bind image memory");
@@ -835,12 +835,12 @@ namespace mxvk {
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-        if (vkCreateImage(window_->getDevice(), &imageInfo, nullptr, &texture.image) != VK_SUCCESS) {
+        if (vkCreateImage(windowPtr->getDevice(), &imageInfo, nullptr, &texture.image) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create CUDA exportable texture image");
         }
 
         VkMemoryRequirements requirements{};
-        vkGetImageMemoryRequirements(window_->getDevice(), texture.image, &requirements);
+        vkGetImageMemoryRequirements(windowPtr->getDevice(), texture.image, &requirements);
 
         VkExportMemoryAllocateInfo exportMemoryInfo{};
         exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
@@ -852,14 +852,14 @@ namespace mxvk {
         allocInfo.allocationSize = requirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &texture.memory) != VK_SUCCESS) {
-            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &texture.memory) != VK_SUCCESS) {
+            vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
             texture.image = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to allocate CUDA exportable texture memory");
         }
-        if (vkBindImageMemory(window_->getDevice(), texture.image, texture.memory, 0) != VK_SUCCESS) {
-            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
-            vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+        if (vkBindImageMemory(windowPtr->getDevice(), texture.image, texture.memory, 0) != VK_SUCCESS) {
+            vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), texture.memory, nullptr);
             texture.image = VK_NULL_HANDLE;
             texture.memory = VK_NULL_HANDLE;
             throw mxvk::Exception("VKAbstractModel failed to bind CUDA exportable texture memory");
@@ -879,7 +879,7 @@ namespace mxvk {
         if (texture.cudaInteropEnabled) {
             return true;
         }
-        if (window_ == nullptr || texture.memory == VK_NULL_HANDLE || texture.cudaExportMemorySize == 0) {
+        if (windowPtr == nullptr || texture.memory == VK_NULL_HANDLE || texture.cudaExportMemorySize == 0) {
             if (!texture.cudaInteropUnavailableLogged) {
                 logVKAbstractModelStep("CUDA interop init: model texture is not exportable; CPU staging fallback remains active");
                 texture.cudaInteropUnavailableLogged = true;
@@ -900,7 +900,7 @@ namespace mxvk {
         fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
         int memoryFd = -1;
-        const VkResult fdResult = vkGetMemoryFdKHR(window_->getDevice(), &fdInfo, &memoryFd);
+        const VkResult fdResult = vkGetMemoryFdKHR(windowPtr->getDevice(), &fdInfo, &memoryFd);
         if (fdResult != VK_SUCCESS) {
             if (!texture.cudaInteropUnavailableLogged) {
                 logVKAbstractModelStep(std::format("CUDA interop init: vkGetMemoryFdKHR failed for model texture ({})", static_cast<int>(fdResult)));
@@ -1039,27 +1039,27 @@ namespace mxvk {
     }
 
     void VKAbstractModel::recreatePrimaryTextureForCuda(TextureEntry &texture, uint32_t width, uint32_t height) {
-        vkDeviceWaitIdle(window_->getDevice());
+        vkDeviceWaitIdle(windowPtr->getDevice());
         destroyTextureCudaInterop(texture);
         if (texture.view != VK_NULL_HANDLE) {
-            vkDestroyImageView(window_->getDevice(), texture.view, nullptr);
+            vkDestroyImageView(windowPtr->getDevice(), texture.view, nullptr);
             texture.view = VK_NULL_HANDLE;
         }
         if (texture.image != VK_NULL_HANDLE) {
-            vkDestroyImage(window_->getDevice(), texture.image, nullptr);
+            vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
             texture.image = VK_NULL_HANDLE;
         }
         if (texture.memory != VK_NULL_HANDLE) {
-            vkFreeMemory(window_->getDevice(), texture.memory, nullptr);
+            vkFreeMemory(windowPtr->getDevice(), texture.memory, nullptr);
             texture.memory = VK_NULL_HANDLE;
         }
 
         createCudaExportableImage(width, height, texture);
         texture.view = createImageView(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        if (descriptorPool_ != VK_NULL_HANDLE && !descriptorSets_.empty()) {
-            vkResetDescriptorPool(window_->getDevice(), descriptorPool_, 0);
-            descriptorSets_.clear();
+        if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
+            vkResetDescriptorPool(windowPtr->getDevice(), descriptorPool, 0);
+            descriptorSets.clear();
             createDescriptorSets();
         }
     }
@@ -1097,18 +1097,18 @@ namespace mxvk {
     }
 
     bool VKAbstractModel::updatePrimaryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
             return false;
         }
         if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
             return false;
         }
 
-        if (textures_.empty()) {
-            textures_.push_back(TextureEntry{});
+        if (textures.empty()) {
+            textures.push_back(TextureEntry{});
         }
 
-        TextureEntry &texture = textures_[0];
+        TextureEntry &texture = textures[0];
         const uint32_t uploadWidth = static_cast<uint32_t>(rgba.cols);
         const uint32_t uploadHeight = static_cast<uint32_t>(rgba.rows);
         if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE ||
@@ -1171,7 +1171,7 @@ namespace mxvk {
         viewInfo.subresourceRange.layerCount = 1;
 
         VkImageView imageView = VK_NULL_HANDLE;
-        if (vkCreateImageView(window_->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+        if (vkCreateImageView(windowPtr->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create image view");
         }
         return imageView;
@@ -1248,14 +1248,14 @@ namespace mxvk {
     }
 
     void VKAbstractModel::createTextureSampler() {
-        if (textureSampler_ != VK_NULL_HANDLE) {
+        if (textureSampler != VK_NULL_HANDLE) {
             return;
         }
 
         VkPhysicalDeviceFeatures deviceFeatures{};
-        vkGetPhysicalDeviceFeatures(window_->getPhysicalDevice(), &deviceFeatures);
+        vkGetPhysicalDeviceFeatures(windowPtr->getPhysicalDevice(), &deviceFeatures);
         VkPhysicalDeviceProperties deviceProperties{};
-        vkGetPhysicalDeviceProperties(window_->getPhysicalDevice(), &deviceProperties);
+        vkGetPhysicalDeviceProperties(windowPtr->getPhysicalDevice(), &deviceProperties);
         const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
         const float anisotropyLevel = anisotropySupported
                                           ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
@@ -1276,13 +1276,13 @@ namespace mxvk {
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-        if (vkCreateSampler(window_->getDevice(), &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
+        if (vkCreateSampler(windowPtr->getDevice(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create texture sampler");
         }
     }
 
     void VKAbstractModel::createDescriptorSetLayout() {
-        if (descriptorSetLayout_ != VK_NULL_HANDLE) {
+        if (descriptorSetLayout != VK_NULL_HANDLE) {
             return;
         }
 
@@ -1305,7 +1305,7 @@ namespace mxvk {
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(window_->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create descriptor set layout");
         }
     }
@@ -1313,53 +1313,53 @@ namespace mxvk {
     void VKAbstractModel::createUniformBuffers() {
         destroyUniformBuffers();
 
-        const size_t frameCount = window_->getSwapchainImageCount();
+        const size_t frameCount = windowPtr->getSwapchainImageCount();
         if (frameCount == 0) {
             return;
         }
 
-        uniformBuffers_.resize(frameCount, VK_NULL_HANDLE);
-        uniformBufferMemory_.resize(frameCount, VK_NULL_HANDLE);
-        uniformBuffersMapped_.resize(frameCount, nullptr);
+        uniformBuffers.resize(frameCount, VK_NULL_HANDLE);
+        uniformBufferMemory.resize(frameCount, VK_NULL_HANDLE);
+        uniformBuffersMapped.resize(frameCount, nullptr);
 
         for (size_t i = 0; i < frameCount; ++i) {
             createBuffer(sizeof(UniformBufferObject),
                          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         uniformBuffers_[i], uniformBufferMemory_[i]);
-            vkMapMemory(window_->getDevice(), uniformBufferMemory_[i], 0, sizeof(UniformBufferObject), 0, &uniformBuffersMapped_[i]);
+                         uniformBuffers[i], uniformBufferMemory[i]);
+            vkMapMemory(windowPtr->getDevice(), uniformBufferMemory[i], 0, sizeof(UniformBufferObject), 0, &uniformBuffersMapped[i]);
         }
     }
 
     void VKAbstractModel::destroyUniformBuffers() {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-            uniformBuffers_.clear();
-            uniformBufferMemory_.clear();
-            uniformBuffersMapped_.clear();
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
+            uniformBuffers.clear();
+            uniformBufferMemory.clear();
+            uniformBuffersMapped.clear();
             return;
         }
 
-        for (size_t i = 0; i < uniformBuffers_.size(); ++i) {
-            if (uniformBuffersMapped_[i] != nullptr) {
-                vkUnmapMemory(window_->getDevice(), uniformBufferMemory_[i]);
-                uniformBuffersMapped_[i] = nullptr;
+        for (size_t i = 0; i < uniformBuffers.size(); ++i) {
+            if (uniformBuffersMapped[i] != nullptr) {
+                vkUnmapMemory(windowPtr->getDevice(), uniformBufferMemory[i]);
+                uniformBuffersMapped[i] = nullptr;
             }
-            if (uniformBuffers_[i] != VK_NULL_HANDLE) {
-                vkDestroyBuffer(window_->getDevice(), uniformBuffers_[i], nullptr);
+            if (uniformBuffers[i] != VK_NULL_HANDLE) {
+                vkDestroyBuffer(windowPtr->getDevice(), uniformBuffers[i], nullptr);
             }
-            if (uniformBufferMemory_[i] != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), uniformBufferMemory_[i], nullptr);
+            if (uniformBufferMemory[i] != VK_NULL_HANDLE) {
+                vkFreeMemory(windowPtr->getDevice(), uniformBufferMemory[i], nullptr);
             }
         }
 
-        uniformBuffers_.clear();
-        uniformBufferMemory_.clear();
-        uniformBuffersMapped_.clear();
+        uniformBuffers.clear();
+        uniformBufferMemory.clear();
+        uniformBuffersMapped.clear();
     }
 
     void VKAbstractModel::createDescriptorPool() {
-        const uint32_t textureCount = std::max<uint32_t>(1U, static_cast<uint32_t>(textures_.size()));
-        const uint32_t frameCount = static_cast<uint32_t>(window_->getSwapchainImageCount());
+        const uint32_t textureCount = std::max<uint32_t>(1U, static_cast<uint32_t>(textures.size()));
+        const uint32_t frameCount = static_cast<uint32_t>(windowPtr->getSwapchainImageCount());
         const uint32_t setCount = textureCount * frameCount;
 
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
@@ -1374,60 +1374,60 @@ namespace mxvk {
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = setCount;
 
-        if (vkCreateDescriptorPool(window_->getDevice(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(windowPtr->getDevice(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create descriptor pool");
         }
     }
 
     void VKAbstractModel::createDescriptorSets() {
-        const size_t textureCount = std::max<size_t>(1, textures_.size());
-        const size_t frameCount = window_->getSwapchainImageCount();
+        const size_t textureCount = std::max<size_t>(1, textures.size());
+        const size_t frameCount = windowPtr->getSwapchainImageCount();
         const size_t setCount = textureCount * frameCount;
 
-        std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout_);
+        std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout);
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool_;
+        allocInfo.descriptorPool = descriptorPool;
         allocInfo.descriptorSetCount = static_cast<uint32_t>(setCount);
         allocInfo.pSetLayouts = layouts.data();
 
-        descriptorSets_.resize(setCount, VK_NULL_HANDLE);
-        if (vkAllocateDescriptorSets(window_->getDevice(), &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
+        descriptorSets.resize(setCount, VK_NULL_HANDLE);
+        if (vkAllocateDescriptorSets(windowPtr->getDevice(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to allocate descriptor sets");
         }
 
         for (size_t frame = 0; frame < frameCount; ++frame) {
             VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = uniformBuffers_[frame];
+            bufferInfo.buffer = uniformBuffers[frame];
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
 
             for (size_t tex = 0; tex < textureCount; ++tex) {
                 const size_t setIndex = frame * textureCount + tex;
-                const TextureEntry &entry = textures_[tex];
+                const TextureEntry &entry = textures[tex];
 
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfo.imageView = entry.view;
-                imageInfo.sampler = textureSampler_;
+                imageInfo.sampler = textureSampler;
 
                 std::array<VkWriteDescriptorSet, 2> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[0].dstSet = descriptorSets_[setIndex];
+                writes[0].dstSet = descriptorSets[setIndex];
                 writes[0].dstBinding = 0;
                 writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[0].descriptorCount = 1;
                 writes[0].pImageInfo = &imageInfo;
 
                 writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[1].dstSet = descriptorSets_[setIndex];
+                writes[1].dstSet = descriptorSets[setIndex];
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
                 writes[1].pBufferInfo = &bufferInfo;
 
-                vkUpdateDescriptorSets(window_->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+                vkUpdateDescriptorSets(windowPtr->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
             }
         }
     }
@@ -1435,27 +1435,27 @@ namespace mxvk {
     void VKAbstractModel::createPipelines() {
         destroyPipelines();
 
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
             return;
         }
-        if (descriptorSetLayout_ == VK_NULL_HANDLE) {
+        if (descriptorSetLayout == VK_NULL_HANDLE) {
             return;
         }
-        if (vertexShaderPath_.empty() || fragmentShaderPath_.empty()) {
+        if (vertexShaderPath.empty() || fragmentShaderPath.empty()) {
             return;
         }
-        if (window_->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
+        if (windowPtr->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
             return;
         }
 
-        const std::vector<char> vertBytes = readBinaryFile(vertexShaderPath_);
-        const std::vector<char> fragBytes = readBinaryFile(fragmentShaderPath_);
+        const std::vector<char> vertBytes = readBinaryFile(vertexShaderPath);
+        const std::vector<char> fragBytes = readBinaryFile(fragmentShaderPath);
 
-        const VkShaderModule vertModule = createShaderModule(window_->getDevice(), vertBytes);
+        const VkShaderModule vertModule = createShaderModule(windowPtr->getDevice(), vertBytes);
         VkShaderModule fragModule = VK_NULL_HANDLE;
 
         try {
-            fragModule = createShaderModule(window_->getDevice(), fragBytes);
+            fragModule = createShaderModule(windowPtr->getDevice(), fragBytes);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1521,7 +1521,7 @@ namespace mxvk {
             rasterizer.depthClampEnable = VK_FALSE;
             rasterizer.rasterizerDiscardEnable = VK_FALSE;
             rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-            rasterizer.cullMode = backfaceCullingEnabled_ ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE;
+            rasterizer.cullMode = backfaceCullingEnabled ? VK_CULL_MODE_BACK_BIT : VK_CULL_MODE_NONE;
             rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
             rasterizer.depthBiasEnable = VK_FALSE;
             rasterizer.lineWidth = 1.0f;
@@ -1554,14 +1554,14 @@ namespace mxvk {
             VkPipelineLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
-            layoutInfo.pSetLayouts = &descriptorSetLayout_;
+            layoutInfo.pSetLayouts = &descriptorSetLayout;
 
-            if (vkCreatePipelineLayout(window_->getDevice(), &layoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
+            if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");
             }
 
-            const VkFormat colorFormat = window_->getSwapchainFormat();
-            const VkFormat depthFormat = window_->getDepthFormat();
+            const VkFormat colorFormat = windowPtr->getSwapchainFormat();
+            const VkFormat depthFormat = windowPtr->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
             renderingInfo.colorAttachmentCount = 1;
@@ -1583,109 +1583,109 @@ namespace mxvk {
             pipelineInfo.pDepthStencilState = &depthStencil;
             pipelineInfo.pColorBlendState = &colorBlend;
             pipelineInfo.pDynamicState = &dynamicInfo;
-            pipelineInfo.layout = pipelineLayout_;
+            pipelineInfo.layout = pipelineLayout;
             pipelineInfo.renderPass = VK_NULL_HANDLE;
             pipelineInfo.subpass = 0;
 
-            if (vkCreateGraphicsPipelines(window_->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineFill_) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(windowPtr->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineFill) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create fill pipeline");
             }
 
             // Keep wireframe pipeline disabled by default. The examples render with
             // filled geometry, and creating a line-mode pipeline requires matching
             // logical-device feature enablement (fillModeNonSolid).
-            pipelineWireframe_ = VK_NULL_HANDLE;
+            pipelineWireframe = VK_NULL_HANDLE;
         } catch (...) {
             if (fragModule != VK_NULL_HANDLE) {
-                vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
+                vkDestroyShaderModule(windowPtr->getDevice(), fragModule, nullptr);
             }
-            vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            vkDestroyShaderModule(windowPtr->getDevice(), vertModule, nullptr);
             throw;
         }
 
-        vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-        vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+        vkDestroyShaderModule(windowPtr->getDevice(), fragModule, nullptr);
+        vkDestroyShaderModule(windowPtr->getDevice(), vertModule, nullptr);
     }
 
     void VKAbstractModel::destroyPipelines() {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-            pipelineFill_ = VK_NULL_HANDLE;
-            pipelineWireframe_ = VK_NULL_HANDLE;
-            pipelineLayout_ = VK_NULL_HANDLE;
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
+            pipelineFill = VK_NULL_HANDLE;
+            pipelineWireframe = VK_NULL_HANDLE;
+            pipelineLayout = VK_NULL_HANDLE;
             return;
         }
 
-        if (pipelineFill_ != VK_NULL_HANDLE) {
+        if (pipelineFill != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying fill pipeline");
-            vkDestroyPipeline(window_->getDevice(), pipelineFill_, nullptr);
-            pipelineFill_ = VK_NULL_HANDLE;
+            vkDestroyPipeline(windowPtr->getDevice(), pipelineFill, nullptr);
+            pipelineFill = VK_NULL_HANDLE;
         }
-        if (pipelineWireframe_ != VK_NULL_HANDLE) {
+        if (pipelineWireframe != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying wireframe pipeline");
-            vkDestroyPipeline(window_->getDevice(), pipelineWireframe_, nullptr);
-            pipelineWireframe_ = VK_NULL_HANDLE;
+            vkDestroyPipeline(windowPtr->getDevice(), pipelineWireframe, nullptr);
+            pipelineWireframe = VK_NULL_HANDLE;
         }
-        if (pipelineLayout_ != VK_NULL_HANDLE) {
+        if (pipelineLayout != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying pipeline layout");
-            vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
-            pipelineLayout_ = VK_NULL_HANDLE;
+            vkDestroyPipelineLayout(windowPtr->getDevice(), pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
         }
     }
 
     void VKAbstractModel::destroyDescriptors() {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-            descriptorSets_.clear();
-            descriptorPool_ = VK_NULL_HANDLE;
-            descriptorSetLayout_ = VK_NULL_HANDLE;
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
+            descriptorSets.clear();
+            descriptorPool = VK_NULL_HANDLE;
+            descriptorSetLayout = VK_NULL_HANDLE;
             destroyUniformBuffers();
             return;
         }
 
-        descriptorSets_.clear();
-        if (descriptorPool_ != VK_NULL_HANDLE) {
+        descriptorSets.clear();
+        if (descriptorPool != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying descriptor pool");
-            vkDestroyDescriptorPool(window_->getDevice(), descriptorPool_, nullptr);
-            descriptorPool_ = VK_NULL_HANDLE;
+            vkDestroyDescriptorPool(windowPtr->getDevice(), descriptorPool, nullptr);
+            descriptorPool = VK_NULL_HANDLE;
         }
-        if (descriptorSetLayout_ != VK_NULL_HANDLE) {
+        if (descriptorSetLayout != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying descriptor set layout");
-            vkDestroyDescriptorSetLayout(window_->getDevice(), descriptorSetLayout_, nullptr);
-            descriptorSetLayout_ = VK_NULL_HANDLE;
+            vkDestroyDescriptorSetLayout(windowPtr->getDevice(), descriptorSetLayout, nullptr);
+            descriptorSetLayout = VK_NULL_HANDLE;
         }
 
         destroyUniformBuffers();
     }
 
     void VKAbstractModel::destroyTextures() {
-        if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-            textures_.clear();
-            textureSampler_ = VK_NULL_HANDLE;
+        if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
+            textures.clear();
+            textureSampler = VK_NULL_HANDLE;
             return;
         }
 
-        for (TextureEntry &tex : textures_) {
+        for (TextureEntry &tex : textures) {
 #ifdef MXVK_CUDA
             destroyTextureCudaInterop(tex);
 #endif
             if (tex.view != VK_NULL_HANDLE) {
                 logVKAbstractModelStep("destroying texture image view");
-                vkDestroyImageView(window_->getDevice(), tex.view, nullptr);
+                vkDestroyImageView(windowPtr->getDevice(), tex.view, nullptr);
             }
             if (tex.image != VK_NULL_HANDLE) {
                 logVKAbstractModelStep("destroying texture image");
-                vkDestroyImage(window_->getDevice(), tex.image, nullptr);
+                vkDestroyImage(windowPtr->getDevice(), tex.image, nullptr);
             }
             if (tex.memory != VK_NULL_HANDLE) {
                 logVKAbstractModelStep("freeing texture memory");
-                vkFreeMemory(window_->getDevice(), tex.memory, nullptr);
+                vkFreeMemory(windowPtr->getDevice(), tex.memory, nullptr);
             }
         }
-        textures_.clear();
+        textures.clear();
 
-        if (textureSampler_ != VK_NULL_HANDLE) {
+        if (textureSampler != VK_NULL_HANDLE) {
             logVKAbstractModelStep("destroying texture sampler");
-            vkDestroySampler(window_->getDevice(), textureSampler_, nullptr);
-            textureSampler_ = VK_NULL_HANDLE;
+            vkDestroySampler(windowPtr->getDevice(), textureSampler, nullptr);
+            textureSampler = VK_NULL_HANDLE;
         }
     }
 

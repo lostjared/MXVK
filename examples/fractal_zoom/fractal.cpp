@@ -44,29 +44,29 @@ namespace example {
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
-                dragging_ = true;
-                drag_start_mouse_x_ = e.button.x;
-                drag_start_mouse_y_ = e.button.y;
-                drag_start_center_x_ = center_x_;
-                drag_start_center_y_ = center_y_;
+                dragging = true;
+                drag_start_mouse_x = e.button.x;
+                drag_start_mouse_y = e.button.y;
+                drag_start_center_x = center_x;
+                drag_start_center_y = center_y;
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
-                dragging_ = false;
+                dragging = false;
                 return;
             }
 
-            if (e.type == SDL_EVENT_MOUSE_MOTION && dragging_) {
+            if (e.type == SDL_EVENT_MOUSE_MOTION && dragging) {
                 const VkExtent2D extent = getSwapchainExtent();
                 if (extent.width == 0U || extent.height == 0U) {
                     return;
                 }
-                const int delta_x = e.motion.x - drag_start_mouse_x_;
-                const int delta_y = e.motion.y - drag_start_mouse_y_;
-                const double scale = 2.0 / (zoom_ * static_cast<double>(std::min(extent.width, extent.height)));
-                center_x_ = drag_start_center_x_ - static_cast<double>(delta_x) * scale;
-                center_y_ = drag_start_center_y_ + static_cast<double>(delta_y) * scale;
+                const int delta_x = e.motion.x - drag_start_mouse_x;
+                const int delta_y = e.motion.y - drag_start_mouse_y;
+                const double scale = 2.0 / (zoom * static_cast<double>(std::min(extent.width, extent.height)));
+                center_x = drag_start_center_x - static_cast<double>(delta_x) * scale;
+                center_y = drag_start_center_y + static_cast<double>(delta_y) * scale;
                 return;
             }
 
@@ -88,11 +88,11 @@ namespace example {
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
-            if (fractal_pipeline_ == VK_NULL_HANDLE || fractal_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (fractal_pipeline == VK_NULL_HANDLE || fractal_pipeline_layout == VK_NULL_HANDLE) {
                 createFractalPipeline();
             }
 
-            if (fractal_pipeline_ == VK_NULL_HANDLE || fractal_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (fractal_pipeline == VK_NULL_HANDLE || fractal_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
 
@@ -101,24 +101,24 @@ namespace example {
                 return;
             }
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fractal_pipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fractal_pipeline);
 
             const FractalPushConstants push_constants{
-                static_cast<FractalScalar>(center_x_),
-                static_cast<FractalScalar>(center_y_),
-                static_cast<FractalScalar>(zoom_),
+                static_cast<FractalScalar>(center_x),
+                static_cast<FractalScalar>(center_y),
+                static_cast<FractalScalar>(zoom),
                 static_cast<FractalScalar>(
-                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time_).count()),
+                    std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count()),
                 static_cast<FractalScalar>(extent.width),
                 static_cast<FractalScalar>(extent.height),
-                max_iterations_,
-                palette_index_,
+                max_iterations,
+                palette_index,
                 1,
                 0};
 
             vkCmdPushConstants(
                 cmd,
-                fractal_pipeline_layout_,
+                fractal_pipeline_layout,
                 VK_SHADER_STAGE_FRAGMENT_BIT,
                 0,
                 sizeof(push_constants),
@@ -137,35 +137,35 @@ namespace example {
                 resetView();
                 break;
             case SDLK_1:
-                center_x_ = -0.5;
-                center_y_ = 0.0;
-                zoom_ = 1.0;
-                max_iterations_ = 256;
+                center_x = -0.5;
+                center_y = 0.0;
+                zoom = 1.0;
+                max_iterations = 256;
                 break;
             case SDLK_2:
-                center_x_ = -0.745;
-                center_y_ = 0.113;
-                zoom_ = 50.0;
-                max_iterations_ = 512;
+                center_x = -0.745;
+                center_y = 0.113;
+                zoom = 50.0;
+                max_iterations = 512;
                 break;
             case SDLK_3:
-                center_x_ = -0.761574;
-                center_y_ = -0.0847596;
-                zoom_ = 220.0;
-                max_iterations_ = 900;
+                center_x = -0.761574;
+                center_y = -0.0847596;
+                zoom = 220.0;
+                max_iterations = 900;
                 break;
             case SDLK_EQUALS:
             case SDLK_PLUS:
-                max_iterations_ = std::min(max_iterations_ + 64, 4096);
+                max_iterations = std::min(max_iterations + 64, 4096);
                 break;
             case SDLK_MINUS:
-                max_iterations_ = std::max(max_iterations_ - 64, 64);
+                max_iterations = std::max(max_iterations - 64, 64);
                 break;
             case SDLK_LEFTBRACKET:
-                palette_index_ = (palette_index_ + 2) % 3;
+                palette_index = (palette_index + 2) % 3;
                 break;
             case SDLK_RIGHTBRACKET:
-                palette_index_ = (palette_index_ + 1) % 3;
+                palette_index = (palette_index + 1) % 3;
                 break;
             default:
                 break;
@@ -182,22 +182,22 @@ namespace example {
             float mouse_y = 0.0f;
             SDL_GetMouseState(&mouse_x, &mouse_y);
 
-            const double base_scale = 2.0 / (zoom_ * static_cast<double>(std::min(extent.width, extent.height)));
-            const double before_x = (static_cast<double>(mouse_x) - static_cast<double>(extent.width) * 0.5) * base_scale + center_x_;
-            const double before_y = (static_cast<double>(extent.height) * 0.5 - static_cast<double>(mouse_y)) * base_scale + center_y_;
+            const double base_scale = 2.0 / (zoom * static_cast<double>(std::min(extent.width, extent.height)));
+            const double before_x = (static_cast<double>(mouse_x) - static_cast<double>(extent.width) * 0.5) * base_scale + center_x;
+            const double before_y = (static_cast<double>(extent.height) * 0.5 - static_cast<double>(mouse_y)) * base_scale + center_y;
 
             const double zoom_factor = (wheel_y > 0.0f) ? 1.2 : (1.0 / 1.2);
-            zoom_ = std::clamp(zoom_ * zoom_factor, 0.5, 1.0e16);
+            zoom = std::clamp(zoom * zoom_factor, 0.5, 1.0e16);
 
-            const double new_scale = 2.0 / (zoom_ * static_cast<double>(std::min(extent.width, extent.height)));
-            const double after_x = (static_cast<double>(mouse_x) - static_cast<double>(extent.width) * 0.5) * new_scale + center_x_;
-            const double after_y = (static_cast<double>(extent.height) * 0.5 - static_cast<double>(mouse_y)) * new_scale + center_y_;
+            const double new_scale = 2.0 / (zoom * static_cast<double>(std::min(extent.width, extent.height)));
+            const double after_x = (static_cast<double>(mouse_x) - static_cast<double>(extent.width) * 0.5) * new_scale + center_x;
+            const double after_y = (static_cast<double>(extent.height) * 0.5 - static_cast<double>(mouse_y)) * new_scale + center_y;
 
-            center_x_ += before_x - after_x;
-            center_y_ += before_y - after_y;
+            center_x += before_x - after_x;
+            center_y += before_y - after_y;
 
-            if (wheel_y > 0.0f && zoom_ > 10.0) {
-                max_iterations_ = std::min(max_iterations_ + 12, 4096);
+            if (wheel_y > 0.0f && zoom > 10.0) {
+                max_iterations = std::min(max_iterations + 12, 4096);
             }
         }
 
@@ -208,50 +208,50 @@ namespace example {
             }
 
             const auto now = std::chrono::steady_clock::now();
-            const double dt = std::chrono::duration<double>(now - last_tick_).count();
-            last_tick_ = now;
+            const double dt = std::chrono::duration<double>(now - last_tick).count();
+            last_tick = now;
 
-            const double move_speed = 0.85 * std::min(dt, 0.1) / zoom_;
+            const double move_speed = 0.85 * std::min(dt, 0.1) / zoom;
             if (keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT]) {
-                center_x_ -= move_speed;
+                center_x -= move_speed;
             }
             if (keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT]) {
-                center_x_ += move_speed;
+                center_x += move_speed;
             }
             if (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP]) {
-                center_y_ += move_speed;
+                center_y += move_speed;
             }
             if (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN]) {
-                center_y_ -= move_speed;
+                center_y -= move_speed;
             }
             if (keys[SDL_SCANCODE_Z]) {
-                zoom_ = std::min(zoom_ * (1.0 + 1.9 * dt), 1.0e16);
+                zoom = std::min(zoom * (1.0 + 1.9 * dt), 1.0e16);
             }
             if (keys[SDL_SCANCODE_X]) {
-                zoom_ = std::max(zoom_ * (1.0 - 1.9 * dt), 0.5);
+                zoom = std::max(zoom * (1.0 - 1.9 * dt), 0.5);
             }
         }
 
         void resetView() {
-            center_x_ = -0.5;
-            center_y_ = 0.0;
-            zoom_ = 1.0;
-            max_iterations_ = 256;
+            center_x = -0.5;
+            center_y = 0.0;
+            zoom = 1.0;
+            max_iterations = 256;
         }
 
         void destroyFractalPipeline() {
             if (device == VK_NULL_HANDLE) {
-                fractal_pipeline_ = VK_NULL_HANDLE;
-                fractal_pipeline_layout_ = VK_NULL_HANDLE;
+                fractal_pipeline = VK_NULL_HANDLE;
+                fractal_pipeline_layout = VK_NULL_HANDLE;
                 return;
             }
-            if (fractal_pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, fractal_pipeline_, nullptr);
-                fractal_pipeline_ = VK_NULL_HANDLE;
+            if (fractal_pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, fractal_pipeline, nullptr);
+                fractal_pipeline = VK_NULL_HANDLE;
             }
-            if (fractal_pipeline_layout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, fractal_pipeline_layout_, nullptr);
-                fractal_pipeline_layout_ = VK_NULL_HANDLE;
+            if (fractal_pipeline_layout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, fractal_pipeline_layout, nullptr);
+                fractal_pipeline_layout = VK_NULL_HANDLE;
             }
         }
 
@@ -366,7 +366,7 @@ namespace example {
                 pipeline_layout_info.pushConstantRangeCount = 1;
                 pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
-                if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &fractal_pipeline_layout_) != VK_SUCCESS) {
+                if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &fractal_pipeline_layout) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create fractal pipeline layout");
                 }
 
@@ -391,21 +391,21 @@ namespace example {
                 pipeline_info.pDepthStencilState = &depth_stencil;
                 pipeline_info.pColorBlendState = &color_blending;
                 pipeline_info.pDynamicState = &dynamic_state;
-                pipeline_info.layout = fractal_pipeline_layout_;
+                pipeline_info.layout = fractal_pipeline_layout;
                 pipeline_info.renderPass = VK_NULL_HANDLE;
                 pipeline_info.subpass = 0;
 
-                if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &fractal_pipeline_) != VK_SUCCESS) {
+                if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &fractal_pipeline) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create fractal graphics pipeline");
                 }
             } catch (...) {
-                if (fractal_pipeline_ != VK_NULL_HANDLE) {
-                    vkDestroyPipeline(device, fractal_pipeline_, nullptr);
-                    fractal_pipeline_ = VK_NULL_HANDLE;
+                if (fractal_pipeline != VK_NULL_HANDLE) {
+                    vkDestroyPipeline(device, fractal_pipeline, nullptr);
+                    fractal_pipeline = VK_NULL_HANDLE;
                 }
-                if (fractal_pipeline_layout_ != VK_NULL_HANDLE) {
-                    vkDestroyPipelineLayout(device, fractal_pipeline_layout_, nullptr);
-                    fractal_pipeline_layout_ = VK_NULL_HANDLE;
+                if (fractal_pipeline_layout != VK_NULL_HANDLE) {
+                    vkDestroyPipelineLayout(device, fractal_pipeline_layout, nullptr);
+                    fractal_pipeline_layout = VK_NULL_HANDLE;
                 }
                 if (frag_module != VK_NULL_HANDLE) {
                     vkDestroyShaderModule(device, frag_module, nullptr);
@@ -440,23 +440,23 @@ namespace example {
             int reserved;
         };
 
-        VkPipeline fractal_pipeline_ = VK_NULL_HANDLE;
-        VkPipelineLayout fractal_pipeline_layout_ = VK_NULL_HANDLE;
+        VkPipeline fractal_pipeline = VK_NULL_HANDLE;
+        VkPipelineLayout fractal_pipeline_layout = VK_NULL_HANDLE;
 
-        double center_x_ = -0.5;
-        double center_y_ = 0.0;
-        double zoom_ = 1.0;
-        int max_iterations_ = 256;
-        int palette_index_ = 0;
+        double center_x = -0.5;
+        double center_y = 0.0;
+        double zoom = 1.0;
+        int max_iterations = 256;
+        int palette_index = 0;
 
-        bool dragging_ = false;
-        int drag_start_mouse_x_ = 0;
-        int drag_start_mouse_y_ = 0;
-        double drag_start_center_x_ = 0.0;
-        double drag_start_center_y_ = 0.0;
+        bool dragging = false;
+        int drag_start_mouse_x = 0;
+        int drag_start_mouse_y = 0;
+        double drag_start_center_x = 0.0;
+        double drag_start_center_y = 0.0;
 
-        std::chrono::steady_clock::time_point start_time_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point last_tick_{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point start_time{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point last_tick{std::chrono::steady_clock::now()};
     };
 
 } // namespace example

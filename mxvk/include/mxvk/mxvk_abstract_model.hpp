@@ -120,13 +120,13 @@ namespace mxvk {
         void cleanup(VK_Window *window);
 
         /** @brief Access the underlying mesh object. */
-        [[nodiscard]] const MXModel &model() const { return obj_; }
+        [[nodiscard]] const MXModel &model() const { return obj; }
         /** @brief Access the computed center offset used for normalization. */
-        [[nodiscard]] glm::vec3 modelCenterOffset() const { return modelCenterOffset_; }
+        [[nodiscard]] glm::vec3 modelCenterOffset() const { return modelCenterOffsetValue; }
         /** @brief Access the computed render scale used for normalization. */
-        [[nodiscard]] float modelRenderScale() const { return modelRenderScale_; }
+        [[nodiscard]] float modelRenderScale() const { return modelRenderScaleValue; }
         /** @brief Per-axis extent (max - min) of the source mesh's bounding box. */
-        [[nodiscard]] glm::vec3 modelAxisExtent() const { return modelAxisExtent_; }
+        [[nodiscard]] glm::vec3 modelAxisExtent() const { return modelAxisExtentValue; }
 
         /**
          * @brief Enable or disable backface culling for this model pipeline.
@@ -155,31 +155,31 @@ namespace mxvk {
 #endif
         };
 
-        MXModel obj_{};
-        std::vector<TextureEntry> textures_{};
+        MXModel obj{};
+        std::vector<TextureEntry> textures{};
 
-        VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
-        VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> descriptorSets_{};
+        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> descriptorSets{};
 
-        VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-        VkPipeline pipelineFill_ = VK_NULL_HANDLE;
-        VkPipeline pipelineWireframe_ = VK_NULL_HANDLE;
-        VkSampler textureSampler_ = VK_NULL_HANDLE;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pipelineFill = VK_NULL_HANDLE;
+        VkPipeline pipelineWireframe = VK_NULL_HANDLE;
+        VkSampler textureSampler = VK_NULL_HANDLE;
 
-        std::vector<VkBuffer> uniformBuffers_{};
-        std::vector<VkDeviceMemory> uniformBufferMemory_{};
-        std::vector<void *> uniformBuffersMapped_{};
+        std::vector<VkBuffer> uniformBuffers{};
+        std::vector<VkDeviceMemory> uniformBufferMemory{};
+        std::vector<void *> uniformBuffersMapped{};
 
-        glm::vec3 modelCenterOffset_{0.0f, 0.0f, 0.0f};
-        float modelRenderScale_ = 1.0f;
-        glm::vec3 modelAxisExtent_{1.0f, 1.0f, 1.0f};
+        glm::vec3 modelCenterOffsetValue{0.0f, 0.0f, 0.0f};
+        float modelRenderScaleValue = 1.0f;
+        glm::vec3 modelAxisExtentValue{1.0f, 1.0f, 1.0f};
 
-        std::string vertexShaderPath_{};
-        std::string fragmentShaderPath_{};
-        bool backfaceCullingEnabled_ = false;
+        std::string vertexShaderPath{};
+        std::string fragmentShaderPath{};
+        bool backfaceCullingEnabled = false;
 
-        VK_Window *window_ = nullptr;
+        VK_Window *windowPtr = nullptr;
 
         void computeBoundsAndScale();
         void loadTextures(const std::string &textureManifestPath, const std::string &textureBasePath);

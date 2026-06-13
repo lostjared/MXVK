@@ -38,23 +38,23 @@ namespace mxvk {
             return false;
         }
 
-        const SDL_JoystickID instance_id = ids[index];
+        const SDL_JoystickID openedInstanceId = ids[index];
         SDL_free(ids);
 
-        stick_ = SDL_OpenJoystick(instance_id);
-        if (stick_ == nullptr) {
+        stick = SDL_OpenJoystick(openedInstanceId);
+        if (stick == nullptr) {
             return false;
         }
 
-        index_ = index;
-        instance_id_ = instance_id;
+        deviceIndex = index;
+        instanceId = openedInstanceId;
         SDL_SetJoystickEventsEnabled(true);
         return true;
     }
 
     std::string VK_Joystick::name() const {
-        if (stick_ != nullptr) {
-            const char *device_name = SDL_GetJoystickName(stick_);
+        if (stick != nullptr) {
+            const char *device_name = SDL_GetJoystickName(stick);
             if (device_name != nullptr) {
                 return device_name;
             }
@@ -63,75 +63,75 @@ namespace mxvk {
     }
 
     void VK_Joystick::close() {
-        if (stick_ != nullptr) {
-            SDL_CloseJoystick(stick_);
+        if (stick != nullptr) {
+            SDL_CloseJoystick(stick);
         }
 
-        stick_ = nullptr;
-        index_ = -1;
-        instance_id_ = 0;
+        stick = nullptr;
+        deviceIndex = -1;
+        instanceId = 0;
     }
 
     std::optional<SDL_Joystick *> VK_Joystick::handle() const {
-        if (stick_ != nullptr) {
-            return stick_;
+        if (stick != nullptr) {
+            return stick;
         }
         return std::nullopt;
     }
 
     SDL_Joystick *VK_Joystick::unwrap() const {
-        if (stick_ != nullptr) {
-            return stick_;
+        if (stick != nullptr) {
+            return stick;
         }
         throw mxvk::Exception("Invalid joystick handle");
     }
 
     int VK_Joystick::joystickIndex() const {
-        return index_;
+        return deviceIndex;
     }
 
     bool VK_Joystick::getButton(const int button) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return false;
         }
-        return SDL_GetJoystickButton(stick_, button);
+        return SDL_GetJoystickButton(stick, button);
     }
 
     Uint8 VK_Joystick::getHat(const int hat) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        return SDL_GetJoystickHat(stick_, hat);
+        return SDL_GetJoystickHat(stick, hat);
     }
 
     Sint16 VK_Joystick::getAxis(const int axis) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        return SDL_GetJoystickAxis(stick_, axis);
+        return SDL_GetJoystickAxis(stick, axis);
     }
 
     int VK_Joystick::numButtons() const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        const int count = SDL_GetNumJoystickButtons(stick_);
+        const int count = SDL_GetNumJoystickButtons(stick);
         return count < 0 ? 0 : count;
     }
 
     int VK_Joystick::numHats() const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        const int count = SDL_GetNumJoystickHats(stick_);
+        const int count = SDL_GetNumJoystickHats(stick);
         return count < 0 ? 0 : count;
     }
 
     int VK_Joystick::numAxes() const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        const int count = SDL_GetNumJoystickAxes(stick_);
+        const int count = SDL_GetNumJoystickAxes(stick);
         return count < 0 ? 0 : count;
     }
 
@@ -150,16 +150,16 @@ namespace mxvk {
         return count;
     }
 
-    bool VK_Controller::openByInstanceId(const SDL_JoystickID instance_id, const int index_hint) {
+    bool VK_Controller::openByInstanceId(const SDL_JoystickID newInstanceId, const int index_hint) {
         close();
 
-        stick_ = SDL_OpenGamepad(instance_id);
-        if (stick_ == nullptr) {
+        stick = SDL_OpenGamepad(newInstanceId);
+        if (stick == nullptr) {
             return false;
         }
 
-        index_ = index_hint;
-        instance_id_ = instance_id;
+        deviceIndex = index_hint;
+        instanceId = newInstanceId;
         SDL_SetGamepadEventsEnabled(true);
         return true;
     }
@@ -174,14 +174,14 @@ namespace mxvk {
             return false;
         }
 
-        const SDL_JoystickID instance_id = ids[index];
+        const SDL_JoystickID openedInstanceId = ids[index];
         SDL_free(ids);
-        return openByInstanceId(instance_id, index);
+        return openByInstanceId(openedInstanceId, index);
     }
 
     std::string VK_Controller::name() const {
-        if (stick_ != nullptr) {
-            const char *device_name = SDL_GetGamepadName(stick_);
+        if (stick != nullptr) {
+            const char *device_name = SDL_GetGamepadName(stick);
             if (device_name != nullptr) {
                 return device_name;
             }
@@ -190,46 +190,46 @@ namespace mxvk {
     }
 
     void VK_Controller::close() {
-        if (stick_ != nullptr) {
-            SDL_CloseGamepad(stick_);
+        if (stick != nullptr) {
+            SDL_CloseGamepad(stick);
         }
 
-        stick_ = nullptr;
-        index_ = -1;
-        instance_id_ = 0;
+        stick = nullptr;
+        deviceIndex = -1;
+        instanceId = 0;
     }
 
     std::optional<SDL_Gamepad *> VK_Controller::handle() const {
-        if (stick_ != nullptr) {
-            return stick_;
+        if (stick != nullptr) {
+            return stick;
         }
         return std::nullopt;
     }
 
     SDL_Gamepad *VK_Controller::unwrap() const {
-        if (stick_ != nullptr) {
-            return stick_;
+        if (stick != nullptr) {
+            return stick;
         }
         throw mxvk::Exception("Invalid controller handle");
     }
 
     int VK_Controller::controllerIndex() const {
-        return index_;
+        return deviceIndex;
     }
 
     bool VK_Controller::getButton(const SDL_GamepadButton button) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return false;
         }
-        return SDL_GetGamepadButton(stick_, button);
+        return SDL_GetGamepadButton(stick, button);
     }
 
     Uint8 VK_Controller::getHat(const int hat) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
 
-        SDL_Joystick *joystick = SDL_GetGamepadJoystick(stick_);
+        SDL_Joystick *joystick = SDL_GetGamepadJoystick(stick);
         if (joystick == nullptr) {
             return 0;
         }
@@ -237,14 +237,14 @@ namespace mxvk {
     }
 
     Sint16 VK_Controller::getAxis(const SDL_GamepadAxis axis) const {
-        if (stick_ == nullptr) {
+        if (stick == nullptr) {
             return 0;
         }
-        return SDL_GetGamepadAxis(stick_, axis);
+        return SDL_GetGamepadAxis(stick, axis);
     }
 
     bool VK_Controller::active() const {
-        return stick_ != nullptr && SDL_GamepadConnected(stick_);
+        return stick != nullptr && SDL_GamepadConnected(stick);
     }
 
     bool VK_Controller::connectEvent(SDL_Event &e) {
@@ -253,7 +253,7 @@ namespace mxvk {
         }
 
         if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
-            if (stick_ != nullptr && instance_id_ == e.gdevice.which) {
+            if (stick != nullptr && instanceId == e.gdevice.which) {
                 close();
             }
             return true;

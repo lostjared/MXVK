@@ -100,9 +100,9 @@ namespace mxvk {
         [[nodiscard]] Sint16 getAxis(int axis) const;
 
       protected:
-        SDL_Joystick *stick_ = nullptr;  ///< Underlying SDL joystick handle.
-        int index_ = -1;                 ///< Open index in the current joystick list.
-        SDL_JoystickID instance_id_ = 0; ///< Stable SDL joystick instance identifier.
+        SDL_Joystick *stick = nullptr;  ///< Underlying SDL joystick handle.
+        int deviceIndex = -1;        ///< Open index in the current joystick list.
+        SDL_JoystickID instanceId = 0; ///< Stable SDL joystick instance identifier.
     };
 
     /**
@@ -199,11 +199,11 @@ namespace mxvk {
         [[nodiscard]] bool active() const;
 
       protected:
-        bool openByInstanceId(SDL_JoystickID instance_id, int index_hint = -1);
+        bool openByInstanceId(SDL_JoystickID instanceId, int index_hint = -1);
 
-        SDL_Gamepad *stick_ = nullptr;   ///< Underlying SDL gamepad handle.
-        int index_ = -1;                 ///< Open index in the current gamepad list.
-        SDL_JoystickID instance_id_ = 0; ///< Stable SDL gamepad instance identifier.
+        SDL_Gamepad *stick = nullptr; ///< Underlying SDL gamepad handle.
+        int deviceIndex = -1;        ///< Open index in the current gamepad list.
+        SDL_JoystickID instanceId = 0; ///< Stable SDL gamepad instance identifier.
     };
 
     // Backward-compatible aliases.

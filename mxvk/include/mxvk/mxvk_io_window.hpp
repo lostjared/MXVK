@@ -18,7 +18,7 @@ namespace mxvk {
         void proc() override;
         virtual void console_proc() = 0;
         virtual void console_event(SDL_Event &e) = 0;
-        bool visible() const { return console_.isVisible(); }
+        bool visible() const { return console.isVisible(); }
 
       protected:
         /**
@@ -40,7 +40,7 @@ namespace mxvk {
         virtual void appendConsoleHelp(std::ostream &out) const;
 
       private:
-        VK_Console console_;
+        VK_Console console;
     };
 } // namespace mxvk
 

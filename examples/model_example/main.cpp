@@ -20,22 +20,22 @@ namespace example {
       public:
         ModelWindow(const std::string filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-              assetRoot_(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path) {
+              assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path) {
             const std::string modelPath = filename;
-            const std::string textureManifestPath = assetRoot_ + "/data/texture_manifest.txt";
-            const std::string textureBasePath = assetRoot_ + "/data";
+            const std::string textureManifestPath = assetRoot + "/data/texture_manifest.txt";
+            const std::string textureBasePath = assetRoot + "/data";
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
 
-            model_.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
-            model_.setShaders(this, vertPath, fragPath);
+            model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
+            model.setShaders(this, vertPath, fragPath);
         }
 
         ~ModelWindow() override {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
-            model_.cleanup(this);
+            model.cleanup(this);
         }
 
         void event(SDL_Event &e) override {
@@ -45,11 +45,11 @@ namespace example {
         }
 
         void onSwapchainRecreated() override {
-            model_.resize(this);
+            model.resize(this);
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
-            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
+            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
             const VkExtent2D extent = getSwapchainExtent();
 
             const float aspect = (extent.height > 0U)
@@ -58,20 +58,20 @@ namespace example {
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * 0.65f, glm::vec3(0.0f, 1.0f, 0.0f));
-            ubo.model = glm::scale(ubo.model, glm::vec3(model_.modelRenderScale()));
-            ubo.model = glm::translate(ubo.model, model_.modelCenterOffset());
+            ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
+            ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
             ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.2f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
             ubo.proj[1][1] *= -1.0f;
 
-            model_.updateUBO(imageIndex, ubo);
-            model_.render(cmd, imageIndex, false);
+            model.updateUBO(imageIndex, ubo);
+            model.render(cmd, imageIndex, false);
         }
 
       private:
-        std::string assetRoot_;
-        mxvk::VKAbstractModel model_{};
-        std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
+        std::string assetRoot;
+        mxvk::VKAbstractModel model{};
+        std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
     };
 
 } // namespace example

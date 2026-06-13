@@ -15,26 +15,26 @@ namespace mxvk {
     }
 
     Font::Font(Font &&other) noexcept
-        : font_(std::exchange(other.font_, nullptr)),
-          ownsTtfInit_(std::exchange(other.ownsTtfInit_, false)) {}
+        : font(std::exchange(other.font, nullptr)),
+          ownsTtfInit(std::exchange(other.ownsTtfInit, false)) {}
 
     Font &Font::operator=(Font &&other) noexcept {
         if (this != &other) {
             reset();
-            font_ = std::exchange(other.font_, nullptr);
-            ownsTtfInit_ = std::exchange(other.ownsTtfInit_, false);
+            font = std::exchange(other.font, nullptr);
+            ownsTtfInit = std::exchange(other.ownsTtfInit, false);
         }
         return *this;
     }
 
     void Font::reset() {
-        if (font_ != nullptr) {
-            TTF_CloseFont(font_);
-            font_ = nullptr;
+        if (font != nullptr) {
+            TTF_CloseFont(font);
+            font = nullptr;
         }
-        if (ownsTtfInit_) {
+        if (ownsTtfInit) {
             TTF_Quit();
-            ownsTtfInit_ = false;
+            ownsTtfInit = false;
         }
     }
 
@@ -55,8 +55,8 @@ namespace mxvk {
             throw mxvk::Exception("Failed to load font: " + std::string(SDL_GetError()));
         }
 
-        font_ = newFont;
-        ownsTtfInit_ = true;
+        font = newFont;
+        ownsTtfInit = true;
     }
 
     VK_Text::VK_Text(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue,

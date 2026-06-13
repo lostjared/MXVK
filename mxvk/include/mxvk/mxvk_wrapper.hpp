@@ -44,13 +44,13 @@ namespace mxvk {
          * @brief Construct from a raw pointer.
          * @param t Pointer to wrap.
          */
-        Wrapper(T t) : type_{t} {}
+        Wrapper(T t) : type{t} {}
 
         /**
          * @brief Construct in the empty (nullopt) state.
          * @param n std::nullopt.
          */
-        Wrapper(std::nullopt_t) : type_{std::nullopt} {}
+        Wrapper(std::nullopt_t) : type{std::nullopt} {}
 
         /** @brief Copy constructor. */
         Wrapper(const Wrapper<T> &) = default;
@@ -66,7 +66,7 @@ namespace mxvk {
          * @return Reference to this.
          */
         Wrapper<T> &operator=(T t) {
-            type_ = t;
+            type = t;
             return *this;
         }
 
@@ -76,7 +76,7 @@ namespace mxvk {
          * @return Reference to this.
          */
         Wrapper<T> &operator=(std::nullopt_t) {
-            type_ = std::nullopt;
+            type = std::nullopt;
             return *this;
         }
 
@@ -91,7 +91,7 @@ namespace mxvk {
          * @return @c true if a non-null pointer is stored.
          */
         [[nodiscard]] bool has_value() const noexcept {
-            return type_.has_value() && type_.value() != nullptr;
+            return type.has_value() && type.value() != nullptr;
         }
 
         /** @brief Check if a value is present and non-null. */
@@ -101,7 +101,7 @@ namespace mxvk {
          * @brief Access the stored pointer without null checking.
          * @return The stored pointer (may be nullptr if constructed from nullopt).
          */
-        [[nodiscard]] T value() const { return type_.value_or(nullptr); }
+        [[nodiscard]] T value() const { return type.value_or(nullptr); }
 
         /**
          * @brief Unwrap with a custom panic message on null.
@@ -111,7 +111,7 @@ namespace mxvk {
          */
         [[nodiscard]] T expect(const std::string &msg) const {
             if (has_value()) {
-                return type_.value();
+                return type.value();
             }
             throw mxvk::Exception(std::format("panic: {}", msg));
         }
@@ -123,7 +123,7 @@ namespace mxvk {
          */
         [[nodiscard]] T unwrap() const {
             if (has_value()) {
-                return type_.value();
+                return type.value();
             }
             throw mxvk::Exception("mxvk panic: Wrapper value is null");
         }
@@ -135,13 +135,13 @@ namespace mxvk {
          */
         [[nodiscard]] T unwrap_or(T fallback) const noexcept {
             if (has_value()) {
-                return type_.value();
+                return type.value();
             }
             return fallback;
         }
 
       private:
-        std::optional<T> type_ = std::nullopt; ///< Internal optional storage.
+        std::optional<T> type = std::nullopt; ///< Internal optional storage.
     };
 
 } // namespace mxvk

@@ -132,7 +132,7 @@ struct TileMatrix {
 struct Score {
     int score;
     std::string name;
-    Score(std::string name_, int score_) : score(score_), name(name_) {}
+    Score(std::string name, int score) : score(score), name(name) {}
     Score() : score{0}, name{} {}
     auto operator<=>(const Score &s) const {
         return s.score <=> score;

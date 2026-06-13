@@ -56,15 +56,15 @@ namespace mxvk {
         Font(Font &&other) noexcept;
         Font &operator=(Font &&other) noexcept;
 
-        [[nodiscard]] TTF_Font *get() const noexcept { return font_; }
-        [[nodiscard]] explicit operator bool() const noexcept { return font_ != nullptr; }
+        [[nodiscard]] TTF_Font *get() const noexcept { return font; }
+        [[nodiscard]] explicit operator bool() const noexcept { return font != nullptr; }
 
         void reset();
         void reset(const std::string &fontPath, int fontSize);
 
       private:
-        TTF_Font *font_ = nullptr;
-        bool ownsTtfInit_ = false;
+        TTF_Font *font = nullptr;
+        bool ownsTtfInit = false;
     };
 
     /**

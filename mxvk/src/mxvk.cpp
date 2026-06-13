@@ -164,8 +164,8 @@ namespace mxvk {
 
         candidates.push_back(std::filesystem::path("data") / shaderFileName);
 
-        if (!font_path_.empty()) {
-            const std::filesystem::path fontPath(font_path_);
+        if (!font_path.empty()) {
+            const std::filesystem::path fontPath(font_path);
             if (fontPath.has_parent_path()) {
                 candidates.push_back(fontPath.parent_path() / shaderFileName);
             }
@@ -219,34 +219,34 @@ namespace mxvk {
             vkDeviceWaitIdle(device);
         }
 
-        if (!sprites_.empty()) {
-            std::cout << std::format("vk: releasing {} sprite(s)\n", sprites_.size());
-            sprites_.clear();
+        if (!sprites.empty()) {
+            std::cout << std::format("vk: releasing {} sprite(s)\n", sprites.size());
+            sprites.clear();
         }
-        sprite_state_dirty_ = false;
+        sprite_state_dirty = false;
         destroySpritePipeline();
-        if (sprite_descriptor_set_layout_ != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, sprite_descriptor_set_layout_, nullptr);
-            sprite_descriptor_set_layout_ = VK_NULL_HANDLE;
+        if (sprite_descriptor_set_layout != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, sprite_descriptor_set_layout, nullptr);
+            sprite_descriptor_set_layout = VK_NULL_HANDLE;
         }
 
-        if (text_renderer_) {
-            text_renderer_.reset();
+        if (text_renderer) {
+            text_renderer.reset();
         }
-        text_state_dirty_ = false;
+        text_state_dirty = false;
         destroyTextPipeline();
-        if (text_descriptor_set_layout_ != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
-            vkDestroyDescriptorSetLayout(device, text_descriptor_set_layout_, nullptr);
-            text_descriptor_set_layout_ = VK_NULL_HANDLE;
+        if (text_descriptor_set_layout != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, text_descriptor_set_layout, nullptr);
+            text_descriptor_set_layout = VK_NULL_HANDLE;
         }
 
         cleanupSyncObjects();
 
-        if (!retired_swapchains_.empty()) {
-            for (VkSwapchainKHR retired : retired_swapchains_) {
+        if (!retired_swapchains.empty()) {
+            for (VkSwapchainKHR retired : retired_swapchains) {
                 vkDestroySwapchainKHR(device, retired, nullptr);
             }
-            retired_swapchains_.clear();
+            retired_swapchains.clear();
         }
         std::cout << "vk: tearing down swapchain-dependent resources\n";
         cleanupSwapchain(true);
@@ -448,10 +448,10 @@ namespace mxvk {
         }
     }
     void VK_Window::setClearColor(float r, float g, float b, float a) {
-        clear_color_.float32[0] = std::clamp(r, 0.0f, 1.0f);
-        clear_color_.float32[1] = std::clamp(g, 0.0f, 1.0f);
-        clear_color_.float32[2] = std::clamp(b, 0.0f, 1.0f);
-        clear_color_.float32[3] = std::clamp(a, 0.0f, 1.0f);
+        clear_color.float32[0] = std::clamp(r, 0.0f, 1.0f);
+        clear_color.float32[1] = std::clamp(g, 0.0f, 1.0f);
+        clear_color.float32[2] = std::clamp(b, 0.0f, 1.0f);
+        clear_color.float32[3] = std::clamp(a, 0.0f, 1.0f);
     }
 
     void VK_Window::loop() {
@@ -465,9 +465,9 @@ namespace mxvk {
                     break;
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                     if (window != nullptr) {
-                        framebuffer_resized_ = true;
-                        last_resize_event_ms_ = SDL_GetTicks();
-                        force_swapchain_recreate_ = false;
+                        framebuffer_resized = true;
+                        last_resize_event_ms = SDL_GetTicks();
+                        force_swapchain_recreate = false;
                     }
                     break;
                 default:
@@ -475,11 +475,11 @@ namespace mxvk {
                 }
                 event(e);
             }
-            if (framebuffer_resized_) {
+            if (framebuffer_resized) {
                 const uint64_t now_ms = SDL_GetTicks();
-                if (!force_swapchain_recreate_ &&
-                    last_resize_event_ms_ != 0 &&
-                    (now_ms - last_resize_event_ms_) < resize_settle_delay_ms_) {
+                if (!force_swapchain_recreate &&
+                    last_resize_event_ms != 0 &&
+                    (now_ms - last_resize_event_ms) < resize_settle_delay_ms) {
                     proc();
                     render();
                     SDL_Delay(1);
@@ -548,10 +548,10 @@ namespace mxvk {
 
     bool VK_Window::ensureRenderResources() {
         const auto sync_ready = [this]() {
-            return std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-                   render_finished_.size() == swapchain_images.size() &&
-                   std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-                   std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+            return std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+                   render_finished.size() == swapchain_images.size() &&
+                   std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+                   std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
         };
 
         if (device == VK_NULL_HANDLE) {
@@ -559,12 +559,12 @@ namespace mxvk {
         }
 
         if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() ||
-            image_fences_.size() != swapchain_images.size()) {
+            image_fences.size() != swapchain_images.size()) {
             createDevice();
         }
 
         return (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() &&
-                image_fences_.size() == swapchain_images.size());
+                image_fences.size() == swapchain_images.size());
     }
 
     void VK_Window::pickDevice() {
@@ -793,13 +793,13 @@ namespace mxvk {
         }
 
         const bool sync_ready =
-            std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            render_finished_.size() == swapchain_images.size() &&
-            std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+            std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            render_finished.size() == swapchain_images.size() &&
+            std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
 
         if (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() &&
-            sync_ready && image_fences_.size() == swapchain_images.size()) {
+            sync_ready && image_fences.size() == swapchain_images.size()) {
             std::cout << "vk: createDevice skipped because render resources are already initialized\n";
             return;
         }
@@ -1065,32 +1065,32 @@ namespace mxvk {
         fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        render_finished_.assign(swapchain_images.size(), VK_NULL_HANDLE);
+        render_finished.assign(swapchain_images.size(), VK_NULL_HANDLE);
 
         for (uint32_t frame = 0; frame < max_frames_in_flight; ++frame) {
             std::cout << std::format("vk: creating image-available semaphore for frame {}\n", frame);
-            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &image_available_[frame]) != VK_SUCCESS) {
+            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &image_available[frame]) != VK_SUCCESS) {
                 cleanupSyncObjects();
                 return false;
             }
 
             std::cout << std::format("vk: creating in-flight fence for frame {}\n", frame);
-            if (vkCreateFence(device, &fence_info, nullptr, &in_flight_fences_[frame]) != VK_SUCCESS) {
+            if (vkCreateFence(device, &fence_info, nullptr, &in_flight_fences[frame]) != VK_SUCCESS) {
                 cleanupSyncObjects();
                 return false;
             }
         }
 
-        for (size_t image_index = 0; image_index < render_finished_.size(); ++image_index) {
+        for (size_t image_index = 0; image_index < render_finished.size(); ++image_index) {
             std::cout << std::format("vk: creating render-finished semaphore for swapchain image {}\n", image_index);
-            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished_[image_index]) != VK_SUCCESS) {
+            if (vkCreateSemaphore(device, &semaphore_info, nullptr, &render_finished[image_index]) != VK_SUCCESS) {
                 cleanupSyncObjects();
                 return false;
             }
         }
 
-        image_fences_.assign(swapchain_images.size(), VK_NULL_HANDLE);
-        current_frame_ = 0;
+        image_fences.assign(swapchain_images.size(), VK_NULL_HANDLE);
+        current_frame = 0;
 
         std::cout << "vk: createSyncObjects complete\n";
         return true;
@@ -1102,27 +1102,27 @@ namespace mxvk {
         }
 
         const bool has_in_flight_fences = std::ranges::any_of(
-            in_flight_fences_.begin(),
-            in_flight_fences_.end(),
+            in_flight_fences.begin(),
+            in_flight_fences.end(),
             [](VkFence fence) { return fence != VK_NULL_HANDLE; });
         const bool has_render_finished = std::ranges::any_of(
-            render_finished_.begin(),
-            render_finished_.end(),
+            render_finished.begin(),
+            render_finished.end(),
             [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
         const bool has_image_available = std::ranges::any_of(
-            image_available_.begin(),
-            image_available_.end(),
+            image_available.begin(),
+            image_available.end(),
             [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
 
         if (!has_in_flight_fences && !has_render_finished && !has_image_available) {
-            image_fences_.clear();
-            current_frame_ = 0;
+            image_fences.clear();
+            current_frame = 0;
             return;
         }
 
         if (has_in_flight_fences) {
             std::cout << "vk: destroying in-flight fences\n";
-            for (VkFence &fence : in_flight_fences_) {
+            for (VkFence &fence : in_flight_fences) {
                 if (fence != VK_NULL_HANDLE) {
                     vkDestroyFence(device, fence, nullptr);
                     fence = VK_NULL_HANDLE;
@@ -1132,7 +1132,7 @@ namespace mxvk {
 
         if (has_render_finished) {
             std::cout << "vk: destroying render-finished semaphores\n";
-            for (VkSemaphore &semaphore : render_finished_) {
+            for (VkSemaphore &semaphore : render_finished) {
                 if (semaphore != VK_NULL_HANDLE) {
                     vkDestroySemaphore(device, semaphore, nullptr);
                     semaphore = VK_NULL_HANDLE;
@@ -1142,7 +1142,7 @@ namespace mxvk {
 
         if (has_image_available) {
             std::cout << "vk: destroying image-available semaphores\n";
-            for (VkSemaphore &semaphore : image_available_) {
+            for (VkSemaphore &semaphore : image_available) {
                 if (semaphore != VK_NULL_HANDLE) {
                     vkDestroySemaphore(device, semaphore, nullptr);
                     semaphore = VK_NULL_HANDLE;
@@ -1150,9 +1150,9 @@ namespace mxvk {
             }
         }
 
-        image_fences_.clear();
-        render_finished_.clear();
-        current_frame_ = 0;
+        image_fences.clear();
+        render_finished.clear();
+        current_frame = 0;
     }
 
     void VK_Window::recreateSwapchain() {
@@ -1194,12 +1194,12 @@ namespace mxvk {
             return;
         }
 
-        if (!force_swapchain_recreate_ && swapchain_extent.width == new_extent.width &&
+        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width &&
             swapchain_extent.height == new_extent.height) {
             return;
         }
 
-        if (!force_swapchain_recreate_ && swapchain_extent.width == new_extent.width &&
+        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width &&
             swapchain_extent.height == new_extent.height) {
             return;
         }
@@ -1208,14 +1208,14 @@ namespace mxvk {
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
 
-        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->releaseUploadResources();
             }
         }
 
-        sprite_state_dirty_ = true;
-        text_state_dirty_ = true;
+        sprite_state_dirty = true;
+        text_state_dirty = true;
         destroySpritePipeline();
         destroyTextPipeline();
         cleanupSyncObjects();
@@ -1224,25 +1224,25 @@ namespace mxvk {
         if (!createSwapchain(old_swapchain) || !createRenderResources() || !createSyncObjects()) {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             if (old_swapchain != VK_NULL_HANDLE) {
-                retired_swapchains_.push_back(old_swapchain);
+                retired_swapchains.push_back(old_swapchain);
                 //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
             }
             return;
         }
         if (old_swapchain != VK_NULL_HANDLE) {
             //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
-            retired_swapchains_.push_back(old_swapchain);
+            retired_swapchains.push_back(old_swapchain);
         }
 
-        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->setCommandPool(command_pool);
             }
         }
 
         onSwapchainRecreated();
-        force_swapchain_recreate_ = false;
-        framebuffer_resized_ = false;
+        force_swapchain_recreate = false;
+        framebuffer_resized = false;
         std::cout << "mxvk: swapchain recreation complete\n";
     }
 
@@ -1318,15 +1318,15 @@ namespace mxvk {
             SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
         }
         if (pixel_w <= 0 || pixel_h <= 0) {
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
         
         if (swapchain_extent.width != 0 && swapchain_extent.height != 0) {
             if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
                 swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
-                framebuffer_resized_ = true;
-                force_swapchain_recreate_ = true;
+                framebuffer_resized = true;
+                force_swapchain_recreate = true;
                 return;
             }
         }
@@ -1340,21 +1340,21 @@ namespace mxvk {
         }
 
         const bool sync_ready =
-            std::ranges::all_of(image_available_.begin(), image_available_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(render_finished_.begin(), render_finished_.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(in_flight_fences_.begin(), in_flight_fences_.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+            std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
+            std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
         if (!sync_ready) {
             return;
         }
 
-        if (sprite_state_dirty_ && !sprites_.empty() && swapchain_format != VK_FORMAT_UNDEFINED) {
-            for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+        if (sprite_state_dirty && !sprites.empty() && swapchain_format != VK_FORMAT_UNDEFINED) {
+            for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
                 if (!sprite) {
                     continue;
                 }
                 sprite->setColorAttachmentFormat(swapchain_format);
                 sprite->setDepthAttachmentFormat(depth_format);
-                sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+                sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
                 sprite->rebuildPipeline();
                 sprite->rebuildInstancedPipeline();
             }
@@ -1363,22 +1363,22 @@ namespace mxvk {
             } catch (const std::exception &ex) {
                 std::cerr << std::format("mxvk: sprite pipeline build skipped: {}\n", ex.what());
             }
-            sprite_state_dirty_ = false;
+            sprite_state_dirty = false;
         }
 
-        if (text_state_dirty_ && text_renderer_ && swapchain_format != VK_FORMAT_UNDEFINED) {
-            text_renderer_->setDescriptorSetLayout(text_descriptor_set_layout_);
+        if (text_state_dirty && text_renderer && swapchain_format != VK_FORMAT_UNDEFINED) {
+            text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
             try {
                 createTextPipeline();
             } catch (const std::exception &ex) {
                 std::cerr << std::format("mxvk: text pipeline build skipped: {}\n", ex.what());
             }
-            text_state_dirty_ = false;
+            text_state_dirty = false;
         }
 
-        VkFence &frame_fence = in_flight_fences_[current_frame_];
-        VkSemaphore &acquire_semaphore = image_available_[current_frame_];
-        const size_t depth_slot = static_cast<size_t>(current_frame_);
+        VkFence &frame_fence = in_flight_fences[current_frame];
+        VkSemaphore &acquire_semaphore = image_available[current_frame];
+        const size_t depth_slot = static_cast<size_t>(current_frame);
 
         const VkResult wait_result = vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
         if (wait_result == VK_ERROR_DEVICE_LOST) {
@@ -1388,7 +1388,7 @@ namespace mxvk {
         }
         if (wait_result != VK_SUCCESS) {
             std::cerr << std::format("mxvk: Failed waiting for frame fence (VkResult={})\n", static_cast<int>(wait_result));
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
 
@@ -1403,8 +1403,8 @@ namespace mxvk {
         if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
             last_acquire_error = VK_SUCCESS;
             repeated_acquire_errors = 0;
-            force_swapchain_recreate_ = true;
-            framebuffer_resized_ = true;
+            force_swapchain_recreate = true;
+            framebuffer_resized = true;
             return;
         }
 
@@ -1414,8 +1414,8 @@ namespace mxvk {
                 last_acquire_error = acquire_result;
                 repeated_acquire_errors = 0;
             }
-            force_swapchain_recreate_ = true;
-            framebuffer_resized_ = true;
+            force_swapchain_recreate = true;
+            framebuffer_resized = true;
             return;
         }
 
@@ -1454,20 +1454,20 @@ namespace mxvk {
             return;
         }
 
-        if (image_index >= image_fences_.size()) {
+        if (image_index >= image_fences.size()) {
             std::cerr << "mxvk: acquired image index exceeds tracked in-flight image count\n";
             return;
         }
 
-        if (image_index >= render_finished_.size() || render_finished_[image_index] == VK_NULL_HANDLE) {
+        if (image_index >= render_finished.size() || render_finished[image_index] == VK_NULL_HANDLE) {
             std::cerr << "mxvk: acquired image index exceeds render-finished semaphore count\n";
             return;
         }
 
-        VkSemaphore &present_semaphore = render_finished_[image_index];
+        VkSemaphore &present_semaphore = render_finished[image_index];
 
-        if (image_fences_[image_index] != VK_NULL_HANDLE && image_fences_[image_index] != frame_fence) {
-            const VkResult image_wait_result = vkWaitForFences(device, 1, &image_fences_[image_index], VK_TRUE, UINT64_MAX);
+        if (image_fences[image_index] != VK_NULL_HANDLE && image_fences[image_index] != frame_fence) {
+            const VkResult image_wait_result = vkWaitForFences(device, 1, &image_fences[image_index], VK_TRUE, UINT64_MAX);
             if (image_wait_result == VK_ERROR_DEVICE_LOST) {
                 std::cerr << "mxvk: device lost while waiting on acquired image fence; stopping render loop\n";
                 active = false;
@@ -1475,7 +1475,7 @@ namespace mxvk {
             }
             if (image_wait_result != VK_SUCCESS) {
                 std::cerr << std::format("mxvk: Failed waiting for acquired image fence (VkResult={})\n", static_cast<int>(image_wait_result));
-                framebuffer_resized_ = true;
+                framebuffer_resized = true;
                 return;
             }
         }
@@ -1487,12 +1487,12 @@ namespace mxvk {
         begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to begin command buffer\n";
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
 
         VkClearValue clear_value{};
-        clear_value.color = clear_color_;
+        clear_value.color = clear_color;
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -1548,7 +1548,7 @@ namespace mxvk {
             vkCmdPipelineBarrier2(cmd, &pre_depth_dependency);
         }
 
-        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->prepareForRendering(cmd);
             }
@@ -1608,21 +1608,21 @@ namespace mxvk {
         onRecordCustomRendering(cmd, image_index);
 
         // Draw 2D overlays after custom scene rendering so HUD/text stays on top.
-        if (!sprites_.empty()) {
-            if (sprite_pipeline_ != VK_NULL_HANDLE) {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+        if (!sprites.empty()) {
+            if (sprite_pipeline != VK_NULL_HANDLE) {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
             }
-            for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+            for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
                 if (!sprite) {
                     continue;
                 }
-                sprite->renderSprites(cmd, sprite_pipeline_layout_, swapchain_extent.width, swapchain_extent.height);
+                sprite->renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
             }
         }
 
-        if (text_renderer_ && text_pipeline_ != VK_NULL_HANDLE) {
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline_);
-            text_renderer_->renderText(cmd, text_pipeline_layout_, swapchain_extent.width, swapchain_extent.height);
+        if (text_renderer && text_pipeline != VK_NULL_HANDLE) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
+            text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
         }
 
         vkCmdEndRendering(cmd);
@@ -1655,7 +1655,7 @@ namespace mxvk {
 
         if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to end command buffer\n";
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
 
@@ -1695,7 +1695,7 @@ namespace mxvk {
         }
         if (fence_reset_result != VK_SUCCESS) {
             std::cerr << std::format("mxvk: Failed to reset frame fence (VkResult={})\n", static_cast<int>(fence_reset_result));
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
 
@@ -1709,10 +1709,10 @@ namespace mxvk {
             std::cerr << std::format("mxvk: Failed to submit draw command (VkResult={})\n", static_cast<int>(submit_result));
             // We already acquired an image this frame. Force swapchain recreation so we do not reuse
             // a signaled acquire semaphore that never got consumed by a successful submit.
-            framebuffer_resized_ = true;
+            framebuffer_resized = true;
             return;
         }
-        image_fences_[image_index] = frame_fence;
+        image_fences[image_index] = frame_fence;
         swapchain_image_initialized[image_index] = true;
 
         VkPresentInfoKHR present_info{};
@@ -1725,32 +1725,32 @@ namespace mxvk {
 
         const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
-            force_swapchain_recreate_ = true;
-            last_resize_event_ms_ = SDL_GetTicks();
-            framebuffer_resized_ = true;
+            force_swapchain_recreate = true;
+            last_resize_event_ms = SDL_GetTicks();
+            framebuffer_resized = true;
         } else if (present_result == VK_SUBOPTIMAL_KHR) {
-            last_resize_event_ms_ = SDL_GetTicks();
-            framebuffer_resized_ = true;
-            force_swapchain_recreate_ = true;
+            last_resize_event_ms = SDL_GetTicks();
+            framebuffer_resized = true;
+            force_swapchain_recreate = true;
         } else if (present_result != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to present swapchain image\n";
         }
 
-        for (const std::unique_ptr<VK_Sprite> &sprite : sprites_) {
+        for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->clearQueue();
             }
         }
-        if (text_renderer_) {
-            text_renderer_->clearQueue();
+        if (text_renderer) {
+            text_renderer->clearQueue();
         }
 
-        current_frame_ = (current_frame_ + 1U) % max_frames_in_flight;
-        if (!retired_swapchains_.empty() && (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR)) {
-            for (VkSwapchainKHR retired : retired_swapchains_) {
+        current_frame = (current_frame + 1U) % max_frames_in_flight;
+        if (!retired_swapchains.empty() && (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR)) {
+            for (VkSwapchainKHR retired : retired_swapchains) {
                 vkDestroySwapchainKHR(device, retired, nullptr);
             }
-            retired_swapchains_.clear();
+            retired_swapchains.clear();
         }
     }
 
@@ -1839,9 +1839,9 @@ namespace mxvk {
             throw mxvk::Exception("setFont requires a non-empty path and positive font size");
         }
 
-        font_path_ = fontPath;
-        font_size_ = fontSize;
-        font_configured_ = true;
+        font_path = fontPath;
+        font_size = fontSize;
+        font_configured = true;
 
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot set font before Vulkan device initialization");
@@ -1853,12 +1853,12 @@ namespace mxvk {
             throw mxvk::Exception("Cannot initialize text renderer before swapchain and command resources are available");
         }
 
-        if (!text_renderer_) {
+        if (!text_renderer) {
             ensureTextRenderer();
         } else {
-            text_renderer_->setFont(font_path_, font_size_);
+            text_renderer->setFont(font_path, font_size);
         }
-        text_state_dirty_ = true;
+        text_state_dirty = true;
     }
 
     void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col) {
@@ -1866,12 +1866,12 @@ namespace mxvk {
             return;
         }
 
-        if (!font_configured_) {
+        if (!font_configured) {
             throw mxvk::Exception("printText requires setFont() to be called first");
         }
 
         ensureTextRenderer();
-        text_renderer_->printTextG_Solid(text, x, y, col);
+        text_renderer->printTextG_Solid(text, x, y, col);
     }
 
     void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *font) {
@@ -1883,12 +1883,12 @@ namespace mxvk {
             throw mxvk::Exception("printText requires a non-null TTF_Font");
         }
 
-        if (!font_configured_) {
+        if (!font_configured) {
             throw mxvk::Exception("printText with an explicit font still requires setFont() to initialize the text renderer");
         }
 
         ensureTextRenderer();
-        text_renderer_->printTextG_Solid(text, x, y, col, font);
+        text_renderer->printTextG_Solid(text, x, y, col, font);
     }
 
     void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font) {
@@ -1896,25 +1896,25 @@ namespace mxvk {
     }
 
     void VK_Window::clearTextQueue() {
-        if (text_renderer_) {
-            text_renderer_->clearQueue();
+        if (text_renderer) {
+            text_renderer->clearQueue();
         }
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height) {
-        if (!font_configured_) {
+        if (!font_configured) {
             throw mxvk::Exception("getTextDimensions requires setFont() to be called first");
         }
 
-        if (!text_renderer_) {
+        if (!text_renderer) {
             ensureTextRenderer();
         }
-        if (!text_renderer_) {
+        if (!text_renderer) {
             width = 0;
             height = 0;
             return false;
         }
-        return text_renderer_->getTextDimensions(text, width, height);
+        return text_renderer->getTextDimensions(text, width, height);
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *font) {
@@ -1924,19 +1924,19 @@ namespace mxvk {
             return false;
         }
 
-        if (!font_configured_) {
+        if (!font_configured) {
             throw mxvk::Exception("getTextDimensions with an explicit font still requires setFont() to initialize the text renderer");
         }
 
-        if (!text_renderer_) {
+        if (!text_renderer) {
             ensureTextRenderer();
         }
-        if (!text_renderer_) {
+        if (!text_renderer) {
             width = 0;
             height = 0;
             return false;
         }
-        return text_renderer_->getTextDimensions(text, width, height, font);
+        return text_renderer->getTextDimensions(text, width, height, font);
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height, const Font &font) {
@@ -1944,11 +1944,11 @@ namespace mxvk {
     }
 
     void VK_Window::ensureTextRenderer() {
-        if (text_renderer_) {
+        if (text_renderer) {
             return;
         }
 
-        if (!font_configured_ || font_path_.empty() || font_size_ <= 0) {
+        if (!font_configured || font_path.empty() || font_size <= 0) {
             return;
         }
 
@@ -1962,17 +1962,17 @@ namespace mxvk {
             return;
         }
 
-        if (text_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (text_descriptor_set_layout == VK_NULL_HANDLE) {
             createTextDescriptorSetLayout();
         }
 
-        text_renderer_ = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, font_path_, font_size_);
-        text_renderer_->setDescriptorSetLayout(text_descriptor_set_layout_);
-        text_state_dirty_ = true;
+        text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, font_path, font_size);
+        text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
+        text_state_dirty = true;
     }
 
     void VK_Window::createTextDescriptorSetLayout() {
-        if (device == VK_NULL_HANDLE || text_descriptor_set_layout_ != VK_NULL_HANDLE) {
+        if (device == VK_NULL_HANDLE || text_descriptor_set_layout != VK_NULL_HANDLE) {
             return;
         }
 
@@ -1988,32 +1988,32 @@ namespace mxvk {
         layout_info.bindingCount = 1;
         layout_info.pBindings = &sampler_binding;
 
-        if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &text_descriptor_set_layout_) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &text_descriptor_set_layout) != VK_SUCCESS) {
             throw mxvk::Exception("Failed to create text descriptor set layout");
         }
     }
 
     void VK_Window::destroyTextPipeline() {
         if (device == VK_NULL_HANDLE) {
-            text_pipeline_ = VK_NULL_HANDLE;
-            text_pipeline_layout_ = VK_NULL_HANDLE;
+            text_pipeline = VK_NULL_HANDLE;
+            text_pipeline_layout = VK_NULL_HANDLE;
             return;
         }
 
-        if (text_pipeline_ != VK_NULL_HANDLE) {
+        if (text_pipeline != VK_NULL_HANDLE) {
             std::cout << "vk: destroying text pipeline\n";
-            vkDestroyPipeline(device, text_pipeline_, nullptr);
-            text_pipeline_ = VK_NULL_HANDLE;
+            vkDestroyPipeline(device, text_pipeline, nullptr);
+            text_pipeline = VK_NULL_HANDLE;
         }
-        if (text_pipeline_layout_ != VK_NULL_HANDLE) {
+        if (text_pipeline_layout != VK_NULL_HANDLE) {
             std::cout << "vk: destroying text pipeline layout\n";
-            vkDestroyPipelineLayout(device, text_pipeline_layout_, nullptr);
-            text_pipeline_layout_ = VK_NULL_HANDLE;
+            vkDestroyPipelineLayout(device, text_pipeline_layout, nullptr);
+            text_pipeline_layout = VK_NULL_HANDLE;
         }
     }
 
     void VK_Window::createTextPipeline() {
-        if (device == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED || text_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (device == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED || text_descriptor_set_layout == VK_NULL_HANDLE) {
             return;
         }
 
@@ -2131,11 +2131,11 @@ namespace mxvk {
             VkPipelineLayoutCreateInfo pipeline_layout_info{};
             pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipeline_layout_info.setLayoutCount = 1;
-            pipeline_layout_info.pSetLayouts = &text_descriptor_set_layout_;
+            pipeline_layout_info.pSetLayouts = &text_descriptor_set_layout;
             pipeline_layout_info.pushConstantRangeCount = 1;
             pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
-            if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &text_pipeline_layout_) != VK_SUCCESS) {
+            if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &text_pipeline_layout) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create text pipeline layout");
             }
 
@@ -2161,23 +2161,23 @@ namespace mxvk {
             pipeline_info.pDepthStencilState = &depth_stencil;
             pipeline_info.pColorBlendState = &color_blending;
             pipeline_info.pDynamicState = &dynamic_state;
-            pipeline_info.layout = text_pipeline_layout_;
+            pipeline_info.layout = text_pipeline_layout;
             pipeline_info.renderPass = VK_NULL_HANDLE;
             pipeline_info.subpass = 0;
             pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
             pipeline_info.basePipelineIndex = -1;
 
-            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &text_pipeline_) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &text_pipeline) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create text graphics pipeline");
             }
         } catch (...) {
-            if (text_pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, text_pipeline_, nullptr);
-                text_pipeline_ = VK_NULL_HANDLE;
+            if (text_pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, text_pipeline, nullptr);
+                text_pipeline = VK_NULL_HANDLE;
             }
-            if (text_pipeline_layout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, text_pipeline_layout_, nullptr);
-                text_pipeline_layout_ = VK_NULL_HANDLE;
+            if (text_pipeline_layout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, text_pipeline_layout, nullptr);
+                text_pipeline_layout = VK_NULL_HANDLE;
             }
             if (frag_module != VK_NULL_HANDLE) {
                 vkDestroyShaderModule(device, frag_module, nullptr);
@@ -2201,12 +2201,12 @@ namespace mxvk {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
-        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (sprite_descriptor_set_layout == VK_NULL_HANDLE) {
             createSpriteDescriptorSetLayout();
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
-        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
 
@@ -2221,8 +2221,8 @@ namespace mxvk {
         }
 
         VK_Sprite *const sprite_ptr = sprite.get();
-        sprites_.push_back(std::move(sprite));
-        sprite_state_dirty_ = true;
+        sprites.push_back(std::move(sprite));
+        sprite_state_dirty = true;
         return sprite_ptr;
     }
 
@@ -2240,12 +2240,12 @@ namespace mxvk {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
-        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (sprite_descriptor_set_layout == VK_NULL_HANDLE) {
             createSpriteDescriptorSetLayout();
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
-        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
 
@@ -2260,8 +2260,8 @@ namespace mxvk {
         }
 
         VK_Sprite *const sprite_ptr = sprite.get();
-        sprites_.push_back(std::move(sprite));
-        sprite_state_dirty_ = true;
+        sprites.push_back(std::move(sprite));
+        sprite_state_dirty = true;
         return sprite_ptr;
     }
 
@@ -2279,12 +2279,12 @@ namespace mxvk {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
-        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (sprite_descriptor_set_layout == VK_NULL_HANDLE) {
             createSpriteDescriptorSetLayout();
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
-        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout_);
+        sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
 
@@ -2295,13 +2295,13 @@ namespace mxvk {
         }
 
         VK_Sprite *const sprite_ptr = sprite.get();
-        sprites_.push_back(std::move(sprite));
-        sprite_state_dirty_ = true;
+        sprites.push_back(std::move(sprite));
+        sprite_state_dirty = true;
         return sprite_ptr;
     }
 
     void VK_Window::createSpriteDescriptorSetLayout() {
-        if (device == VK_NULL_HANDLE || sprite_descriptor_set_layout_ != VK_NULL_HANDLE) {
+        if (device == VK_NULL_HANDLE || sprite_descriptor_set_layout != VK_NULL_HANDLE) {
             return;
         }
 
@@ -2317,27 +2317,27 @@ namespace mxvk {
         layout_info.bindingCount = 1;
         layout_info.pBindings = &sampler_binding;
 
-        if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &sprite_descriptor_set_layout_) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &sprite_descriptor_set_layout) != VK_SUCCESS) {
             throw mxvk::Exception("Failed to create sprite descriptor set layout");
         }
     }
 
     void VK_Window::destroySpritePipeline() {
         if (device == VK_NULL_HANDLE) {
-            sprite_pipeline_ = VK_NULL_HANDLE;
-            sprite_pipeline_layout_ = VK_NULL_HANDLE;
+            sprite_pipeline = VK_NULL_HANDLE;
+            sprite_pipeline_layout = VK_NULL_HANDLE;
             return;
         }
 
-        if (sprite_pipeline_ != VK_NULL_HANDLE) {
+        if (sprite_pipeline != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite pipeline\n";
-            vkDestroyPipeline(device, sprite_pipeline_, nullptr);
-            sprite_pipeline_ = VK_NULL_HANDLE;
+            vkDestroyPipeline(device, sprite_pipeline, nullptr);
+            sprite_pipeline = VK_NULL_HANDLE;
         }
-        if (sprite_pipeline_layout_ != VK_NULL_HANDLE) {
+        if (sprite_pipeline_layout != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite pipeline layout\n";
-            vkDestroyPipelineLayout(device, sprite_pipeline_layout_, nullptr);
-            sprite_pipeline_layout_ = VK_NULL_HANDLE;
+            vkDestroyPipelineLayout(device, sprite_pipeline_layout, nullptr);
+            sprite_pipeline_layout = VK_NULL_HANDLE;
         }
     }
 
@@ -2345,7 +2345,7 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE || swapchain_format == VK_FORMAT_UNDEFINED) {
             return;
         }
-        if (sprite_descriptor_set_layout_ == VK_NULL_HANDLE) {
+        if (sprite_descriptor_set_layout == VK_NULL_HANDLE) {
             createSpriteDescriptorSetLayout();
         }
 
@@ -2463,11 +2463,11 @@ namespace mxvk {
             VkPipelineLayoutCreateInfo pipeline_layout_info{};
             pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             pipeline_layout_info.setLayoutCount = 1;
-            pipeline_layout_info.pSetLayouts = &sprite_descriptor_set_layout_;
+            pipeline_layout_info.pSetLayouts = &sprite_descriptor_set_layout;
             pipeline_layout_info.pushConstantRangeCount = 1;
             pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
-            if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &sprite_pipeline_layout_) != VK_SUCCESS) {
+            if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &sprite_pipeline_layout) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create sprite pipeline layout");
             }
 
@@ -2493,23 +2493,23 @@ namespace mxvk {
             pipeline_info.pDepthStencilState = &depth_stencil;
             pipeline_info.pColorBlendState = &color_blending;
             pipeline_info.pDynamicState = &dynamic_state;
-            pipeline_info.layout = sprite_pipeline_layout_;
+            pipeline_info.layout = sprite_pipeline_layout;
             pipeline_info.renderPass = VK_NULL_HANDLE;
             pipeline_info.subpass = 0;
             pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
             pipeline_info.basePipelineIndex = -1;
 
-            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &sprite_pipeline_) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &sprite_pipeline) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create sprite graphics pipeline");
             }
         } catch (...) {
-            if (sprite_pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, sprite_pipeline_, nullptr);
-                sprite_pipeline_ = VK_NULL_HANDLE;
+            if (sprite_pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, sprite_pipeline, nullptr);
+                sprite_pipeline = VK_NULL_HANDLE;
             }
-            if (sprite_pipeline_layout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, sprite_pipeline_layout_, nullptr);
-                sprite_pipeline_layout_ = VK_NULL_HANDLE;
+            if (sprite_pipeline_layout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, sprite_pipeline_layout, nullptr);
+                sprite_pipeline_layout = VK_NULL_HANDLE;
             }
             if (frag_module != VK_NULL_HANDLE) {
                 vkDestroyShaderModule(device, frag_module, nullptr);

@@ -92,19 +92,19 @@ namespace walk {
 
     class MazeWorld {
       public:
-        [[nodiscard]] glm::vec3 startPosition() const noexcept { return startPosition_; }
+        [[nodiscard]] glm::vec3 startPosition() const noexcept { return startPositionValue; }
 
-        [[nodiscard]] const std::vector<WallSegment> &walls() const noexcept { return walls_; }
+        [[nodiscard]] const std::vector<WallSegment> &walls() const noexcept { return wallSegments; }
 
-        [[nodiscard]] const std::vector<PillarInstance> &pillars() const noexcept { return pillars_; }
+        [[nodiscard]] const std::vector<PillarInstance> &pillars() const noexcept { return pillarInstances; }
 
-        [[nodiscard]] std::vector<Collectible> &collectibles() noexcept { return collectibles_; }
+        [[nodiscard]] std::vector<Collectible> &collectibles() noexcept { return collectibleItems; }
 
-        [[nodiscard]] const std::vector<Collectible> &collectibles() const noexcept { return collectibles_; }
+        [[nodiscard]] const std::vector<Collectible> &collectibles() const noexcept { return collectibleItems; }
 
         [[nodiscard]] int activeCollectibles() const {
             int count = 0;
-            for (const Collectible &obj : collectibles_) {
+            for (const Collectible &obj : collectibleItems) {
                 if (obj.active) {
                     ++count;
                 }
@@ -118,11 +118,11 @@ namespace walk {
             generatePillars(rng);
             // Rescue: if the player start happens to land inside a pillar, push the
             // start point to the safest unoccupied spot in the same cell.
-            if (checkPillarCollision(startPosition_, 0.6f)) {
+            if (checkPillarCollision(startPositionValue, 0.6f)) {
                 for (int attempt = 0; attempt < 64; ++attempt) {
-                    const glm::vec3 candidate = randomPointInCell(startCellX_, startCellZ_, 0.6f, eyeHeight_, rng, 0.5f);
+                    const glm::vec3 candidate = randomPointInCell(startCellX, startCellZ, 0.6f, eyeHeight, rng, 0.5f);
                     if (!checkWallCollision(candidate, 0.5f) && !checkPillarCollision(candidate, 0.6f)) {
-                        startPosition_ = candidate;
+                        startPositionValue = candidate;
                         break;
                     }
                 }
@@ -131,9 +131,9 @@ namespace walk {
         }
 
         [[nodiscard]] bool checkWallCollision(const glm::vec3 &position, float radius) const {
-            const float halfThickness = wallThickness_ * 0.5f;
+            const float halfThickness = wallThicknessValue * 0.5f;
             const float hitRadius = radius + halfThickness;
-            for (const WallSegment &wall : walls_) {
+            for (const WallSegment &wall : wallSegments) {
                 const glm::vec3 segment = wall.end - wall.start;
                 const float segmentLength = glm::length(segment);
                 if (segmentLength < 0.0001f) {
@@ -153,7 +153,7 @@ namespace walk {
         }
 
         [[nodiscard]] bool checkPillarCollision(const glm::vec3 &position, float playerRadius) const {
-            for (const PillarInstance &pillar : pillars_) {
+            for (const PillarInstance &pillar : pillarInstances) {
                 const glm::vec2 player2d(position.x, position.z);
                 const glm::vec2 pillar2d(pillar.position.x, pillar.position.z);
                 if (glm::length(player2d - pillar2d) < (playerRadius + pillar.radius)) {
@@ -164,11 +164,11 @@ namespace walk {
         }
 
         [[nodiscard]] bool checkCollectibleCollision(const glm::vec3 &point, size_t &indexOut) const {
-            for (size_t i = 0; i < collectibles_.size(); ++i) {
-                if (!collectibles_[i].active) {
+            for (size_t i = 0; i < collectibleItems.size(); ++i) {
+                if (!collectibleItems[i].active) {
                     continue;
                 }
-                const Collectible &collectible = collectibles_[i];
+                const Collectible &collectible = collectibleItems[i];
                 const glm::vec3 center = collectible.position + collectible.hitCenterOffset;
                 if (collectible.type == Collectible::Type::Bird) {
                     const glm::vec3 delta = point - center;
@@ -191,11 +191,11 @@ namespace walk {
         }
 
         [[nodiscard]] glm::vec3 randomPointInCell(int cellX, int cellZ, float objectRadius, float y, std::mt19937 &rng, float margin) const {
-            const float pad = objectRadius + wallThickness_ * 0.5f + margin;
-            const float x0 = -size_ + static_cast<float>(cellX) * cellSize_;
-            const float z0 = -size_ + static_cast<float>(cellZ) * cellSize_;
-            const float x1 = x0 + cellSize_;
-            const float z1 = z0 + cellSize_;
+            const float pad = objectRadius + wallThicknessValue * 0.5f + margin;
+            const float x0 = -size + static_cast<float>(cellX) * cellSize;
+            const float z0 = -size + static_cast<float>(cellZ) * cellSize;
+            const float x1 = x0 + cellSize;
+            const float z1 = z0 + cellSize;
 
             float minX = x0 + pad;
             float maxX = x1 - pad;
@@ -213,7 +213,7 @@ namespace walk {
             return glm::vec3(distX(rng), y, distZ(rng));
         }
 
-        [[nodiscard]] float wallThickness() const noexcept { return wallThickness_; }
+        [[nodiscard]] float wallThickness() const noexcept { return wallThicknessValue; }
 
       private:
         struct Cell {
@@ -222,9 +222,9 @@ namespace walk {
         };
 
         void generateMaze(std::mt19937 &rng) {
-            const int gridX = mazeGridX_;
-            const int gridZ = mazeGridZ_;
-            cellSize_ = (size_ * 2.0f) / static_cast<float>(gridX);
+            const int gridX = mazeGridX;
+            const int gridZ = mazeGridZ;
+            cellSize = (size * 2.0f) / static_cast<float>(gridX);
 
             auto indexFor = [gridX](int x, int z) {
                 return z * gridX + x;
@@ -276,44 +276,44 @@ namespace walk {
                 stack.emplace_back(nx, nz);
             }
 
-            walls_.clear();
+            wallSegments.clear();
             for (int z = 0; z < gridZ; ++z) {
                 for (int x = 0; x < gridX; ++x) {
-                    const float cx = -size_ + static_cast<float>(x) * cellSize_;
-                    const float cz = -size_ + static_cast<float>(z) * cellSize_;
+                    const float cx = -size + static_cast<float>(x) * cellSize;
+                    const float cz = -size + static_cast<float>(z) * cellSize;
                     const float x0 = cx;
                     const float z0 = cz;
-                    const float x1 = cx + cellSize_;
-                    const float z1 = cz + cellSize_;
+                    const float x1 = cx + cellSize;
+                    const float z1 = cz + cellSize;
                     const Cell &cell = grid[static_cast<size_t>(indexFor(x, z))];
 
                     if (cell.walls[0]) {
-                        walls_.push_back({glm::vec3(x0, 0.0f, z0), glm::vec3(x1, 0.0f, z0), wallHeight_});
+                        wallSegments.push_back({glm::vec3(x0, 0.0f, z0), glm::vec3(x1, 0.0f, z0), wallHeight});
                     }
                     if (cell.walls[3]) {
-                        walls_.push_back({glm::vec3(x0, 0.0f, z1), glm::vec3(x0, 0.0f, z0), wallHeight_});
+                        wallSegments.push_back({glm::vec3(x0, 0.0f, z1), glm::vec3(x0, 0.0f, z0), wallHeight});
                     }
                     if (x == (gridX - 1) && cell.walls[1]) {
-                        walls_.push_back({glm::vec3(x1, 0.0f, z0), glm::vec3(x1, 0.0f, z1), wallHeight_});
+                        wallSegments.push_back({glm::vec3(x1, 0.0f, z0), glm::vec3(x1, 0.0f, z1), wallHeight});
                     }
                     if (z == (gridZ - 1) && cell.walls[2]) {
-                        walls_.push_back({glm::vec3(x1, 0.0f, z1), glm::vec3(x0, 0.0f, z1), wallHeight_});
+                        wallSegments.push_back({glm::vec3(x1, 0.0f, z1), glm::vec3(x0, 0.0f, z1), wallHeight});
                     }
                 }
             }
             mergeContiguousWalls();
 
             const float playerRadius = 0.5f;
-            startCellX_ = 0;
-            startCellZ_ = 0;
-            startPosition_ = randomPointInCell(0, 0, playerRadius, eyeHeight_, rng, 0.5f);
-            if (checkWallCollision(startPosition_, playerRadius)) {
-                for (int z = 0; z < mazeGridZ_; ++z) {
-                    for (int x = 0; x < mazeGridX_; ++x) {
-                        startPosition_ = randomPointInCell(x, z, playerRadius, eyeHeight_, rng, 0.5f);
-                        if (!checkWallCollision(startPosition_, playerRadius)) {
-                            startCellX_ = x;
-                            startCellZ_ = z;
+            startCellX = 0;
+            startCellZ = 0;
+            startPositionValue = randomPointInCell(0, 0, playerRadius, eyeHeight, rng, 0.5f);
+            if (checkWallCollision(startPositionValue, playerRadius)) {
+                for (int z = 0; z < mazeGridZ; ++z) {
+                    for (int x = 0; x < mazeGridX; ++x) {
+                        startPositionValue = randomPointInCell(x, z, playerRadius, eyeHeight, rng, 0.5f);
+                        if (!checkWallCollision(startPositionValue, playerRadius)) {
+                            startCellX = x;
+                            startCellZ = z;
                             return;
                         }
                     }
@@ -322,7 +322,7 @@ namespace walk {
         }
 
         void mergeContiguousWalls() {
-            if (walls_.empty()) {
+            if (wallSegments.empty()) {
                 return;
             }
 
@@ -343,8 +343,8 @@ namespace walk {
             };
 
             std::vector<NormalizedWall> normalized;
-            normalized.reserve(walls_.size());
-            for (const WallSegment &wall : walls_) {
+            normalized.reserve(wallSegments.size());
+            for (const WallSegment &wall : wallSegments) {
                 const bool horizontal = std::abs(wall.start.z - wall.end.z) <= epsilon;
                 if (horizontal) {
                     const float x0 = std::min(wall.start.x, wall.end.x);
@@ -408,11 +408,11 @@ namespace walk {
                 index = next;
             }
 
-            walls_.swap(merged);
+            wallSegments.swap(merged);
         }
 
         void generatePillars(std::mt19937 &rng) {
-            pillars_.clear();
+            pillarInstances.clear();
             std::uniform_real_distribution<float> radiusDist(0.5f, 1.5f);
             std::uniform_real_distribution<float> heightDist(3.0f, 6.0f);
 
@@ -420,10 +420,10 @@ namespace walk {
             constexpr int maxAttempts = targetPillars * 8;
             int created = 0;
             for (int attempt = 0; attempt < maxAttempts && created < targetPillars; ++attempt) {
-                const int cellX = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridX_));
-                const int cellZ = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridZ_));
+                const int cellX = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridX));
+                const int cellZ = static_cast<int>(rng() % static_cast<uint32_t>(mazeGridZ));
                 // Don't drop pillars on top of where the player spawns.
-                if (cellX == startCellX_ && cellZ == startCellZ_) {
+                if (cellX == startCellX && cellZ == startCellZ) {
                     continue;
                 }
                 PillarInstance pillar{};
@@ -431,17 +431,17 @@ namespace walk {
                 pillar.height = heightDist(rng);
                 pillar.position = randomPointInCell(cellX, cellZ, pillar.radius, 0.0f, rng, 0.3f);
                 if (!checkWallCollision(pillar.position, pillar.radius)) {
-                    pillars_.push_back(pillar);
+                    pillarInstances.push_back(pillar);
                     ++created;
                 }
             }
         }
 
         void generateCollectibles(std::mt19937 &rng) {
-            collectibles_.clear();
-            const int usableCells = std::max(1, (mazeGridX_ * mazeGridZ_) - 1);
-            const int targetCollectibles = usableCells * collectiblesPerCell_;
-            collectibles_.reserve(static_cast<size_t>(targetCollectibles));
+            collectibleItems.clear();
+            const int usableCells = std::max(1, (mazeGridX * mazeGridZ) - 1);
+            const int targetCollectibles = usableCells * collectiblesPerCell;
+            collectibleItems.reserve(static_cast<size_t>(targetCollectibles));
 
             std::vector<Collectible::Type> types;
             types.reserve(static_cast<size_t>(targetCollectibles));
@@ -460,12 +460,12 @@ namespace walk {
             std::uniform_real_distribution<float> birdRotSpeed(20.0f, 60.0f);
 
             int typeIndex = 0;
-            for (int cellZ = 0; cellZ < mazeGridZ_; ++cellZ) {
-                for (int cellX = 0; cellX < mazeGridX_; ++cellX) {
-                    if (cellX == startCellX_ && cellZ == startCellZ_) {
+            for (int cellZ = 0; cellZ < mazeGridZ; ++cellZ) {
+                for (int cellX = 0; cellX < mazeGridX; ++cellX) {
+                    if (cellX == startCellX && cellZ == startCellZ) {
                         continue;
                     }
-                    for (int slot = 0; slot < collectiblesPerCell_; ++slot) {
+                    for (int slot = 0; slot < collectiblesPerCell; ++slot) {
                         if (typeIndex >= targetCollectibles) {
                             break;
                         }
@@ -492,7 +492,7 @@ namespace walk {
                             fallback = candidate;
 
                             bool overlapsOtherCollectible = false;
-                            for (const Collectible &placed : collectibles_) {
+                            for (const Collectible &placed : collectibleItems) {
                                 const float separation = std::max(5.0f, placed.radius + obj.radius + 0.2f);
                                 if (glm::length(placed.position - candidate) < separation) {
                                     overlapsOtherCollectible = true;
@@ -510,28 +510,28 @@ namespace walk {
                             // Keep spawn count fixed: use the last in-cell candidate as a fallback.
                             obj.position = fallback;
                         }
-                        collectibles_.push_back(obj);
+                        collectibleItems.push_back(obj);
                         ++typeIndex;
                     }
                 }
             }
         }
 
-        std::vector<WallSegment> walls_{};
-        std::vector<PillarInstance> pillars_{};
-        std::vector<Collectible> collectibles_{};
+        std::vector<WallSegment> wallSegments{};
+        std::vector<PillarInstance> pillarInstances{};
+        std::vector<Collectible> collectibleItems{};
 
-        float size_ = 50.0f;
-        float wallHeight_ = 5.0f;
-        float wallThickness_ = 0.5f;
-        int mazeGridX_ = 6;
-        int mazeGridZ_ = 6;
-        int collectiblesPerCell_ = 1;
-        float cellSize_ = 0.0f;
-        float eyeHeight_ = 1.7f;
-        int startCellX_ = 0;
-        int startCellZ_ = 0;
-        glm::vec3 startPosition_{0.0f, 1.7f, 0.0f};
+        float size = 50.0f;
+        float wallHeight = 5.0f;
+        float wallThicknessValue = 0.5f;
+        int mazeGridX = 6;
+        int mazeGridZ = 6;
+        int collectiblesPerCell = 1;
+        float cellSize = 0.0f;
+        float eyeHeight = 1.7f;
+        int startCellX = 0;
+        int startCellZ = 0;
+        glm::vec3 startPositionValue{0.0f, 1.7f, 0.0f};
     };
 
     class RawPillarRenderer {
@@ -548,19 +548,19 @@ namespace walk {
             glm::vec4 fx{0.0f};
         };
 
-        void load(mxvk::VK_Window *window,
+        void load(mxvk::VK_Window *targetWindow,
                   const std::string &textureManifestPath,
                   const std::string &textureBasePath,
                   const std::vector<char> &vertSpv,
                   const std::vector<char> &fragSpv) {
-            if (window == nullptr) {
+            if (targetWindow == nullptr) {
                 throw mxvk::Exception("walk: raw pillar renderer requires a valid window");
             }
-            window_ = window;
-            vertexSpv_ = vertSpv;
-            fragmentSpv_ = fragSpv;
+            window = targetWindow;
+            vertexSpv = vertSpv;
+            fragmentSpv = fragSpv;
 
-            if (!window_->ensureRenderResources()) {
+            if (!window->ensureRenderResources()) {
                 throw mxvk::Exception("walk: raw pillar renderer requires render resources");
             }
 
@@ -574,12 +574,12 @@ namespace walk {
             createPipeline();
         }
 
-        void resize(mxvk::VK_Window *window) {
-            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+        void resize(mxvk::VK_Window *targetWindow) {
+            if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
                 return;
             }
 
-            window_ = window;
+            window = targetWindow;
             destroyPipeline();
             destroyDescriptors();
             createDescriptorSetLayout();
@@ -592,26 +592,26 @@ namespace walk {
         /// @brief Hot-swap the fragment shader without rebuilding geometry or descriptors.
         /// @param newFragSpv Compiled SPIR-V bytecode for the new fragment shader.
         void reloadFragShader(const std::vector<char> &newFragSpv) {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
                 return;
             }
-            vkDeviceWaitIdle(window_->getDevice());
-            fragmentSpv_ = newFragSpv;
+            vkDeviceWaitIdle(window->getDevice());
+            fragmentSpv = newFragSpv;
             destroyPipeline();
             createPipeline();
         }
 
-        void cleanup(mxvk::VK_Window *window) {
-            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+        void cleanup(mxvk::VK_Window *targetWindow) {
+            if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
                 return;
             }
 
-            window_ = window;
+            window = targetWindow;
             destroyPipeline();
             destroyDescriptors();
             destroyTexture();
             destroyBuffers();
-            window_ = nullptr;
+            window = nullptr;
         }
 
         void render(VkCommandBuffer cmd,
@@ -620,10 +620,10 @@ namespace walk {
                     const glm::mat4 &view,
                     const glm::mat4 &proj,
                     const glm::vec4 &fx) {
-            if (cmd == VK_NULL_HANDLE || pipeline_ == VK_NULL_HANDLE || pipelineLayout_ == VK_NULL_HANDLE) {
+            if (cmd == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
                 return;
             }
-            if (imageIndex >= uniformBuffersMapped_.size() || descriptorSets_.empty() || vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE) {
+            if (imageIndex >= uniformBuffersMapped.size() || descriptorSets.empty() || vertexBuffer == VK_NULL_HANDLE || indexBuffer == VK_NULL_HANDLE) {
                 return;
             }
 
@@ -631,21 +631,21 @@ namespace walk {
             uniforms.view = view;
             uniforms.proj = proj;
             uniforms.fx = fx;
-            std::memcpy(uniformBuffersMapped_[imageIndex], &uniforms, sizeof(PillarUniforms));
+            std::memcpy(uniformBuffersMapped[imageIndex], &uniforms, sizeof(PillarUniforms));
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             vkCmdBindDescriptorSets(cmd,
                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout_,
+                                    pipelineLayout,
                                     0,
                                     1,
-                                    &descriptorSets_[imageIndex],
+                                    &descriptorSets[imageIndex],
                                     0,
                                     nullptr);
 
             const VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer_, &offset);
-            vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+            vkCmdBindIndexBuffer(cmd, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             for (const PillarInstance &pillar : pillars) {
                 // Vertex data is defined with Y in [0..1] (base at 0.0, top at 1.0).
@@ -654,8 +654,8 @@ namespace walk {
                 constexpr float baseSink = 0.02f;
                 glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(pillar.position.x, pillar.position.y - baseSink, pillar.position.z));
                 model = glm::scale(model, glm::vec3(pillar.radius, pillar.height, pillar.radius));
-                vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-                vkCmdDrawIndexed(cmd, indexCount_, 1, 0, 0, 0);
+                vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+                vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
             }
         }
 
@@ -675,7 +675,7 @@ namespace walk {
 
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
             VkPhysicalDeviceMemoryProperties memProperties{};
-            vkGetPhysicalDeviceMemoryProperties(window_->getPhysicalDevice(), &memProperties);
+            vkGetPhysicalDeviceMemoryProperties(window->getPhysicalDevice(), &memProperties);
             for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
                 if ((typeFilter & (1u << i)) != 0u && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
                     return i;
@@ -695,27 +695,27 @@ namespace walk {
             bufferInfo.usage = usage;
             bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            if (vkCreateBuffer(window_->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            if (vkCreateBuffer(window->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar buffer");
             }
 
             VkMemoryRequirements requirements{};
-            vkGetBufferMemoryRequirements(window_->getDevice(), buffer, &requirements);
+            vkGetBufferMemoryRequirements(window->getDevice(), buffer, &requirements);
 
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
             allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
+            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
                 buffer = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to allocate raw pillar buffer memory");
             }
 
-            if (vkBindBufferMemory(window_->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-                vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
-                vkFreeMemory(window_->getDevice(), bufferMemory, nullptr);
+            if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
+                vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
                 buffer = VK_NULL_HANDLE;
                 bufferMemory = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to bind raw pillar buffer memory");
@@ -745,27 +745,27 @@ namespace walk {
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            if (vkCreateImage(window_->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
+            if (vkCreateImage(window->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar image");
             }
 
             VkMemoryRequirements requirements{};
-            vkGetImageMemoryRequirements(window_->getDevice(), image, &requirements);
+            vkGetImageMemoryRequirements(window->getDevice(), image, &requirements);
 
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
             allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                vkDestroyImage(window_->getDevice(), image, nullptr);
+            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                vkDestroyImage(window->getDevice(), image, nullptr);
                 image = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to allocate raw pillar image memory");
             }
 
-            if (vkBindImageMemory(window_->getDevice(), image, memory, 0) != VK_SUCCESS) {
-                vkDestroyImage(window_->getDevice(), image, nullptr);
-                vkFreeMemory(window_->getDevice(), memory, nullptr);
+            if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
+                vkDestroyImage(window->getDevice(), image, nullptr);
+                vkFreeMemory(window->getDevice(), memory, nullptr);
                 image = VK_NULL_HANDLE;
                 memory = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to bind raw pillar image memory");
@@ -785,7 +785,7 @@ namespace walk {
             viewInfo.subresourceRange.layerCount = 1;
 
             VkImageView imageView = VK_NULL_HANDLE;
-            if (vkCreateImageView(window_->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            if (vkCreateImageView(window->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar image view");
             }
             return imageView;
@@ -795,11 +795,11 @@ namespace walk {
             VkCommandBufferAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandPool = window_->getCommandPool();
+            allocInfo.commandPool = window->getCommandPool();
             allocInfo.commandBufferCount = 1;
 
             VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-            if (vkAllocateCommandBuffers(window_->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
+            if (vkAllocateCommandBuffers(window->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to allocate raw pillar command buffer");
             }
 
@@ -807,7 +807,7 @@ namespace walk {
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
             if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to begin raw pillar command buffer");
             }
 
@@ -816,7 +816,7 @@ namespace walk {
 
         void endSingleTimeCommands(VkCommandBuffer commandBuffer) const {
             if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to end raw pillar command buffer");
             }
 
@@ -825,16 +825,16 @@ namespace walk {
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &commandBuffer;
 
-            if (vkQueueSubmit(window_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            if (vkQueueSubmit(window->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to submit raw pillar command buffer");
             }
-            if (vkQueueWaitIdle(window_->getGraphicsQueue()) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            if (vkQueueWaitIdle(window->getGraphicsQueue()) != VK_SUCCESS) {
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to wait for raw pillar upload queue");
             }
 
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
         }
 
         void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) const {
@@ -887,14 +887,14 @@ namespace walk {
         }
 
         void createTextureSampler() {
-            if (textureSampler_ != VK_NULL_HANDLE) {
+            if (textureSampler != VK_NULL_HANDLE) {
                 return;
             }
 
             VkPhysicalDeviceFeatures deviceFeatures{};
-            vkGetPhysicalDeviceFeatures(window_->getPhysicalDevice(), &deviceFeatures);
+            vkGetPhysicalDeviceFeatures(window->getPhysicalDevice(), &deviceFeatures);
             VkPhysicalDeviceProperties deviceProperties{};
-            vkGetPhysicalDeviceProperties(window_->getPhysicalDevice(), &deviceProperties);
+            vkGetPhysicalDeviceProperties(window->getPhysicalDevice(), &deviceProperties);
             const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
             const float anisotropyLevel = anisotropySupported
                                               ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
@@ -915,13 +915,13 @@ namespace walk {
             samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-            if (vkCreateSampler(window_->getDevice(), &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
+            if (vkCreateSampler(window->getDevice(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar texture sampler");
             }
         }
 
         void createDescriptorSetLayout() {
-            if (descriptorSetLayout_ != VK_NULL_HANDLE) {
+            if (descriptorSetLayout != VK_NULL_HANDLE) {
                 return;
             }
 
@@ -944,7 +944,7 @@ namespace walk {
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
             layoutInfo.pBindings = bindings.data();
 
-            if (vkCreateDescriptorSetLayout(window_->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
+            if (vkCreateDescriptorSetLayout(window->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar descriptor set layout");
             }
         }
@@ -952,27 +952,27 @@ namespace walk {
         void createUniformBuffers() {
             destroyUniformBuffers();
 
-            const size_t frameCount = window_->getSwapchainImageCount();
+            const size_t frameCount = window->getSwapchainImageCount();
             if (frameCount == 0) {
                 return;
             }
 
-            uniformBuffers_.resize(frameCount, VK_NULL_HANDLE);
-            uniformBufferMemory_.resize(frameCount, VK_NULL_HANDLE);
-            uniformBuffersMapped_.resize(frameCount, nullptr);
+            uniformBuffers.resize(frameCount, VK_NULL_HANDLE);
+            uniformBufferMemory.resize(frameCount, VK_NULL_HANDLE);
+            uniformBuffersMapped.resize(frameCount, nullptr);
 
             for (size_t i = 0; i < frameCount; ++i) {
                 createBuffer(sizeof(PillarUniforms),
                              VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             uniformBuffers_[i],
-                             uniformBufferMemory_[i]);
-                vkMapMemory(window_->getDevice(), uniformBufferMemory_[i], 0, sizeof(PillarUniforms), 0, &uniformBuffersMapped_[i]);
+                             uniformBuffers[i],
+                             uniformBufferMemory[i]);
+                vkMapMemory(window->getDevice(), uniformBufferMemory[i], 0, sizeof(PillarUniforms), 0, &uniformBuffersMapped[i]);
             }
         }
 
         void createDescriptorPool() {
-            const uint32_t frameCount = static_cast<uint32_t>(window_->getSwapchainImageCount());
+            const uint32_t frameCount = static_cast<uint32_t>(window->getSwapchainImageCount());
             std::array<VkDescriptorPoolSize, 2> poolSizes{};
             poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             poolSizes[0].descriptorCount = frameCount;
@@ -985,63 +985,63 @@ namespace walk {
             poolInfo.pPoolSizes = poolSizes.data();
             poolInfo.maxSets = frameCount;
 
-            if (vkCreateDescriptorPool(window_->getDevice(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
+            if (vkCreateDescriptorPool(window->getDevice(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw pillar descriptor pool");
             }
         }
 
         void createDescriptorSets() {
-            const size_t frameCount = window_->getSwapchainImageCount();
-            std::vector<VkDescriptorSetLayout> layouts(frameCount, descriptorSetLayout_);
+            const size_t frameCount = window->getSwapchainImageCount();
+            std::vector<VkDescriptorSetLayout> layouts(frameCount, descriptorSetLayout);
 
             VkDescriptorSetAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = descriptorPool_;
+            allocInfo.descriptorPool = descriptorPool;
             allocInfo.descriptorSetCount = static_cast<uint32_t>(frameCount);
             allocInfo.pSetLayouts = layouts.data();
 
-            descriptorSets_.resize(frameCount, VK_NULL_HANDLE);
-            if (vkAllocateDescriptorSets(window_->getDevice(), &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
+            descriptorSets.resize(frameCount, VK_NULL_HANDLE);
+            if (vkAllocateDescriptorSets(window->getDevice(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to allocate raw pillar descriptor sets");
             }
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureView_;
-            imageInfo.sampler = textureSampler_;
+            imageInfo.imageView = textureView;
+            imageInfo.sampler = textureSampler;
 
             for (size_t i = 0; i < frameCount; ++i) {
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = uniformBuffers_[i];
+                bufferInfo.buffer = uniformBuffers[i];
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(PillarUniforms);
 
                 std::array<VkWriteDescriptorSet, 2> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[0].dstSet = descriptorSets_[i];
+                writes[0].dstSet = descriptorSets[i];
                 writes[0].dstBinding = 0;
                 writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[0].descriptorCount = 1;
                 writes[0].pImageInfo = &imageInfo;
 
                 writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[1].dstSet = descriptorSets_[i];
+                writes[1].dstSet = descriptorSets[i];
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
                 writes[1].pBufferInfo = &bufferInfo;
 
-                vkUpdateDescriptorSets(window_->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+                vkUpdateDescriptorSets(window->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
             }
         }
 
         void createPipeline() {
-            if (descriptorSetLayout_ == VK_NULL_HANDLE || vertexSpv_.empty() || fragmentSpv_.empty() || window_->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
+            if (descriptorSetLayout == VK_NULL_HANDLE || vertexSpv.empty() || fragmentSpv.empty() || window->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
                 return;
             }
 
-            const VkShaderModule vertModule = createShaderModule(window_->getDevice(), vertexSpv_);
-            const VkShaderModule fragModule = createShaderModule(window_->getDevice(), fragmentSpv_);
+            const VkShaderModule vertModule = createShaderModule(window->getDevice(), vertexSpv);
+            const VkShaderModule fragModule = createShaderModule(window->getDevice(), fragmentSpv);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1125,18 +1125,18 @@ namespace walk {
             VkPipelineLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
-            layoutInfo.pSetLayouts = &descriptorSetLayout_;
+            layoutInfo.pSetLayouts = &descriptorSetLayout;
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &pushRange;
 
-            if (vkCreatePipelineLayout(window_->getDevice(), &layoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
-                vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-                vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            if (vkCreatePipelineLayout(window->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+                vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+                vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create raw pillar pipeline layout");
             }
 
-            const VkFormat colorFormat = window_->getSwapchainFormat();
-            const VkFormat depthFormat = window_->getDepthFormat();
+            const VkFormat colorFormat = window->getSwapchainFormat();
+            const VkFormat depthFormat = window->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
             renderingInfo.colorAttachmentCount = 1;
@@ -1158,136 +1158,136 @@ namespace walk {
             pipelineInfo.pDepthStencilState = &depthStencil;
             pipelineInfo.pColorBlendState = &colorBlend;
             pipelineInfo.pDynamicState = &dynamicInfo;
-            pipelineInfo.layout = pipelineLayout_;
+            pipelineInfo.layout = pipelineLayout;
             pipelineInfo.renderPass = VK_NULL_HANDLE;
 
-            if (vkCreateGraphicsPipelines(window_->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS) {
-                vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
-                pipelineLayout_ = VK_NULL_HANDLE;
-                vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-                vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            if (vkCreateGraphicsPipelines(window->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+                vkDestroyPipelineLayout(window->getDevice(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
+                vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+                vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create raw pillar graphics pipeline");
             }
 
-            vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-            vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+            vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
         }
 
         void destroyPipeline() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                pipeline_ = VK_NULL_HANDLE;
-                pipelineLayout_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                pipeline = VK_NULL_HANDLE;
+                pipelineLayout = VK_NULL_HANDLE;
                 return;
             }
 
-            if (pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(window_->getDevice(), pipeline_, nullptr);
-                pipeline_ = VK_NULL_HANDLE;
+            if (pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(window->getDevice(), pipeline, nullptr);
+                pipeline = VK_NULL_HANDLE;
             }
-            if (pipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
-                pipelineLayout_ = VK_NULL_HANDLE;
+            if (pipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(window->getDevice(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
             }
         }
 
         void destroyDescriptors() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                descriptorSets_.clear();
-                descriptorPool_ = VK_NULL_HANDLE;
-                descriptorSetLayout_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                descriptorSets.clear();
+                descriptorPool = VK_NULL_HANDLE;
+                descriptorSetLayout = VK_NULL_HANDLE;
                 destroyUniformBuffers();
                 return;
             }
 
-            descriptorSets_.clear();
-            if (descriptorPool_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(window_->getDevice(), descriptorPool_, nullptr);
-                descriptorPool_ = VK_NULL_HANDLE;
+            descriptorSets.clear();
+            if (descriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(window->getDevice(), descriptorPool, nullptr);
+                descriptorPool = VK_NULL_HANDLE;
             }
-            if (descriptorSetLayout_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorSetLayout(window_->getDevice(), descriptorSetLayout_, nullptr);
-                descriptorSetLayout_ = VK_NULL_HANDLE;
+            if (descriptorSetLayout != VK_NULL_HANDLE) {
+                vkDestroyDescriptorSetLayout(window->getDevice(), descriptorSetLayout, nullptr);
+                descriptorSetLayout = VK_NULL_HANDLE;
             }
             destroyUniformBuffers();
         }
 
         void destroyUniformBuffers() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                uniformBuffers_.clear();
-                uniformBufferMemory_.clear();
-                uniformBuffersMapped_.clear();
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                uniformBuffers.clear();
+                uniformBufferMemory.clear();
+                uniformBuffersMapped.clear();
                 return;
             }
 
-            for (size_t i = 0; i < uniformBuffers_.size(); ++i) {
-                if (uniformBuffersMapped_[i] != nullptr) {
-                    vkUnmapMemory(window_->getDevice(), uniformBufferMemory_[i]);
-                    uniformBuffersMapped_[i] = nullptr;
+            for (size_t i = 0; i < uniformBuffers.size(); ++i) {
+                if (uniformBuffersMapped[i] != nullptr) {
+                    vkUnmapMemory(window->getDevice(), uniformBufferMemory[i]);
+                    uniformBuffersMapped[i] = nullptr;
                 }
-                if (uniformBuffers_[i] != VK_NULL_HANDLE) {
-                    vkDestroyBuffer(window_->getDevice(), uniformBuffers_[i], nullptr);
+                if (uniformBuffers[i] != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(window->getDevice(), uniformBuffers[i], nullptr);
                 }
-                if (uniformBufferMemory_[i] != VK_NULL_HANDLE) {
-                    vkFreeMemory(window_->getDevice(), uniformBufferMemory_[i], nullptr);
+                if (uniformBufferMemory[i] != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), uniformBufferMemory[i], nullptr);
                 }
             }
 
-            uniformBuffers_.clear();
-            uniformBufferMemory_.clear();
-            uniformBuffersMapped_.clear();
+            uniformBuffers.clear();
+            uniformBufferMemory.clear();
+            uniformBuffersMapped.clear();
         }
 
         void destroyTexture() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                textureView_ = VK_NULL_HANDLE;
-                textureImage_ = VK_NULL_HANDLE;
-                textureMemory_ = VK_NULL_HANDLE;
-                textureSampler_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                textureView = VK_NULL_HANDLE;
+                textureImage = VK_NULL_HANDLE;
+                textureMemory = VK_NULL_HANDLE;
+                textureSampler = VK_NULL_HANDLE;
                 return;
             }
 
-            if (textureView_ != VK_NULL_HANDLE) {
-                vkDestroyImageView(window_->getDevice(), textureView_, nullptr);
-                textureView_ = VK_NULL_HANDLE;
+            if (textureView != VK_NULL_HANDLE) {
+                vkDestroyImageView(window->getDevice(), textureView, nullptr);
+                textureView = VK_NULL_HANDLE;
             }
-            if (textureImage_ != VK_NULL_HANDLE) {
-                vkDestroyImage(window_->getDevice(), textureImage_, nullptr);
-                textureImage_ = VK_NULL_HANDLE;
+            if (textureImage != VK_NULL_HANDLE) {
+                vkDestroyImage(window->getDevice(), textureImage, nullptr);
+                textureImage = VK_NULL_HANDLE;
             }
-            if (textureMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), textureMemory_, nullptr);
-                textureMemory_ = VK_NULL_HANDLE;
+            if (textureMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), textureMemory, nullptr);
+                textureMemory = VK_NULL_HANDLE;
             }
-            if (textureSampler_ != VK_NULL_HANDLE) {
-                vkDestroySampler(window_->getDevice(), textureSampler_, nullptr);
-                textureSampler_ = VK_NULL_HANDLE;
+            if (textureSampler != VK_NULL_HANDLE) {
+                vkDestroySampler(window->getDevice(), textureSampler, nullptr);
+                textureSampler = VK_NULL_HANDLE;
             }
         }
 
         void destroyBuffers() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                vertexBuffer_ = VK_NULL_HANDLE;
-                vertexMemory_ = VK_NULL_HANDLE;
-                indexBuffer_ = VK_NULL_HANDLE;
-                indexMemory_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                vertexBuffer = VK_NULL_HANDLE;
+                vertexMemory = VK_NULL_HANDLE;
+                indexBuffer = VK_NULL_HANDLE;
+                indexMemory = VK_NULL_HANDLE;
                 return;
             }
 
-            if (vertexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(window_->getDevice(), vertexBuffer_, nullptr);
-                vertexBuffer_ = VK_NULL_HANDLE;
+            if (vertexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(window->getDevice(), vertexBuffer, nullptr);
+                vertexBuffer = VK_NULL_HANDLE;
             }
-            if (vertexMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), vertexMemory_, nullptr);
-                vertexMemory_ = VK_NULL_HANDLE;
+            if (vertexMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), vertexMemory, nullptr);
+                vertexMemory = VK_NULL_HANDLE;
             }
-            if (indexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(window_->getDevice(), indexBuffer_, nullptr);
-                indexBuffer_ = VK_NULL_HANDLE;
+            if (indexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(window->getDevice(), indexBuffer, nullptr);
+                indexBuffer = VK_NULL_HANDLE;
             }
-            if (indexMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), indexMemory_, nullptr);
-                indexMemory_ = VK_NULL_HANDLE;
+            if (indexMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), indexMemory, nullptr);
+                indexMemory = VK_NULL_HANDLE;
             }
         }
 
@@ -1415,11 +1415,11 @@ namespace walk {
                                               });
             }
 
-            vertexCount_ = static_cast<uint32_t>(vertices.size() / 8);
-            indexCount_ = static_cast<uint32_t>(indices.size());
+            vertexCount = static_cast<uint32_t>(vertices.size() / 8);
+            indexCount = static_cast<uint32_t>(indices.size());
 
-            std::vector<PillarVertex> pillarVertices(vertexCount_);
-            for (uint32_t i = 0; i < vertexCount_; ++i) {
+            std::vector<PillarVertex> pillarVertices(vertexCount);
+            for (uint32_t i = 0; i < vertexCount; ++i) {
                 const size_t base = static_cast<size_t>(i) * 8;
                 pillarVertices[i].position = glm::vec3(vertices[base + 0], vertices[base + 1], vertices[base + 2]);
                 pillarVertices[i].texCoord = glm::vec2(vertices[base + 3], vertices[base + 4]);
@@ -1429,21 +1429,21 @@ namespace walk {
             createBuffer(static_cast<VkDeviceSize>(pillarVertices.size() * sizeof(PillarVertex)),
                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         vertexBuffer_,
-                         vertexMemory_);
+                         vertexBuffer,
+                         vertexMemory);
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), vertexMemory_, 0, VK_WHOLE_SIZE, 0, &mapped);
+            vkMapMemory(window->getDevice(), vertexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, pillarVertices.data(), pillarVertices.size() * sizeof(PillarVertex));
-            vkUnmapMemory(window_->getDevice(), vertexMemory_);
+            vkUnmapMemory(window->getDevice(), vertexMemory);
 
             createBuffer(static_cast<VkDeviceSize>(indices.size() * sizeof(uint32_t)),
                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         indexBuffer_,
-                         indexMemory_);
-            vkMapMemory(window_->getDevice(), indexMemory_, 0, VK_WHOLE_SIZE, 0, &mapped);
+                         indexBuffer,
+                         indexMemory);
+            vkMapMemory(window->getDevice(), indexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, indices.data(), indices.size() * sizeof(uint32_t));
-            vkUnmapMemory(window_->getDevice(), indexMemory_);
+            vkUnmapMemory(window->getDevice(), indexMemory);
         }
 
         void loadTexture(const std::string &textureManifestPath, const std::string &textureBasePath) {
@@ -1465,56 +1465,56 @@ namespace walk {
                          stagingMemory);
 
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
+            vkMapMemory(window->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
-            vkUnmapMemory(window_->getDevice(), stagingMemory);
+            vkUnmapMemory(window->getDevice(), stagingMemory);
 
             createImage(width, height,
                         VK_FORMAT_R8G8B8A8_UNORM,
                         VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        textureImage_,
-                        textureMemory_);
+                        textureImage,
+                        textureMemory);
 
-            transitionImageLayout(textureImage_, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            copyBufferToImage(stagingBuffer, textureImage_, width, height);
-            transitionImageLayout(textureImage_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            copyBufferToImage(stagingBuffer, textureImage, width, height);
+            transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            textureView_ = createImageView(textureImage_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+            textureView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            vkDestroyBuffer(window->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(window->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
             (void)textureManifestPath;
         }
 
-        mxvk::VK_Window *window_ = nullptr;
-        std::vector<char> vertexSpv_{};
-        std::vector<char> fragmentSpv_{};
+        mxvk::VK_Window *window = nullptr;
+        std::vector<char> vertexSpv{};
+        std::vector<char> fragmentSpv{};
 
-        uint32_t vertexCount_ = 0;
-        uint32_t indexCount_ = 0;
-        VkBuffer vertexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory vertexMemory_ = VK_NULL_HANDLE;
-        VkBuffer indexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory indexMemory_ = VK_NULL_HANDLE;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount = 0;
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory indexMemory = VK_NULL_HANDLE;
 
-        VkImage textureImage_ = VK_NULL_HANDLE;
-        VkDeviceMemory textureMemory_ = VK_NULL_HANDLE;
-        VkImageView textureView_ = VK_NULL_HANDLE;
-        VkSampler textureSampler_ = VK_NULL_HANDLE;
+        VkImage textureImage = VK_NULL_HANDLE;
+        VkDeviceMemory textureMemory = VK_NULL_HANDLE;
+        VkImageView textureView = VK_NULL_HANDLE;
+        VkSampler textureSampler = VK_NULL_HANDLE;
 
-        VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
-        VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> descriptorSets_{};
+        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> descriptorSets{};
 
-        VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-        VkPipeline pipeline_ = VK_NULL_HANDLE;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pipeline = VK_NULL_HANDLE;
 
-        std::vector<VkBuffer> uniformBuffers_{};
-        std::vector<VkDeviceMemory> uniformBufferMemory_{};
-        std::vector<void *> uniformBuffersMapped_{};
+        std::vector<VkBuffer> uniformBuffers{};
+        std::vector<VkDeviceMemory> uniformBufferMemory{};
+        std::vector<void *> uniformBuffersMapped{};
     };
 
     class RawWallRenderer {
@@ -1531,19 +1531,19 @@ namespace walk {
             glm::vec4 fx{0.0f};
         };
 
-        void load(mxvk::VK_Window *window,
+        void load(mxvk::VK_Window *targetWindow,
                   const std::string &textureManifestPath,
                   const std::string &textureBasePath,
-                  const std::vector<char> &vertSpv,
-                  const std::vector<char> &fragSpv) {
-            if (window == nullptr) {
+                  const std::vector<char> &vertexShaderSpv,
+                  const std::vector<char> &fragmentShaderSpv) {
+            if (targetWindow == nullptr) {
                 throw mxvk::Exception("walk: raw wall renderer requires a valid window");
             }
-            window_ = window;
-            vertSpv_ = vertSpv;
-            fragSpv_ = fragSpv;
+            window = targetWindow;
+            vertSpv = vertexShaderSpv;
+            fragSpv = fragmentShaderSpv;
 
-            if (!window_->ensureRenderResources()) {
+            if (!window->ensureRenderResources()) {
                 throw mxvk::Exception("walk: raw wall renderer requires render resources");
             }
 
@@ -1557,12 +1557,12 @@ namespace walk {
             createPipeline();
         }
 
-        void resize(mxvk::VK_Window *window) {
-            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+        void resize(mxvk::VK_Window *targetWindow) {
+            if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
                 return;
             }
 
-            window_ = window;
+            window = targetWindow;
             destroyPipeline();
             destroyDescriptors();
             createDescriptorSetLayout();
@@ -1575,26 +1575,26 @@ namespace walk {
         /// @brief Hot-swap the fragment shader without rebuilding geometry or descriptors.
         /// @param newFragSpv Compiled SPIR-V bytecode for the new fragment shader.
         void reloadFragShader(const std::vector<char> &newFragSpv) {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE || newFragSpv.empty()) {
                 return;
             }
-            vkDeviceWaitIdle(window_->getDevice());
-            fragSpv_ = newFragSpv;
+            vkDeviceWaitIdle(window->getDevice());
+            fragSpv = newFragSpv;
             destroyPipeline();
             createPipeline();
         }
 
-        void cleanup(mxvk::VK_Window *window) {
-            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+        void cleanup(mxvk::VK_Window *targetWindow) {
+            if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
                 return;
             }
 
-            window_ = window;
+            window = targetWindow;
             destroyPipeline();
             destroyDescriptors();
             destroyTexture();
             destroyBuffers();
-            window_ = nullptr;
+            window = nullptr;
         }
 
         void render(VkCommandBuffer cmd,
@@ -1604,10 +1604,10 @@ namespace walk {
                     const glm::mat4 &view,
                     const glm::mat4 &proj,
                     const glm::vec4 &fx) {
-            if (cmd == VK_NULL_HANDLE || pipeline_ == VK_NULL_HANDLE || pipelineLayout_ == VK_NULL_HANDLE) {
+            if (cmd == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
                 return;
             }
-            if (imageIndex >= uniformBuffersMapped_.size() || descriptorSets_.empty() || vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE) {
+            if (imageIndex >= uniformBuffersMapped.size() || descriptorSets.empty() || vertexBuffer == VK_NULL_HANDLE || indexBuffer == VK_NULL_HANDLE) {
                 return;
             }
 
@@ -1615,21 +1615,21 @@ namespace walk {
             uniforms.view = view;
             uniforms.proj = proj;
             uniforms.fx = fx;
-            std::memcpy(uniformBuffersMapped_[imageIndex], &uniforms, sizeof(WallUniforms));
+            std::memcpy(uniformBuffersMapped[imageIndex], &uniforms, sizeof(WallUniforms));
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             vkCmdBindDescriptorSets(cmd,
                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout_,
+                                    pipelineLayout,
                                     0,
                                     1,
-                                    &descriptorSets_[imageIndex],
+                                    &descriptorSets[imageIndex],
                                     0,
                                     nullptr);
 
             const VkDeviceSize offset = 0;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer_, &offset);
-            vkCmdBindIndexBuffer(cmd, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+            vkCmdBindIndexBuffer(cmd, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
             const float thickness = std::max(0.02f, wallThickness);
             // Extend each wall by about half its thickness on both ends so adjoining
@@ -1648,8 +1648,8 @@ namespace walk {
                 glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(center.x, -baseSink, center.z));
                 model = glm::rotate(model, std::atan2(span.z, span.x), glm::vec3(0.0f, 1.0f, 0.0f));
                 model = glm::scale(model, glm::vec3(length + wallOverlap * 2.0f, segment.height, thickness));
-                vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
-                vkCmdDrawIndexed(cmd, indexCount_, 1, 0, 0, 0);
+                vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &model);
+                vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
             }
         }
 
@@ -1669,7 +1669,7 @@ namespace walk {
 
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
             VkPhysicalDeviceMemoryProperties memProperties{};
-            vkGetPhysicalDeviceMemoryProperties(window_->getPhysicalDevice(), &memProperties);
+            vkGetPhysicalDeviceMemoryProperties(window->getPhysicalDevice(), &memProperties);
             for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
                 if ((typeFilter & (1u << i)) != 0u && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
                     return i;
@@ -1689,27 +1689,27 @@ namespace walk {
             bufferInfo.usage = usage;
             bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            if (vkCreateBuffer(window_->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            if (vkCreateBuffer(window->getDevice(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall buffer");
             }
 
             VkMemoryRequirements requirements{};
-            vkGetBufferMemoryRequirements(window_->getDevice(), buffer, &requirements);
+            vkGetBufferMemoryRequirements(window->getDevice(), buffer, &requirements);
 
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
             allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
+            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
                 buffer = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to allocate raw wall buffer memory");
             }
 
-            if (vkBindBufferMemory(window_->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-                vkDestroyBuffer(window_->getDevice(), buffer, nullptr);
-                vkFreeMemory(window_->getDevice(), bufferMemory, nullptr);
+            if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
+                vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
                 buffer = VK_NULL_HANDLE;
                 bufferMemory = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to bind raw wall buffer memory");
@@ -1749,27 +1749,27 @@ namespace walk {
             addFace(glm::vec3(-x, y1, z), glm::vec3(x, y1, z), glm::vec3(x, y1, -z), glm::vec3(-x, y1, -z), glm::vec3(0.0f, 1.0f, 0.0f));
             addFace(glm::vec3(-x, y0, -z), glm::vec3(x, y0, -z), glm::vec3(x, y0, z), glm::vec3(-x, y0, z), glm::vec3(0.0f, -1.0f, 0.0f));
 
-            vertexCount_ = static_cast<uint32_t>(verts.size());
-            indexCount_ = static_cast<uint32_t>(inds.size());
+            vertexCount = static_cast<uint32_t>(verts.size());
+            indexCount = static_cast<uint32_t>(inds.size());
 
             createBuffer(static_cast<VkDeviceSize>(verts.size() * sizeof(WallVertex)),
                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         vertexBuffer_,
-                         vertexMemory_);
+                         vertexBuffer,
+                         vertexMemory);
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), vertexMemory_, 0, VK_WHOLE_SIZE, 0, &mapped);
+            vkMapMemory(window->getDevice(), vertexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, verts.data(), verts.size() * sizeof(WallVertex));
-            vkUnmapMemory(window_->getDevice(), vertexMemory_);
+            vkUnmapMemory(window->getDevice(), vertexMemory);
 
             createBuffer(static_cast<VkDeviceSize>(inds.size() * sizeof(uint32_t)),
                          VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         indexBuffer_,
-                         indexMemory_);
-            vkMapMemory(window_->getDevice(), indexMemory_, 0, VK_WHOLE_SIZE, 0, &mapped);
+                         indexBuffer,
+                         indexMemory);
+            vkMapMemory(window->getDevice(), indexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, inds.data(), inds.size() * sizeof(uint32_t));
-            vkUnmapMemory(window_->getDevice(), indexMemory_);
+            vkUnmapMemory(window->getDevice(), indexMemory);
         }
 
         void loadTexture(const std::string &textureManifestPath, const std::string &textureBasePath) {
@@ -1791,39 +1791,39 @@ namespace walk {
                          stagingMemory);
 
             void *mapped = nullptr;
-            vkMapMemory(window_->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
+            vkMapMemory(window->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
-            vkUnmapMemory(window_->getDevice(), stagingMemory);
+            vkUnmapMemory(window->getDevice(), stagingMemory);
 
             createImage(width, height,
                         VK_FORMAT_R8G8B8A8_UNORM,
                         VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        textureImage_,
-                        textureMemory_);
+                        textureImage,
+                        textureMemory);
 
-            transitionImageLayout(textureImage_, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            copyBufferToImage(stagingBuffer, textureImage_, width, height);
-            transitionImageLayout(textureImage_, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            copyBufferToImage(stagingBuffer, textureImage, width, height);
+            transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-            textureView_ = createImageView(textureImage_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+            textureView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-            vkDestroyBuffer(window_->getDevice(), stagingBuffer, nullptr);
-            vkFreeMemory(window_->getDevice(), stagingMemory, nullptr);
+            vkDestroyBuffer(window->getDevice(), stagingBuffer, nullptr);
+            vkFreeMemory(window->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
             (void)textureManifestPath;
         }
 
         void createTextureSampler() {
-            if (textureSampler_ != VK_NULL_HANDLE) {
+            if (textureSampler != VK_NULL_HANDLE) {
                 return;
             }
 
             VkPhysicalDeviceFeatures deviceFeatures{};
-            vkGetPhysicalDeviceFeatures(window_->getPhysicalDevice(), &deviceFeatures);
+            vkGetPhysicalDeviceFeatures(window->getPhysicalDevice(), &deviceFeatures);
             VkPhysicalDeviceProperties deviceProperties{};
-            vkGetPhysicalDeviceProperties(window_->getPhysicalDevice(), &deviceProperties);
+            vkGetPhysicalDeviceProperties(window->getPhysicalDevice(), &deviceProperties);
             const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
             const float anisotropyLevel = anisotropySupported
                                               ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
@@ -1844,13 +1844,13 @@ namespace walk {
             samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-            if (vkCreateSampler(window_->getDevice(), &samplerInfo, nullptr, &textureSampler_) != VK_SUCCESS) {
+            if (vkCreateSampler(window->getDevice(), &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall texture sampler");
             }
         }
 
         void createDescriptorSetLayout() {
-            if (descriptorSetLayout_ != VK_NULL_HANDLE) {
+            if (descriptorSetLayout != VK_NULL_HANDLE) {
                 return;
             }
 
@@ -1873,7 +1873,7 @@ namespace walk {
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
             layoutInfo.pBindings = bindings.data();
 
-            if (vkCreateDescriptorSetLayout(window_->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
+            if (vkCreateDescriptorSetLayout(window->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall descriptor set layout");
             }
         }
@@ -1881,27 +1881,27 @@ namespace walk {
         void createUniformBuffers() {
             destroyUniformBuffers();
 
-            const size_t frameCount = window_->getSwapchainImageCount();
+            const size_t frameCount = window->getSwapchainImageCount();
             if (frameCount == 0) {
                 return;
             }
 
-            uniformBuffers_.resize(frameCount, VK_NULL_HANDLE);
-            uniformBufferMemory_.resize(frameCount, VK_NULL_HANDLE);
-            uniformBuffersMapped_.resize(frameCount, nullptr);
+            uniformBuffers.resize(frameCount, VK_NULL_HANDLE);
+            uniformBufferMemory.resize(frameCount, VK_NULL_HANDLE);
+            uniformBuffersMapped.resize(frameCount, nullptr);
 
             for (size_t i = 0; i < frameCount; ++i) {
                 createBuffer(sizeof(WallUniforms),
                              VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             uniformBuffers_[i],
-                             uniformBufferMemory_[i]);
-                vkMapMemory(window_->getDevice(), uniformBufferMemory_[i], 0, sizeof(WallUniforms), 0, &uniformBuffersMapped_[i]);
+                             uniformBuffers[i],
+                             uniformBufferMemory[i]);
+                vkMapMemory(window->getDevice(), uniformBufferMemory[i], 0, sizeof(WallUniforms), 0, &uniformBuffersMapped[i]);
             }
         }
 
         void createDescriptorPool() {
-            const uint32_t frameCount = static_cast<uint32_t>(window_->getSwapchainImageCount());
+            const uint32_t frameCount = static_cast<uint32_t>(window->getSwapchainImageCount());
             std::array<VkDescriptorPoolSize, 2> poolSizes{};
             poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             poolSizes[0].descriptorCount = frameCount;
@@ -1914,63 +1914,63 @@ namespace walk {
             poolInfo.pPoolSizes = poolSizes.data();
             poolInfo.maxSets = frameCount;
 
-            if (vkCreateDescriptorPool(window_->getDevice(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
+            if (vkCreateDescriptorPool(window->getDevice(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall descriptor pool");
             }
         }
 
         void createDescriptorSets() {
-            const size_t frameCount = window_->getSwapchainImageCount();
-            std::vector<VkDescriptorSetLayout> layouts(frameCount, descriptorSetLayout_);
+            const size_t frameCount = window->getSwapchainImageCount();
+            std::vector<VkDescriptorSetLayout> layouts(frameCount, descriptorSetLayout);
 
             VkDescriptorSetAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = descriptorPool_;
+            allocInfo.descriptorPool = descriptorPool;
             allocInfo.descriptorSetCount = static_cast<uint32_t>(frameCount);
             allocInfo.pSetLayouts = layouts.data();
 
-            descriptorSets_.resize(frameCount, VK_NULL_HANDLE);
-            if (vkAllocateDescriptorSets(window_->getDevice(), &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
+            descriptorSets.resize(frameCount, VK_NULL_HANDLE);
+            if (vkAllocateDescriptorSets(window->getDevice(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to allocate raw wall descriptor sets");
             }
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = textureView_;
-            imageInfo.sampler = textureSampler_;
+            imageInfo.imageView = textureView;
+            imageInfo.sampler = textureSampler;
 
             for (size_t i = 0; i < frameCount; ++i) {
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = uniformBuffers_[i];
+                bufferInfo.buffer = uniformBuffers[i];
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(WallUniforms);
 
                 std::array<VkWriteDescriptorSet, 2> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[0].dstSet = descriptorSets_[i];
+                writes[0].dstSet = descriptorSets[i];
                 writes[0].dstBinding = 0;
                 writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[0].descriptorCount = 1;
                 writes[0].pImageInfo = &imageInfo;
 
                 writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[1].dstSet = descriptorSets_[i];
+                writes[1].dstSet = descriptorSets[i];
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
                 writes[1].pBufferInfo = &bufferInfo;
 
-                vkUpdateDescriptorSets(window_->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+                vkUpdateDescriptorSets(window->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
             }
         }
 
         void createPipeline() {
-            if (descriptorSetLayout_ == VK_NULL_HANDLE || vertSpv_.empty() || fragSpv_.empty() || window_->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
+            if (descriptorSetLayout == VK_NULL_HANDLE || vertSpv.empty() || fragSpv.empty() || window->getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
                 return;
             }
 
-            const VkShaderModule vertModule = createShaderModule(window_->getDevice(), vertSpv_);
-            const VkShaderModule fragModule = createShaderModule(window_->getDevice(), fragSpv_);
+            const VkShaderModule vertModule = createShaderModule(window->getDevice(), vertSpv);
+            const VkShaderModule fragModule = createShaderModule(window->getDevice(), fragSpv);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -2051,18 +2051,18 @@ namespace walk {
             VkPipelineLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
-            layoutInfo.pSetLayouts = &descriptorSetLayout_;
+            layoutInfo.pSetLayouts = &descriptorSetLayout;
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &pushRange;
 
-            if (vkCreatePipelineLayout(window_->getDevice(), &layoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
-                vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-                vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            if (vkCreatePipelineLayout(window->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+                vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+                vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create raw wall pipeline layout");
             }
 
-            const VkFormat colorFormat = window_->getSwapchainFormat();
-            const VkFormat depthFormat = window_->getDepthFormat();
+            const VkFormat colorFormat = window->getSwapchainFormat();
+            const VkFormat depthFormat = window->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
             renderingInfo.colorAttachmentCount = 1;
@@ -2084,136 +2084,136 @@ namespace walk {
             pipelineInfo.pDepthStencilState = &depthStencil;
             pipelineInfo.pColorBlendState = &colorBlend;
             pipelineInfo.pDynamicState = &dynamicInfo;
-            pipelineInfo.layout = pipelineLayout_;
+            pipelineInfo.layout = pipelineLayout;
             pipelineInfo.renderPass = VK_NULL_HANDLE;
 
-            if (vkCreateGraphicsPipelines(window_->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS) {
-                vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
-                pipelineLayout_ = VK_NULL_HANDLE;
-                vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-                vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            if (vkCreateGraphicsPipelines(window->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+                vkDestroyPipelineLayout(window->getDevice(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
+                vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+                vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create raw wall graphics pipeline");
             }
 
-            vkDestroyShaderModule(window_->getDevice(), fragModule, nullptr);
-            vkDestroyShaderModule(window_->getDevice(), vertModule, nullptr);
+            vkDestroyShaderModule(window->getDevice(), fragModule, nullptr);
+            vkDestroyShaderModule(window->getDevice(), vertModule, nullptr);
         }
 
         void destroyPipeline() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                pipeline_ = VK_NULL_HANDLE;
-                pipelineLayout_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                pipeline = VK_NULL_HANDLE;
+                pipelineLayout = VK_NULL_HANDLE;
                 return;
             }
 
-            if (pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(window_->getDevice(), pipeline_, nullptr);
-                pipeline_ = VK_NULL_HANDLE;
+            if (pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(window->getDevice(), pipeline, nullptr);
+                pipeline = VK_NULL_HANDLE;
             }
-            if (pipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(window_->getDevice(), pipelineLayout_, nullptr);
-                pipelineLayout_ = VK_NULL_HANDLE;
+            if (pipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(window->getDevice(), pipelineLayout, nullptr);
+                pipelineLayout = VK_NULL_HANDLE;
             }
         }
 
         void destroyDescriptors() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                descriptorSets_.clear();
-                descriptorPool_ = VK_NULL_HANDLE;
-                descriptorSetLayout_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                descriptorSets.clear();
+                descriptorPool = VK_NULL_HANDLE;
+                descriptorSetLayout = VK_NULL_HANDLE;
                 destroyUniformBuffers();
                 return;
             }
 
-            descriptorSets_.clear();
-            if (descriptorPool_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(window_->getDevice(), descriptorPool_, nullptr);
-                descriptorPool_ = VK_NULL_HANDLE;
+            descriptorSets.clear();
+            if (descriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(window->getDevice(), descriptorPool, nullptr);
+                descriptorPool = VK_NULL_HANDLE;
             }
-            if (descriptorSetLayout_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorSetLayout(window_->getDevice(), descriptorSetLayout_, nullptr);
-                descriptorSetLayout_ = VK_NULL_HANDLE;
+            if (descriptorSetLayout != VK_NULL_HANDLE) {
+                vkDestroyDescriptorSetLayout(window->getDevice(), descriptorSetLayout, nullptr);
+                descriptorSetLayout = VK_NULL_HANDLE;
             }
             destroyUniformBuffers();
         }
 
         void destroyUniformBuffers() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                uniformBuffers_.clear();
-                uniformBufferMemory_.clear();
-                uniformBuffersMapped_.clear();
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                uniformBuffers.clear();
+                uniformBufferMemory.clear();
+                uniformBuffersMapped.clear();
                 return;
             }
 
-            for (size_t i = 0; i < uniformBuffers_.size(); ++i) {
-                if (uniformBuffersMapped_[i] != nullptr) {
-                    vkUnmapMemory(window_->getDevice(), uniformBufferMemory_[i]);
-                    uniformBuffersMapped_[i] = nullptr;
+            for (size_t i = 0; i < uniformBuffers.size(); ++i) {
+                if (uniformBuffersMapped[i] != nullptr) {
+                    vkUnmapMemory(window->getDevice(), uniformBufferMemory[i]);
+                    uniformBuffersMapped[i] = nullptr;
                 }
-                if (uniformBuffers_[i] != VK_NULL_HANDLE) {
-                    vkDestroyBuffer(window_->getDevice(), uniformBuffers_[i], nullptr);
+                if (uniformBuffers[i] != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(window->getDevice(), uniformBuffers[i], nullptr);
                 }
-                if (uniformBufferMemory_[i] != VK_NULL_HANDLE) {
-                    vkFreeMemory(window_->getDevice(), uniformBufferMemory_[i], nullptr);
+                if (uniformBufferMemory[i] != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), uniformBufferMemory[i], nullptr);
                 }
             }
 
-            uniformBuffers_.clear();
-            uniformBufferMemory_.clear();
-            uniformBuffersMapped_.clear();
+            uniformBuffers.clear();
+            uniformBufferMemory.clear();
+            uniformBuffersMapped.clear();
         }
 
         void destroyTexture() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                textureView_ = VK_NULL_HANDLE;
-                textureImage_ = VK_NULL_HANDLE;
-                textureMemory_ = VK_NULL_HANDLE;
-                textureSampler_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                textureView = VK_NULL_HANDLE;
+                textureImage = VK_NULL_HANDLE;
+                textureMemory = VK_NULL_HANDLE;
+                textureSampler = VK_NULL_HANDLE;
                 return;
             }
 
-            if (textureView_ != VK_NULL_HANDLE) {
-                vkDestroyImageView(window_->getDevice(), textureView_, nullptr);
-                textureView_ = VK_NULL_HANDLE;
+            if (textureView != VK_NULL_HANDLE) {
+                vkDestroyImageView(window->getDevice(), textureView, nullptr);
+                textureView = VK_NULL_HANDLE;
             }
-            if (textureImage_ != VK_NULL_HANDLE) {
-                vkDestroyImage(window_->getDevice(), textureImage_, nullptr);
-                textureImage_ = VK_NULL_HANDLE;
+            if (textureImage != VK_NULL_HANDLE) {
+                vkDestroyImage(window->getDevice(), textureImage, nullptr);
+                textureImage = VK_NULL_HANDLE;
             }
-            if (textureMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), textureMemory_, nullptr);
-                textureMemory_ = VK_NULL_HANDLE;
+            if (textureMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), textureMemory, nullptr);
+                textureMemory = VK_NULL_HANDLE;
             }
-            if (textureSampler_ != VK_NULL_HANDLE) {
-                vkDestroySampler(window_->getDevice(), textureSampler_, nullptr);
-                textureSampler_ = VK_NULL_HANDLE;
+            if (textureSampler != VK_NULL_HANDLE) {
+                vkDestroySampler(window->getDevice(), textureSampler, nullptr);
+                textureSampler = VK_NULL_HANDLE;
             }
         }
 
         void destroyBuffers() {
-            if (window_ == nullptr || window_->getDevice() == VK_NULL_HANDLE) {
-                vertexBuffer_ = VK_NULL_HANDLE;
-                vertexMemory_ = VK_NULL_HANDLE;
-                indexBuffer_ = VK_NULL_HANDLE;
-                indexMemory_ = VK_NULL_HANDLE;
+            if (window == nullptr || window->getDevice() == VK_NULL_HANDLE) {
+                vertexBuffer = VK_NULL_HANDLE;
+                vertexMemory = VK_NULL_HANDLE;
+                indexBuffer = VK_NULL_HANDLE;
+                indexMemory = VK_NULL_HANDLE;
                 return;
             }
 
-            if (vertexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(window_->getDevice(), vertexBuffer_, nullptr);
-                vertexBuffer_ = VK_NULL_HANDLE;
+            if (vertexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(window->getDevice(), vertexBuffer, nullptr);
+                vertexBuffer = VK_NULL_HANDLE;
             }
-            if (vertexMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), vertexMemory_, nullptr);
-                vertexMemory_ = VK_NULL_HANDLE;
+            if (vertexMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), vertexMemory, nullptr);
+                vertexMemory = VK_NULL_HANDLE;
             }
-            if (indexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(window_->getDevice(), indexBuffer_, nullptr);
-                indexBuffer_ = VK_NULL_HANDLE;
+            if (indexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(window->getDevice(), indexBuffer, nullptr);
+                indexBuffer = VK_NULL_HANDLE;
             }
-            if (indexMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(window_->getDevice(), indexMemory_, nullptr);
-                indexMemory_ = VK_NULL_HANDLE;
+            if (indexMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(window->getDevice(), indexMemory, nullptr);
+                indexMemory = VK_NULL_HANDLE;
             }
         }
 
@@ -2240,27 +2240,27 @@ namespace walk {
             imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            if (vkCreateImage(window_->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
+            if (vkCreateImage(window->getDevice(), &imageInfo, nullptr, &image) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall image");
             }
 
             VkMemoryRequirements requirements{};
-            vkGetImageMemoryRequirements(window_->getDevice(), image, &requirements);
+            vkGetImageMemoryRequirements(window->getDevice(), image, &requirements);
 
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
             allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window_->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                vkDestroyImage(window_->getDevice(), image, nullptr);
+            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                vkDestroyImage(window->getDevice(), image, nullptr);
                 image = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to allocate raw wall image memory");
             }
 
-            if (vkBindImageMemory(window_->getDevice(), image, memory, 0) != VK_SUCCESS) {
-                vkDestroyImage(window_->getDevice(), image, nullptr);
-                vkFreeMemory(window_->getDevice(), memory, nullptr);
+            if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
+                vkDestroyImage(window->getDevice(), image, nullptr);
+                vkFreeMemory(window->getDevice(), memory, nullptr);
                 image = VK_NULL_HANDLE;
                 memory = VK_NULL_HANDLE;
                 throw mxvk::Exception("walk: failed to bind raw wall image memory");
@@ -2280,7 +2280,7 @@ namespace walk {
             viewInfo.subresourceRange.layerCount = 1;
 
             VkImageView imageView = VK_NULL_HANDLE;
-            if (vkCreateImageView(window_->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            if (vkCreateImageView(window->getDevice(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create raw wall image view");
             }
             return imageView;
@@ -2290,11 +2290,11 @@ namespace walk {
             VkCommandBufferAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            allocInfo.commandPool = window_->getCommandPool();
+            allocInfo.commandPool = window->getCommandPool();
             allocInfo.commandBufferCount = 1;
 
             VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-            if (vkAllocateCommandBuffers(window_->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
+            if (vkAllocateCommandBuffers(window->getDevice(), &allocInfo, &commandBuffer) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to allocate raw wall command buffer");
             }
 
@@ -2302,7 +2302,7 @@ namespace walk {
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
             if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to begin raw wall command buffer");
             }
 
@@ -2311,7 +2311,7 @@ namespace walk {
 
         void endSingleTimeCommands(VkCommandBuffer commandBuffer) const {
             if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to end raw wall command buffer");
             }
 
@@ -2320,16 +2320,16 @@ namespace walk {
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &commandBuffer;
 
-            if (vkQueueSubmit(window_->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            if (vkQueueSubmit(window->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to submit raw wall command buffer");
             }
-            if (vkQueueWaitIdle(window_->getGraphicsQueue()) != VK_SUCCESS) {
-                vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            if (vkQueueWaitIdle(window->getGraphicsQueue()) != VK_SUCCESS) {
+                vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
                 throw mxvk::Exception("walk: failed to wait for raw wall upload queue");
             }
 
-            vkFreeCommandBuffers(window_->getDevice(), window_->getCommandPool(), 1, &commandBuffer);
+            vkFreeCommandBuffers(window->getDevice(), window->getCommandPool(), 1, &commandBuffer);
         }
 
         void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) const {
@@ -2381,60 +2381,60 @@ namespace walk {
             endSingleTimeCommands(cmd);
         }
 
-        std::vector<char> vertSpv_{};
-        std::vector<char> fragSpv_{};
+        std::vector<char> vertSpv{};
+        std::vector<char> fragSpv{};
 
-        uint32_t vertexCount_ = 0;
-        uint32_t indexCount_ = 0;
-        VkBuffer vertexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory vertexMemory_ = VK_NULL_HANDLE;
-        VkBuffer indexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory indexMemory_ = VK_NULL_HANDLE;
+        uint32_t vertexCount = 0;
+        uint32_t indexCount = 0;
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory vertexMemory = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory indexMemory = VK_NULL_HANDLE;
 
-        VkImage textureImage_ = VK_NULL_HANDLE;
-        VkDeviceMemory textureMemory_ = VK_NULL_HANDLE;
-        VkImageView textureView_ = VK_NULL_HANDLE;
-        VkSampler textureSampler_ = VK_NULL_HANDLE;
+        VkImage textureImage = VK_NULL_HANDLE;
+        VkDeviceMemory textureMemory = VK_NULL_HANDLE;
+        VkImageView textureView = VK_NULL_HANDLE;
+        VkSampler textureSampler = VK_NULL_HANDLE;
 
-        VkDescriptorSetLayout descriptorSetLayout_ = VK_NULL_HANDLE;
-        VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> descriptorSets_{};
+        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> descriptorSets{};
 
-        VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-        VkPipeline pipeline_ = VK_NULL_HANDLE;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pipeline = VK_NULL_HANDLE;
 
-        std::vector<VkBuffer> uniformBuffers_{};
-        std::vector<VkDeviceMemory> uniformBufferMemory_{};
-        std::vector<void *> uniformBuffersMapped_{};
+        std::vector<VkBuffer> uniformBuffers{};
+        std::vector<VkDeviceMemory> uniformBufferMemory{};
+        std::vector<void *> uniformBuffersMapped{};
 
-        VkDevice device_ [[maybe_unused]] = VK_NULL_HANDLE;
-        mxvk::VK_Window *window_ = nullptr;
+        VkDevice device [[maybe_unused]] = VK_NULL_HANDLE;
+        mxvk::VK_Window *window = nullptr;
     };
 
     class WalkWindow final : public mxvk::VK_IOWindow {
       public:
         WalkWindow(const Arguments &args)
             : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen),
-              assetRoot_(args.path.empty() ? std::string(WALK_ASSET_DIR) : args.path),
-              modelRoot_(WALK_MODELS_DIR) {
+              assetRoot(args.path.empty() ? std::string(WALK_ASSET_DIR) : args.path),
+              modelRoot(WALK_MODELS_DIR) {
             logEnv(std::format("initializing window {}x{} (fullscreen={})", args.width, args.height, args.fullscreen ? "true" : "false"));
-            logEnv(std::format("asset root: {}", assetRoot_));
-            logEnv(std::format("model root: {}", modelRoot_));
+            logEnv(std::format("asset root: {}", assetRoot));
+            logEnv(std::format("model root: {}", modelRoot));
 
             std::mt19937 rng(static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
-            world_.generate(rng());
+            world.generate(rng());
             logEnv(std::format("world generated (walls={}, pillars={}, collectibles={})",
-                               world_.walls().size(),
-                               world_.pillars().size(),
-                               world_.collectibles().size()));
+                               world.walls().size(),
+                               world.pillars().size(),
+                               world.collectibles().size()));
             setClearColor(100.0f / 255.0f, 181.0f / 255.0f, 246.0f / 255.0f, 1.0f);
 
-            cameraPos_ = world_.startPosition();
-            yaw_ = chooseBestSpawnYaw(cameraPos_);
-            pitch_ = 0.0f;
+            cameraPos = world.startPosition();
+            yaw = chooseBestSpawnYaw(cameraPos);
+            pitch = 0.0f;
             updateCameraVectors();
 
-            setFont(assetRoot_ + "/data/font.ttf", 22);
+            setFont(assetRoot + "/data/font.ttf", 22);
 
             const std::string vertPath = std::string(WALK_SHADER_DIR) + "/model.vert.spv";
             const std::string wallFragPath = std::string(WALK_SHADER_DIR) + "/wall.frag.spv";
@@ -2444,45 +2444,45 @@ namespace walk {
             const std::string objectFragPath = std::string(WALK_SHADER_DIR) + "/object.frag.spv";
             const std::string bulletFragPath = std::string(WALK_SHADER_DIR) + "/bullet.frag.spv";
             const std::string particleFragPath = std::string(WALK_SHADER_DIR) + "/particle.frag.spv";
-            const std::string groundTexManifest = assetRoot_ + "/data/ground.tex";
+            const std::string groundTexManifest = assetRoot + "/data/ground.tex";
 
-            modelVertSpv_  = vertPath;
-            pillarVertSpv_ = pillarVertPath;
-            wallFragSpv_   = wallFragPath;
-            floorFragSpv_  = floorFragPath;
-            pillarFragSpv_ = pillarFragPath;
-            objectFragSpv_ = objectFragPath;
-            bulletFragSpv_ = bulletFragPath;
+            modelVertSpv  = vertPath;
+            pillarVertSpv = pillarVertPath;
+            wallFragSpv   = wallFragPath;
+            floorFragSpv  = floorFragPath;
+            pillarFragSpv = pillarFragPath;
+            objectFragSpv = objectFragPath;
+            bulletFragSpv = bulletFragPath;
 
-            loadModel(floorModel_, modelRoot_ + "/cube.mxmod.z", groundTexManifest, assetRoot_ + "/data", vertPath, floorFragPath);
-            loadModel(bulletModel_, modelRoot_ + "/sphere.mxmod.z", "", "", vertPath, bulletFragPath);
+            loadModel(floorModel, modelRoot + "/cube.mxmod.z", groundTexManifest, assetRoot + "/data", vertPath, floorFragPath);
+            loadModel(bulletModel, modelRoot + "/sphere.mxmod.z", "", "", vertPath, bulletFragPath);
 
             logEnv("loading wall renderer assets");
-            rawWallRenderer_.load(this,
+            rawWallRenderer.load(this,
                                   groundTexManifest,
-                                  assetRoot_ + "/data",
+                                  assetRoot + "/data",
                                   loadSpv(pillarVertPath),
                                   loadSpv(wallFragPath));
             logEnv("wall renderer ready");
 
             logEnv("loading pillar renderer assets");
-            rawPillarRenderer_.load(this,
+            rawPillarRenderer.load(this,
                                     groundTexManifest,
-                                    assetRoot_ + "/data",
+                                    assetRoot + "/data",
                                     loadSpv(pillarVertPath),
                                     loadSpv(pillarFragPath));
             logEnv("pillar renderer ready");
 
-            loadModel(saturnModel_, assetRoot_ + "/data/saturn.mxmod.z",
-                      assetRoot_ + "/data/planet.tex", assetRoot_ + "/data", vertPath, objectFragPath);
-            loadModel(birdModel_, assetRoot_ + "/data/tux.obj",
-                      assetRoot_ + "/data/tux.mtl", assetRoot_ + "/data", vertPath, objectFragPath);
-            loadModel(blasterModel_, assetRoot_ + "/data/blaster.obj",
-                      assetRoot_ + "/data/blaster.mtl", assetRoot_ + "/data", vertPath, objectFragPath);
+            loadModel(saturnModel, assetRoot + "/data/saturn.mxmod.z",
+                      assetRoot + "/data/planet.tex", assetRoot + "/data", vertPath, objectFragPath);
+            loadModel(birdModel, assetRoot + "/data/tux.obj",
+                      assetRoot + "/data/tux.mtl", assetRoot + "/data", vertPath, objectFragPath);
+            loadModel(blasterModel, assetRoot + "/data/blaster.obj",
+                      assetRoot + "/data/blaster.mtl", assetRoot + "/data", vertPath, objectFragPath);
             normalizeCollectiblesToModel();
 
-            pointParticleVertSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
-            pointParticleFragSpv_ = std::string(WALK_SHADER_DIR) + "/particle_points.frag.spv";
+            pointParticleVertSpv = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
+            pointParticleFragSpv = std::string(WALK_SHADER_DIR) + "/particle_points.frag.spv";
             initializePointParticles();
             logEnv("point-particle pipeline initialized");
 
@@ -2493,10 +2493,10 @@ namespace walk {
 
         ~WalkWindow() override {
             logEnv("shutting down walk window");
-            if (gamepad_ != nullptr) {
-                SDL_CloseGamepad(gamepad_);
-                gamepad_ = nullptr;
-                gamepadId_ = 0;
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepadId = 0;
             }
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
@@ -2518,10 +2518,10 @@ namespace walk {
                     SDL_SetWindowRelativeMouseMode(sdlWindow, true);
                 }
 
-                mouseCapture_ = true;
-                firstMouse_ = true;
+                mouseCapture = true;
+                firstMouse = true;
                 if (!visible()) {
-                    suppressProjectileOnNextLeftDown_ = true;
+                    suppressProjectileOnNextLeftDown = true;
                 }
                 logEnv("mouse capture enabled (double-click)");
             }
@@ -2538,10 +2538,10 @@ namespace walk {
 
             if (e.type == SDL_EVENT_KEY_DOWN) {
                 if (e.key.key == SDLK_ESCAPE) {
-                    if (mouseCapture_) {
-                        mouseCapture_ = false;
+                    if (mouseCapture) {
+                        mouseCapture = false;
                         SDL_SetWindowRelativeMouseMode(getSDLWindow(), false);
-                        suppressProjectileOnNextLeftDown_ = false;
+                        suppressProjectileOnNextLeftDown = false;
                         logEnv("mouse capture disabled (ESC)");
                     } else {
                         logEnv("exit requested by ESC");
@@ -2549,8 +2549,8 @@ namespace walk {
                         return;
                     }
                 } else if (e.key.key == SDLK_F) {
-                    showFps_ = !showFps_;
-                    logEnv(std::format("FPS overlay {}", showFps_ ? "enabled" : "disabled"));
+                    showFps = !showFps;
+                    logEnv(std::format("FPS overlay {}", showFps ? "enabled" : "disabled"));
                 }
             }
 
@@ -2560,11 +2560,11 @@ namespace walk {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
-                if (gamepad_ != nullptr && e.gdevice.which == gamepadId_) {
+                if (gamepad != nullptr && e.gdevice.which == gamepadId) {
                     logEnv(std::format("gamepad removed (id={})", static_cast<int>(e.gdevice.which)));
-                    SDL_CloseGamepad(gamepad_);
-                    gamepad_ = nullptr;
-                    gamepadId_ = 0;
+                    SDL_CloseGamepad(gamepad);
+                    gamepad = nullptr;
+                    gamepadId = 0;
                 }
             }
 
@@ -2574,26 +2574,26 @@ namespace walk {
                     exit();
                 } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
                     fireProjectile();
-                } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH && cameraPos_.y <= 1.71f) {
-                    jumpVelocity_ = 0.3f;
+                } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH && cameraPos.y <= 1.71f) {
+                    jumpVelocity = 0.3f;
                     logEnv("jump triggered by gamepad");
                 }
             }
 
-            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseCapture_) {
-                if (firstMouse_) {
-                    firstMouse_ = false;
+            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseCapture) {
+                if (firstMouse) {
+                    firstMouse = false;
                     return;
                 }
-                yaw_ += static_cast<float>(e.motion.xrel) * mouseSensitivity_;
-                pitch_ -= static_cast<float>(e.motion.yrel) * mouseSensitivity_;
-                pitch_ = glm::clamp(pitch_, -89.0f, 89.0f);
+                yaw += static_cast<float>(e.motion.xrel) * mouseSensitivity;
+                pitch -= static_cast<float>(e.motion.yrel) * mouseSensitivity;
+                pitch = glm::clamp(pitch, -89.0f, 89.0f);
                 updateCameraVectors();
             }
 
-            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT && mouseCapture_) {
-                if (suppressProjectileOnNextLeftDown_) {
-                    suppressProjectileOnNextLeftDown_ = false;
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT && mouseCapture) {
+                if (suppressProjectileOnNextLeftDown) {
+                    suppressProjectileOnNextLeftDown = false;
                     return;
                 }
                 fireProjectile();
@@ -2603,23 +2603,23 @@ namespace walk {
         void console_proc() override {
             tryOpenFirstGamepad();
             const auto now = std::chrono::steady_clock::now();
-            const float deltaTime = std::chrono::duration<float>(now - lastTick_).count();
-            lastTick_ = now;
-            deltaTime_ = std::clamp(deltaTime, 0.0f, 0.05f);
+            float deltaTime = std::chrono::duration<float>(now - lastTick).count();
+            lastTick = now;
+            deltaTime = std::clamp(deltaTime, 0.0f, 0.05f);
 
             if (!visible()) {
-                updatePlayer(deltaTime_);
+                updatePlayer(deltaTime);
             }
-            updateProjectiles(deltaTime_);
-            updateExplosions(deltaTime_);
-            updateCollectibles(deltaTime_);
+            updateProjectiles(deltaTime);
+            updateExplosions(deltaTime);
+            updateCollectibles(deltaTime);
 
-            const int aliveObjects = world_.activeCollectibles();
+            const int aliveObjects = world.activeCollectibles();
             if (!visible()) {
                 printText(std::format("Objects left: {}", aliveObjects), 20, 20, {255, 255, 255, 255});
-                printText(std::format("Active Bullets: {}", bullets_.size()), 20, 48, {255, 220, 120, 255});
-                if (showFps_ && deltaTime_ > 0.0001f) {
-                    const int fps = static_cast<int>(1.0f / deltaTime_);
+                printText(std::format("Active Bullets: {}", bullets.size()), 20, 48, {255, 220, 120, 255});
+                if (showFps && deltaTime > 0.0001f) {
+                    const int fps = static_cast<int>(1.0f / deltaTime);
                     printText(std::format("FPS: {}", fps), 20, 76, {120, 255, 120, 255});
                 }
 
@@ -2633,13 +2633,13 @@ namespace walk {
 
         void onSwapchainRecreated() override {
             logEnv("swapchain recreated; resizing render resources");
-            floorModel_.resize(this);
-            rawWallRenderer_.resize(this);
-            rawPillarRenderer_.resize(this);
-            saturnModel_.resize(this);
-            birdModel_.resize(this);
-            blasterModel_.resize(this);
-            bulletModel_.resize(this);
+            floorModel.resize(this);
+            rawWallRenderer.resize(this);
+            rawPillarRenderer.resize(this);
+            saturnModel.resize(this);
+            birdModel.resize(this);
+            blasterModel.resize(this);
+            bulletModel.resize(this);
             rebuildPointParticlePipeline();
         }
 
@@ -2649,7 +2649,7 @@ namespace walk {
                                      ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
                                      : 1.0f;
 
-            const glm::mat4 view = glm::lookAt(cameraPos_, cameraPos_ + cameraFront_, glm::vec3(0.0f, 1.0f, 0.0f));
+            const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
             proj[1][1] *= -1.0f;
 
@@ -2659,28 +2659,28 @@ namespace walk {
             {
                 constexpr float floorHalfSize = 100.0f;
                 constexpr float floorThickness = 0.04f;
-                const glm::vec3 extent = floorModel_.modelAxisExtent();
+                const glm::vec3 extent = floorModel.modelAxisExtent();
                 const glm::vec3 srcScale(
                     (floorHalfSize * 2.0f) / std::max(extent.x, 1e-4f),
                     floorThickness / std::max(extent.y, 1e-4f),
                     (floorHalfSize * 2.0f) / std::max(extent.z, 1e-4f));
                 glm::mat4 floorWorld = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.02f, 0.0f));
                 floorWorld = glm::scale(floorWorld, srcScale);
-                renderModel(cmd, imageIndex, floorModel_, floorWorld, view, proj,
+                renderModel(cmd, imageIndex, floorModel, floorWorld, view, proj,
                             glm::vec4(0.0f, 0.0f, 0.0f, t), false);
             }
 
-            rawWallRenderer_.render(cmd,
+            rawWallRenderer.render(cmd,
                                     imageIndex,
-                                    world_.walls(),
-                                    world_.wallThickness(),
+                                    world.walls(),
+                                    world.wallThickness(),
                                     view,
                                     proj,
                                     glm::vec4(0.58f, 0.58f, 0.65f, t));
 
-            rawPillarRenderer_.render(cmd, imageIndex, world_.pillars(), view, proj, glm::vec4(0.0f, 0.0f, 0.0f, t));
+            rawPillarRenderer.render(cmd, imageIndex, world.pillars(), view, proj, glm::vec4(0.0f, 0.0f, 0.0f, t));
 
-            for (const Collectible &obj : world_.collectibles()) {
+            for (const Collectible &obj : world.collectibles()) {
                 if (!obj.active) {
                     continue;
                 }
@@ -2688,23 +2688,23 @@ namespace walk {
                 world = glm::rotate(world, glm::radians(obj.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
                 world = glm::scale(world, obj.scale);
                 if (obj.type == Collectible::Type::Saturn) {
-                    renderRawModel(cmd, imageIndex, saturnModel_, world, view, proj, glm::vec4(cameraPos_, 0.0f));
+                    renderRawModel(cmd, imageIndex, saturnModel, world, view, proj, glm::vec4(cameraPos, 0.0f));
                 } else {
-                    renderRawModel(cmd, imageIndex, birdModel_, world, view, proj, glm::vec4(cameraPos_, 0.0f));
+                    renderRawModel(cmd, imageIndex, birdModel, world, view, proj, glm::vec4(cameraPos, 0.0f));
                 }
             }
 
             if (!visible()) {
                 renderRawModel(cmd,
                                imageIndex,
-                               blasterModel_,
+                               blasterModel,
                                blasterWorldTransform(),
                                view,
                                proj,
-                               glm::vec4(cameraPos_, 0.0f));
+                               glm::vec4(cameraPos, 0.0f));
             }
 
-            for (const Projectile &bullet : bullets_) {
+            for (const Projectile &bullet : bullets) {
                 if (!bullet.active) {
                     continue;
                 }
@@ -2716,7 +2716,7 @@ namespace walk {
                 const float fadeProgress = glm::clamp(bullet.lifetime / bullet.maxLifetime, 0.0f, 1.0f);
                 const float distanceProgress = glm::clamp(bullet.distanceTraveled / bullet.maxDistance, 0.0f, 1.0f);
                 const float alpha = std::min(1.0f - fadeProgress, 1.0f - distanceProgress);
-                renderRawModel(cmd, imageIndex, bulletModel_, world, view, proj, glm::vec4(alpha, 0.0f, 0.0f, 0.0f));
+                renderRawModel(cmd, imageIndex, bulletModel, world, view, proj, glm::vec4(alpha, 0.0f, 0.0f, 0.0f));
             }
             renderPointParticles(cmd, view, proj);
         }
@@ -2772,23 +2772,23 @@ namespace walk {
             if (cmd == "spawn_random" || (cmd == "spawn" && args.size() >= 2 && args[1] == "random")) {
                 const int attempts = (args.size() >= 3 && cmd == "spawn") ? parseIntOrDefault(args[2], 128)
                                                                           : ((args.size() >= 2 && cmd == "spawn_random") ? parseIntOrDefault(args[1], 128) : 128);
-                glm::vec3 candidate = cameraPos_;
+                glm::vec3 candidate = cameraPos;
                 if (!sampleNavigablePoint(1.7f, 0.68f, candidate, std::max(1, attempts))) {
-                    candidate = world_.startPosition();
+                    candidate = world.startPosition();
                 }
 
-                cameraPos_ = candidate;
-                yaw_ = chooseBestSpawnYaw(cameraPos_);
-                pitch_ = 0.0f;
+                cameraPos = candidate;
+                yaw = chooseBestSpawnYaw(cameraPos);
+                pitch = 0.0f;
                 updateCameraVectors();
 
-                out << std::format("Spawned at random location ({:.2f}, {:.2f}, {:.2f})", cameraPos_.x, cameraPos_.y, cameraPos_.z);
+                out << std::format("Spawned at random location ({:.2f}, {:.2f}, {:.2f})", cameraPos.x, cameraPos.y, cameraPos.z);
                 logEnv("command: spawn_random");
                 return true;
             }
 
             if (cmd == "reset" || cmd == "reset_collectibles") {
-                std::vector<Collectible> &collectibles = world_.collectibles();
+                std::vector<Collectible> &collectibles = world.collectibles();
                 for (size_t i = 0; i < collectibles.size(); ++i) {
                     Collectible &obj = collectibles[i];
                     obj.active = true;
@@ -2796,8 +2796,8 @@ namespace walk {
                     relocateCollectible(i, 2.0f, 128);
                 }
                 resolveCollectibleClusters(2.0f, 4);
-                destroyedCount_ = 0;
-                out << std::format("Collectibles reset. Active collectibles: {}", world_.activeCollectibles());
+                destroyedCount = 0;
+                out << std::format("Collectibles reset. Active collectibles: {}", world.activeCollectibles());
                 logEnv("command: reset collectibles");
                 return true;
             }
@@ -2814,17 +2814,17 @@ namespace walk {
                 int added = 0;
                 for (int i = 0; i < toAdd; ++i) {
                     Collectible obj{};
-                    obj.type = (typeDist(rng_) == 0) ? Collectible::Type::Saturn : Collectible::Type::Bird;
+                    obj.type = (typeDist(rng) == 0) ? Collectible::Type::Saturn : Collectible::Type::Bird;
                     if (obj.type == Collectible::Type::Saturn) {
-                        const float scale = saturnScale(rng_);
+                        const float scale = saturnScale(rng);
                         obj.scale = glm::vec3(scale);
-                        obj.rotationSpeed = saturnRotSpeed(rng_);
+                        obj.rotationSpeed = saturnRotSpeed(rng);
                         obj.radius = saturnHitRadiusForScale(scale);
                         obj.hitCenterOffset = saturnHitCenterOffsetForScale(scale);
                     } else {
-                        const float scale = birdScale(rng_);
+                        const float scale = birdScale(rng);
                         obj.scale = glm::vec3(scale);
-                        obj.rotationSpeed = birdRotSpeed(rng_);
+                        obj.rotationSpeed = birdRotSpeed(rng);
                         obj.radius = birdHitHalfSideForScale(scale);
                         obj.hitCenterOffset = birdHitCenterOffsetForScale(scale);
                     }
@@ -2839,7 +2839,7 @@ namespace walk {
                         }
 
                         bool overlaps = false;
-                        for (const Collectible &existing : world_.collectibles()) {
+                        for (const Collectible &existing : world.collectibles()) {
                             if (!existing.active) {
                                 continue;
                             }
@@ -2858,14 +2858,14 @@ namespace walk {
                     }
 
                     if (placed) {
-                        world_.collectibles().push_back(obj);
+                        world.collectibles().push_back(obj);
                         ++added;
                     }
                 }
 
                 out << std::format("Added {} collectible(s). Active collectibles: {}",
                                    added,
-                                   world_.activeCollectibles());
+                                   world.activeCollectibles());
                 resolveCollectibleClusters(2.0f, 4);
                 logEnv(std::format("command: add_collectibles requested={} added={}", toAdd, added));
                 return true;
@@ -2874,18 +2874,18 @@ namespace walk {
             if (cmd == "status") {
                 out << std::format("pos=({:.2f}, {:.2f}, {:.2f}) yaw={:.2f} pitch={:.2f}\n"
                                    "walls={} pillars={} collectibles(active/total)={}/{} bullets={} particles={} destroyed={}",
-                                   cameraPos_.x,
-                                   cameraPos_.y,
-                                   cameraPos_.z,
-                                   yaw_,
-                                   pitch_,
-                                   world_.walls().size(),
-                                   world_.pillars().size(),
-                                   world_.activeCollectibles(),
-                                   world_.collectibles().size(),
-                                   bullets_.size(),
-                                   explosionParticles_.size(),
-                                   destroyedCount_);
+                                   cameraPos.x,
+                                   cameraPos.y,
+                                   cameraPos.z,
+                                   yaw,
+                                   pitch,
+                                   world.walls().size(),
+                                   world.pillars().size(),
+                                   world.activeCollectibles(),
+                                   world.collectibles().size(),
+                                   bullets.size(),
+                                   explosionParticles.size(),
+                                   destroyedCount);
                 return true;
             }
 
@@ -2904,44 +2904,44 @@ namespace walk {
                 }
 
                 const glm::vec3 candidate{x, y, z};
-                if (world_.checkWallCollision(candidate, 0.68f) || world_.checkPillarCollision(candidate, 0.68f)) {
+                if (world.checkWallCollision(candidate, 0.68f) || world.checkPillarCollision(candidate, 0.68f)) {
                     out << "teleport blocked: target intersects wall/pillar";
                     return true;
                 }
 
-                cameraPos_ = candidate;
+                cameraPos = candidate;
                 out << std::format("Teleported to ({:.2f}, {:.2f}, {:.2f})", x, y, z);
                 logEnv("command: teleport");
                 return true;
             }
 
             if (cmd == "clear_bullets") {
-                const std::size_t removed = bullets_.size();
-                bullets_.clear();
+                const std::size_t removed = bullets.size();
+                bullets.clear();
                 out << std::format("Cleared {} bullet(s)", removed);
                 return true;
             }
 
             if (cmd == "clear_fx") {
-                const std::size_t removed = explosionParticles_.size();
-                explosionParticles_.clear();
+                const std::size_t removed = explosionParticles.size();
+                explosionParticles.clear();
                 out << std::format("Cleared {} particle effect(s)", removed);
                 return true;
             }
 
             if (cmd == "set_fps") {
                 if (args.size() < 2) {
-                    out << std::format("FPS overlay is currently {}. Usage: set_fps <on|off>", showFps_ ? "on" : "off");
+                    out << std::format("FPS overlay is currently {}. Usage: set_fps <on|off>", showFps ? "on" : "off");
                     return true;
                 }
                 const std::string value = toLowerCopy(args[1]);
                 if (value == "on" || value == "1" || value == "true") {
-                    showFps_ = true;
+                    showFps = true;
                     out << "FPS overlay enabled";
                     return true;
                 }
                 if (value == "off" || value == "0" || value == "false") {
-                    showFps_ = false;
+                    showFps = false;
                     out << "FPS overlay disabled";
                     return true;
                 }
@@ -2951,23 +2951,23 @@ namespace walk {
             }
 
             if (cmd == "regen_world") {
-                const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng_())))
-                                                         : rng_();
-                world_.generate(seed);
+                const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng())))
+                                                         : rng();
+                world.generate(seed);
                 normalizeCollectiblesToModel();
-                cameraPos_ = world_.startPosition();
-                yaw_ = chooseBestSpawnYaw(cameraPos_);
-                pitch_ = 0.0f;
+                cameraPos = world.startPosition();
+                yaw = chooseBestSpawnYaw(cameraPos);
+                pitch = 0.0f;
                 updateCameraVectors();
-                bullets_.clear();
-                explosionParticles_.clear();
-                destroyedCount_ = 0;
+                bullets.clear();
+                explosionParticles.clear();
+                destroyedCount = 0;
 
                 out << std::format("Regenerated world with seed {} (walls={}, pillars={}, collectibles={})",
                                    seed,
-                                   world_.walls().size(),
-                                   world_.pillars().size(),
-                                   world_.collectibles().size());
+                                   world.walls().size(),
+                                   world.pillars().size(),
+                                   world.collectibles().size());
                 logEnv(std::format("command: regen_world seed={}", seed));
                 return true;
             }
@@ -2993,25 +2993,25 @@ namespace walk {
                 }
 
                 if (cmd == "set_wall") {
-                    wallFragSpv_ = shaderPath;
-                    rawWallRenderer_.reloadFragShader(shaderBytes);
+                    wallFragSpv = shaderPath;
+                    rawWallRenderer.reloadFragShader(shaderBytes);
                     out << std::format("Wall shader reloaded from {}", shaderPath);
                 } else if (cmd == "set_floor") {
-                    floorFragSpv_ = shaderPath;
-                    floorModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    floorFragSpv = shaderPath;
+                    floorModel.setShaders(this, modelVertSpv, shaderPath);
                     out << std::format("Floor shader reloaded from {}", shaderPath);
                 } else if (cmd == "set_pillar") {
-                    pillarFragSpv_ = shaderPath;
-                    rawPillarRenderer_.reloadFragShader(shaderBytes);
+                    pillarFragSpv = shaderPath;
+                    rawPillarRenderer.reloadFragShader(shaderBytes);
                     out << std::format("Pillar shader reloaded from {}", shaderPath);
                 } else if (cmd == "set_object") {
-                    objectFragSpv_ = shaderPath;
-                    saturnModel_.setShaders(this, modelVertSpv_, shaderPath);
-                    birdModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    objectFragSpv = shaderPath;
+                    saturnModel.setShaders(this, modelVertSpv, shaderPath);
+                    birdModel.setShaders(this, modelVertSpv, shaderPath);
                     out << std::format("Object shader reloaded from {}", shaderPath);
                 } else if (cmd == "set_bullet") {
-                    bulletFragSpv_ = shaderPath;
-                    bulletModel_.setShaders(this, modelVertSpv_, shaderPath);
+                    bulletFragSpv = shaderPath;
+                    bulletModel.setShaders(this, modelVertSpv, shaderPath);
                     out << std::format("Bullet shader reloaded from {}", shaderPath);
                 }
 
@@ -3044,11 +3044,11 @@ namespace walk {
                                    "  pillar   {}\n"
                                    "  object   {}\n"
                                    "  bullet   {}\n",
-                                   wallFragSpv_,
-                                   floorFragSpv_,
-                                   pillarFragSpv_,
-                                   objectFragSpv_,
-                                   bulletFragSpv_);
+                                   wallFragSpv,
+                                   floorFragSpv,
+                                   pillarFragSpv,
+                                   objectFragSpv,
+                                   bulletFragSpv);
                 return true;
             }
 
@@ -3131,7 +3131,7 @@ namespace walk {
             float maxZ = 50.0f;
 
             bool haveBounds = false;
-            for (const WallSegment &wall : world_.walls()) {
+            for (const WallSegment &wall : world.walls()) {
                 if (!haveBounds) {
                     minX = std::min(wall.start.x, wall.end.x);
                     maxX = std::max(wall.start.x, wall.end.x);
@@ -3147,7 +3147,7 @@ namespace walk {
             }
 
             if (!haveBounds) {
-                outPoint = world_.startPosition();
+                outPoint = world.startPosition();
                 outPoint.y = y;
                 return true;
             }
@@ -3159,7 +3159,7 @@ namespace walk {
             maxZ -= margin;
 
             if (minX > maxX || minZ > maxZ) {
-                outPoint = world_.startPosition();
+                outPoint = world.startPosition();
                 outPoint.y = y;
                 return true;
             }
@@ -3167,8 +3167,8 @@ namespace walk {
             std::uniform_real_distribution<float> distX(minX, maxX);
             std::uniform_real_distribution<float> distZ(minZ, maxZ);
             for (int i = 0; i < maxAttempts; ++i) {
-                const glm::vec3 candidate{distX(rng_), y, distZ(rng_)};
-                if (!world_.checkWallCollision(candidate, radius) && !world_.checkPillarCollision(candidate, radius)) {
+                const glm::vec3 candidate{distX(rng), y, distZ(rng)};
+                if (!world.checkWallCollision(candidate, radius) && !world.checkPillarCollision(candidate, radius)) {
                     outPoint = candidate;
                     return true;
                 }
@@ -3196,14 +3196,14 @@ namespace walk {
         }
 
         void cleanupModels() {
-            floorModel_.cleanup(this);
-            rawWallRenderer_.cleanup(this);
-            rawPillarRenderer_.cleanup(this);
+            floorModel.cleanup(this);
+            rawWallRenderer.cleanup(this);
+            rawPillarRenderer.cleanup(this);
 
-            saturnModel_.cleanup(this);
-            birdModel_.cleanup(this);
-            blasterModel_.cleanup(this);
-            bulletModel_.cleanup(this);
+            saturnModel.cleanup(this);
+            birdModel.cleanup(this);
+            blasterModel.cleanup(this);
+            bulletModel.cleanup(this);
         }
 
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
@@ -3224,26 +3224,26 @@ namespace walk {
 
             VkBufferCreateInfo bufferInfo{};
             bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufferInfo.size = maxPointVertices_ * sizeof(ParticlePointVertex);
+            bufferInfo.size = maxPointVertices * sizeof(ParticlePointVertex);
             bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
             bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            if (vkCreateBuffer(getDevice(), &bufferInfo, nullptr, &pointVertexBuffer_) != VK_SUCCESS) {
+            if (vkCreateBuffer(getDevice(), &bufferInfo, nullptr, &pointVertexBuffer) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to create point particle vertex buffer");
             }
 
             VkMemoryRequirements memReq{};
-            vkGetBufferMemoryRequirements(getDevice(), pointVertexBuffer_, &memReq);
+            vkGetBufferMemoryRequirements(getDevice(), pointVertexBuffer, &memReq);
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = memReq.size;
             allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            if (vkAllocateMemory(getDevice(), &allocInfo, nullptr, &pointVertexMemory_) != VK_SUCCESS) {
+            if (vkAllocateMemory(getDevice(), &allocInfo, nullptr, &pointVertexMemory) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to allocate point particle vertex memory");
             }
-            if (vkBindBufferMemory(getDevice(), pointVertexBuffer_, pointVertexMemory_, 0) != VK_SUCCESS) {
+            if (vkBindBufferMemory(getDevice(), pointVertexBuffer, pointVertexMemory, 0) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to bind point particle vertex memory");
             }
-            if (vkMapMemory(getDevice(), pointVertexMemory_, 0, bufferInfo.size, 0, &pointVertexMapped_) != VK_SUCCESS) {
+            if (vkMapMemory(getDevice(), pointVertexMemory, 0, bufferInfo.size, 0, &pointVertexMapped) != VK_SUCCESS) {
                 throw mxvk::Exception("walk: failed to map point particle vertex memory");
             }
 
@@ -3251,21 +3251,21 @@ namespace walk {
         }
 
         void rebuildPointParticlePipeline() {
-            if (pointPipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(getDevice(), pointPipeline_, nullptr);
-                pointPipeline_ = VK_NULL_HANDLE;
+            if (pointPipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(getDevice(), pointPipeline, nullptr);
+                pointPipeline = VK_NULL_HANDLE;
             }
-            if (pointPipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(getDevice(), pointPipelineLayout_, nullptr);
-                pointPipelineLayout_ = VK_NULL_HANDLE;
+            if (pointPipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(getDevice(), pointPipelineLayout, nullptr);
+                pointPipelineLayout = VK_NULL_HANDLE;
             }
 
             if (getSwapchainFormat() == VK_FORMAT_UNDEFINED) {
                 return;
             }
 
-            const std::vector<char> vertBytes = loadSpv(pointParticleVertSpv_);
-            const std::vector<char> fragBytes = loadSpv(pointParticleFragSpv_);
+            const std::vector<char> vertBytes = loadSpv(pointParticleVertSpv);
+            const std::vector<char> fragBytes = loadSpv(pointParticleFragSpv);
             const VkShaderModule vertModule = createShaderModule(getDevice(), vertBytes);
             const VkShaderModule fragModule = createShaderModule(getDevice(), fragBytes);
 
@@ -3355,7 +3355,7 @@ namespace walk {
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.pushConstantRangeCount = 1;
             layoutInfo.pPushConstantRanges = &pushRange;
-            if (vkCreatePipelineLayout(getDevice(), &layoutInfo, nullptr, &pointPipelineLayout_) != VK_SUCCESS) {
+            if (vkCreatePipelineLayout(getDevice(), &layoutInfo, nullptr, &pointPipelineLayout) != VK_SUCCESS) {
                 vkDestroyShaderModule(getDevice(), fragModule, nullptr);
                 vkDestroyShaderModule(getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create point particle pipeline layout");
@@ -3384,10 +3384,10 @@ namespace walk {
             pipelineInfo.pDepthStencilState = &depthStencil;
             pipelineInfo.pColorBlendState = &colorBlend;
             pipelineInfo.pDynamicState = &dynamicInfo;
-            pipelineInfo.layout = pointPipelineLayout_;
+            pipelineInfo.layout = pointPipelineLayout;
             pipelineInfo.renderPass = VK_NULL_HANDLE;
 
-            if (vkCreateGraphicsPipelines(getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pointPipeline_) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pointPipeline) != VK_SUCCESS) {
                 vkDestroyShaderModule(getDevice(), fragModule, nullptr);
                 vkDestroyShaderModule(getDevice(), vertModule, nullptr);
                 throw mxvk::Exception("walk: failed to create point particle graphics pipeline");
@@ -3398,37 +3398,37 @@ namespace walk {
         }
 
         void destroyPointParticles() {
-            if (pointPipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(getDevice(), pointPipeline_, nullptr);
-                pointPipeline_ = VK_NULL_HANDLE;
+            if (pointPipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(getDevice(), pointPipeline, nullptr);
+                pointPipeline = VK_NULL_HANDLE;
             }
-            if (pointPipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(getDevice(), pointPipelineLayout_, nullptr);
-                pointPipelineLayout_ = VK_NULL_HANDLE;
+            if (pointPipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(getDevice(), pointPipelineLayout, nullptr);
+                pointPipelineLayout = VK_NULL_HANDLE;
             }
-            if (pointVertexMapped_ != nullptr) {
-                vkUnmapMemory(getDevice(), pointVertexMemory_);
-                pointVertexMapped_ = nullptr;
+            if (pointVertexMapped != nullptr) {
+                vkUnmapMemory(getDevice(), pointVertexMemory);
+                pointVertexMapped = nullptr;
             }
-            if (pointVertexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(getDevice(), pointVertexBuffer_, nullptr);
-                pointVertexBuffer_ = VK_NULL_HANDLE;
+            if (pointVertexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(getDevice(), pointVertexBuffer, nullptr);
+                pointVertexBuffer = VK_NULL_HANDLE;
             }
-            if (pointVertexMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(getDevice(), pointVertexMemory_, nullptr);
-                pointVertexMemory_ = VK_NULL_HANDLE;
+            if (pointVertexMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(getDevice(), pointVertexMemory, nullptr);
+                pointVertexMemory = VK_NULL_HANDLE;
             }
         }
 
         void renderPointParticles(VkCommandBuffer cmd, const glm::mat4 &view, const glm::mat4 &proj) {
-            if (pointPipeline_ == VK_NULL_HANDLE || pointPipelineLayout_ == VK_NULL_HANDLE || pointVertexMapped_ == nullptr) {
+            if (pointPipeline == VK_NULL_HANDLE || pointPipelineLayout == VK_NULL_HANDLE || pointVertexMapped == nullptr) {
                 return;
             }
 
             std::vector<ParticlePointVertex> vertices{};
             vertices.reserve(2048);
 
-            for (const Projectile &bullet : bullets_) {
+            for (const Projectile &bullet : bullets) {
                 if (!bullet.active) {
                     continue;
                 }
@@ -3439,7 +3439,7 @@ namespace walk {
                 }
             }
 
-            for (const ExplosionParticle &particle : explosionParticles_) {
+            for (const ExplosionParticle &particle : explosionParticles) {
                 if (!particle.active) {
                     continue;
                 }
@@ -3453,36 +3453,36 @@ namespace walk {
                 return;
             }
 
-            if (vertices.size() > maxPointVertices_) {
-                vertices.resize(maxPointVertices_);
+            if (vertices.size() > maxPointVertices) {
+                vertices.resize(maxPointVertices);
             }
-            std::memcpy(pointVertexMapped_, vertices.data(), vertices.size() * sizeof(ParticlePointVertex));
+            std::memcpy(pointVertexMapped, vertices.data(), vertices.size() * sizeof(ParticlePointVertex));
 
-            const VkBuffer vb = pointVertexBuffer_;
+            const VkBuffer vb = pointVertexBuffer;
             const VkDeviceSize offset = 0;
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipeline);
             vkCmdBindVertexBuffers(cmd, 0, 1, &vb, &offset);
             const glm::mat4 vp = proj * view;
-            vkCmdPushConstants(cmd, pointPipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
+            vkCmdPushConstants(cmd, pointPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &vp);
             vkCmdDraw(cmd, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
         }
 
         bool openGamepad(SDL_JoystickID id) {
-            if (gamepad_ != nullptr && gamepadId_ == id) {
+            if (gamepad != nullptr && gamepadId == id) {
                 return true;
             }
-            if (gamepad_ != nullptr) {
-                SDL_CloseGamepad(gamepad_);
-                gamepad_ = nullptr;
-                gamepadId_ = 0;
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepadId = 0;
             }
-            gamepad_ = SDL_OpenGamepad(id);
-            if (gamepad_ == nullptr) {
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
                 logEnv(std::format("failed to open gamepad id={}", static_cast<int>(id)));
                 return false;
             }
-            gamepadId_ = id;
-            const char *padName = SDL_GetGamepadName(gamepad_);
+            gamepadId = id;
+            const char *padName = SDL_GetGamepadName(gamepad);
             logEnv(std::format("gamepad connected: id={} name='{}'",
                                static_cast<int>(id),
                                padName != nullptr ? padName : "unknown"));
@@ -3490,7 +3490,7 @@ namespace walk {
         }
 
         void tryOpenFirstGamepad() {
-            if (gamepad_ != nullptr) {
+            if (gamepad != nullptr) {
                 return;
             }
             int count = 0;
@@ -3555,14 +3555,14 @@ namespace walk {
 
         void updateCameraVectors() {
             glm::vec3 front(0.0f);
-            front.x = std::cos(glm::radians(yaw_)) * std::cos(glm::radians(pitch_));
-            front.y = std::sin(glm::radians(pitch_));
-            front.z = std::sin(glm::radians(yaw_)) * std::cos(glm::radians(pitch_));
-            cameraFront_ = glm::normalize(front);
+            front.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+            front.y = std::sin(glm::radians(pitch));
+            front.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+            cameraFront = glm::normalize(front);
         }
 
         void buildCameraBasis(glm::vec3 &forward, glm::vec3 &right, glm::vec3 &up) const {
-            forward = cameraFront_;
+            forward = cameraFront;
             if (glm::length(forward) <= 1e-5f) {
                 forward = glm::vec3(0.0f, 0.0f, -1.0f);
             } else {
@@ -3589,7 +3589,7 @@ namespace walk {
             glm::vec3 right(0.0f);
             glm::vec3 up(0.0f);
             buildCameraBasis(forward, right, up);
-            return cameraPos_ + (forward * 0.55f) + (right * 0.18f) - (up * 0.12f);
+            return cameraPos + (forward * 0.55f) + (right * 0.18f) - (up * 0.12f);
         }
 
         [[nodiscard]] glm::vec3 projectileSpawnPosition() const {
@@ -3630,7 +3630,7 @@ namespace walk {
             constexpr float probeRadius = 0.30f;
             for (float d = step; d <= maxDistance; d += step) {
                 const glm::vec3 point = origin + (dir * d);
-                if (world_.checkWallCollision(point, probeRadius) || world_.checkPillarCollision(point, probeRadius)) {
+                if (world.checkWallCollision(point, probeRadius) || world.checkPillarCollision(point, probeRadius)) {
                     return d - step;
                 }
             }
@@ -3641,7 +3641,7 @@ namespace walk {
             constexpr float pi = 3.14159265358979323846f;
             constexpr int sampleCount = 48;
             float bestDistance = -1.0f;
-            float bestYaw = yaw_;
+            float bestYaw = yaw;
             for (int i = 0; i < sampleCount; ++i) {
                 const float angle = (-pi) + (2.0f * pi * static_cast<float>(i) / static_cast<float>(sampleCount));
                 const glm::vec3 dir(std::cos(angle), 0.0f, std::sin(angle));
@@ -3656,15 +3656,15 @@ namespace walk {
 
         void updatePlayer(float deltaTime) {
             const bool *keys = SDL_GetKeyboardState(nullptr);
-            glm::vec3 horizontalFront = glm::normalize(glm::vec3(cameraFront_.x, 0.0f, cameraFront_.z));
+            glm::vec3 horizontalFront = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
             if (glm::length(horizontalFront) < 0.0001f) {
                 horizontalFront = glm::vec3(0.0f, 0.0f, -1.0f);
             }
             const glm::vec3 right = glm::normalize(glm::cross(horizontalFront, glm::vec3(0.0f, 1.0f, 0.0f)));
 
-            glm::vec3 desired = cameraPos_;
+            glm::vec3 desired = cameraPos;
             bool sprint = keys[SDL_SCANCODE_LSHIFT] != 0;
-            if (gamepad_ != nullptr && SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_LEFT_STICK)) {
+            if (gamepad != nullptr && SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_STICK)) {
                 sprint = true;
             }
             const float cameraSpeed = 0.2f;
@@ -3685,22 +3685,22 @@ namespace walk {
                 desired += right * moveStep;
             }
 
-            if (gamepad_ != nullptr) {
-                const Sint16 leftX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTX);
-                const Sint16 leftY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY);
-                if (std::abs(leftX) > stickDeadZone_) {
+            if (gamepad != nullptr) {
+                const Sint16 leftX = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+                const Sint16 leftY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+                if (std::abs(leftX) > stickDeadZone) {
                     desired += moveStep * (static_cast<float>(leftX) / 32768.0f) * right;
                 }
-                if (std::abs(leftY) > stickDeadZone_) {
+                if (std::abs(leftY) > stickDeadZone) {
                     desired -= moveStep * (static_cast<float>(leftY) / 32768.0f) * horizontalFront;
                 }
 
-                const Sint16 rightX = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX);
-                const Sint16 rightY = SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY);
-                if (std::abs(rightX) > stickDeadZone_ || std::abs(rightY) > stickDeadZone_) {
-                    yaw_ += (static_cast<float>(rightX) / 32768.0f) * controllerLookSensitivity_;
-                    pitch_ -= (static_cast<float>(rightY) / 32768.0f) * controllerLookSensitivity_;
-                    pitch_ = glm::clamp(pitch_, -89.0f, 89.0f);
+                const Sint16 rightX = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+                const Sint16 rightY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
+                if (std::abs(rightX) > stickDeadZone || std::abs(rightY) > stickDeadZone) {
+                    yaw += (static_cast<float>(rightX) / 32768.0f) * controllerLookSensitivity;
+                    pitch -= (static_cast<float>(rightY) / 32768.0f) * controllerLookSensitivity;
+                    pitch = glm::clamp(pitch, -89.0f, 89.0f);
                     updateCameraVectors();
                 }
             }
@@ -3709,38 +3709,38 @@ namespace walk {
             constexpr float cameraStandOff = 0.18f;
             const float collisionRadius = playerRadius + cameraStandOff;
             const auto isBlocked = [this, collisionRadius](const glm::vec3 &position) {
-                return world_.checkWallCollision(position, collisionRadius) || world_.checkPillarCollision(position, collisionRadius);
+                return world.checkWallCollision(position, collisionRadius) || world.checkPillarCollision(position, collisionRadius);
             };
 
             if (!isBlocked(desired)) {
-                cameraPos_ = desired;
+                cameraPos = desired;
             } else {
                 // Resolve per-axis so the player slides along obstacles instead of
                 // clipping into them or fully stopping on diagonal movement.
-                glm::vec3 tryX = cameraPos_;
+                glm::vec3 tryX = cameraPos;
                 tryX.x = desired.x;
                 if (!isBlocked(tryX)) {
-                    cameraPos_.x = tryX.x;
+                    cameraPos.x = tryX.x;
                 }
 
-                glm::vec3 tryZ = cameraPos_;
+                glm::vec3 tryZ = cameraPos;
                 tryZ.z = desired.z;
                 if (!isBlocked(tryZ)) {
-                    cameraPos_.z = tryZ.z;
+                    cameraPos.z = tryZ.z;
                 }
             }
 
             const bool crouch = keys[SDL_SCANCODE_LCTRL] != 0;
             const float minHeight = crouch ? 0.8f : 1.7f;
-            if (keys[SDL_SCANCODE_SPACE] && cameraPos_.y <= minHeight + 0.01f) {
-                jumpVelocity_ = 0.3f;
+            if (keys[SDL_SCANCODE_SPACE] && cameraPos.y <= minHeight + 0.01f) {
+                jumpVelocity = 0.3f;
             }
 
-            cameraPos_.y += jumpVelocity_ * deltaTime * 60.0f;
-            jumpVelocity_ -= gravity_ * deltaTime * 60.0f;
-            if (cameraPos_.y < minHeight) {
-                cameraPos_.y = minHeight;
-                jumpVelocity_ = 0.0f;
+            cameraPos.y += jumpVelocity * deltaTime * 60.0f;
+            jumpVelocity -= gravity * deltaTime * 60.0f;
+            if (cameraPos.y < minHeight) {
+                cameraPos.y = minHeight;
+                jumpVelocity = 0.0f;
             }
         }
 
@@ -3749,8 +3749,8 @@ namespace walk {
 
             Projectile bullet{};
             bullet.position = projectileSpawnPosition();
-            bullet.direction = glm::normalize(cameraFront_);
-            bullets_.push_back(bullet);
+            bullet.direction = glm::normalize(cameraFront);
+            bullets.push_back(bullet);
             logEnv(std::format("projectile fired from ({:.2f}, {:.2f}, {:.2f}) dir=({:.2f}, {:.2f}, {:.2f}) active_bullets={}",
                                bullet.position.x,
                                bullet.position.y,
@@ -3758,7 +3758,7 @@ namespace walk {
                                bullet.direction.x,
                                bullet.direction.y,
                                bullet.direction.z,
-                               bullets_.size()));
+                               bullets.size()));
         }
 
         void emitMuzzleParticles() {
@@ -3780,26 +3780,26 @@ namespace walk {
                 p.position = muzzle + (forward * 0.01f);
 
                 glm::vec3 dir = forward
-                                + (right * lateralJitter(rng_))
-                                + (up * verticalJitter(rng_));
+                                + (right * lateralJitter(rng))
+                                + (up * verticalJitter(rng));
                 if (glm::length(dir) <= 1e-5f) {
                     dir = forward;
                 } else {
                     dir = glm::normalize(dir);
                 }
 
-                const float speed = speedDist(rng_);
+                const float speed = speedDist(rng);
                 p.velocity = dir * speed;
-                p.color = glm::vec3(warmDist(rng_), warmDist(rng_) * 0.7f, warmDist(rng_) * 0.18f);
-                p.maxLifetime = lifeDist(rng_);
+                p.color = glm::vec3(warmDist(rng), warmDist(rng) * 0.7f, warmDist(rng) * 0.18f);
+                p.maxLifetime = lifeDist(rng);
                 p.size = 0.035f + (speed * 0.003f);
-                explosionParticles_.push_back(p);
+                explosionParticles.push_back(p);
             }
         }
 
         void updateProjectiles(float deltaTime) {
-            for (size_t bulletIndex = 0; bulletIndex < bullets_.size(); ++bulletIndex) {
-                Projectile &bullet = bullets_[bulletIndex];
+            for (size_t bulletIndex = 0; bulletIndex < bullets.size(); ++bulletIndex) {
+                Projectile &bullet = bullets[bulletIndex];
                 if (!bullet.active) {
                     continue;
                 }
@@ -3829,12 +3829,12 @@ namespace walk {
                 glm::vec3 collectibleImpact{0.0f};
                 if (lineHitCollectible(previous, bullet.position, collectibleIndex, collectibleImpact)) {
                     createExplosion(collectibleImpact, 5000, false);
-                    const Collectible::Type hitType = world_.collectibles()[collectibleIndex].type;
+                    const Collectible::Type hitType = world.collectibles()[collectibleIndex].type;
                     const bool removed = deactivateCollectibleAt(collectibleIndex);
                     resolveCollectibleClusters(2.0f, 3);
                     bullet.active = false;
                     if (removed) {
-                        ++destroyedCount_;
+                        ++destroyedCount;
                     }
                     logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
                                        bulletIndex,
@@ -3843,7 +3843,7 @@ namespace walk {
                                        collectibleImpact.x,
                                        collectibleImpact.y,
                                        collectibleImpact.z,
-                                       destroyedCount_));
+                                       destroyedCount));
                     continue;
                 }
 
@@ -3884,11 +3884,11 @@ namespace walk {
                 }
             }
 
-            bullets_.erase(std::remove_if(bullets_.begin(), bullets_.end(), [](const Projectile &b) { return !b.active; }), bullets_.end());
+            bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Projectile &b) { return !b.active; }), bullets.end());
         }
 
         void updateCollectibles(float deltaTime) {
-            for (Collectible &obj : world_.collectibles()) {
+            for (Collectible &obj : world.collectibles()) {
                 if (!obj.active) {
                     continue;
                 }
@@ -3898,9 +3898,9 @@ namespace walk {
                 }
             }
 
-            collectibleClusterResolveTimer_ += deltaTime;
-            if (collectibleClusterResolveTimer_ >= 0.75f) {
-                collectibleClusterResolveTimer_ = 0.0f;
+            collectibleClusterResolveTimer += deltaTime;
+            if (collectibleClusterResolveTimer >= 0.75f) {
+                collectibleClusterResolveTimer = 0.0f;
                 resolveCollectibleClusters(2.0f, 2);
             }
         }
@@ -3926,30 +3926,30 @@ namespace walk {
             for (int i = 0; i < count; ++i) {
                 ExplosionParticle p{};
                 p.position = position;
-                const float theta = angleDist(rng_);
-                const float phi = elevationDist(rng_);
-                const float v = speedDist(rng_);
+                const float theta = angleDist(rng);
+                const float phi = elevationDist(rng);
+                const float v = speedDist(rng);
                 p.velocity = glm::vec3(v * std::cos(phi) * std::cos(theta), v * std::sin(phi), v * std::cos(phi) * std::sin(theta));
                 if (isRed) {
-                    p.color = glm::vec3(colorDist(rng_), colorDist(rng_) * 0.3f, colorDist(rng_) * 0.1f);
+                    p.color = glm::vec3(colorDist(rng), colorDist(rng) * 0.3f, colorDist(rng) * 0.1f);
                 } else {
-                    p.color = glm::vec3(colorDist(rng_), colorDist(rng_) * 0.7f, colorDist(rng_) * 0.2f);
+                    p.color = glm::vec3(colorDist(rng), colorDist(rng) * 0.7f, colorDist(rng) * 0.2f);
                 }
                 p.maxLifetime = 0.55f;
                 p.size = 0.08f + (v * 0.010f);
-                explosionParticles_.push_back(p);
+                explosionParticles.push_back(p);
             }
         }
 
         void updateExplosions(float deltaTime) {
-            for (ExplosionParticle &particle : explosionParticles_) {
+            for (ExplosionParticle &particle : explosionParticles) {
                 if (!particle.active) {
                     continue;
                 }
                 particle.position += particle.velocity * deltaTime;
                 particle.velocity.y -= 9.8f * deltaTime;
 
-                for (const PillarInstance &pillar : world_.pillars()) {
+                for (const PillarInstance &pillar : world.pillars()) {
                     const glm::vec2 particle2d(particle.position.x, particle.position.z);
                     const glm::vec2 pillar2d(pillar.position.x, pillar.position.z);
                     const float distance = glm::length(particle2d - pillar2d);
@@ -3968,7 +3968,7 @@ namespace walk {
                     }
                 }
 
-                for (const WallSegment &wall : world_.walls()) {
+                for (const WallSegment &wall : world.walls()) {
                     glm::vec3 wallDir = wall.end - wall.start;
                     const float wallLength = glm::length(wallDir);
                     if (wallLength < 0.0001f) {
@@ -4005,11 +4005,11 @@ namespace walk {
                 }
             }
 
-            explosionParticles_.erase(
-                std::remove_if(explosionParticles_.begin(), explosionParticles_.end(), [](const ExplosionParticle &p) {
+            explosionParticles.erase(
+                std::remove_if(explosionParticles.begin(), explosionParticles.end(), [](const ExplosionParticle &p) {
                     return !p.active;
                 }),
-                explosionParticles_.end());
+                explosionParticles.end());
         }
 
         [[nodiscard]] bool lineHitWall(const glm::vec3 &from, const glm::vec3 &to, glm::vec3 &impactOut) const {
@@ -4092,7 +4092,7 @@ namespace walk {
             float bestT = 2.0f;
             size_t bestIndex = 0;
 
-            const std::vector<Collectible> &collectibles = world_.collectibles();
+            const std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 const Collectible &obj = collectibles[i];
                 if (!obj.active) {
@@ -4184,9 +4184,9 @@ namespace walk {
         }
 
         [[nodiscard]] bool pointHitsWall3D(const glm::vec3 &point, float radius) const {
-            const float halfThickness = (world_.wallThickness() * 0.5f) + radius;
+            const float halfThickness = (world.wallThickness() * 0.5f) + radius;
             const float halfThicknessSq = halfThickness * halfThickness;
-            for (const WallSegment &wall : world_.walls()) {
+            for (const WallSegment &wall : world.walls()) {
                 if (point.y < 0.0f || point.y > wall.height) {
                     continue;
                 }
@@ -4212,7 +4212,7 @@ namespace walk {
         }
 
         [[nodiscard]] bool pointHitsPillar3D(const glm::vec3 &point, float radius) const {
-            for (const PillarInstance &pillar : world_.pillars()) {
+            for (const PillarInstance &pillar : world.pillars()) {
                 if (point.y < 0.0f || point.y > pillar.height) {
                     continue;
                 }
@@ -4229,29 +4229,29 @@ namespace walk {
         }
 
         [[nodiscard]] float birdGroundYForScale(float scale) const {
-            const glm::vec3 extent = birdModel_.modelAxisExtent();
-            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const glm::vec3 extent = birdModel.modelAxisExtent();
+            const glm::vec3 centerOffset = birdModel.modelCenterOffset();
             const float modelMinY = -centerOffset.y - (extent.y * 0.5f);
             const float clampedScale = std::max(scale, 0.0001f);
             return std::max(0.0f, -modelMinY * clampedScale);
         }
 
         [[nodiscard]] float birdHitHalfSideForScale(float scale) const {
-            const glm::vec3 extent = birdModel_.modelAxisExtent();
+            const glm::vec3 extent = birdModel.modelAxisExtent();
             const float modelSide = std::max({extent.x, extent.y, extent.z, 0.0001f});
             const float clampedScale = std::max(scale, 0.0001f);
             return 0.5f * modelSide * clampedScale;
         }
 
         [[nodiscard]] float saturnHitRadiusForScale(float scale) const {
-            const glm::vec3 extent = saturnModel_.modelAxisExtent();
+            const glm::vec3 extent = saturnModel.modelAxisExtent();
             const float modelDiameter = std::max({extent.x, extent.y, extent.z, 0.0001f});
             const float clampedScale = std::max(scale, 0.0001f);
             return 0.5f * modelDiameter * clampedScale;
         }
 
         [[nodiscard]] glm::vec3 saturnHitCenterOffsetForScale(float scale) const {
-            const glm::vec3 centerOffset = saturnModel_.modelCenterOffset();
+            const glm::vec3 centerOffset = saturnModel.modelCenterOffset();
             const float clampedScale = std::max(scale, 0.0001f);
             return glm::vec3(-centerOffset.x * clampedScale,
                              -centerOffset.y * clampedScale,
@@ -4259,14 +4259,14 @@ namespace walk {
         }
 
         [[nodiscard]] glm::vec3 birdHitCenterOffsetForScale(float scale) const {
-            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const glm::vec3 centerOffset = birdModel.modelCenterOffset();
             const float clampedScale = std::max(scale, 0.0001f);
             return glm::vec3(0.0f, -centerOffset.y * clampedScale, 0.0f);
         }
 
         [[nodiscard]] float birdSpawnClearanceRadiusForScale(float scale) const {
-            const glm::vec3 extent = birdModel_.modelAxisExtent();
-            const glm::vec3 centerOffset = birdModel_.modelCenterOffset();
+            const glm::vec3 extent = birdModel.modelAxisExtent();
+            const glm::vec3 centerOffset = birdModel.modelCenterOffset();
             const float clampedScale = std::max(scale, 0.0001f);
 
             const float halfXFromOrigin = (extent.x * 0.5f) + std::abs(centerOffset.x);
@@ -4283,7 +4283,7 @@ namespace walk {
         }
 
         void normalizeCollectiblesToModel() {
-            for (Collectible &obj : world_.collectibles()) {
+            for (Collectible &obj : world.collectibles()) {
                 if (obj.type == Collectible::Type::Bird) {
                     obj.radius = birdHitHalfSideForScale(obj.scale.x);
                     obj.hitCenterOffset = birdHitCenterOffsetForScale(obj.scale.x);
@@ -4303,7 +4303,7 @@ namespace walk {
                                                  float radius,
                                                  size_t ignoreIndex,
                                                  bool includeInactive) const {
-            const std::vector<Collectible> &collectibles = world_.collectibles();
+            const std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 if (i == ignoreIndex) {
                     continue;
@@ -4322,7 +4322,7 @@ namespace walk {
         }
 
         bool relocateCollectible(size_t index, float minMoveDistance, int maxAttempts) {
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             if (index >= collectibles.size()) {
                 return false;
             }
@@ -4352,15 +4352,15 @@ namespace walk {
         }
 
         void resolveCollectibleEnvironmentCollisions() {
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 if (!collectibles[i].active) {
                     continue;
                 }
 
                 const float placementRadius = placementRadiusForCollectible(collectibles[i]);
-                if (!world_.checkWallCollision(collectibles[i].position, placementRadius) &&
-                    !world_.checkPillarCollision(collectibles[i].position, placementRadius)) {
+                if (!world.checkWallCollision(collectibles[i].position, placementRadius) &&
+                    !world.checkPillarCollision(collectibles[i].position, placementRadius)) {
                     continue;
                 }
 
@@ -4369,7 +4369,7 @@ namespace walk {
         }
 
         void resolveCollectibleOverlaps() {
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 if (!collectibles[i].active) {
                     continue;
@@ -4386,7 +4386,7 @@ namespace walk {
                 return;
             }
 
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             const float minVisualSeparationSq = minVisualSeparation * minVisualSeparation;
             for (int pass = 0; pass < passes; ++pass) {
                 bool movedAny = false;
@@ -4418,7 +4418,7 @@ namespace walk {
         }
 
         void disperseNearbyCollectibles(const glm::vec3 &center, float radius, size_t ignoreIndex) {
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 if (i == ignoreIndex) {
                     continue;
@@ -4435,7 +4435,7 @@ namespace walk {
         }
 
         [[nodiscard]] bool deactivateCollectibleAt(size_t index) {
-            std::vector<Collectible> &collectibles = world_.collectibles();
+            std::vector<Collectible> &collectibles = world.collectibles();
             if (index >= collectibles.size()) {
                 return false;
             }
@@ -4449,60 +4449,60 @@ namespace walk {
             return true;
         }
 
-        std::string assetRoot_;
-        std::string modelRoot_;
+        std::string assetRoot;
+        std::string modelRoot;
 
-        MazeWorld world_{};
-        mxvk::VKAbstractModel floorModel_{};
-        RawWallRenderer rawWallRenderer_{};
-        RawPillarRenderer rawPillarRenderer_{};
-        mxvk::VKAbstractModel saturnModel_{};
-        mxvk::VKAbstractModel birdModel_{};
-        mxvk::VKAbstractModel blasterModel_{};
-        mxvk::VKAbstractModel bulletModel_{};
+        MazeWorld world{};
+        mxvk::VKAbstractModel floorModel{};
+        RawWallRenderer rawWallRenderer{};
+        RawPillarRenderer rawPillarRenderer{};
+        mxvk::VKAbstractModel saturnModel{};
+        mxvk::VKAbstractModel birdModel{};
+        mxvk::VKAbstractModel blasterModel{};
+        mxvk::VKAbstractModel bulletModel{};
 
-        VkPipelineLayout pointPipelineLayout_ = VK_NULL_HANDLE;
-        VkPipeline pointPipeline_ = VK_NULL_HANDLE;
-        VkBuffer pointVertexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory pointVertexMemory_ = VK_NULL_HANDLE;
-        void *pointVertexMapped_ = nullptr;
-        size_t maxPointVertices_ = 200000;
-        std::string pointParticleVertSpv_{};
-        std::string pointParticleFragSpv_{};
-    std::string modelVertSpv_{};
-    std::string pillarVertSpv_{};
-    std::string wallFragSpv_{};
-    std::string floorFragSpv_{};
-    std::string pillarFragSpv_{};
-    std::string objectFragSpv_{};
-    std::string bulletFragSpv_{};
+        VkPipelineLayout pointPipelineLayout = VK_NULL_HANDLE;
+        VkPipeline pointPipeline = VK_NULL_HANDLE;
+        VkBuffer pointVertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory pointVertexMemory = VK_NULL_HANDLE;
+        void *pointVertexMapped = nullptr;
+        size_t maxPointVertices = 200000;
+        std::string pointParticleVertSpv{};
+        std::string pointParticleFragSpv{};
+    std::string modelVertSpv{};
+    std::string pillarVertSpv{};
+    std::string wallFragSpv{};
+    std::string floorFragSpv{};
+    std::string pillarFragSpv{};
+    std::string objectFragSpv{};
+    std::string bulletFragSpv{};
 
-        std::vector<Projectile> bullets_{};
-        std::vector<ExplosionParticle> explosionParticles_{};
-        std::mt19937 rng_{std::random_device{}()};
+        std::vector<Projectile> bullets{};
+        std::vector<ExplosionParticle> explosionParticles{};
+        std::mt19937 rng{std::random_device{}()};
 
-        glm::vec3 cameraPos_{0.0f, 1.7f, 0.0f};
-        glm::vec3 cameraFront_{0.0f, 0.0f, -1.0f};
-        float yaw_ = -90.0f;
-        float pitch_ = 0.0f;
-        bool mouseCapture_ = true;
-        bool firstMouse_ = true;
-        bool suppressProjectileOnNextLeftDown_ = false;
-        bool showFps_ = true;
-        float mouseSensitivity_ = 0.15f;
+        glm::vec3 cameraPos{0.0f, 1.7f, 0.0f};
+        glm::vec3 cameraFront{0.0f, 0.0f, -1.0f};
+        float yaw = -90.0f;
+        float pitch = 0.0f;
+        bool mouseCapture = true;
+        bool firstMouse = true;
+        bool suppressProjectileOnNextLeftDown = false;
+        bool showFps = true;
+        float mouseSensitivity = 0.15f;
 
-        float deltaTime_ = 0.0f;
-        float jumpVelocity_ = 0.0f;
-        float gravity_ = 0.015f;
-        float collectibleClusterResolveTimer_ = 0.0f;
-        uint32_t destroyedCount_ = 0;
+        float deltaTime = 0.0f;
+        float jumpVelocity = 0.0f;
+        float gravity = 0.015f;
+        float collectibleClusterResolveTimer = 0.0f;
+        uint32_t destroyedCount = 0;
 
-        SDL_Gamepad *gamepad_ = nullptr;
-        SDL_JoystickID gamepadId_ = 0;
-        int stickDeadZone_ = 8000;
-        float controllerLookSensitivity_ = 2.0f;
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepadId = 0;
+        int stickDeadZone = 8000;
+        float controllerLookSensitivity = 2.0f;
 
-        std::chrono::steady_clock::time_point lastTick_{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point lastTick{std::chrono::steady_clock::now()};
     };
 
 } // namespace walk

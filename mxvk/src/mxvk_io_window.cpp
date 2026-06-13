@@ -6,12 +6,12 @@ namespace mxvk {
 
     VK_IOWindow::VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION) {
         const std::string base_path = path;
-        console_.attach(*this, base_path + "/data/font.ttf", 20);
-        console_.setSpriteYOriginTopLeft(true);
-        console_.setPrompt("$> ");
-        console_.printLine("Press F3 to open/close the console.");
-        console_.printLine("Type 'help' for built-in commands.");
-        console_.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
+        console.attach(*this, base_path + "/data/font.ttf", 20);
+        console.setSpriteYOriginTopLeft(true);
+        console.setPrompt("$> ");
+        console.printLine("Press F3 to open/close the console.");
+        console.printLine("Type 'help' for built-in commands.");
+        console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
             if (args.empty()) {
                 return true;
             }
@@ -66,19 +66,19 @@ namespace mxvk {
 
     void VK_IOWindow::event(SDL_Event &e) {
         const bool is_escape_down = (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE);
-        const bool was_console_visible = console_.isVisible();
+        const bool was_console_visible = console.isVisible();
         if (is_escape_down && was_console_visible && SDL_GetWindowRelativeMouseMode(getSDLWindow())) {
             console_event(e);
             return;
         }
 
-        console_.handleEvent(e);
+        console.handleEvent(e);
 
-        if (is_escape_down && was_console_visible && !console_.isVisible()) {
+        if (is_escape_down && was_console_visible && !console.isVisible()) {
             return;
         }
 
-        if (console_.isVisible()) {
+        if (console.isVisible()) {
             return;
         }
 
@@ -86,12 +86,12 @@ namespace mxvk {
     }
 
     void VK_IOWindow::print(const std::string &text, SDL_Color col) {
-        console_.printLine(text, col);
+        console.printLine(text, col);
     }
 
     void VK_IOWindow::proc() {
         console_proc();
-        console_.draw();
+        console.draw();
     }
 
 } // namespace mxvk

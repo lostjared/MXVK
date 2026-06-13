@@ -390,8 +390,8 @@ namespace mxvk {
         bool instancingEnabled = false;
         VkPipeline instancedPipeline = VK_NULL_HANDLE;
         VkPipelineLayout instancedPipelineLayout = VK_NULL_HANDLE;
-        std::string instanceVertPath_;
-        std::string instanceFragPath_;
+        std::string instanceVertPath;
+        std::string instanceFragPath;
         void createInstancedPipeline(const std::string &vertPath, const std::string &fragPath);
         void ensureInstanceBuffer(uint32_t count);
         void destroyInstanceResources();

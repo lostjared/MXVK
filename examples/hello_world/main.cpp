@@ -20,7 +20,7 @@ namespace example {
       public:
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen)
             : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION),
-              shader_root_(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
+              shader_root(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
             setClearColor(0.02F, 0.03F, 0.06F, 1.0F);
         }
 
@@ -40,10 +40,10 @@ namespace example {
                 return;
             }
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
 
             const auto now = std::chrono::steady_clock::now();
-            const float elapsed_seconds = std::chrono::duration<float>(now - start_time_).count();
+            const float elapsed_seconds = std::chrono::duration<float>(now - start_time).count();
             const VkExtent2D extent = getSwapchainExtent();
             const float aspect =
                 (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0F;
@@ -51,7 +51,7 @@ namespace example {
             const PushConstants push_constants{elapsed_seconds, aspect};
             vkCmdPushConstants(
                 cmd,
-                pipeline_layout_,
+                pipeline_layout,
                 VK_SHADER_STAGE_VERTEX_BIT,
                 0,
                 sizeof(PushConstants),
@@ -61,33 +61,33 @@ namespace example {
         }
 
       private:
-        std::string shader_root_;
-        std::chrono::steady_clock::time_point start_time_{std::chrono::steady_clock::now()};
+        std::string shader_root;
+        std::chrono::steady_clock::time_point start_time{std::chrono::steady_clock::now()};
 
         void destroyGraphicsPipeline() {
             if (device == VK_NULL_HANDLE) {
-                pipeline_layout_ = VK_NULL_HANDLE;
-                graphics_pipeline_ = VK_NULL_HANDLE;
+                pipeline_layout = VK_NULL_HANDLE;
+                graphics_pipeline = VK_NULL_HANDLE;
                 return;
             }
 
-            if (graphics_pipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, graphics_pipeline_, nullptr);
-                graphics_pipeline_ = VK_NULL_HANDLE;
+            if (graphics_pipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, graphics_pipeline, nullptr);
+                graphics_pipeline = VK_NULL_HANDLE;
             }
-            if (pipeline_layout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, pipeline_layout_, nullptr);
-                pipeline_layout_ = VK_NULL_HANDLE;
+            if (pipeline_layout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+                pipeline_layout = VK_NULL_HANDLE;
             }
         }
 
         bool ensureGraphicsPipeline() {
-            if (graphics_pipeline_ != VK_NULL_HANDLE && pipeline_layout_ != VK_NULL_HANDLE) {
+            if (graphics_pipeline != VK_NULL_HANDLE && pipeline_layout != VK_NULL_HANDLE) {
                 return true;
             }
 
             createGraphicsPipeline();
-            return graphics_pipeline_ != VK_NULL_HANDLE && pipeline_layout_ != VK_NULL_HANDLE;
+            return graphics_pipeline != VK_NULL_HANDLE && pipeline_layout != VK_NULL_HANDLE;
         }
 
         void createGraphicsPipeline() {
@@ -95,8 +95,8 @@ namespace example {
                 return;
             }
 
-            const std::string vert_path = shader_root_ + "/triangle.vert.spv";
-            const std::string frag_path = shader_root_ + "/triangle.frag.spv";
+            const std::string vert_path = shader_root + "/triangle.vert.spv";
+            const std::string frag_path = shader_root + "/triangle.frag.spv";
             const std::vector<char> vert_bytes = loadSpv(vert_path);
             const std::vector<char> frag_bytes = loadSpv(frag_path);
 
@@ -175,7 +175,7 @@ namespace example {
                 pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
                 pipeline_layout_info.pushConstantRangeCount = 1;
                 pipeline_layout_info.pPushConstantRanges = &push_constant_range;
-                if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout_) != VK_SUCCESS) {
+                if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create pipeline layout");
                 }
 
@@ -198,23 +198,23 @@ namespace example {
                 pipeline_info.pDepthStencilState = nullptr;
                 pipeline_info.pColorBlendState = &color_blending;
                 pipeline_info.pDynamicState = &dynamic_state;
-                pipeline_info.layout = pipeline_layout_;
+                pipeline_info.layout = pipeline_layout;
                 pipeline_info.renderPass = VK_NULL_HANDLE;
                 pipeline_info.subpass = 0;
                 pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
                 pipeline_info.basePipelineIndex = -1;
 
-                if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &graphics_pipeline_) != VK_SUCCESS) {
+                if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &graphics_pipeline) != VK_SUCCESS) {
                     throw mxvk::Exception("Failed to create graphics pipeline");
                 }
             } catch (...) {
-                if (graphics_pipeline_ != VK_NULL_HANDLE) {
-                    vkDestroyPipeline(device, graphics_pipeline_, nullptr);
-                    graphics_pipeline_ = VK_NULL_HANDLE;
+                if (graphics_pipeline != VK_NULL_HANDLE) {
+                    vkDestroyPipeline(device, graphics_pipeline, nullptr);
+                    graphics_pipeline = VK_NULL_HANDLE;
                 }
-                if (pipeline_layout_ != VK_NULL_HANDLE) {
-                    vkDestroyPipelineLayout(device, pipeline_layout_, nullptr);
-                    pipeline_layout_ = VK_NULL_HANDLE;
+                if (pipeline_layout != VK_NULL_HANDLE) {
+                    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+                    pipeline_layout = VK_NULL_HANDLE;
                 }
                 if (frag_module != VK_NULL_HANDLE) {
                     vkDestroyShaderModule(device, frag_module, nullptr);
@@ -227,8 +227,8 @@ namespace example {
             vkDestroyShaderModule(device, vert_module, nullptr);
         }
 
-        VkPipeline graphics_pipeline_ = VK_NULL_HANDLE;
-        VkPipelineLayout pipeline_layout_ = VK_NULL_HANDLE;
+        VkPipeline graphics_pipeline = VK_NULL_HANDLE;
+        VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     };
 } // namespace example
 

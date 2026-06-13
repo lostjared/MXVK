@@ -243,19 +243,19 @@ namespace {
       public:
         PongWindow(const std::string &path, int width, int height, bool fullscreen)
             : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION),
-              assetRoot_((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path),
-              dataRoot_(assetRoot_ + "/data"),
-              paddle1_(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
-              paddle2_(glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
-              ball_(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.3f, 0.0f), 0.05f),
-              fallbackWidth_(width),
-              fallbackHeight_(height) {
+              assetRoot((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path),
+              dataRoot(assetRoot + "/data"),
+              paddle1(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
+              paddle2(glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
+              ball(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.3f, 0.0f), 0.05f),
+              fallbackWidth(width),
+              fallbackHeight(height) {
             std::srand(static_cast<unsigned>(std::time(nullptr)));
-            setFont(dataRoot_ + "/font.ttf", 24);
+            setFont(dataRoot + "/font.ttf", 24);
             initModels();
             createParticleBuffer();
             initStarfield(30000);
-            ball_.resetBall();
+            ball.resetBall();
             tryOpenFirstGamepad();
         }
 
@@ -267,9 +267,9 @@ namespace {
             cleanupStarSwapchainResources();
             cleanupParticleResources();
             cleanupStarResources();
-            paddleModel1_.cleanup(this);
-            paddleModel2_.cleanup(this);
-            ballModel_.cleanup(this);
+            paddleModel1.cleanup(this);
+            paddleModel2.cleanup(this);
+            ballModel.cleanup(this);
         }
 
         void onSwapchainAboutToRecreate() override {
@@ -277,9 +277,9 @@ namespace {
         }
 
         void onSwapchainRecreated() override {
-            paddleModel1_.resize(this);
-            paddleModel2_.resize(this);
-            ballModel_.resize(this);
+            paddleModel1.resize(this);
+            paddleModel2.resize(this);
+            ballModel.resize(this);
             createStarSwapchainResources();
         }
 
@@ -295,7 +295,7 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
-                if (gamepad_ != nullptr && e.gdevice.which == gamepadId_) {
+                if (gamepad != nullptr && e.gdevice.which == gamepadId) {
                     closeGamepad();
                     tryOpenFirstGamepad();
                 }
@@ -305,12 +305,12 @@ namespace {
             if (e.type == SDL_EVENT_KEY_DOWN) {
                 switch (e.key.key) {
                 case SDLK_SPACE:
-                    wireframe_ = !wireframe_;
+                    wireframe = !wireframe;
                     break;
                 case SDLK_RETURN:
-                    cameraZ_ = 5.0f;
-                    gridRotation_ = 0.0f;
-                    gridYRotation_ = 0.0f;
+                    cameraZ = 5.0f;
+                    gridRotation = 0.0f;
+                    gridYRotation = 0.0f;
                     break;
                 case SDLK_ESCAPE:
                     exit();
@@ -325,59 +325,59 @@ namespace {
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (e.button.button == SDL_BUTTON_LEFT || e.button.button == SDL_BUTTON_RIGHT) {
-                    mouseDragging_ = true;
-                    lastMouseX_ = static_cast<int>(e.button.x);
-                    lastMouseY_ = static_cast<int>(e.button.y);
+                    mouseDragging = true;
+                    lastMouseX = static_cast<int>(e.button.x);
+                    lastMouseY = static_cast<int>(e.button.y);
                 }
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
                 if (e.button.button == SDL_BUTTON_LEFT || e.button.button == SDL_BUTTON_RIGHT) {
-                    mouseDragging_ = false;
+                    mouseDragging = false;
                 }
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_MOTION) {
-                if (mouseDragging_) {
-                    const int deltaX = static_cast<int>(e.motion.x) - lastMouseX_;
-                    const int deltaY = static_cast<int>(e.motion.y) - lastMouseY_;
+                if (mouseDragging) {
+                    const int deltaX = static_cast<int>(e.motion.x) - lastMouseX;
+                    const int deltaY = static_cast<int>(e.motion.y) - lastMouseY;
 
-                    gridYRotation_ += static_cast<float>(deltaX) * mouseSensitivity_;
-                    gridRotation_ += static_cast<float>(deltaY) * mouseSensitivity_;
+                    gridYRotation += static_cast<float>(deltaX) * mouseSensitivity;
+                    gridRotation += static_cast<float>(deltaY) * mouseSensitivity;
 
-                    gridRotation_ = std::clamp(gridRotation_, -89.0f, 89.0f);
+                    gridRotation = std::clamp(gridRotation, -89.0f, 89.0f);
 
-                    lastMouseX_ = static_cast<int>(e.motion.x);
-                    lastMouseY_ = static_cast<int>(e.motion.y);
+                    lastMouseX = static_cast<int>(e.motion.x);
+                    lastMouseY = static_cast<int>(e.motion.y);
                 } else {
-                    const int renderH = std::max(1, fallbackHeight_);
+                    const int renderH = std::max(1, fallbackHeight);
                     const float normalizedY = (static_cast<float>(e.motion.y) / static_cast<float>(renderH)) * 2.0f - 1.0f;
-                    paddle1_.position.y = -normalizedY;
-                    clampPaddle(paddle1_);
+                    paddle1.position.y = -normalizedY;
+                    clampPaddle(paddle1);
                 }
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_WHEEL) {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
-                cameraZ_ -= delta * 0.5f;
-                cameraZ_ = std::clamp(cameraZ_, 1.0f, 20.0f);
+                cameraZ -= delta * 0.5f;
+                cameraZ = std::clamp(cameraZ, 1.0f, 20.0f);
                 return;
             }
 
             if (e.type == SDL_EVENT_FINGER_MOTION) {
                 const float normalizedY = e.tfinger.y * 2.0f - 1.0f;
-                paddle1_.position.y = -normalizedY;
-                clampPaddle(paddle1_);
+                paddle1.position.y = -normalizedY;
+                clampPaddle(paddle1);
             }
         }
 
         void proc() override {
             const auto currentTime = std::chrono::steady_clock::now();
-            float deltaTime = std::chrono::duration<float>(currentTime - lastFrameTime_).count();
-            lastFrameTime_ = currentTime;
+            float deltaTime = std::chrono::duration<float>(currentTime - lastFrameTime).count();
+            lastFrameTime = currentTime;
 
             if (deltaTime > 0.1f) {
                 deltaTime = 0.1f;
@@ -385,10 +385,10 @@ namespace {
 
             const VkExtent2D extent = getSwapchainExtent();
             if (extent.width > 0U) {
-                fallbackWidth_ = static_cast<int>(extent.width);
+                fallbackWidth = static_cast<int>(extent.width);
             }
             if (extent.height > 0U) {
-                fallbackHeight_ = static_cast<int>(extent.height);
+                fallbackHeight = static_cast<int>(extent.height);
             }
 
             updateFromKeyboard(deltaTime);
@@ -396,15 +396,15 @@ namespace {
 
             updateAI(deltaTime);
 
-            paddle1_.update(deltaTime);
-            paddle2_.update(deltaTime);
-            ball_.update(deltaTime, paddle1_, paddle2_, score1_, score2_);
+            paddle1.update(deltaTime);
+            paddle2.update(deltaTime);
+            ball.update(deltaTime, paddle1, paddle2, score1, score2);
 
-            if (ball_.hitPaddle1) {
-                spawnBurst(ball_.lastImpactPos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec4(0.3f, 0.6f, 1.0f, 1.0f));
+            if (ball.hitPaddle1) {
+                spawnBurst(ball.lastImpactPos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec4(0.3f, 0.6f, 1.0f, 1.0f));
             }
-            if (ball_.hitPaddle2) {
-                spawnBurst(ball_.lastImpactPos, glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec4(1.0f, 0.3f, 0.3f, 1.0f));
+            if (ball.hitPaddle2) {
+                spawnBurst(ball.lastImpactPos, glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec4(1.0f, 0.3f, 0.3f, 1.0f));
             }
 
             updateParticles(deltaTime);
@@ -431,116 +431,116 @@ namespace {
                 100.0f);
             proj[1][1] *= -1.0f;
 
-            drawModel(cmd, imageIndex, paddleModel1_, paddle1_.modelMatrix(), glm::vec3(0.3f, 0.6f, 1.0f), view, proj);
-            drawModel(cmd, imageIndex, paddleModel2_, paddle2_.modelMatrix(), glm::vec3(1.0f, 0.3f, 0.3f), view, proj);
-            drawModel(cmd, imageIndex, ballModel_, ball_.modelMatrix(), glm::vec3(1.0f, 1.0f, 1.0f), view, proj);
+            drawModel(cmd, imageIndex, paddleModel1, paddle1.modelMatrix(), glm::vec3(0.3f, 0.6f, 1.0f), view, proj);
+            drawModel(cmd, imageIndex, paddleModel2, paddle2.modelMatrix(), glm::vec3(1.0f, 0.3f, 0.3f), view, proj);
+            drawModel(cmd, imageIndex, ballModel, ball.modelMatrix(), glm::vec3(1.0f, 1.0f, 1.0f), view, proj);
 
             drawParticles(cmd, imageIndex, extent, view, proj);
         }
 
       private:
-        static constexpr int maxParticles_ = 500;
+        static constexpr int maxParticles = 500;
 
-        std::string assetRoot_;
-        std::string dataRoot_;
+        std::string assetRoot;
+        std::string dataRoot;
 
-        Paddle paddle1_;
-        Paddle paddle2_;
-        Ball ball_;
+        Paddle paddle1;
+        Paddle paddle2;
+        Ball ball;
 
-        mxvk::VKAbstractModel paddleModel1_{};
-        mxvk::VKAbstractModel paddleModel2_{};
-        mxvk::VKAbstractModel ballModel_{};
+        mxvk::VKAbstractModel paddleModel1{};
+        mxvk::VKAbstractModel paddleModel2{};
+        mxvk::VKAbstractModel ballModel{};
 
-        int score1_ = 0;
-        int score2_ = 0;
+        int score1 = 0;
+        int score2 = 0;
 
-        float gridRotation_ = 0.0f;
-        float gridYRotation_ = 0.0f;
-        float rotationSpeed_ = 50.0f;
-        float cameraZ_ = 5.0f;
-        float mouseSensitivity_ = 0.5f;
+        float gridRotation = 0.0f;
+        float gridYRotation = 0.0f;
+        float rotationSpeed = 50.0f;
+        float cameraZ = 5.0f;
+        float mouseSensitivity = 0.5f;
 
-        bool wireframe_ = false;
-        bool mouseDragging_ = false;
-        int lastMouseX_ = 0;
-        int lastMouseY_ = 0;
+        bool wireframe = false;
+        bool mouseDragging = false;
+        int lastMouseX = 0;
+        int lastMouseY = 0;
 
-        SDL_Gamepad *gamepad_ = nullptr;
-        SDL_JoystickID gamepadId_ = 0;
-        static constexpr float controllerDeadzone_ = 8000.0f;
-        static constexpr float controllerMax_ = 32767.0f;
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepadId = 0;
+        static constexpr float controllerDeadzone = 8000.0f;
+        static constexpr float controllerMax = 32767.0f;
 
-        int fallbackWidth_ = 1280;
-        int fallbackHeight_ = 720;
+        int fallbackWidth = 1280;
+        int fallbackHeight = 720;
 
-        std::chrono::steady_clock::time_point lastFrameTime_ = std::chrono::steady_clock::now();
-        float fpsAccumulator_ = 0.0f;
-        int fpsFrameCounter_ = 0;
-        float fpsValue_ = 0.0f;
+        std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
+        float fpsAccumulator = 0.0f;
+        int fpsFrameCounter = 0;
+        float fpsValue = 0.0f;
 
-        std::vector<Particle> particles_{};
-        uint32_t activeParticleCount_ = 0;
-        void *mappedParticleData_ = nullptr;
-        VkBuffer particleBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory particleBufferMemory_ = VK_NULL_HANDLE;
-        VkPipeline particlePipeline_ = VK_NULL_HANDLE;
-        VkPipelineLayout particlePipelineLayout_ = VK_NULL_HANDLE;
-        VkDescriptorPool particleDescriptorPool_ = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> particleDescriptorSets_{};
-        std::vector<VkBuffer> particleUniformBuffers_{};
-        std::vector<VkDeviceMemory> particleUniformBufferMemories_{};
-        std::vector<void *> particleUniformBufferMapped_{};
+        std::vector<Particle> particles{};
+        uint32_t activeParticleCount = 0;
+        void *mappedParticleData = nullptr;
+        VkBuffer particleBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory particleBufferMemory = VK_NULL_HANDLE;
+        VkPipeline particlePipeline = VK_NULL_HANDLE;
+        VkPipelineLayout particlePipelineLayout = VK_NULL_HANDLE;
+        VkDescriptorPool particleDescriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> particleDescriptorSets{};
+        std::vector<VkBuffer> particleUniformBuffers{};
+        std::vector<VkDeviceMemory> particleUniformBufferMemories{};
+        std::vector<void *> particleUniformBufferMapped{};
 
-        std::vector<Star> stars_{};
-        int numStars_ = 0;
-        bool starfieldInitialized_ = false;
-        Uint32 lastStarUpdateTime_ = 0;
-        float atmosphericTwinkle_ = 1.0f;
-        float lightPollution_ = 0.1f;
+        std::vector<Star> stars{};
+        int numStars = 0;
+        bool starfieldInitialized = false;
+        Uint32 lastStarUpdateTime = 0;
+        float atmosphericTwinkle = 1.0f;
+        float lightPollution = 0.1f;
 
-        VkImage starTexture_ = VK_NULL_HANDLE;
-        VkDeviceMemory starTextureMemory_ = VK_NULL_HANDLE;
-        VkImageView starTextureView_ = VK_NULL_HANDLE;
-        VkSampler starSampler_ = VK_NULL_HANDLE;
+        VkImage starTexture = VK_NULL_HANDLE;
+        VkDeviceMemory starTextureMemory = VK_NULL_HANDLE;
+        VkImageView starTextureView = VK_NULL_HANDLE;
+        VkSampler starSampler = VK_NULL_HANDLE;
 
-        VkBuffer starVertexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory starVertexBufferMemory_ = VK_NULL_HANDLE;
-        void *starVertexBufferMapped_ = nullptr;
+        VkBuffer starVertexBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory starVertexBufferMemory = VK_NULL_HANDLE;
+        void *starVertexBufferMapped = nullptr;
 
-        VkDescriptorSetLayout starDescriptorSetLayout_ = VK_NULL_HANDLE;
-        VkDescriptorPool starDescriptorPool_ = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> starDescriptorSets_{};
+        VkDescriptorSetLayout starDescriptorSetLayout = VK_NULL_HANDLE;
+        VkDescriptorPool starDescriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> starDescriptorSets{};
 
-        std::vector<VkBuffer> starUniformBuffers_{};
-        std::vector<VkDeviceMemory> starUniformBufferMemories_{};
-        std::vector<void *> starUniformBufferMapped_{};
+        std::vector<VkBuffer> starUniformBuffers{};
+        std::vector<VkDeviceMemory> starUniformBufferMemories{};
+        std::vector<void *> starUniformBufferMapped{};
 
-        VkPipeline starPipeline_ = VK_NULL_HANDLE;
-        VkPipelineLayout starPipelineLayout_ = VK_NULL_HANDLE;
+        VkPipeline starPipeline = VK_NULL_HANDLE;
+        VkPipelineLayout starPipelineLayout = VK_NULL_HANDLE;
 
         void initModels() {
-            const std::string modelPath = dataRoot_ + "/cube.mxmod";
+            const std::string modelPath = dataRoot + "/cube.mxmod";
             const std::string shaderVert = std::string(pong_SHADER_DIR) + "/pong_model.vert.spv";
             const std::string shaderFrag = std::string(pong_SHADER_DIR) + "/pong_model.frag.spv";
-            const std::string paddleManifest = dataRoot_ + "/paddle_texture_manifest.txt";
-            const std::string ballManifest = dataRoot_ + "/ball_texture_manifest.txt";
+            const std::string paddleManifest = dataRoot + "/paddle_texture_manifest.txt";
+            const std::string ballManifest = dataRoot + "/ball_texture_manifest.txt";
 
-            paddleModel1_.load(this, modelPath, paddleManifest, dataRoot_, 1.0f);
-            paddleModel1_.setShaders(this, shaderVert, shaderFrag);
+            paddleModel1.load(this, modelPath, paddleManifest, dataRoot, 1.0f);
+            paddleModel1.setShaders(this, shaderVert, shaderFrag);
 
-            paddleModel2_.load(this, modelPath, paddleManifest, dataRoot_, 1.0f);
-            paddleModel2_.setShaders(this, shaderVert, shaderFrag);
+            paddleModel2.load(this, modelPath, paddleManifest, dataRoot, 1.0f);
+            paddleModel2.setShaders(this, shaderVert, shaderFrag);
 
-            ballModel_.load(this, modelPath, ballManifest, dataRoot_, 1.0f);
-            ballModel_.setShaders(this, shaderVert, shaderFrag);
+            ballModel.load(this, modelPath, ballManifest, dataRoot, 1.0f);
+            ballModel.setShaders(this, shaderVert, shaderFrag);
         }
 
         [[nodiscard]] glm::mat4 buildViewMatrix() const {
             glm::mat4 view(1.0f);
-            view = glm::translate(view, glm::vec3(0.0f, 0.0f, -cameraZ_));
-            view = glm::rotate(view, glm::radians(gridRotation_), glm::vec3(1.0f, 0.0f, 0.0f));
-            view = glm::rotate(view, glm::radians(gridYRotation_), glm::vec3(0.0f, 1.0f, 0.0f));
+            view = glm::translate(view, glm::vec3(0.0f, 0.0f, -cameraZ));
+            view = glm::rotate(view, glm::radians(gridRotation), glm::vec3(1.0f, 0.0f, 0.0f));
+            view = glm::rotate(view, glm::radians(gridYRotation), glm::vec3(0.0f, 1.0f, 0.0f));
             return view;
         }
 
@@ -557,15 +557,15 @@ namespace {
             ubo.proj = proj;
             ubo.fx = glm::vec4(color, 1.0f);
             model.updateUBO(imageIndex, ubo);
-            model.render(cmd, imageIndex, wireframe_);
+            model.render(cmd, imageIndex, wireframe);
         }
 
         void resetGame() {
-            score1_ = 0;
-            score2_ = 0;
-            paddle1_.position.y = 0.0f;
-            paddle2_.position.y = 0.0f;
-            ball_.resetBall();
+            score1 = 0;
+            score2 = 0;
+            paddle1.position.y = 0.0f;
+            paddle2.position.y = 0.0f;
+            ball.resetBall();
         }
 
         static void clampPaddle(Paddle &paddle) {
@@ -575,11 +575,11 @@ namespace {
 
         [[nodiscard]] static float normalizeAxisWithDeadzone(float axisValue) {
             const float magnitude = std::abs(axisValue);
-            if (magnitude <= controllerDeadzone_) {
+            if (magnitude <= controllerDeadzone) {
                 return 0.0f;
             }
 
-            const float normalized = (magnitude - controllerDeadzone_) / (controllerMax_ - controllerDeadzone_);
+            const float normalized = (magnitude - controllerDeadzone) / (controllerMax - controllerDeadzone);
             return std::copysign(std::clamp(normalized, 0.0f, 1.0f), axisValue);
         }
 
@@ -590,117 +590,117 @@ namespace {
             }
 
             if (keyState[SDL_SCANCODE_A]) {
-                gridRotation_ -= rotationSpeed_ * deltaTime;
+                gridRotation -= rotationSpeed * deltaTime;
             }
             if (keyState[SDL_SCANCODE_D]) {
-                gridRotation_ += rotationSpeed_ * deltaTime;
+                gridRotation += rotationSpeed * deltaTime;
             }
             if (keyState[SDL_SCANCODE_S]) {
-                gridYRotation_ -= rotationSpeed_ * deltaTime;
+                gridYRotation -= rotationSpeed * deltaTime;
             }
             if (keyState[SDL_SCANCODE_W]) {
-                gridYRotation_ += rotationSpeed_ * deltaTime;
+                gridYRotation += rotationSpeed * deltaTime;
             }
             if (keyState[SDL_SCANCODE_Q]) {
-                gridRotation_ = 0.0f;
-                gridYRotation_ = 0.0f;
+                gridRotation = 0.0f;
+                gridYRotation = 0.0f;
             }
 
             constexpr float speed = 2.0f;
             if (keyState[SDL_SCANCODE_UP]) {
-                paddle1_.position.y += speed * deltaTime;
+                paddle1.position.y += speed * deltaTime;
             }
             if (keyState[SDL_SCANCODE_DOWN]) {
-                paddle1_.position.y -= speed * deltaTime;
+                paddle1.position.y -= speed * deltaTime;
             }
-            clampPaddle(paddle1_);
+            clampPaddle(paddle1);
         }
 
         void updateFromGamepad(float deltaTime) {
-            if (gamepad_ == nullptr) {
+            if (gamepad == nullptr) {
                 return;
             }
 
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_BACK)) {
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_BACK)) {
                 exit();
                 return;
             }
 
             constexpr float paddleMoveSpeed = 2.0f;
 
-            const float leftY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFTY)));
-            paddle1_.position.y -= leftY * paddleMoveSpeed * deltaTime;
-            clampPaddle(paddle1_);
+            const float leftY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY)));
+            paddle1.position.y -= leftY * paddleMoveSpeed * deltaTime;
+            clampPaddle(paddle1);
 
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_DPAD_UP)) {
-                paddle1_.position.y += 2.0f * deltaTime;
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP)) {
+                paddle1.position.y += 2.0f * deltaTime;
             }
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
-                paddle1_.position.y -= 2.0f * deltaTime;
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
+                paddle1.position.y -= 2.0f * deltaTime;
             }
-            clampPaddle(paddle1_);
+            clampPaddle(paddle1);
 
-            const float rightX = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTX)));
-            const float rightY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHTY)));
-            gridRotation_ += rightX * rotationSpeed_ * deltaTime;
-            gridYRotation_ -= rightY * rotationSpeed_ * deltaTime;
+            const float rightX = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX)));
+            const float rightY = normalizeAxisWithDeadzone(static_cast<float>(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY)));
+            gridRotation += rightX * rotationSpeed * deltaTime;
+            gridYRotation -= rightY * rotationSpeed * deltaTime;
 
-            const float leftTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_LEFT_TRIGGER));
-            const float rightTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad_, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
-            if (leftTrigger > controllerDeadzone_) {
-                cameraZ_ += (leftTrigger / controllerMax_) * 3.0f * deltaTime;
+            const float leftTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER));
+            const float rightTrigger = static_cast<float>(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER));
+            if (leftTrigger > controllerDeadzone) {
+                cameraZ += (leftTrigger / controllerMax) * 3.0f * deltaTime;
             }
-            if (rightTrigger > controllerDeadzone_) {
-                cameraZ_ -= (rightTrigger / controllerMax_) * 3.0f * deltaTime;
-            }
-
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
-                cameraZ_ += 3.0f * deltaTime;
-            }
-            if (SDL_GetGamepadButton(gamepad_, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
-                cameraZ_ -= 3.0f * deltaTime;
+            if (rightTrigger > controllerDeadzone) {
+                cameraZ -= (rightTrigger / controllerMax) * 3.0f * deltaTime;
             }
 
-            cameraZ_ = std::clamp(cameraZ_, 1.0f, 20.0f);
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                cameraZ += 3.0f * deltaTime;
+            }
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+                cameraZ -= 3.0f * deltaTime;
+            }
+
+            cameraZ = std::clamp(cameraZ, 1.0f, 20.0f);
         }
 
         void updateAI(float deltaTime) {
             constexpr float paddleSpeed = 0.9f;
-            if (ball_.position.y > paddle2_.position.y + paddle2_.size.y / 4.0f) {
-                paddle2_.position.y += paddleSpeed * deltaTime;
+            if (ball.position.y > paddle2.position.y + paddle2.size.y / 4.0f) {
+                paddle2.position.y += paddleSpeed * deltaTime;
             }
-            if (ball_.position.y < paddle2_.position.y - paddle2_.size.y / 4.0f) {
-                paddle2_.position.y -= paddleSpeed * deltaTime;
+            if (ball.position.y < paddle2.position.y - paddle2.size.y / 4.0f) {
+                paddle2.position.y -= paddleSpeed * deltaTime;
             }
-            clampPaddle(paddle2_);
+            clampPaddle(paddle2);
         }
 
         void printHud(float deltaTime) {
-            fpsAccumulator_ += deltaTime;
-            ++fpsFrameCounter_;
-            if (fpsAccumulator_ >= 0.2f) {
-                fpsValue_ = static_cast<float>(fpsFrameCounter_) / fpsAccumulator_;
-                fpsAccumulator_ = 0.0f;
-                fpsFrameCounter_ = 0;
+            fpsAccumulator += deltaTime;
+            ++fpsFrameCounter;
+            if (fpsAccumulator >= 0.2f) {
+                fpsValue = static_cast<float>(fpsFrameCounter) / fpsAccumulator;
+                fpsAccumulator = 0.0f;
+                fpsFrameCounter = 0;
             }
 
             const SDL_Color white{255, 255, 255, 255};
             const SDL_Color yellow{255, 255, 0, 255};
 
             printText("Vulkan Pong", 50, 50, white);
-            printText(std::format("Player 1: {} : Player 2: {}", score1_, score2_), 50, 80, yellow);
+            printText(std::format("Player 1: {} : Player 2: {}", score1, score2), 50, 80, yellow);
 
             std::ostringstream fpsStream;
-            fpsStream << std::fixed << std::setprecision(1) << "FPS: " << fpsValue_;
-            const std::string polygonMode = wireframe_ ? "WIREFRAME" : "SOLID";
-            const std::string controllerStatus = (gamepad_ != nullptr) ? "Controller: Connected" : "Controller: None";
+            fpsStream << std::fixed << std::setprecision(1) << "FPS: " << fpsValue;
+            const std::string polygonMode = wireframe ? "WIREFRAME" : "SOLID";
+            const std::string controllerStatus = (gamepad != nullptr) ? "Controller: Connected" : "Controller: None";
 
             printText(fpsStream.str() + " | Mode: " + polygonMode, 50, 110, white);
             printText(controllerStatus, 50, 140, white);
         }
 
         void spawnBurst(const glm::vec3 &impactPos, const glm::vec3 &normal, const glm::vec4 &paddleColor) {
-            for (int i = 0; i < 35 && particles_.size() < static_cast<size_t>(maxParticles_); ++i) {
+            for (int i = 0; i < 35 && particles.size() < static_cast<size_t>(maxParticles); ++i) {
                 Particle p;
                 p.position = impactPos;
                 p.velocity = normal * static_cast<float>((std::rand() % 50) / 10.0f + 0.5f) +
@@ -709,26 +709,26 @@ namespace {
                                        static_cast<float>((std::rand() % 40) - 20) / 40.0f);
                 p.life = 0.6f;
                 p.color = paddleColor;
-                particles_.push_back(p);
+                particles.push_back(p);
             }
         }
 
         void updateParticles(float deltaTime) {
-            if (mappedParticleData_ == nullptr) {
-                activeParticleCount_ = 0;
+            if (mappedParticleData == nullptr) {
+                activeParticleCount = 0;
                 return;
             }
 
             const glm::vec3 gravity(0.0f, -2.0f, 0.0f);
-            activeParticleCount_ = 0;
-            auto *particleBufferData = static_cast<ParticleVertex *>(mappedParticleData_);
+            activeParticleCount = 0;
+            auto *particleBufferData = static_cast<ParticleVertex *>(mappedParticleData);
 
-            particles_.erase(
-                std::remove_if(particles_.begin(), particles_.end(), [](const Particle &p) { return p.life <= 0.0f; }),
-                particles_.end());
+            particles.erase(
+                std::remove_if(particles.begin(), particles.end(), [](const Particle &p) { return p.life <= 0.0f; }),
+                particles.end());
 
-            for (auto &p : particles_) {
-                if (p.life <= 0.0f || activeParticleCount_ >= static_cast<uint32_t>(maxParticles_)) {
+            for (auto &p : particles) {
+                if (p.life <= 0.0f || activeParticleCount >= static_cast<uint32_t>(maxParticles)) {
                     continue;
                 }
 
@@ -737,67 +737,67 @@ namespace {
                 p.life -= deltaTime * 1.5f;
                 p.color.a = p.life;
 
-                particleBufferData[activeParticleCount_].position = p.position;
-                particleBufferData[activeParticleCount_].color = p.color;
-                ++activeParticleCount_;
+                particleBufferData[activeParticleCount].position = p.position;
+                particleBufferData[activeParticleCount].color = p.color;
+                ++activeParticleCount;
             }
         }
 
         void createParticleBuffer() {
-            const VkDeviceSize bufferSize = sizeof(ParticleVertex) * maxParticles_;
+            const VkDeviceSize bufferSize = sizeof(ParticleVertex) * maxParticles;
             createBuffer(
                 bufferSize,
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                particleBuffer_,
-                particleBufferMemory_);
+                particleBuffer,
+                particleBufferMemory);
 
-            VK_CHECK_RESULT(vkMapMemory(device, particleBufferMemory_, 0, bufferSize, 0, &mappedParticleData_));
+            VK_CHECK_RESULT(vkMapMemory(device, particleBufferMemory, 0, bufferSize, 0, &mappedParticleData));
         }
 
         void cleanupParticleResources() {
             cleanupParticleSwapchainResources();
-            if (mappedParticleData_ != nullptr && particleBufferMemory_ != VK_NULL_HANDLE) {
-                vkUnmapMemory(device, particleBufferMemory_);
-                mappedParticleData_ = nullptr;
+            if (mappedParticleData != nullptr && particleBufferMemory != VK_NULL_HANDLE) {
+                vkUnmapMemory(device, particleBufferMemory);
+                mappedParticleData = nullptr;
             }
-            if (particleBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(device, particleBuffer_, nullptr);
-                particleBuffer_ = VK_NULL_HANDLE;
+            if (particleBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, particleBuffer, nullptr);
+                particleBuffer = VK_NULL_HANDLE;
             }
-            if (particleBufferMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(device, particleBufferMemory_, nullptr);
-                particleBufferMemory_ = VK_NULL_HANDLE;
+            if (particleBufferMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, particleBufferMemory, nullptr);
+                particleBufferMemory = VK_NULL_HANDLE;
             }
         }
 
         void destroyParticleUniformBuffers() {
-            for (size_t i = 0; i < particleUniformBuffers_.size(); ++i) {
-                if (particleUniformBufferMapped_[i] != nullptr && particleUniformBufferMemories_[i] != VK_NULL_HANDLE) {
-                    vkUnmapMemory(device, particleUniformBufferMemories_[i]);
-                    particleUniformBufferMapped_[i] = nullptr;
+            for (size_t i = 0; i < particleUniformBuffers.size(); ++i) {
+                if (particleUniformBufferMapped[i] != nullptr && particleUniformBufferMemories[i] != VK_NULL_HANDLE) {
+                    vkUnmapMemory(device, particleUniformBufferMemories[i]);
+                    particleUniformBufferMapped[i] = nullptr;
                 }
-                if (particleUniformBuffers_[i] != VK_NULL_HANDLE) {
-                    vkDestroyBuffer(device, particleUniformBuffers_[i], nullptr);
-                    particleUniformBuffers_[i] = VK_NULL_HANDLE;
+                if (particleUniformBuffers[i] != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(device, particleUniformBuffers[i], nullptr);
+                    particleUniformBuffers[i] = VK_NULL_HANDLE;
                 }
-                if (particleUniformBufferMemories_[i] != VK_NULL_HANDLE) {
-                    vkFreeMemory(device, particleUniformBufferMemories_[i], nullptr);
-                    particleUniformBufferMemories_[i] = VK_NULL_HANDLE;
+                if (particleUniformBufferMemories[i] != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, particleUniformBufferMemories[i], nullptr);
+                    particleUniformBufferMemories[i] = VK_NULL_HANDLE;
                 }
             }
-            particleUniformBuffers_.clear();
-            particleUniformBufferMemories_.clear();
-            particleUniformBufferMapped_.clear();
+            particleUniformBuffers.clear();
+            particleUniformBufferMemories.clear();
+            particleUniformBufferMapped.clear();
         }
 
         void cleanupParticleSwapchainResources() {
             cleanupParticlePipeline();
-            if (particleDescriptorPool_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, particleDescriptorPool_, nullptr);
-                particleDescriptorPool_ = VK_NULL_HANDLE;
+            if (particleDescriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(device, particleDescriptorPool, nullptr);
+                particleDescriptorPool = VK_NULL_HANDLE;
             }
-            particleDescriptorSets_.clear();
+            particleDescriptorSets.clear();
             destroyParticleUniformBuffers();
         }
 
@@ -805,18 +805,18 @@ namespace {
             const size_t imageCount = getSwapchainImageCount();
             const VkDeviceSize bufferSize = sizeof(PongUniformBufferObject);
 
-            particleUniformBuffers_.resize(imageCount, VK_NULL_HANDLE);
-            particleUniformBufferMemories_.resize(imageCount, VK_NULL_HANDLE);
-            particleUniformBufferMapped_.resize(imageCount, nullptr);
+            particleUniformBuffers.resize(imageCount, VK_NULL_HANDLE);
+            particleUniformBufferMemories.resize(imageCount, VK_NULL_HANDLE);
+            particleUniformBufferMapped.resize(imageCount, nullptr);
 
             for (size_t i = 0; i < imageCount; ++i) {
                 createBuffer(
                     bufferSize,
                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    particleUniformBuffers_[i],
-                    particleUniformBufferMemories_[i]);
-                VK_CHECK_RESULT(vkMapMemory(device, particleUniformBufferMemories_[i], 0, bufferSize, 0, &particleUniformBufferMapped_[i]));
+                    particleUniformBuffers[i],
+                    particleUniformBufferMemories[i]);
+                VK_CHECK_RESULT(vkMapMemory(device, particleUniformBufferMemories[i], 0, bufferSize, 0, &particleUniformBufferMapped[i]));
             }
         }
 
@@ -835,43 +835,43 @@ namespace {
             poolInfo.pPoolSizes = poolSizes.data();
             poolInfo.maxSets = imageCount;
 
-            VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &particleDescriptorPool_));
+            VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &particleDescriptorPool));
         }
 
         void createParticleDescriptorSets() {
             const size_t imageCount = getSwapchainImageCount();
-            std::vector<VkDescriptorSetLayout> layouts(imageCount, starDescriptorSetLayout_);
+            std::vector<VkDescriptorSetLayout> layouts(imageCount, starDescriptorSetLayout);
 
             VkDescriptorSetAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = particleDescriptorPool_;
+            allocInfo.descriptorPool = particleDescriptorPool;
             allocInfo.descriptorSetCount = static_cast<uint32_t>(imageCount);
             allocInfo.pSetLayouts = layouts.data();
 
-            particleDescriptorSets_.resize(imageCount, VK_NULL_HANDLE);
-            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, particleDescriptorSets_.data()));
+            particleDescriptorSets.resize(imageCount, VK_NULL_HANDLE);
+            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, particleDescriptorSets.data()));
 
             for (size_t i = 0; i < imageCount; ++i) {
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = starTextureView_;
-                imageInfo.sampler = starSampler_;
+                imageInfo.imageView = starTextureView;
+                imageInfo.sampler = starSampler;
 
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = particleUniformBuffers_[i];
+                bufferInfo.buffer = particleUniformBuffers[i];
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(PongUniformBufferObject);
 
                 std::array<VkWriteDescriptorSet, 2> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[0].dstSet = particleDescriptorSets_[i];
+                writes[0].dstSet = particleDescriptorSets[i];
                 writes[0].dstBinding = 0;
                 writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[0].descriptorCount = 1;
                 writes[0].pImageInfo = &imageInfo;
 
                 writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[1].dstSet = particleDescriptorSets_[i];
+                writes[1].dstSet = particleDescriptorSets[i];
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
@@ -886,7 +886,7 @@ namespace {
                                    const glm::mat4 &view,
                                    const glm::mat4 &proj,
                                    float timeSeconds) {
-            if (imageIndex >= particleUniformBufferMapped_.size() || particleUniformBufferMapped_[imageIndex] == nullptr) {
+            if (imageIndex >= particleUniformBufferMapped.size() || particleUniformBufferMapped[imageIndex] == nullptr) {
                 return;
             }
 
@@ -898,28 +898,28 @@ namespace {
             ubo.color = glm::vec4(1.0f);
 
             (void)extent;
-            std::memcpy(particleUniformBufferMapped_[imageIndex], &ubo, sizeof(ubo));
+            std::memcpy(particleUniformBufferMapped[imageIndex], &ubo, sizeof(ubo));
         }
 
         void cleanupParticlePipeline() {
-            if (particlePipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, particlePipeline_, nullptr);
-                particlePipeline_ = VK_NULL_HANDLE;
+            if (particlePipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, particlePipeline, nullptr);
+                particlePipeline = VK_NULL_HANDLE;
             }
-            if (particlePipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, particlePipelineLayout_, nullptr);
-                particlePipelineLayout_ = VK_NULL_HANDLE;
+            if (particlePipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, particlePipelineLayout, nullptr);
+                particlePipelineLayout = VK_NULL_HANDLE;
             }
         }
 
         void drawParticles(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &proj) {
-            if (particlePipeline_ == VK_NULL_HANDLE || activeParticleCount_ == 0 || imageIndex >= particleDescriptorSets_.size()) {
+            if (particlePipeline == VK_NULL_HANDLE || activeParticleCount == 0 || imageIndex >= particleDescriptorSets.size()) {
                 return;
             }
 
             updateParticleUniform(imageIndex, extent, view, proj, SDL_GetTicks() * 0.001f);
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipeline);
 
             VkViewport viewport{};
             viewport.x = 0.0f;
@@ -935,21 +935,21 @@ namespace {
             scissor.extent = extent;
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-            VkBuffer vertexBuffers[] = {particleBuffer_};
+            VkBuffer vertexBuffers[] = {particleBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
             vkCmdBindDescriptorSets(
                 cmd,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
-                particlePipelineLayout_,
+                particlePipelineLayout,
                 0,
                 1,
-                &particleDescriptorSets_[imageIndex],
+                &particleDescriptorSets[imageIndex],
                 0,
                 nullptr);
 
-            vkCmdDraw(cmd, activeParticleCount_, 1, 0, 0);
+            vkCmdDraw(cmd, activeParticleCount, 1, 0, 0);
         }
 
         float randomFloat(float minv, float maxv) {
@@ -995,20 +995,20 @@ namespace {
 
         float magnitudeToAlpha(float magnitude) const {
             const float alpha = (6.5f - magnitude) / 6.5f;
-            return glm::clamp(alpha - lightPollution_, 0.0f, 1.0f);
+            return glm::clamp(alpha - lightPollution, 0.0f, 1.0f);
         }
 
         void initStarfield(int numStarsParam) {
-            if (starfieldInitialized_) {
+            if (starfieldInitialized) {
                 return;
             }
 
-            numStars_ = numStarsParam;
-            stars_.resize(static_cast<size_t>(numStars_));
+            numStars = numStarsParam;
+            stars.resize(static_cast<size_t>(numStars));
 
             constexpr float pi = 3.14159265358979323846f;
-            for (int i = 0; i < numStars_; ++i) {
-                auto &star = stars_[static_cast<size_t>(i)];
+            for (int i = 0; i < numStars; ++i) {
+                auto &star = stars[static_cast<size_t>(i)];
 
                 const float theta = randomFloat(0.0f, 2.0f * pi);
                 const float phi = std::acos(randomFloat(-1.0f, 1.0f));
@@ -1051,68 +1051,68 @@ namespace {
             createStarVertexBuffer();
             createStarSwapchainResources();
 
-            lastStarUpdateTime_ = SDL_GetTicks();
-            starfieldInitialized_ = true;
+            lastStarUpdateTime = SDL_GetTicks();
+            starfieldInitialized = true;
         }
 
         void cleanupStarResources() {
-            if (starVertexBufferMapped_ != nullptr && starVertexBufferMemory_ != VK_NULL_HANDLE) {
-                vkUnmapMemory(device, starVertexBufferMemory_);
-                starVertexBufferMapped_ = nullptr;
+            if (starVertexBufferMapped != nullptr && starVertexBufferMemory != VK_NULL_HANDLE) {
+                vkUnmapMemory(device, starVertexBufferMemory);
+                starVertexBufferMapped = nullptr;
             }
-            if (starVertexBuffer_ != VK_NULL_HANDLE) {
-                vkDestroyBuffer(device, starVertexBuffer_, nullptr);
-                starVertexBuffer_ = VK_NULL_HANDLE;
+            if (starVertexBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, starVertexBuffer, nullptr);
+                starVertexBuffer = VK_NULL_HANDLE;
             }
-            if (starVertexBufferMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(device, starVertexBufferMemory_, nullptr);
-                starVertexBufferMemory_ = VK_NULL_HANDLE;
+            if (starVertexBufferMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, starVertexBufferMemory, nullptr);
+                starVertexBufferMemory = VK_NULL_HANDLE;
             }
 
-            if (starSampler_ != VK_NULL_HANDLE) {
-                vkDestroySampler(device, starSampler_, nullptr);
-                starSampler_ = VK_NULL_HANDLE;
+            if (starSampler != VK_NULL_HANDLE) {
+                vkDestroySampler(device, starSampler, nullptr);
+                starSampler = VK_NULL_HANDLE;
             }
-            if (starTextureView_ != VK_NULL_HANDLE) {
-                vkDestroyImageView(device, starTextureView_, nullptr);
-                starTextureView_ = VK_NULL_HANDLE;
+            if (starTextureView != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, starTextureView, nullptr);
+                starTextureView = VK_NULL_HANDLE;
             }
-            if (starTexture_ != VK_NULL_HANDLE) {
-                vkDestroyImage(device, starTexture_, nullptr);
-                starTexture_ = VK_NULL_HANDLE;
+            if (starTexture != VK_NULL_HANDLE) {
+                vkDestroyImage(device, starTexture, nullptr);
+                starTexture = VK_NULL_HANDLE;
             }
-            if (starTextureMemory_ != VK_NULL_HANDLE) {
-                vkFreeMemory(device, starTextureMemory_, nullptr);
-                starTextureMemory_ = VK_NULL_HANDLE;
+            if (starTextureMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, starTextureMemory, nullptr);
+                starTextureMemory = VK_NULL_HANDLE;
             }
         }
 
         void cleanupStarSwapchainResources() {
             cleanupParticleSwapchainResources();
 
-            if (starPipeline_ != VK_NULL_HANDLE) {
-                vkDestroyPipeline(device, starPipeline_, nullptr);
-                starPipeline_ = VK_NULL_HANDLE;
+            if (starPipeline != VK_NULL_HANDLE) {
+                vkDestroyPipeline(device, starPipeline, nullptr);
+                starPipeline = VK_NULL_HANDLE;
             }
-            if (starPipelineLayout_ != VK_NULL_HANDLE) {
-                vkDestroyPipelineLayout(device, starPipelineLayout_, nullptr);
-                starPipelineLayout_ = VK_NULL_HANDLE;
+            if (starPipelineLayout != VK_NULL_HANDLE) {
+                vkDestroyPipelineLayout(device, starPipelineLayout, nullptr);
+                starPipelineLayout = VK_NULL_HANDLE;
             }
-            if (starDescriptorPool_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, starDescriptorPool_, nullptr);
-                starDescriptorPool_ = VK_NULL_HANDLE;
+            if (starDescriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(device, starDescriptorPool, nullptr);
+                starDescriptorPool = VK_NULL_HANDLE;
             }
-            if (starDescriptorSetLayout_ != VK_NULL_HANDLE) {
-                vkDestroyDescriptorSetLayout(device, starDescriptorSetLayout_, nullptr);
-                starDescriptorSetLayout_ = VK_NULL_HANDLE;
+            if (starDescriptorSetLayout != VK_NULL_HANDLE) {
+                vkDestroyDescriptorSetLayout(device, starDescriptorSetLayout, nullptr);
+                starDescriptorSetLayout = VK_NULL_HANDLE;
             }
 
             destroyStarUniformBuffers();
-            starDescriptorSets_.clear();
+            starDescriptorSets.clear();
         }
 
         void createStarSwapchainResources() {
-            if (!starfieldInitialized_ && stars_.empty()) {
+            if (!starfieldInitialized && stars.empty()) {
                 return;
             }
             createStarDescriptorSetLayout();
@@ -1127,7 +1127,7 @@ namespace {
         }
 
         void createStarTexture() {
-            SDL_Surface *starImg = mxvk::LoadPNG((dataRoot_ + "/star.png").c_str());
+            SDL_Surface *starImg = mxvk::LoadPNG((dataRoot + "/star.png").c_str());
             if (starImg == nullptr) {
                 throw mxvk::Exception("Failed to load star.png texture");
             }
@@ -1155,17 +1155,17 @@ namespace {
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                starTexture_,
-                starTextureMemory_);
+                starTexture,
+                starTextureMemory);
 
-            transitionImageLayout(starTexture_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-            copyBufferToImage(stagingBuffer, starTexture_, static_cast<uint32_t>(starImg->w), static_cast<uint32_t>(starImg->h));
-            transitionImageLayout(starTexture_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transitionImageLayout(starTexture, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            copyBufferToImage(stagingBuffer, starTexture, static_cast<uint32_t>(starImg->w), static_cast<uint32_t>(starImg->h));
+            transitionImageLayout(starTexture, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             vkDestroyBuffer(device, stagingBuffer, nullptr);
             vkFreeMemory(device, stagingBufferMemory, nullptr);
 
-            starTextureView_ = createImageView(starTexture_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+            starTextureView = createImageView(starTexture, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
             VkSamplerCreateInfo samplerInfo{};
             samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1180,21 +1180,21 @@ namespace {
             samplerInfo.compareEnable = VK_FALSE;
             samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-            VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &starSampler_));
+            VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &starSampler));
 
             SDL_DestroySurface(starImg);
         }
 
         void createStarVertexBuffer() {
-            const VkDeviceSize bufferSize = sizeof(StarVertex) * static_cast<VkDeviceSize>(numStars_);
+            const VkDeviceSize bufferSize = sizeof(StarVertex) * static_cast<VkDeviceSize>(numStars);
             createBuffer(
                 bufferSize,
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                starVertexBuffer_,
-                starVertexBufferMemory_);
+                starVertexBuffer,
+                starVertexBufferMemory);
 
-            VK_CHECK_RESULT(vkMapMemory(device, starVertexBufferMemory_, 0, bufferSize, 0, &starVertexBufferMapped_));
+            VK_CHECK_RESULT(vkMapMemory(device, starVertexBufferMemory, 0, bufferSize, 0, &starVertexBufferMapped));
         }
 
         void createStarDescriptorSetLayout() {
@@ -1215,46 +1215,46 @@ namespace {
             layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
             layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
             layoutInfo.pBindings = bindings.data();
-            VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &starDescriptorSetLayout_));
+            VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &starDescriptorSetLayout));
         }
 
         void createStarUniformBuffers() {
             const size_t imageCount = getSwapchainImageCount();
             const VkDeviceSize bufferSize = sizeof(PongUniformBufferObject);
 
-            starUniformBuffers_.resize(imageCount, VK_NULL_HANDLE);
-            starUniformBufferMemories_.resize(imageCount, VK_NULL_HANDLE);
-            starUniformBufferMapped_.resize(imageCount, nullptr);
+            starUniformBuffers.resize(imageCount, VK_NULL_HANDLE);
+            starUniformBufferMemories.resize(imageCount, VK_NULL_HANDLE);
+            starUniformBufferMapped.resize(imageCount, nullptr);
 
             for (size_t i = 0; i < imageCount; ++i) {
                 createBuffer(
                     bufferSize,
                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    starUniformBuffers_[i],
-                    starUniformBufferMemories_[i]);
-                VK_CHECK_RESULT(vkMapMemory(device, starUniformBufferMemories_[i], 0, bufferSize, 0, &starUniformBufferMapped_[i]));
+                    starUniformBuffers[i],
+                    starUniformBufferMemories[i]);
+                VK_CHECK_RESULT(vkMapMemory(device, starUniformBufferMemories[i], 0, bufferSize, 0, &starUniformBufferMapped[i]));
             }
         }
 
         void destroyStarUniformBuffers() {
-            for (size_t i = 0; i < starUniformBuffers_.size(); ++i) {
-                if (starUniformBufferMapped_[i] != nullptr && starUniformBufferMemories_[i] != VK_NULL_HANDLE) {
-                    vkUnmapMemory(device, starUniformBufferMemories_[i]);
-                    starUniformBufferMapped_[i] = nullptr;
+            for (size_t i = 0; i < starUniformBuffers.size(); ++i) {
+                if (starUniformBufferMapped[i] != nullptr && starUniformBufferMemories[i] != VK_NULL_HANDLE) {
+                    vkUnmapMemory(device, starUniformBufferMemories[i]);
+                    starUniformBufferMapped[i] = nullptr;
                 }
-                if (starUniformBuffers_[i] != VK_NULL_HANDLE) {
-                    vkDestroyBuffer(device, starUniformBuffers_[i], nullptr);
-                    starUniformBuffers_[i] = VK_NULL_HANDLE;
+                if (starUniformBuffers[i] != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(device, starUniformBuffers[i], nullptr);
+                    starUniformBuffers[i] = VK_NULL_HANDLE;
                 }
-                if (starUniformBufferMemories_[i] != VK_NULL_HANDLE) {
-                    vkFreeMemory(device, starUniformBufferMemories_[i], nullptr);
-                    starUniformBufferMemories_[i] = VK_NULL_HANDLE;
+                if (starUniformBufferMemories[i] != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, starUniformBufferMemories[i], nullptr);
+                    starUniformBufferMemories[i] = VK_NULL_HANDLE;
                 }
             }
-            starUniformBuffers_.clear();
-            starUniformBufferMemories_.clear();
-            starUniformBufferMapped_.clear();
+            starUniformBuffers.clear();
+            starUniformBufferMemories.clear();
+            starUniformBufferMapped.clear();
         }
 
         void createStarDescriptorPool() {
@@ -1272,43 +1272,43 @@ namespace {
             poolInfo.pPoolSizes = poolSizes.data();
             poolInfo.maxSets = imageCount;
 
-            VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &starDescriptorPool_));
+            VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &starDescriptorPool));
         }
 
         void createStarDescriptorSets() {
             const size_t imageCount = getSwapchainImageCount();
-            std::vector<VkDescriptorSetLayout> layouts(imageCount, starDescriptorSetLayout_);
+            std::vector<VkDescriptorSetLayout> layouts(imageCount, starDescriptorSetLayout);
 
             VkDescriptorSetAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-            allocInfo.descriptorPool = starDescriptorPool_;
+            allocInfo.descriptorPool = starDescriptorPool;
             allocInfo.descriptorSetCount = static_cast<uint32_t>(imageCount);
             allocInfo.pSetLayouts = layouts.data();
 
-            starDescriptorSets_.resize(imageCount, VK_NULL_HANDLE);
-            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, starDescriptorSets_.data()));
+            starDescriptorSets.resize(imageCount, VK_NULL_HANDLE);
+            VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, starDescriptorSets.data()));
 
             for (size_t i = 0; i < imageCount; ++i) {
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = starTextureView_;
-                imageInfo.sampler = starSampler_;
+                imageInfo.imageView = starTextureView;
+                imageInfo.sampler = starSampler;
 
                 VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = starUniformBuffers_[i];
+                bufferInfo.buffer = starUniformBuffers[i];
                 bufferInfo.offset = 0;
                 bufferInfo.range = sizeof(PongUniformBufferObject);
 
                 std::array<VkWriteDescriptorSet, 2> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[0].dstSet = starDescriptorSets_[i];
+                writes[0].dstSet = starDescriptorSets[i];
                 writes[0].dstBinding = 0;
                 writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 writes[0].descriptorCount = 1;
                 writes[0].pImageInfo = &imageInfo;
 
                 writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                writes[1].dstSet = starDescriptorSets_[i];
+                writes[1].dstSet = starDescriptorSets[i];
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
@@ -1319,8 +1319,8 @@ namespace {
         }
 
         void createStarPipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(dataRoot_ + "/star_vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(dataRoot_ + "/star_frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(dataRoot + "/star_vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(dataRoot + "/star_frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;
@@ -1432,10 +1432,10 @@ namespace {
                 VkPipelineLayoutCreateInfo layoutInfo{};
                 layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
                 layoutInfo.setLayoutCount = 1;
-                layoutInfo.pSetLayouts = &starDescriptorSetLayout_;
+                layoutInfo.pSetLayouts = &starDescriptorSetLayout;
                 layoutInfo.pushConstantRangeCount = 0;
 
-                VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &starPipelineLayout_));
+                VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &starPipelineLayout));
 
                 VkFormat colorFormat = getSwapchainFormat();
                 VkFormat depthFormat = getDepthFormat();
@@ -1460,13 +1460,13 @@ namespace {
                 pipelineInfo.pDepthStencilState = &depthStencil;
                 pipelineInfo.pColorBlendState = &colorBlending;
                 pipelineInfo.pDynamicState = &dynamicInfo;
-                pipelineInfo.layout = starPipelineLayout_;
+                pipelineInfo.layout = starPipelineLayout;
                 pipelineInfo.renderPass = VK_NULL_HANDLE;
                 pipelineInfo.subpass = 0;
                 pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
                 pipelineInfo.basePipelineIndex = -1;
 
-                VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &starPipeline_));
+                VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &starPipeline));
             } catch (...) {
                 if (fragShaderModule != VK_NULL_HANDLE) {
                     vkDestroyShaderModule(device, fragShaderModule, nullptr);
@@ -1482,7 +1482,7 @@ namespace {
         }
 
         void updateStarfield(float deltaTime) {
-            if (!starfieldInitialized_ || starVertexBufferMapped_ == nullptr) {
+            if (!starfieldInitialized || starVertexBufferMapped == nullptr) {
                 return;
             }
             if (deltaTime > 0.1f) {
@@ -1490,10 +1490,10 @@ namespace {
             }
 
             const float time = SDL_GetTicks() * 0.001f;
-            auto *vertices = static_cast<StarVertex *>(starVertexBufferMapped_);
+            auto *vertices = static_cast<StarVertex *>(starVertexBufferMapped);
 
-            for (int i = 0; i < numStars_; ++i) {
-                auto &star = stars_[static_cast<size_t>(i)];
+            for (int i = 0; i < numStars; ++i) {
+                auto &star = stars[static_cast<size_t>(i)];
 
                 star.x += star.vx * deltaTime;
                 star.y += star.vy * deltaTime;
@@ -1504,8 +1504,8 @@ namespace {
                 vertices[i].pos[2] = star.z;
 
                 float twinkleFactor = 1.0f;
-                if (atmosphericTwinkle_ > 0.0f) {
-                    twinkleFactor = 0.7f + 0.3f * std::sin(time * star.twinkle) * atmosphericTwinkle_;
+                if (atmosphericTwinkle > 0.0f) {
+                    twinkleFactor = 0.7f + 0.3f * std::sin(time * star.twinkle) * atmosphericTwinkle;
                 }
 
                 float size = star.size * twinkleFactor;
@@ -1529,7 +1529,7 @@ namespace {
                                const glm::mat4 &view,
                                const glm::mat4 &proj,
                                float timeSeconds) {
-            if (imageIndex >= starUniformBufferMapped_.size() || starUniformBufferMapped_[imageIndex] == nullptr) {
+            if (imageIndex >= starUniformBufferMapped.size() || starUniformBufferMapped[imageIndex] == nullptr) {
                 return;
             }
 
@@ -1541,17 +1541,17 @@ namespace {
             ubo.color = glm::vec4(1.0f);
 
             (void)extent;
-            std::memcpy(starUniformBufferMapped_[imageIndex], &ubo, sizeof(ubo));
+            std::memcpy(starUniformBufferMapped[imageIndex], &ubo, sizeof(ubo));
         }
 
         void drawStarfield(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
-            if (!starfieldInitialized_ || starPipeline_ == VK_NULL_HANDLE || imageIndex >= starDescriptorSets_.size()) {
+            if (!starfieldInitialized || starPipeline == VK_NULL_HANDLE || imageIndex >= starDescriptorSets.size()) {
                 return;
             }
 
             const Uint32 currentTime = SDL_GetTicks();
-            const float deltaTime = static_cast<float>(currentTime - lastStarUpdateTime_) / 1000.0f;
-            lastStarUpdateTime_ = currentTime;
+            const float deltaTime = static_cast<float>(currentTime - lastStarUpdateTime) / 1000.0f;
+            lastStarUpdateTime = currentTime;
             updateStarfield(deltaTime);
 
             const glm::mat4 view = buildViewMatrix();
@@ -1564,7 +1564,7 @@ namespace {
 
             updateStarUniform(imageIndex, extent, view, proj, SDL_GetTicks() * 0.001f);
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, starPipeline_);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, starPipeline);
 
             VkViewport viewport{};
             viewport.x = 0.0f;
@@ -1580,26 +1580,26 @@ namespace {
             scissor.extent = extent;
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-            VkBuffer vertexBuffers[] = {starVertexBuffer_};
+            VkBuffer vertexBuffers[] = {starVertexBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
             vkCmdBindDescriptorSets(
                 cmd,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
-                starPipelineLayout_,
+                starPipelineLayout,
                 0,
                 1,
-                &starDescriptorSets_[imageIndex],
+                &starDescriptorSets[imageIndex],
                 0,
                 nullptr);
 
-            vkCmdDraw(cmd, static_cast<uint32_t>(numStars_), 1, 0, 0);
+            vkCmdDraw(cmd, static_cast<uint32_t>(numStars), 1, 0, 0);
         }
 
         void createParticlePipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(dataRoot_ + "/particle_vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(dataRoot_ + "/particle_frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(dataRoot + "/particle_vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(dataRoot + "/particle_frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;
@@ -1706,10 +1706,10 @@ namespace {
                 VkPipelineLayoutCreateInfo layoutInfo{};
                 layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
                 layoutInfo.setLayoutCount = 1;
-                layoutInfo.pSetLayouts = &starDescriptorSetLayout_;
+                layoutInfo.pSetLayouts = &starDescriptorSetLayout;
                 layoutInfo.pushConstantRangeCount = 0;
 
-                VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &particlePipelineLayout_));
+                VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &particlePipelineLayout));
 
                 VkFormat colorFormat = getSwapchainFormat();
                 VkFormat depthFormat = getDepthFormat();
@@ -1734,13 +1734,13 @@ namespace {
                 pipelineInfo.pDepthStencilState = &depthStencil;
                 pipelineInfo.pColorBlendState = &colorBlending;
                 pipelineInfo.pDynamicState = &dynamicInfo;
-                pipelineInfo.layout = particlePipelineLayout_;
+                pipelineInfo.layout = particlePipelineLayout;
                 pipelineInfo.renderPass = VK_NULL_HANDLE;
                 pipelineInfo.subpass = 0;
                 pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
                 pipelineInfo.basePipelineIndex = -1;
 
-                VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &particlePipeline_));
+                VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &particlePipeline));
             } catch (...) {
                 if (fragShaderModule != VK_NULL_HANDLE) {
                     vkDestroyShaderModule(device, fragShaderModule, nullptr);
@@ -1756,28 +1756,28 @@ namespace {
         }
 
         bool openGamepad(SDL_JoystickID id) {
-            if (gamepad_ != nullptr && gamepadId_ == id) {
+            if (gamepad != nullptr && gamepadId == id) {
                 return true;
             }
             closeGamepad();
-            gamepad_ = SDL_OpenGamepad(id);
-            if (gamepad_ == nullptr) {
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
                 return false;
             }
-            gamepadId_ = id;
+            gamepadId = id;
             return true;
         }
 
         void closeGamepad() {
-            if (gamepad_ != nullptr) {
-                SDL_CloseGamepad(gamepad_);
-                gamepad_ = nullptr;
-                gamepadId_ = 0;
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepadId = 0;
             }
         }
 
         void tryOpenFirstGamepad() {
-            if (gamepad_ != nullptr) {
+            if (gamepad != nullptr) {
                 return;
             }
             int count = 0;

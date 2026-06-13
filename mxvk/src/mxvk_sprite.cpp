@@ -438,8 +438,8 @@ namespace mxvk {
         }
         ensureInstanceBuffer(maxInstances);
         createQuadBuffer();
-        instanceVertPath_ = instanceVertShaderPath;
-        instanceFragPath_ = instanceFragShaderPath;
+        instanceVertPath = instanceVertShaderPath;
+        instanceFragPath = instanceFragShaderPath;
         createInstancedPipeline(instanceVertShaderPath, instanceFragShaderPath);
         instancingEnabled = true;
         std::cout << std::format("mxvk: Instancing enabled (max {} instances)\n", maxInstances);
@@ -775,9 +775,9 @@ namespace mxvk {
     }
 
     void VK_Sprite::rebuildInstancedPipeline() {
-        if (!instancingEnabled || instanceVertPath_.empty() || instanceFragPath_.empty())
+        if (!instancingEnabled || instanceVertPath.empty() || instanceFragPath.empty())
             return;
-        createInstancedPipeline(instanceVertPath_, instanceFragPath_);
+        createInstancedPipeline(instanceVertPath, instanceFragPath);
     }
 
     void VK_Sprite::createQuadBuffer() {

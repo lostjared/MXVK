@@ -35,8 +35,8 @@ namespace mxvk {
      * modified in memory, and saved back to disk.
      */
     class VK_Config {
-        std::unordered_map<std::string, std::unordered_map<std::string, VK_ConfigItem>> values_;
-        std::string file_name_;
+        std::unordered_map<std::string, std::unordered_map<std::string, VK_ConfigItem>> values;
+        std::string file_name;
 
       public:
         /** @brief Default constructor — no file loaded. */

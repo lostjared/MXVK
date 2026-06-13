@@ -22,14 +22,14 @@ namespace example {
             const std::string sprite_vert_path = base_path + "/data/sprite.vert.spv";
             const std::string shader_path = base_path + "/data/background_pulse.frag.spv";
 
-            background_ = createSprite(base_path + "/data/background.png", sprite_vert_path, shader_path);
-            console_.attach(*this, base_path + "/data/font.ttf", 20);
-            console_.setSpriteYOriginTopLeft(true);
-            console_.setPrompt("mxvk> ");
-            console_.printLine("Press F3 to open/close the console.");
-            console_.printLine("Type 'help' for built-in commands.");
+            background = createSprite(base_path + "/data/background.png", sprite_vert_path, shader_path);
+            console.attach(*this, base_path + "/data/font.ttf", 20);
+            console.setSpriteYOriginTopLeft(true);
+            console.setPrompt("mxvk> ");
+            console.printLine("Press F3 to open/close the console.");
+            console.printLine("Type 'help' for built-in commands.");
 
-            console_.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
+            console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
                 if (args.empty()) {
                     return true;
                 }
@@ -60,39 +60,39 @@ namespace example {
         }
 
         void event(SDL_Event &e) override {
-            console_.handleEvent(e);
+            console.handleEvent(e);
 
-            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !console_.isVisible()) {
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE && !console.isVisible()) {
                 exit();
             }
         }
 
         void proc() override {
-            if (background_ != nullptr) {
+            if (background != nullptr) {
                 const VkExtent2D extent = getSwapchainExtent();
                 const int target_w = static_cast<int>(extent.width);
                 const int target_h = static_cast<int>(extent.height);
                 if (target_w > 0 && target_h > 0) {
-                    const float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_).count();
-                    background_->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
-                    background_->drawSpriteRect(0, 0, target_w, target_h);
+                    const float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
+                    background->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
+                    background->drawSpriteRect(0, 0, target_w, target_h);
                 }
             }
 
-            if (!console_.isVisible()) {
+            if (!console.isVisible()) {
                 printText("MXVK Console Demo", 14, 12, SDL_Color{255, 255, 255, 255});
                 printText("Press F3 to toggle console. Press ESC to quit when console is hidden.",
                           14,
                           38,
                           SDL_Color{180, 180, 220, 255});
             }
-            console_.draw();
+            console.draw();
         }
 
       private:
-        std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
-        mxvk::VK_Sprite *background_ = nullptr;
-        mxvk::VK_Console console_;
+        std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+        mxvk::VK_Sprite *background = nullptr;
+        mxvk::VK_Console console;
     };
 } // namespace example
 

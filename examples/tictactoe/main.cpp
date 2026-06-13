@@ -21,14 +21,14 @@ namespace example {
       public:
         TicTacToeWindow(const std::string &assetPath, int width, int height, bool fullscreen)
             : mxvk::VK_Window("-[ MXVK Tic-Tac-Toe ]-", width, height, fullscreen, MXVK_VALIDATION),
-              rng_(std::random_device{}()) {
-            assetRoot_ = assetPath.empty() ? std::string(tictactoe_ASSET_DIR) : assetPath;
-            const std::string fontPath = assetPath.empty() ? std::string(tictactoe_FONT_PATH) : assetRoot_ + "/data/font.ttf";
+              rng(std::random_device{}()) {
+            assetRoot = assetPath.empty() ? std::string(tictactoe_ASSET_DIR) : assetPath;
+            const std::string fontPath = assetPath.empty() ? std::string(tictactoe_FONT_PATH) : assetRoot + "/data/font.ttf";
             setFont(fontPath, 20);
-            titleFont_.reset(fontPath, 30);
-            uiFont_.reset(fontPath, 18);
+            titleFont.reset(fontPath, 30);
+            uiFont.reset(fontPath, 18);
             setClearColor(0.03f, 0.04f, 0.07f, 1.0f);
-            background_ = createSprite(assetRoot_ + "/data/bg.png");
+            background = createSprite(assetRoot + "/data/bg.png");
             makePixelSprite();
             resetGame();
         }
@@ -64,28 +64,28 @@ namespace example {
             Draw
         };
 
-        static constexpr int gridSize_ = 360;
-        static constexpr int cellSize_ = gridSize_ / 3;
-        static constexpr int lineThickness_ = 6;
-        static constexpr float pi_ = 3.14159265358979323846f;
+        static constexpr int gridSize = 360;
+        static constexpr int cellSize = gridSize / 3;
+        static constexpr int lineThickness = 6;
+        static constexpr float pi = 3.14159265358979323846f;
 
-        std::array<char, 9> board_{};
-        std::string assetRoot_ = ".";
-        mxvk::Font titleFont_{};
-        mxvk::Font uiFont_{};
-        mxvk::VK_Sprite *background_ = nullptr;
-        mxvk::VK_Sprite *boardPixel_ = nullptr;
-        mxvk::VK_Sprite *xPixel_ = nullptr;
-        mxvk::VK_Sprite *oPixel_ = nullptr;
-        std::mt19937 rng_;
-        Outcome outcome_ = Outcome::Running;
-        int boardX_ = 0;
-        int boardY_ = 0;
+        std::array<char, 9> board{};
+        std::string assetRoot = ".";
+        mxvk::Font titleFont{};
+        mxvk::Font uiFont{};
+        mxvk::VK_Sprite *background = nullptr;
+        mxvk::VK_Sprite *boardPixel = nullptr;
+        mxvk::VK_Sprite *xPixel = nullptr;
+        mxvk::VK_Sprite *oPixel = nullptr;
+        std::mt19937 rng;
+        Outcome outcome = Outcome::Running;
+        int boardX = 0;
+        int boardY = 0;
 
         void makePixelSprite() {
-            boardPixel_ = makeSolidPixel(235, 240, 255, 255);
-            xPixel_ = makeSolidPixel(95, 205, 255, 255);
-            oPixel_ = makeSolidPixel(255, 140, 140, 255);
+            boardPixel = makeSolidPixel(235, 240, 255, 255);
+            xPixel = makeSolidPixel(95, 205, 255, 255);
+            oPixel = makeSolidPixel(255, 140, 140, 255);
         }
 
         mxvk::VK_Sprite *makeSolidPixel(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) {
@@ -96,41 +96,41 @@ namespace example {
         }
 
         void resetGame() {
-            board_.fill(' ');
-            outcome_ = Outcome::Running;
+            board.fill(' ');
+            outcome = Outcome::Running;
         }
 
         void updateBoardLayout() {
             const int windowWidth = static_cast<int>(swapchain_extent.width);
             const int windowHeight = static_cast<int>(swapchain_extent.height);
-            boardX_ = std::max(24, (windowWidth - gridSize_) / 2);
-            boardY_ = std::max(100, (windowHeight - gridSize_) / 2 + 20);
+            boardX = std::max(24, (windowWidth - gridSize) / 2);
+            boardY = std::max(100, (windowHeight - gridSize) / 2 + 20);
         }
 
         void handleClick(float windowMouseX, float windowMouseY) {
-            if (outcome_ != Outcome::Running) {
+            if (outcome != Outcome::Running) {
                 resetGame();
                 return;
             }
 
             updateBoardLayout();
             const auto [mouseX, mouseY] = mouseToRenderCoordinates(windowMouseX, windowMouseY);
-            const int localX = mouseX - boardX_;
-            const int localY = mouseY - boardY_;
-            if (localX < 0 || localY < 0 || localX >= gridSize_ || localY >= gridSize_) {
+            const int localX = mouseX - boardX;
+            const int localY = mouseY - boardY;
+            if (localX < 0 || localY < 0 || localX >= gridSize || localY >= gridSize) {
                 return;
             }
 
-            const int col = localX / cellSize_;
-            const int row = localY / cellSize_;
+            const int col = localX / cellSize;
+            const int row = localY / cellSize;
             const int index = row * 3 + col;
-            if (board_[static_cast<std::size_t>(index)] != ' ') {
+            if (board[static_cast<std::size_t>(index)] != ' ') {
                 return;
             }
 
-            board_[static_cast<std::size_t>(index)] = 'X';
+            board[static_cast<std::size_t>(index)] = 'X';
             updateOutcome();
-            if (outcome_ == Outcome::Running) {
+            if (outcome == Outcome::Running) {
                 makeComputerMove();
                 updateOutcome();
             }
@@ -169,35 +169,35 @@ namespace example {
             if (playImmediateMove('X')) {
                 return;
             }
-            if (board_[4] == ' ') {
-                board_[4] = 'O';
+            if (board[4] == ' ') {
+                board[4] = 'O';
                 return;
             }
 
             std::vector<int> openCells;
-            for (int i = 0; i < static_cast<int>(board_.size()); ++i) {
-                if (board_[static_cast<std::size_t>(i)] == ' ') {
+            for (int i = 0; i < static_cast<int>(board.size()); ++i) {
+                if (board[static_cast<std::size_t>(i)] == ' ') {
                     openCells.push_back(i);
                 }
             }
 
             if (!openCells.empty()) {
-                std::shuffle(openCells.begin(), openCells.end(), rng_);
-                board_[static_cast<std::size_t>(openCells.front())] = 'O';
+                std::shuffle(openCells.begin(), openCells.end(), rng);
+                board[static_cast<std::size_t>(openCells.front())] = 'O';
             }
         }
 
         bool playImmediateMove(char side) {
-            for (int i = 0; i < static_cast<int>(board_.size()); ++i) {
-                if (board_[static_cast<std::size_t>(i)] != ' ') {
+            for (int i = 0; i < static_cast<int>(board.size()); ++i) {
+                if (board[static_cast<std::size_t>(i)] != ' ') {
                     continue;
                 }
 
-                board_[static_cast<std::size_t>(i)] = side;
+                board[static_cast<std::size_t>(i)] = side;
                 const bool completesLine = winner() == side;
-                board_[static_cast<std::size_t>(i)] = ' ';
+                board[static_cast<std::size_t>(i)] = ' ';
                 if (completesLine) {
-                    board_[static_cast<std::size_t>(i)] = 'O';
+                    board[static_cast<std::size_t>(i)] = 'O';
                     return true;
                 }
             }
@@ -207,11 +207,11 @@ namespace example {
         void updateOutcome() {
             const char winningSide = winner();
             if (winningSide == 'X') {
-                outcome_ = Outcome::UserWon;
+                outcome = Outcome::UserWon;
             } else if (winningSide == 'O') {
-                outcome_ = Outcome::ComputerWon;
-            } else if (std::ranges::none_of(board_, [](char c) { return c == ' '; })) {
-                outcome_ = Outcome::Draw;
+                outcome = Outcome::ComputerWon;
+            } else if (std::ranges::none_of(board, [](char c) { return c == ' '; })) {
+                outcome = Outcome::Draw;
             }
         }
 
@@ -228,10 +228,10 @@ namespace example {
             }};
 
             for (const auto &line : lines) {
-                const char first = board_[static_cast<std::size_t>(line[0])];
+                const char first = board[static_cast<std::size_t>(line[0])];
                 if (first != ' ' &&
-                    first == board_[static_cast<std::size_t>(line[1])] &&
-                    first == board_[static_cast<std::size_t>(line[2])]) {
+                    first == board[static_cast<std::size_t>(line[1])] &&
+                    first == board[static_cast<std::size_t>(line[2])]) {
                     return first;
                 }
             }
@@ -239,48 +239,48 @@ namespace example {
         }
 
         void drawBoard() {
-            if (boardPixel_ == nullptr) {
+            if (boardPixel == nullptr) {
                 return;
             }
 
-            const int boardEnd = boardX_ + gridSize_;
+            const int boardEnd = boardX + gridSize;
             for (int i = 1; i <= 2; ++i) {
-                const int pos = boardX_ + i * cellSize_ - lineThickness_ / 2;
-                boardPixel_->drawSpriteRect(pos, boardY_, lineThickness_, gridSize_);
-                boardPixel_->drawSpriteRect(boardX_, boardY_ + i * cellSize_ - lineThickness_ / 2, gridSize_, lineThickness_);
+                const int pos = boardX + i * cellSize - lineThickness / 2;
+                boardPixel->drawSpriteRect(pos, boardY, lineThickness, gridSize);
+                boardPixel->drawSpriteRect(boardX, boardY + i * cellSize - lineThickness / 2, gridSize, lineThickness);
             }
 
-            boardPixel_->drawSpriteRect(boardX_ - lineThickness_, boardY_ - lineThickness_, gridSize_ + lineThickness_ * 2, lineThickness_);
-            boardPixel_->drawSpriteRect(boardX_ - lineThickness_, boardY_ + gridSize_, gridSize_ + lineThickness_ * 2, lineThickness_);
-            boardPixel_->drawSpriteRect(boardX_ - lineThickness_, boardY_, lineThickness_, gridSize_);
-            boardPixel_->drawSpriteRect(boardEnd, boardY_, lineThickness_, gridSize_);
+            boardPixel->drawSpriteRect(boardX - lineThickness, boardY - lineThickness, gridSize + lineThickness * 2, lineThickness);
+            boardPixel->drawSpriteRect(boardX - lineThickness, boardY + gridSize, gridSize + lineThickness * 2, lineThickness);
+            boardPixel->drawSpriteRect(boardX - lineThickness, boardY, lineThickness, gridSize);
+            boardPixel->drawSpriteRect(boardEnd, boardY, lineThickness, gridSize);
         }
 
         void drawBackground() {
-            if (background_ == nullptr) {
+            if (background == nullptr) {
                 return;
             }
-            background_->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
+            background->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
         }
 
         void drawMarks() {
-            if (xPixel_ == nullptr || oPixel_ == nullptr) {
+            if (xPixel == nullptr || oPixel == nullptr) {
                 return;
             }
 
-            const int markSize = std::max(24, cellSize_ * 58 / 100);
-            const int thickness = std::max(4, cellSize_ / 18);
+            const int markSize = std::max(24, cellSize * 58 / 100);
+            const int thickness = std::max(4, cellSize / 18);
 
             for (int row = 0; row < 3; ++row) {
                 for (int col = 0; col < 3; ++col) {
                     const int index = row * 3 + col;
-                    const char mark = board_[static_cast<std::size_t>(index)];
+                    const char mark = board[static_cast<std::size_t>(index)];
                     if (mark == ' ') {
                         continue;
                     }
 
-                    const int centerX = boardX_ + col * cellSize_ + cellSize_ / 2;
-                    const int centerY = boardY_ + row * cellSize_ + cellSize_ / 2;
+                    const int centerX = boardX + col * cellSize + cellSize / 2;
+                    const int centerY = boardY + row * cellSize + cellSize / 2;
 
                     if (mark == 'X') {
                         drawX(centerX, centerY, markSize, thickness);
@@ -293,8 +293,8 @@ namespace example {
 
         void drawX(int centerX, int centerY, int size, int thickness) {
             const int half = size / 2;
-            drawLine(*xPixel_, centerX - half, centerY - half, centerX + half, centerY + half, thickness);
-            drawLine(*xPixel_, centerX + half, centerY - half, centerX - half, centerY + half, thickness);
+            drawLine(*xPixel, centerX - half, centerY - half, centerX + half, centerY + half, thickness);
+            drawLine(*xPixel, centerX + half, centerY - half, centerX - half, centerY + half, thickness);
         }
 
         void drawO(int centerX, int centerY, int size, int thickness) {
@@ -304,10 +304,10 @@ namespace example {
             int previousY = centerY;
 
             for (int i = 1; i <= segments; ++i) {
-                const float angle = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * pi_;
+                const float angle = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * pi;
                 const int x = centerX + static_cast<int>(std::lround(std::cos(angle) * static_cast<float>(radius)));
                 const int y = centerY + static_cast<int>(std::lround(std::sin(angle) * static_cast<float>(radius)));
-                drawLine(*oPixel_, previousX, previousY, x, y, thickness);
+                drawLine(*oPixel, previousX, previousY, x, y, thickness);
                 previousX = x;
                 previousY = y;
             }
@@ -335,13 +335,13 @@ namespace example {
         }
 
         void drawText() {
-            printText("Tic-Tac-Toe", boardX_, 30, SDL_Color{235, 240, 255, 255}, titleFont_);
-            printText(statusText(), boardX_, boardY_ - 135, SDL_Color{190, 210, 255, 255}, uiFont_);
-            printText("Click a square. R resets. Esc quits.", boardX_, boardY_ + gridSize_ + 18, SDL_Color{180, 185, 200, 255}, uiFont_);
+            printText("Tic-Tac-Toe", boardX, 30, SDL_Color{235, 240, 255, 255}, titleFont);
+            printText(statusText(), boardX, boardY - 135, SDL_Color{190, 210, 255, 255}, uiFont);
+            printText("Click a square. R resets. Esc quits.", boardX, boardY + gridSize + 18, SDL_Color{180, 185, 200, 255}, uiFont);
         }
 
         std::string statusText() const {
-            switch (outcome_) {
+            switch (outcome) {
             case Outcome::Running:
                 return "You are X. The computer is O.";
             case Outcome::UserWon:

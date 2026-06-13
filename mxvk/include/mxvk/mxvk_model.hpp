@@ -116,31 +116,31 @@ namespace mxvk {
         /** @brief Remove duplicate vertices and remap indices. */
         void compressIndices();
 
-        [[nodiscard]] const std::vector<VKVertex> &vertices() const { return vertices_; }
-        [[nodiscard]] const std::vector<uint32_t> &indices() const { return indices_; }
-        [[nodiscard]] uint32_t indexCount() const { return static_cast<uint32_t>(indices_.size()); }
+        [[nodiscard]] const std::vector<VKVertex> &vertices() const { return verticesData; }
+        [[nodiscard]] const std::vector<uint32_t> &indices() const { return indicesData; }
+        [[nodiscard]] uint32_t indexCount() const { return static_cast<uint32_t>(indicesData.size()); }
 
-        [[nodiscard]] VkBuffer vertexBuffer() const { return vertexBuffer_; }
-        [[nodiscard]] VkBuffer indexBuffer() const { return indexBuffer_; }
+        [[nodiscard]] VkBuffer vertexBuffer() const { return vertexBufferHandle; }
+        [[nodiscard]] VkBuffer indexBuffer() const { return indexBufferHandle; }
 
-        [[nodiscard]] size_t subMeshCount() const { return subMeshes_.size(); }
-        [[nodiscard]] const SubMesh &subMesh(size_t i) const { return subMeshes_[i]; }
-        [[nodiscard]] const std::vector<SubMesh> &subMeshes() const { return subMeshes_; }
+        [[nodiscard]] size_t subMeshCount() const { return subMeshList.size(); }
+        [[nodiscard]] const SubMesh &subMesh(size_t i) const { return subMeshList[i]; }
+        [[nodiscard]] const std::vector<SubMesh> &subMeshes() const { return subMeshList; }
 
-        [[nodiscard]] const std::vector<MXMaterial> &materials() const { return materials_; }
-        [[nodiscard]] const std::string &mtlLibPath() const { return mtlLibPath_; }
+        [[nodiscard]] const std::vector<MXMaterial> &materials() const { return materialList; }
+        [[nodiscard]] const std::string &mtlLibPath() const { return mtlLibraryPath; }
 
       private:
-        std::vector<VKVertex> vertices_{};
-        std::vector<uint32_t> indices_{};
-        std::vector<SubMesh> subMeshes_{};
-        std::vector<MXMaterial> materials_{};
-        std::string mtlLibPath_{};
+        std::vector<VKVertex> verticesData{};
+        std::vector<uint32_t> indicesData{};
+        std::vector<SubMesh> subMeshList{};
+        std::vector<MXMaterial> materialList{};
+        std::string mtlLibraryPath{};
 
-        VkBuffer vertexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory vertexBufferMemory_ = VK_NULL_HANDLE;
-        VkBuffer indexBuffer_ = VK_NULL_HANDLE;
-        VkDeviceMemory indexBufferMemory_ = VK_NULL_HANDLE;
+        VkBuffer vertexBufferHandle = VK_NULL_HANDLE;
+        VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+        VkBuffer indexBufferHandle = VK_NULL_HANDLE;
+        VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
 
         static void createBuffer(VkDevice device, VkPhysicalDevice physicalDevice,
                                  VkDeviceSize size, VkBufferUsageFlags usage,

@@ -130,7 +130,7 @@ namespace mxvk {
         bool readToModelTexture(VKAbstractModel &model, bool flipY = false);
 #ifdef MXVK_CUDA
         bool readGpuRgba(cv::cuda::GpuMat &rgba, bool flipY = false);
-        cv::cuda::Stream &cudaStream() { return cudaStream_; }
+        cv::cuda::Stream &cudaStream() { return cudaStream; }
 #endif
 
         /**
@@ -164,18 +164,18 @@ namespace mxvk {
         cv::VideoCapture cap;              ///< OpenCV capture device.
         cv::Mat frame;                     ///< Most recent decoded frame.
 #ifdef MXVK_CUDA
-        bool cudaChecked_ = false;
-        bool cudaAvailable_ = false;
-        bool cudaMappedInput_ = false;
-        bool cudaPipelineLogged_ = false;
-        bool cudaFlipYForVulkan_ = true;
-        cv::cuda::Stream cudaStream_{};
-        cv::cuda::GpuMat gpuFrame_{};
-        cv::cuda::GpuMat gpuRgba_{};
-        cv::cuda::GpuMat gpuVulkanRgba_{};
-        cv::cuda::HostMem mappedFrame_{cv::cuda::HostMem::SHARED};
-        cv::cuda::HostMem pinnedRgba_{cv::cuda::HostMem::PAGE_LOCKED};
-        cv::Mat pinnedRgbaMat_{};
+        bool cudaChecked = false;
+        bool cudaAvailable = false;
+        bool cudaMappedInput = false;
+        bool cudaPipelineLogged = false;
+        bool cudaFlipYForVulkan = true;
+        cv::cuda::Stream cudaStream{};
+        cv::cuda::GpuMat gpuFrame{};
+        cv::cuda::GpuMat gpuRgba{};
+        cv::cuda::GpuMat gpuVulkanRgba{};
+        cv::cuda::HostMem mappedFrame{cv::cuda::HostMem::SHARED};
+        cv::cuda::HostMem pinnedRgba{cv::cuda::HostMem::PAGE_LOCKED};
+        cv::Mat pinnedRgbaMat{};
 #endif
     };
 } // namespace mxvk

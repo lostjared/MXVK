@@ -32,45 +32,45 @@ namespace example {
       public:
         OpenCVModelWindow(const Arguments &args, const std::string &title)
             : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION),
-              assetRoot_(args.path.empty() ? std::string(opencv_model_ASSET_DIR) : args.path),
-              shaderRoot_(args.shaderPath.empty() ? std::string(opencv_model_SHADER_DIR) : args.shaderPath),
-              cameraIndex_(args.camera_index),
-              fallbackWidth_(args.width),
-              fallbackHeight_(args.height) {
+              assetRoot(args.path.empty() ? std::string(opencv_model_ASSET_DIR) : args.path),
+              shaderRoot(args.shaderPath.empty() ? std::string(opencv_model_SHADER_DIR) : args.shaderPath),
+              cameraIndex(args.camera_index),
+              fallbackWidth(args.width),
+              fallbackHeight(args.height) {
             try {
-                modelPath_ = resolveModelPath(args.filename, assetRoot_);
-                if (modelPath_.empty()) {
+                modelPath = resolveModelPath(args.filename, assetRoot);
+                if (modelPath.empty()) {
                     throw mxvk::Exception("opencv_model: args.filename must point to a model file (.obj/.mxmod/.mxmod.z)");
                 }
-                setFont(assetRoot_ + "/data/font.ttf", 20);
+                setFont(assetRoot + "/data/font.ttf", 20);
 
-                if (!capture_.open(cameraIndex_)) {
-                    throw mxvk::Exception(std::format("opencv_model: failed to open camera index {}", cameraIndex_));
+                if (!capture.open(cameraIndex)) {
+                    throw mxvk::Exception(std::format("opencv_model: failed to open camera index {}", cameraIndex));
                 }
 
-                capture_.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth_));
-                capture_.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight_));
-                fps_ = configureCameraFps();
+                capture.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth));
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight));
+                fps = configureCameraFps();
 
-                fallbackWidth_ = static_cast<int>(capture_.get(cv::CAP_PROP_FRAME_WIDTH));
-                fallbackHeight_ = static_cast<int>(capture_.get(cv::CAP_PROP_FRAME_HEIGHT));
+                fallbackWidth = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
+                fallbackHeight = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
 
-                std::cout << "opencv_model: model='" << modelPath_ << "' capture="
-                          << fallbackWidth_ << "x" << fallbackHeight_ << " @ " << fps_ << " fps\n";
+                std::cout << "opencv_model: model='" << modelPath << "' capture="
+                          << fallbackWidth << "x" << fallbackHeight << " @ " << fps << " fps\n";
 
-                const std::string vertPath = shaderRoot_ + "/model.vert.spv";
-                const std::string fragPath = shaderRoot_ + "/model.frag.spv";
-                model_.load(this, modelPath_, "", "", 1.0f);
-                model_.setShaders(this, vertPath, fragPath);
+                const std::string vertPath = shaderRoot + "/model.vert.spv";
+                const std::string fragPath = shaderRoot + "/model.frag.spv";
+                model.load(this, modelPath, "", "", 1.0f);
+                model.setShaders(this, vertPath, fragPath);
 
-                if (!capture_.readToModelTexture(model_, true)) {
+                if (!capture.readToModelTexture(model, true)) {
                     std::cerr << "opencv_model: failed to upload initial camera frame\n";
                 }
             } catch (...) {
-                capture_.close();
+                capture.close();
                 if (device != VK_NULL_HANDLE) {
                     vkDeviceWaitIdle(device);
-                    model_.cleanup(this);
+                    model.cleanup(this);
                 }
                 throw;
             }
@@ -80,8 +80,8 @@ namespace example {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
-            model_.cleanup(this);
-            capture_.close();
+            model.cleanup(this);
+            capture.close();
         }
 
         void event(SDL_Event &e) override {
@@ -91,62 +91,62 @@ namespace example {
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
-                mouseDragging_ = true;
-                lastMouseX_ = static_cast<int>(e.button.x);
-                lastMouseY_ = static_cast<int>(e.button.y);
+                mouseDragging = true;
+                lastMouseX = static_cast<int>(e.button.x);
+                lastMouseY = static_cast<int>(e.button.y);
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
-                mouseDragging_ = false;
+                mouseDragging = false;
                 return;
             }
 
-            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseDragging_) {
+            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseDragging) {
                 const int x = static_cast<int>(e.motion.x);
                 const int y = static_cast<int>(e.motion.y);
-                const int deltaX = x - lastMouseX_;
-                const int deltaY = y - lastMouseY_;
+                const int deltaX = x - lastMouseX;
+                const int deltaY = y - lastMouseY;
 
-                mouseYawDegrees_ += static_cast<float>(deltaX) * mouseSensitivity_;
-                mousePitchDegrees_ += static_cast<float>(deltaY) * mouseSensitivity_;
-                mousePitchDegrees_ = std::clamp(mousePitchDegrees_, -80.0f, 80.0f);
+                mouseYawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
+                mousePitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
+                mousePitchDegrees = std::clamp(mousePitchDegrees, -80.0f, 80.0f);
 
-                lastMouseX_ = x;
-                lastMouseY_ = y;
+                lastMouseX = x;
+                lastMouseY = y;
                 return;
             }
 
             if (e.type == SDL_EVENT_MOUSE_WHEEL) {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
-                cameraDistance_ -= delta * 0.45f;
-                cameraDistance_ = std::clamp(cameraDistance_, 1.8f, 12.0f);
+                cameraDistance -= delta * 0.45f;
+                cameraDistance = std::clamp(cameraDistance, 1.8f, 12.0f);
                 return;
             }
         }
 
         void onSwapchainRecreated() override {
-            model_.resize(this);
+            model.resize(this);
         }
 
         void proc() override {
             const auto now = std::chrono::steady_clock::now();
             const float deltaSeconds = std::clamp(
-                std::chrono::duration<float>(now - lastUpdateTime_).count(),
+                std::chrono::duration<float>(now - lastUpdateTime).count(),
                 0.0f,
                 0.1f);
-            lastUpdateTime_ = now;
+            lastUpdateTime = now;
             updateRotationFromKeyboard(deltaSeconds);
 
-            if (!capture_.readToModelTexture(model_, true)) {
-                capture_.close();
-                if (!capture_.open(cameraIndex_)) {
+            if (!capture.readToModelTexture(model, true)) {
+                capture.close();
+                if (!capture.open(cameraIndex)) {
                     return;
                 }
-                capture_.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth_));
-                capture_.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight_));
-                fps_ = configureCameraFps();
-                if (!capture_.readToModelTexture(model_, true)) {
+                capture.set(cv::CAP_PROP_FRAME_WIDTH, static_cast<double>(fallbackWidth));
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT, static_cast<double>(fallbackHeight));
+                fps = configureCameraFps();
+                if (!capture.readToModelTexture(model, true)) {
                     return;
                 }
             }
@@ -155,7 +155,7 @@ namespace example {
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const VkExtent2D extent = getSwapchainExtent();
-            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime_).count();
+            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
 
             const float aspect = (extent.height > 0U)
                                      ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
@@ -163,19 +163,19 @@ namespace example {
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::mat4(1.0f);
-            ubo.model = glm::rotate(ubo.model, glm::radians(mousePitchDegrees_), glm::vec3(1.0f, 0.0f, 0.0f));
-            ubo.model = glm::rotate(ubo.model, glm::radians(mouseYawDegrees_), glm::vec3(0.0f, 1.0f, 0.0f));
-            ubo.model = glm::rotate(ubo.model, pitchRadians_, glm::vec3(1.0f, 0.0f, 0.0f));
-            ubo.model = glm::rotate(ubo.model, yawRadians_ + autoSpinRadians_, glm::vec3(0.0f, 1.0f, 0.0f));
-            ubo.model = glm::scale(ubo.model, glm::vec3(model_.modelRenderScale()));
-            ubo.model = glm::translate(ubo.model, model_.modelCenterOffset());
-            ubo.view = glm::lookAt(glm::vec3(0.0f, 0.15f, cameraDistance_), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.model = glm::rotate(ubo.model, glm::radians(mousePitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
+            ubo.model = glm::rotate(ubo.model, glm::radians(mouseYawDegrees), glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.model = glm::rotate(ubo.model, pitchRadians, glm::vec3(1.0f, 0.0f, 0.0f));
+            ubo.model = glm::rotate(ubo.model, yawRadians + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
+            ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
+            ubo.view = glm::lookAt(glm::vec3(0.0f, 0.15f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
             ubo.proj[1][1] *= -1.0f;
             ubo.fx = glm::vec4(elapsedSeconds, 0.32f, 0.18f + 0.12f * std::sin(elapsedSeconds * 1.2f), 0.0f);
 
-            model_.updateUBO(imageIndex, ubo);
-            model_.render(cmd, imageIndex, false);
+            model.updateUBO(imageIndex, ubo);
+            model.render(cmd, imageIndex, false);
         }
 
       private:
@@ -183,15 +183,15 @@ namespace example {
             static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
 
             for (const double requestedFps : fpsChoices) {
-                capture_.set(cv::CAP_PROP_FPS, requestedFps);
-                const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+                capture.set(cv::CAP_PROP_FPS, requestedFps);
+                const double reportedFps = capture.get(cv::CAP_PROP_FPS);
                 if (reportedFps > 0.0 && reportedFps + 0.5 >= requestedFps) {
                     return reportedFps;
                 }
             }
 
-            capture_.set(cv::CAP_PROP_FPS, fpsChoices.back());
-            const double reportedFps = capture_.get(cv::CAP_PROP_FPS);
+            capture.set(cv::CAP_PROP_FPS, fpsChoices.back());
+            const double reportedFps = capture.get(cv::CAP_PROP_FPS);
             return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
         }
 
@@ -250,69 +250,69 @@ namespace example {
 
             bool usingArrowKeys = false;
             if (keys[SDL_SCANCODE_LEFT]) {
-                yawRadians_ -= kManualSpeed * deltaSeconds;
+                yawRadians -= kManualSpeed * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_RIGHT]) {
-                yawRadians_ += kManualSpeed * deltaSeconds;
+                yawRadians += kManualSpeed * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_UP]) {
-                pitchRadians_ -= kManualSpeed * deltaSeconds;
+                pitchRadians -= kManualSpeed * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_DOWN]) {
-                pitchRadians_ += kManualSpeed * deltaSeconds;
+                pitchRadians += kManualSpeed * deltaSeconds;
                 usingArrowKeys = true;
             }
 
             if (!usingArrowKeys) {
-                autoSpinRadians_ += kAutoSpinSpeed * deltaSeconds;
+                autoSpinRadians += kAutoSpinSpeed * deltaSeconds;
             }
 
-            yawRadians_ = wrapAngle(yawRadians_);
-            pitchRadians_ = wrapAngle(pitchRadians_);
-            autoSpinRadians_ = wrapAngle(autoSpinRadians_);
+            yawRadians = wrapAngle(yawRadians);
+            pitchRadians = wrapAngle(pitchRadians);
+            autoSpinRadians = wrapAngle(autoSpinRadians);
         }
 
         void updateFpsOverlay() {
-            ++fpsFrameCount_;
+            ++fpsFrameCount;
             const auto now = std::chrono::steady_clock::now();
-            const double elapsed = std::chrono::duration<double>(now - fpsSampleTime_).count();
+            const double elapsed = std::chrono::duration<double>(now - fpsSampleTime).count();
             if (elapsed >= 0.25) {
-                fps_ = static_cast<double>(fpsFrameCount_) / elapsed;
-                fpsFrameCount_ = 0;
-                fpsSampleTime_ = now;
-                fpsText_ = std::format("FPS: {:.1f}", fps_);
+                fps = static_cast<double>(fpsFrameCount) / elapsed;
+                fpsFrameCount = 0;
+                fpsSampleTime = now;
+                fpsText = std::format("FPS: {:.1f}", fps);
             }
 
-            printText(fpsText_, 15, 15, SDL_Color{255, 255, 255, 255});
+            printText(fpsText, 15, 15, SDL_Color{255, 255, 255, 255});
         }
 
-        std::string assetRoot_{};
-        std::string shaderRoot_{};
-        std::string modelPath_{};
-        int cameraIndex_ = 0;
-        int fallbackWidth_ = 1280;
-        int fallbackHeight_ = 720;
-        float yawRadians_ = 0.0f;
-        float pitchRadians_ = 0.0f;
-        float autoSpinRadians_ = 0.0f;
-        bool mouseDragging_ = false;
-        int lastMouseX_ = 0;
-        int lastMouseY_ = 0;
-        float mouseYawDegrees_ = 0.0f;
-        float mousePitchDegrees_ = 0.0f;
-        float cameraDistance_ = 4.2f;
-        float mouseSensitivity_ = 0.35f;
-        double fps_ = 0.0;
-        uint32_t fpsFrameCount_ = 0;
-        std::chrono::steady_clock::time_point fpsSampleTime_{std::chrono::steady_clock::now()};
-        std::string fpsText_ = "FPS: --";
-        mxvk::VK_Capture capture_{};
-        mxvk::VKAbstractModel model_{};
-        std::chrono::steady_clock::time_point lastUpdateTime_{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point startTime_{std::chrono::steady_clock::now()};
+        std::string assetRoot{};
+        std::string shaderRoot{};
+        std::string modelPath{};
+        int cameraIndex = 0;
+        int fallbackWidth = 1280;
+        int fallbackHeight = 720;
+        float yawRadians = 0.0f;
+        float pitchRadians = 0.0f;
+        float autoSpinRadians = 0.0f;
+        bool mouseDragging = false;
+        int lastMouseX = 0;
+        int lastMouseY = 0;
+        float mouseYawDegrees = 0.0f;
+        float mousePitchDegrees = 0.0f;
+        float cameraDistance = 4.2f;
+        float mouseSensitivity = 0.35f;
+        double fps = 0.0;
+        uint32_t fpsFrameCount = 0;
+        std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
+        std::string fpsText = "FPS: --";
+        mxvk::VK_Capture capture{};
+        mxvk::VKAbstractModel model{};
+        std::chrono::steady_clock::time_point lastUpdateTime{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point startTime{std::chrono::steady_clock::now()};
     };
 
 } // namespace example

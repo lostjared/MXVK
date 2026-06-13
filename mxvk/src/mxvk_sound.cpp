@@ -27,7 +27,7 @@ namespace mxvk {
     }
 
     void VK_Mixer::init() {
-        if (init_) {
+        if (initialized) {
             return;
         }
 
@@ -46,24 +46,24 @@ namespace mxvk {
             throw mxvk::Exception("Could not create mixer device: " + std::string(SDL_GetError()));
         }
 
-        mixer_.reset(raw_mixer);
-        init_ = true;
+        mixer.reset(raw_mixer);
+        initialized = true;
     }
 
     int VK_Mixer::loadMusic(const std::string &filename) {
         if (filename.empty()) {
             throw mxvk::Exception("Music filename cannot be empty");
         }
-        if (!init_ || mixer_ == nullptr) {
+        if (!initialized || mixer == nullptr) {
             throw mxvk::Exception("Audio mixer is not initialized");
         }
 
-        MIX_Audio *raw_audio = MIX_LoadAudio(mixer_.get(), filename.c_str(), false);
+        MIX_Audio *raw_audio = MIX_LoadAudio(mixer.get(), filename.c_str(), false);
         if (raw_audio == nullptr) {
             throw mxvk::Exception("Error loading music file '" + filename + "': " + std::string(SDL_GetError()));
         }
 
-        MIX_Track *raw_track = MIX_CreateTrack(mixer_.get());
+        MIX_Track *raw_track = MIX_CreateTrack(mixer.get());
         if (raw_track == nullptr) {
             MIX_DestroyAudio(raw_audio);
             throw mxvk::Exception("Error creating music track: " + std::string(SDL_GetError()));
@@ -74,25 +74,25 @@ namespace mxvk {
             throw mxvk::Exception("Error assigning music track audio: " + std::string(SDL_GetError()));
         }
 
-        music_files_.emplace_back(raw_audio, MIX_DestroyAudio);
-        music_tracks_.emplace_back(raw_track, MIX_DestroyTrack);
-        return static_cast<int>(music_files_.size() - 1);
+        music_files.emplace_back(raw_audio, MIX_DestroyAudio);
+        music_tracks.emplace_back(raw_track, MIX_DestroyTrack);
+        return static_cast<int>(music_files.size() - 1);
     }
 
     int VK_Mixer::loadWav(const std::string &filename) {
         if (filename.empty()) {
             throw mxvk::Exception("WAV filename cannot be empty");
         }
-        if (!init_ || mixer_ == nullptr) {
+        if (!initialized || mixer == nullptr) {
             throw mxvk::Exception("Audio mixer is not initialized");
         }
 
-        MIX_Audio *raw_audio = MIX_LoadAudio(mixer_.get(), filename.c_str(), true);
+        MIX_Audio *raw_audio = MIX_LoadAudio(mixer.get(), filename.c_str(), true);
         if (raw_audio == nullptr) {
             throw mxvk::Exception("Error loading WAV file '" + filename + "': " + std::string(SDL_GetError()));
         }
 
-        MIX_Track *raw_track = MIX_CreateTrack(mixer_.get());
+        MIX_Track *raw_track = MIX_CreateTrack(mixer.get());
         if (raw_track == nullptr) {
             MIX_DestroyAudio(raw_audio);
             throw mxvk::Exception("Error creating WAV track: " + std::string(SDL_GetError()));
@@ -103,20 +103,20 @@ namespace mxvk {
             throw mxvk::Exception("Error assigning WAV track audio: " + std::string(SDL_GetError()));
         }
 
-        wav_files_.emplace_back(raw_audio, MIX_DestroyAudio);
-        wav_tracks_.emplace_back(raw_track, MIX_DestroyTrack);
-        return static_cast<int>(wav_files_.size() - 1);
+        wav_files.emplace_back(raw_audio, MIX_DestroyAudio);
+        wav_tracks.emplace_back(raw_track, MIX_DestroyTrack);
+        return static_cast<int>(wav_files.size() - 1);
     }
 
     int VK_Mixer::playMusic(int id, int value) {
-        if (!init_) {
+        if (!initialized) {
             return -1;
         }
-        if (id < 0 || id >= static_cast<int>(music_tracks_.size())) {
+        if (id < 0 || id >= static_cast<int>(music_tracks.size())) {
             return -1;
         }
 
-        MIX_Track *track = music_tracks_[toIndex(id)].get();
+        MIX_Track *track = music_tracks[toIndex(id)].get();
         if (track == nullptr) {
             return -1;
         }
@@ -127,23 +127,23 @@ namespace mxvk {
     }
 
     int VK_Mixer::playWav(int id, int value, int channel) {
-        if (!init_) {
+        if (!initialized) {
             return -1;
         }
-        if (id < 0 || id >= static_cast<int>(wav_files_.size())) {
+        if (id < 0 || id >= static_cast<int>(wav_files.size())) {
             return -1;
         }
 
         int target = id;
         if (channel >= 0) {
-            if (channel >= static_cast<int>(wav_tracks_.size())) {
+            if (channel >= static_cast<int>(wav_tracks.size())) {
                 return -1;
             }
             target = channel;
         }
 
-        MIX_Track *track = wav_tracks_[toIndex(target)].get();
-        MIX_Audio *audio = wav_files_[toIndex(id)].get();
+        MIX_Track *track = wav_tracks[toIndex(target)].get();
+        MIX_Audio *audio = wav_files[toIndex(id)].get();
         if (track == nullptr || audio == nullptr) {
             return -1;
         }
@@ -157,11 +157,11 @@ namespace mxvk {
     }
 
     [[nodiscard]] bool VK_Mixer::isPlaying(int channel) const {
-        if (!init_ || channel < 0 || channel >= static_cast<int>(wav_tracks_.size())) {
+        if (!initialized || channel < 0 || channel >= static_cast<int>(wav_tracks.size())) {
             return false;
         }
 
-        MIX_Track *track = wav_tracks_[toIndex(channel)].get();
+        MIX_Track *track = wav_tracks[toIndex(channel)].get();
         if (track == nullptr) {
             return false;
         }
@@ -169,11 +169,11 @@ namespace mxvk {
     }
 
     [[nodiscard]] bool VK_Mixer::isMusicPlaying(int id) const {
-        if (!init_ || id < 0 || id >= static_cast<int>(music_tracks_.size())) {
+        if (!initialized || id < 0 || id >= static_cast<int>(music_tracks.size())) {
             return false;
         }
 
-        MIX_Track *track = music_tracks_[toIndex(id)].get();
+        MIX_Track *track = music_tracks[toIndex(id)].get();
         if (track == nullptr) {
             return false;
         }
@@ -181,31 +181,31 @@ namespace mxvk {
     }
 
     void VK_Mixer::stopMusic() {
-        if (!init_ || mixer_ == nullptr) {
+        if (!initialized || mixer == nullptr) {
             return;
         }
 
-        for (const auto &track : music_tracks_) {
+        for (const auto &track : music_tracks) {
             if (track != nullptr) {
                 MIX_StopTrack(track.get(), 0);
             }
         }
-        MIX_StopAllTracks(mixer_.get(), 0);
+        MIX_StopAllTracks(mixer.get(), 0);
     }
 
     void VK_Mixer::cleanup() {
-        if (!init_) {
+        if (!initialized) {
             return;
         }
 
         stopMusic();
-        music_tracks_.clear();
-        wav_tracks_.clear();
-        music_files_.clear();
-        wav_files_.clear();
-        mixer_.reset();
+        music_tracks.clear();
+        wav_tracks.clear();
+        music_files.clear();
+        wav_files.clear();
+        mixer.reset();
         MIX_Quit();
-        init_ = false;
+        initialized = false;
     }
 
 } // namespace mxvk
