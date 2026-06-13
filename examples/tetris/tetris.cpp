@@ -132,6 +132,15 @@ namespace {
         return rotated;
     }
 
+    enum class AppScreen {
+        Intro,
+        Menu,
+        Game,
+        Multiplayer,
+        HighScores,
+        Credits,
+    };
+
     class TetrisWindow final : public mxvk::VK_Window {
       public:
         TetrisWindow(const std::string &path, int width, int height, bool fullscreen)
@@ -153,6 +162,22 @@ namespace {
                 dataRoot_ + "/psychedelic_background.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(tetris_SHADER_DIR) + "/tetris_background_transition.frag.spv");
+            menuBackgroundSprite_ = createSprite(
+                dataRoot_ + "/start_screen.png",
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+            highScoresBackgroundSprite_ = createSprite(
+                dataRoot_ + "/high_scores_screen.png",
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+            creditsBackgroundSprite_ = createSprite(
+                dataRoot_ + "/credits_screen.png",
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+            multiplayerBackgroundSprite_ = createSprite(
+                dataRoot_ + "/multiplayer_screen.png",
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
             previewBorderSprite_ = createSprite(1, 1);
             const uint32_t whitePixel = 0xFFFFFFFFu;
             previewBorderSprite_->updateTexture(&whitePixel, 1, 1);
@@ -209,10 +234,6 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-                if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) {
-                    exit();
-                    return;
-                }
                 handleGamepadButtonDown(e.gbutton.button);
             }
         }
@@ -221,41 +242,47 @@ namespace {
             ensureMusicPlaying();
             tryOpenFirstGamepad();
             updateIntroState();
+            updateScreenTransition();
             updateInput();
-            updateGame();
+            if (screen_ == AppScreen::Game) {
+                updateGame();
+            }
             drawHud();
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
-            glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.2f, cameraDistance_), glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-            view = glm::rotate(view, glm::radians(gridPitch_), glm::vec3(1.0f, 0.0f, 0.0f));
-            view = glm::rotate(view, glm::radians(gridYaw_), glm::vec3(0.0f, 1.0f, 0.0f));
-            view = glm::rotate(view, glm::radians(gridRoll_), glm::vec3(0.0f, 0.0f, 1.0f));
+            drawScreenBackdrop(cmd, extent);
 
-            glm::mat4 proj = glm::perspective(glm::radians(46.0f), aspect, 0.1f, 100.0f);
-            proj[1][1] *= -1.0f;
-            const bool blinkVisible = !lineClearActive_ || isLineClearVisible();
+            if (screen_ == AppScreen::Game) {
+                const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
+                glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.2f, cameraDistance_), glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridPitch_), glm::vec3(1.0f, 0.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridYaw_), glm::vec3(0.0f, 1.0f, 0.0f));
+                view = glm::rotate(view, glm::radians(gridRoll_), glm::vec3(0.0f, 0.0f, 1.0f));
 
-            drawBackground(cmd, extent);
+                glm::mat4 proj = glm::perspective(glm::radians(46.0f), aspect, 0.1f, 100.0f);
+                proj[1][1] *= -1.0f;
+                const bool blinkVisible = !lineClearActive_ || isLineClearVisible();
 
-            for (LockedBlock &locked : lockedBlocks_) {
-                if (blinkVisible || !isClearingRow(locked.y)) {
-                    drawBlock(cmd, imageIndex, locked.block, locked.x, locked.y, locked.block.color, view, proj);
+                for (LockedBlock &locked : lockedBlocks_) {
+                    if (blinkVisible || !isClearingRow(locked.y)) {
+                        drawBlock(cmd, imageIndex, locked.block, locked.x, locked.y, locked.block.color, view, proj);
+                    }
                 }
-            }
 
-            if (!lineClearActive_) {
-                for (size_t i = 0; i < activeModels_.size(); ++i) {
-                    const int x = active_.x + active_.blocks[i].x;
-                    const int y = active_.y + active_.blocks[i].y;
-                    drawBlock(cmd, imageIndex, activeModels_[i], x, y, active_.color, view, proj);
+                if (!lineClearActive_) {
+                    for (size_t i = 0; i < activeModels_.size(); ++i) {
+                        const int x = active_.x + active_.blocks[i].x;
+                        const int y = active_.y + active_.blocks[i].y;
+                        drawBlock(cmd, imageIndex, activeModels_[i], x, y, active_.color, view, proj);
+                    }
                 }
-            }
 
-            drawFrame(cmd, imageIndex, view, proj);
-            drawNextPiecePreview(cmd, imageIndex, extent);
+                drawFrame(cmd, imageIndex, view, proj);
+                drawNextPiecePreview(cmd, imageIndex, extent);
+            }
+            drawGameScreenTransitionOverlay(cmd, extent);
             drawIntroOverlay(cmd, extent);
             drawGameOverOverlay(cmd, extent);
         }
@@ -271,6 +298,10 @@ namespace {
         std::vector<BlockModel> frameModels_{};
         mxvk::VK_Sprite *background_ = nullptr;
         mxvk::VK_Sprite *backgroundTransitionSprite_ = nullptr;
+        mxvk::VK_Sprite *menuBackgroundSprite_ = nullptr;
+        mxvk::VK_Sprite *highScoresBackgroundSprite_ = nullptr;
+        mxvk::VK_Sprite *creditsBackgroundSprite_ = nullptr;
+        mxvk::VK_Sprite *multiplayerBackgroundSprite_ = nullptr;
         mxvk::VK_Sprite *previewBorderSprite_ = nullptr;
         std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites_{};
         mxvk::VK_Sprite *introSprite_ = nullptr;
@@ -286,14 +317,17 @@ namespace {
         std::chrono::steady_clock::time_point lastInputUpdate_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lineClearStart_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point backgroundTransitionStart_{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point screenTransitionStart_{std::chrono::steady_clock::now()};
         bool introActive_ = true;
         float gridYaw_ = 0.0f;
         float gridPitch_ = 0.0f;
         float gridRoll_ = 0.0f;
         float cameraDistance_ = 2.45f;
         int score_ = 0;
+        int bestScore_ = 0;
         int linesCleared_ = 0;
         int level_ = 1;
+        int cursorPos = 0;
         float fallSeconds_ = 0.65f;
         float moveRepeatTimer_ = 0.0f;
         float softDropRepeatTimer_ = 0.0f;
@@ -305,12 +339,20 @@ namespace {
         bool resetHeld_ = false;
         bool enterHeld_ = false;
         bool escapeHeld_ = false;
+        bool menuUpHeld_ = false;
+        bool menuDownHeld_ = false;
+        bool menuEnterHeld_ = false;
+        bool introSkipHeld_ = false;
+        bool screenTransitionActive_ = false;
         bool lineClearActive_ = false;
         bool backgroundTransitionActive_ = false;
         std::array<bool, boardHeight> clearingRows_{};
         PieceQueueEntry nextPiece_{};
+        AppScreen screen_ = AppScreen::Intro;
+        AppScreen transitionFromScreen_ = AppScreen::Intro;
         static constexpr float introHoldSeconds_ = 5.0f;
         static constexpr float introFadeSeconds_ = 1.0f;
+        static constexpr float screenTransitionSeconds_ = 0.36f;
         static constexpr float backgroundTransitionSeconds_ = 1.25f;
         static constexpr Sint16 gamepadDeadzone_ = 10000;
         static constexpr float gamepadMoveInitialDelaySeconds_ = 0.22f;
@@ -403,6 +445,9 @@ namespace {
             active_.color = nextPiece_.color;
             reloadActiveModels(active_.color);
             gameOver_ = collides(active_.x, active_.y, active_.blocks);
+            if (gameOver_) {
+                bestScore_ = std::max(bestScore_, score_);
+            }
             nextPiece_ = randomPiece();
         }
 
@@ -468,11 +513,28 @@ namespace {
             }
 
             if (introActive_) {
+                const bool enterDown = keys[SDL_SCANCODE_RETURN];
+                const bool spaceDown = keys[SDL_SCANCODE_SPACE];
                 const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
+                const bool skipDown = enterDown || spaceDown;
+                if (skipDown && !introSkipHeld_) {
+                    introActive_ = false;
+                    requestScreen(AppScreen::Menu);
+                }
                 if (escapeDown && !escapeHeld_) {
                     exit();
                 }
+                introSkipHeld_ = skipDown;
                 escapeHeld_ = escapeDown;
+                return;
+            }
+
+            if (screenTransitionActive_) {
+                return;
+            }
+
+            if (screen_ != AppScreen::Game) {
+                handleMenuKeys(keys);
                 return;
             }
 
@@ -482,8 +544,59 @@ namespace {
             handleGamepadInput(deltaSeconds);
         }
 
+        void handleMenuKeys(const bool *keys) {
+            if (screenTransitionActive_) {
+                menuUpHeld_ = keys[SDL_SCANCODE_UP];
+                menuDownHeld_ = keys[SDL_SCANCODE_DOWN];
+                menuEnterHeld_ = keys[SDL_SCANCODE_RETURN];
+                escapeHeld_ = keys[SDL_SCANCODE_ESCAPE];
+                return;
+            }
+
+            const bool upDown = keys[SDL_SCANCODE_UP];
+            const bool downDown = keys[SDL_SCANCODE_DOWN];
+            const bool enterDown = keys[SDL_SCANCODE_RETURN];
+            const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
+
+            if (screen_ == AppScreen::Menu) {
+                if (upDown && !menuUpHeld_) {
+                    cursorPos = (cursorPos + 3) % 4;
+                }
+                if (downDown && !menuDownHeld_) {
+                    cursorPos = (cursorPos + 1) % 4;
+                }
+            }
+            if (enterDown && !menuEnterHeld_) {
+                if (screen_ == AppScreen::Menu) {
+                    if (cursorPos == 0) {
+                        startGame();
+                    } else if (cursorPos == 1) {
+                        goToMultiplayer();
+                    } else if (cursorPos == 2) {
+                        goToHighScores();
+                    } else if (cursorPos == 3) {
+                        goToCredits();
+                    }
+                } else {
+                    goToMenu();
+                }
+            }
+            if (escapeDown && !escapeHeld_) {
+                if (screen_ == AppScreen::Menu) {
+                    exit();
+                } else {
+                    goToMenu();
+                }
+            }
+
+            menuUpHeld_ = upDown;
+            menuDownHeld_ = downDown;
+            menuEnterHeld_ = enterDown;
+            escapeHeld_ = escapeDown;
+        }
+
         void handleGamepadInput(float deltaSeconds) {
-            if (gamepad_ == nullptr || introActive_ || gameOver_ || lineClearActive_) {
+            if (gamepad_ == nullptr || introActive_ || screen_ != AppScreen::Game || gameOver_ || lineClearActive_) {
                 gamepadMoveDirection_ = 0;
                 gamepadMoveHeldSeconds_ = 0.0f;
                 gamepadSoftDropHeld_ = false;
@@ -559,22 +672,67 @@ namespace {
             if (gamepad_ == nullptr) {
                 return;
             }
+            if (screenTransitionActive_) {
+                return;
+            }
 
-            if (gameOver_) {
-                if (button == SDL_GAMEPAD_BUTTON_START) {
-                    resetGame();
+            if (introActive_) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    introActive_ = false;
+                    requestScreen(AppScreen::Menu);
                 }
                 return;
             }
 
-            if (introActive_ || lineClearActive_) {
-                return;
-            }
-
-            if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
-                rotatePiece();
-            } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
-                hardDrop();
+            switch (screen_) {
+            case AppScreen::Menu:
+                if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                    cursorPos = (cursorPos + 3) % 4;
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                    cursorPos = (cursorPos + 1) % 4;
+                } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    if (cursorPos == 0) {
+                        startGame();
+                    } else if (cursorPos == 1) {
+                        goToMultiplayer();
+                    } else if (cursorPos == 2) {
+                        goToHighScores();
+                    } else if (cursorPos == 3) {
+                        goToCredits();
+                    }
+                } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
+                    exit();
+                }
+                break;
+            case AppScreen::Game:
+                if (gameOver_) {
+                    if (button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                        startGame();
+                    } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
+                        goToMenu();
+                    }
+                    return;
+                }
+                if (lineClearActive_) {
+                    return;
+                }
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                    rotatePiece();
+                } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
+                    hardDrop();
+                } else if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                    goToMenu();
+                }
+                break;
+            case AppScreen::Multiplayer:
+            case AppScreen::HighScores:
+            case AppScreen::Credits:
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
+                    goToMenu();
+                }
+                break;
+            case AppScreen::Intro:
+                break;
             }
         }
 
@@ -624,8 +782,102 @@ namespace {
             const float elapsed = std::chrono::duration<float>(now - introStart_).count();
             if (elapsed >= (introHoldSeconds_ + introFadeSeconds_)) {
                 introActive_ = false;
+                requestScreen(AppScreen::Menu);
                 lastFall_ = now;
             }
+        }
+
+        void startGame() {
+            const AppScreen previousScreen = screen_;
+            resetGame();
+            introActive_ = false;
+            screen_ = AppScreen::Game;
+            screenTransitionActive_ = previousScreen != AppScreen::Game;
+            transitionFromScreen_ = previousScreen;
+            screenTransitionStart_ = std::chrono::steady_clock::now();
+            lastInputUpdate_ = std::chrono::steady_clock::now();
+            resetMenuLatchState();
+        }
+
+        void goToMenu() {
+            if (screen_ == AppScreen::Game) {
+                gameOver_ = false;
+            }
+            cursorPos = 0;
+            requestScreen(AppScreen::Menu);
+        }
+
+        void goToHighScores() {
+            requestScreen(AppScreen::HighScores);
+        }
+
+        void goToCredits() {
+            requestScreen(AppScreen::Credits);
+        }
+
+        void goToMultiplayer() {
+            requestScreen(AppScreen::Multiplayer);
+        }
+
+        void requestScreen(AppScreen nextScreen) {
+            if (screen_ == nextScreen && !screenTransitionActive_) {
+                return;
+            }
+            if (nextScreen == AppScreen::Game) {
+                screenTransitionActive_ = false;
+                screen_ = nextScreen;
+                return;
+            }
+            if (screen_ == AppScreen::Game) {
+                screenTransitionActive_ = false;
+                screen_ = nextScreen;
+                return;
+            }
+            transitionFromScreen_ = screen_;
+            screen_ = nextScreen;
+            screenTransitionActive_ = true;
+            screenTransitionStart_ = std::chrono::steady_clock::now();
+            resetMenuLatchState();
+        }
+
+        void updateScreenTransition() {
+            if (!screenTransitionActive_) {
+                return;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart_).count();
+            if (elapsed >= screenTransitionSeconds_) {
+                screenTransitionActive_ = false;
+                transitionFromScreen_ = screen_;
+                resetMenuLatchState();
+            }
+        }
+
+        float screenFadeAlpha() const {
+            if (!screenTransitionActive_) {
+                return 1.0f;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - screenTransitionStart_).count();
+            return std::clamp(elapsed / screenTransitionSeconds_, 0.0f, 1.0f);
+        }
+
+        void resetMenuLatchState() {
+            menuUpHeld_ = false;
+            menuDownHeld_ = false;
+            menuEnterHeld_ = false;
+            introSkipHeld_ = false;
+        }
+
+        void updateMenuInputLatchState() {
+            const bool *keys = SDL_GetKeyboardState(nullptr);
+            if (keys == nullptr) {
+                return;
+            }
+            menuUpHeld_ = keys[SDL_SCANCODE_UP];
+            menuDownHeld_ = keys[SDL_SCANCODE_DOWN];
+            menuEnterHeld_ = keys[SDL_SCANCODE_RETURN];
+            escapeHeld_ = keys[SDL_SCANCODE_ESCAPE];
         }
 
         void handleHeldViewRotation(const bool *keys, float deltaSeconds) {
@@ -708,7 +960,7 @@ namespace {
             const bool enterDown = keys[SDL_SCANCODE_RETURN];
 
             if (escapeDown && !escapeHeld_) {
-                exit();
+                goToMenu();
             }
             if (gameOver_ && enterDown && !enterHeld_) {
                 resetGame();
@@ -796,7 +1048,7 @@ namespace {
         }
 
         void updateGame() {
-            if (introActive_) {
+            if (screen_ != AppScreen::Game || introActive_) {
                 return;
             }
             if (gameOver_) {
@@ -933,33 +1185,6 @@ namespace {
             return (static_cast<int>(elapsed / blinkIntervalSeconds) % 2) == 0;
         }
 
-        void drawBackground(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
-                return;
-            }
-
-            updateBackgroundTransitionState();
-
-            mxvk::VK_Sprite *sprite = background_;
-            if (backgroundTransitionActive_ && backgroundTransitionSprite_ != nullptr) {
-                sprite = backgroundTransitionSprite_;
-            }
-            if (sprite == nullptr) {
-                return;
-            }
-
-            if (sprite == backgroundTransitionSprite_) {
-                const auto now = std::chrono::steady_clock::now();
-                const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
-                sprite->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
-            }
-
-            sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
-            sprite->clearQueue();
-        }
-
         void drawIntroOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
             if (!introActive_ || introSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
                 return;
@@ -1056,7 +1281,7 @@ namespace {
         }
 
         void drawNextPiecePreview(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
-            if (introActive_ || previewBorderSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (screen_ != AppScreen::Game || introActive_ || previewBorderSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
                 return;
             }
             (void)imageIndex;
@@ -1110,15 +1335,66 @@ namespace {
             if (introActive_) {
                 return;
             }
-            printText(std::format("Score: {}", score_), 15, 15, SDL_Color{255, 255, 255, 255});
-            printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, SDL_Color{255, 220, 120, 255});
-            printText(std::format("Level: {}", level_), 15, 75, SDL_Color{120, 220, 255, 255});
-            if (gameOver_) {
-                const VkExtent2D extent = getSwapchainExtent();
-                const int centerX = static_cast<int>(extent.width) / 2;
-                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.58f);
-                printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, SDL_Color{255, 255, 255, 255});
-                printCenteredText("Press Enter to start a new game", centerX, baseY + 34, SDL_Color{255, 220, 120, 255});
+            const VkExtent2D extent = getSwapchainExtent();
+            const int centerX = static_cast<int>(extent.width) / 2;
+            const float alpha = screenFadeAlpha();
+            const auto withAlpha = [alpha](SDL_Color color) {
+                color.a = static_cast<Uint8>(static_cast<float>(color.a) * alpha);
+                return color;
+            };
+
+            switch (screen_) {
+            case AppScreen::Menu: {
+                const int titleY = static_cast<int>(static_cast<float>(extent.height) * 0.18f);
+                const int menuY = static_cast<int>(static_cast<float>(extent.height) * 0.40f);
+                const int spacing = static_cast<int>(std::max(34.0f, static_cast<float>(extent.height) * 0.07f));
+                printCenteredText("MXVK 3D Tetris", centerX, titleY, withAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText("Choose a mode", centerX, titleY + 42, withAlpha(SDL_Color{255, 255, 255, 255}));
+
+                const char *items[] = {"New Game", "New Multiplayer", "High Scores", "Credits"};
+                for (int i = 0; i < 4; ++i) {
+                    const SDL_Color color = (i == cursorPos) ? SDL_Color{255, 255, 0, 255} : SDL_Color{255, 255, 255, 255};
+                    printCenteredText(items[i], centerX, menuY + i * spacing, withAlpha(color));
+                }
+                printCenteredText("Use arrows and Enter", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.86f), withAlpha(SDL_Color{180, 180, 180, 255}));
+                break;
+            }
+            case AppScreen::HighScores: {
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
+                printCenteredText("High Scores", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText(std::format("Best score: {}", bestScore_), centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText(std::format("Current score: {}", score_), centerX, baseY + 84, withAlpha(SDL_Color{255, 220, 120, 255}));
+                printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
+                break;
+            }
+            case AppScreen::Credits: {
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
+                printCenteredText("Credits", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText("MXVK 3D Tetris", centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText("Built with Vulkan and SDL3", centerX, baseY + 84, withAlpha(SDL_Color{255, 220, 120, 255}));
+                printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
+                break;
+            }
+            case AppScreen::Multiplayer: {
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
+                printCenteredText("Multiplayer", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText("Local multiplayer is not implemented yet", centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
+                break;
+            }
+            case AppScreen::Game:
+                printText(std::format("Score: {}", score_), 15, 15, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, withAlpha(SDL_Color{255, 220, 120, 255}));
+                printText(std::format("Level: {}", level_), 15, 75, withAlpha(SDL_Color{120, 220, 255, 255}));
+                if (gameOver_) {
+                    const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.58f);
+                    printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withAlpha(SDL_Color{255, 255, 255, 255}));
+                    printCenteredText("Press Enter to start a new game", centerX, baseY + 34, withAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText("Escape returns to menu", centerX, baseY + 68, withAlpha(SDL_Color{180, 180, 180, 255}));
+                }
+                break;
+            case AppScreen::Intro:
+                break;
             }
         }
 
@@ -1146,6 +1422,76 @@ namespace {
             if (elapsed >= backgroundTransitionSeconds_) {
                 backgroundTransitionActive_ = false;
             }
+        }
+
+        [[nodiscard]] mxvk::VK_Sprite *screenSpriteFor(AppScreen screen) const {
+            switch (screen) {
+            case AppScreen::Menu:
+                return menuBackgroundSprite_;
+            case AppScreen::HighScores:
+                return highScoresBackgroundSprite_;
+            case AppScreen::Credits:
+                return creditsBackgroundSprite_;
+            case AppScreen::Multiplayer:
+                return multiplayerBackgroundSprite_;
+            case AppScreen::Intro:
+            case AppScreen::Game:
+                return nullptr;
+            }
+            return nullptr;
+        }
+
+        void drawFadedSprite(mxvk::VK_Sprite *sprite, VkCommandBuffer cmd, const VkExtent2D &extent, float alpha) {
+            if (sprite == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+                return;
+            }
+            sprite->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
+            sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            sprite->clearQueue();
+        }
+
+        void drawGameScreenTransitionOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
+            if (screen_ != AppScreen::Game || !screenTransitionActive_) {
+                return;
+            }
+            drawFadedSprite(screenSpriteFor(transitionFromScreen_), cmd, extent, 1.0f - screenFadeAlpha());
+        }
+
+        void drawScreenBackdrop(VkCommandBuffer cmd, const VkExtent2D &extent) {
+            if (screen_ == AppScreen::Game) {
+                if (sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+                    return;
+                }
+                updateBackgroundTransitionState();
+
+                mxvk::VK_Sprite *sprite = background_;
+                if (backgroundTransitionActive_ && backgroundTransitionSprite_ != nullptr) {
+                    sprite = backgroundTransitionSprite_;
+                }
+                if (sprite == nullptr) {
+                    return;
+                }
+
+                if (sprite == backgroundTransitionSprite_) {
+                    const auto now = std::chrono::steady_clock::now();
+                    const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
+                    sprite->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
+                }
+
+                sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+                sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+                sprite->clearQueue();
+                return;
+            }
+
+            const float alpha = screenFadeAlpha();
+            if (screenTransitionActive_) {
+                drawFadedSprite(screenSpriteFor(transitionFromScreen_), cmd, extent, 1.0f - alpha);
+            }
+            drawFadedSprite(screenSpriteFor(screen_), cmd, extent, alpha);
         }
     };
 
