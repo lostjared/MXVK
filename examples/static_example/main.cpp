@@ -193,6 +193,10 @@ namespace example {
                 pipeline_rendering_info.viewMask = 0;
                 pipeline_rendering_info.colorAttachmentCount = 1;
                 pipeline_rendering_info.pColorAttachmentFormats = &swapchain_format;
+                const VkFormat depth_format = getDepthFormat();
+                if (depth_format != VK_FORMAT_UNDEFINED) {
+                    pipeline_rendering_info.depthAttachmentFormat = depth_format;
+                }
 
                 VkGraphicsPipelineCreateInfo pipeline_info{};
                 pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
