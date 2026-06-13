@@ -19,6 +19,9 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+#include "mxvk/mxvk_sound.hpp"
+#endif
 
 #ifndef tetris_ASSET_DIR
 #define tetris_ASSET_DIR "."
@@ -124,6 +127,13 @@ namespace {
             setFont(tetris_FONT_PATH, 22);
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             tryOpenFirstGamepad();
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            music_ = std::make_unique<mxvk::VK_Mixer>();
+            const int musicTrack = music_->loadMusic(dataRoot_ + "/music.ogg");
+            if (music_->playMusic(musicTrack, -1) != 0) {
+                throw mxvk::Exception("Could not start Tetris background music");
+            }
+#endif
             background_ = createSprite(dataRoot_ + "/psychedelic_background.png");
             gameOverSprite_ = createSprite(dataRoot_ + "/gameover.png");
             introSprite_ = createSprite(dataRoot_ + "/intro.png",
@@ -138,6 +148,11 @@ namespace {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (music_) {
+                music_->stopMusic();
+            }
+#endif
             closeGamepad();
             cleanupModels();
         }
@@ -231,6 +246,9 @@ namespace {
         mxvk::VK_Sprite *background_ = nullptr;
         mxvk::VK_Sprite *introSprite_ = nullptr;
         mxvk::VK_Sprite *gameOverSprite_ = nullptr;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::unique_ptr<mxvk::VK_Mixer> music_{};
+#endif
         SDL_Gamepad *gamepad_ = nullptr;
         SDL_JoystickID gamepadId_ = 0;
         std::chrono::steady_clock::time_point introStart_{std::chrono::steady_clock::now()};
