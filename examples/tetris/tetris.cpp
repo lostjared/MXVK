@@ -1731,7 +1731,7 @@ namespace {
             model = glm::translate(model, glm::vec3(0.0f, -0.34f, 0.0f));
             model = glm::rotate(model, elapsed * 0.75f, glm::vec3(0.0f, 1.0f, 0.0f));
             model = glm::rotate(model, std::sin(elapsed * 0.6f) * 0.08f, glm::vec3(1.0f, 0.0f, 0.0f));
-            model = glm::scale(model, glm::vec3(0.48f));
+            model = glm::scale(model, glm::vec3(0.228f));
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = model;
