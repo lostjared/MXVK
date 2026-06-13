@@ -168,6 +168,18 @@ namespace mxvk {
         return MIX_TrackPlaying(track);
     }
 
+    [[nodiscard]] bool VK_Mixer::isMusicPlaying(int id) const {
+        if (!init_ || id < 0 || id >= static_cast<int>(music_tracks_.size())) {
+            return false;
+        }
+
+        MIX_Track *track = music_tracks_[toIndex(id)].get();
+        if (track == nullptr) {
+            return false;
+        }
+        return MIX_TrackPlaying(track);
+    }
+
     void VK_Mixer::stopMusic() {
         if (!init_ || mixer_ == nullptr) {
             return;

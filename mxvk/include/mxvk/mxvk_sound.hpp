@@ -79,6 +79,13 @@ namespace mxvk {
          */
         [[nodiscard]] bool isPlaying(int channel) const;
 
+        /**
+         * @brief Query whether a loaded music track is currently playing.
+         * @param id Music index returned by loadMusic().
+         * @return @c true if the music track is active.
+         */
+        [[nodiscard]] bool isMusicPlaying(int id) const;
+
         /** @brief Free all loaded audio chunks and music tracks. */
         void cleanup();
 

@@ -63,6 +63,11 @@ namespace {
         int color = 0;
     };
 
+    struct PieceQueueEntry {
+        std::array<Block, 4> blocks{};
+        int color = 0;
+    };
+
     struct BlockModel {
         std::unique_ptr<mxvk::VKAbstractModel> model;
         int color = 0;
@@ -93,6 +98,17 @@ namespace {
         "manifest_purple.txt",
         "manifest_red.txt",
         "manifest_gray.txt",
+    }};
+
+    const std::array<std::string, 8> blockTextureFiles{{
+        "block_ltblue.png",
+        "block_dblue.png",
+        "block_orange.png",
+        "block_yellow.png",
+        "block_green.png",
+        "block_purple.png",
+        "block_red.png",
+        "block_gray.png",
     }};
 
     const std::array<glm::vec3, 8> colorTints{{
@@ -129,12 +145,20 @@ namespace {
             tryOpenFirstGamepad();
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             music_ = std::make_unique<mxvk::VK_Mixer>();
-            const int musicTrack = music_->loadMusic(dataRoot_ + "/music.ogg");
-            if (music_->playMusic(musicTrack, -1) != 0) {
-                throw mxvk::Exception("Could not start Tetris background music");
-            }
+            musicTrack_ = music_->loadMusic(dataRoot_ + "/music.ogg");
+            ensureMusicPlaying();
 #endif
             background_ = createSprite(dataRoot_ + "/psychedelic_background.png");
+            backgroundTransitionSprite_ = createSprite(
+                dataRoot_ + "/psychedelic_background.png",
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(tetris_SHADER_DIR) + "/tetris_background_transition.frag.spv");
+            previewBorderSprite_ = createSprite(1, 1);
+            const uint32_t whitePixel = 0xFFFFFFFFu;
+            previewBorderSprite_->updateTexture(&whitePixel, 1, 1);
+            for (std::size_t i = 0; i < blockPreviewSprites_.size(); ++i) {
+                blockPreviewSprites_[i] = createSprite(dataRoot_ + "/" + blockTextureFiles[i]);
+            }
             gameOverSprite_ = createSprite(dataRoot_ + "/gameover.png");
             introSprite_ = createSprite(dataRoot_ + "/intro.png",
                                         std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
@@ -194,6 +218,7 @@ namespace {
         }
 
         void proc() override {
+            ensureMusicPlaying();
             tryOpenFirstGamepad();
             updateIntroState();
             updateInput();
@@ -230,6 +255,7 @@ namespace {
             }
 
             drawFrame(cmd, imageIndex, view, proj);
+            drawNextPiecePreview(cmd, imageIndex, extent);
             drawIntroOverlay(cmd, extent);
             drawGameOverOverlay(cmd, extent);
         }
@@ -244,10 +270,14 @@ namespace {
         std::array<BlockModel, 4> activeModels_{};
         std::vector<BlockModel> frameModels_{};
         mxvk::VK_Sprite *background_ = nullptr;
+        mxvk::VK_Sprite *backgroundTransitionSprite_ = nullptr;
+        mxvk::VK_Sprite *previewBorderSprite_ = nullptr;
+        std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites_{};
         mxvk::VK_Sprite *introSprite_ = nullptr;
         mxvk::VK_Sprite *gameOverSprite_ = nullptr;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> music_{};
+        int musicTrack_ = -1;
 #endif
         SDL_Gamepad *gamepad_ = nullptr;
         SDL_JoystickID gamepadId_ = 0;
@@ -255,6 +285,7 @@ namespace {
         std::chrono::steady_clock::time_point lastFall_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lastInputUpdate_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lineClearStart_{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point backgroundTransitionStart_{std::chrono::steady_clock::now()};
         bool introActive_ = true;
         float gridYaw_ = 0.0f;
         float gridPitch_ = 0.0f;
@@ -262,6 +293,7 @@ namespace {
         float cameraDistance_ = 2.45f;
         int score_ = 0;
         int linesCleared_ = 0;
+        int level_ = 1;
         float fallSeconds_ = 0.65f;
         float moveRepeatTimer_ = 0.0f;
         float softDropRepeatTimer_ = 0.0f;
@@ -274,9 +306,12 @@ namespace {
         bool enterHeld_ = false;
         bool escapeHeld_ = false;
         bool lineClearActive_ = false;
+        bool backgroundTransitionActive_ = false;
         std::array<bool, boardHeight> clearingRows_{};
+        PieceQueueEntry nextPiece_{};
         static constexpr float introHoldSeconds_ = 5.0f;
         static constexpr float introFadeSeconds_ = 1.0f;
+        static constexpr float backgroundTransitionSeconds_ = 1.25f;
         static constexpr Sint16 gamepadDeadzone_ = 10000;
         static constexpr float gamepadMoveInitialDelaySeconds_ = 0.22f;
         static constexpr float gamepadMoveRepeatSeconds_ = 0.12f;
@@ -340,13 +375,15 @@ namespace {
                     cell.color = -1;
                 }
             }
-            fallSeconds_ = 0.65f;
             gameOver_ = false;
             lineClearActive_ = false;
+            backgroundTransitionActive_ = false;
             clearingRows_.fill(false);
             score_ = 0;
             linesCleared_ = 0;
+            updateDifficulty();
             lastFall_ = std::chrono::steady_clock::now();
+            nextPiece_ = randomPiece();
             spawnPiece();
         }
 
@@ -360,14 +397,13 @@ namespace {
         }
 
         void spawnPiece() {
-            std::uniform_int_distribution<int> dist(0, static_cast<int>(pieceDefinitions.size()) - 1);
-            const PieceDefinition &definition = pieceDefinitions[dist(rng_)];
-            active_.blocks = definition.blocks;
+            active_.blocks = nextPiece_.blocks;
             active_.x = boardWidth / 2;
             active_.y = boardHeight - 2;
-            active_.color = definition.color;
+            active_.color = nextPiece_.color;
             reloadActiveModels(active_.color);
             gameOver_ = collides(active_.x, active_.y, active_.blocks);
+            nextPiece_ = randomPiece();
         }
 
         void reloadActiveModels(int color) {
@@ -378,6 +414,47 @@ namespace {
                 block = loadBlockModel(color);
             }
         }
+
+        [[nodiscard]] PieceQueueEntry randomPiece() {
+            std::uniform_int_distribution<int> dist(0, static_cast<int>(pieceDefinitions.size()) - 1);
+            const PieceDefinition &definition = pieceDefinitions[dist(rng_)];
+            return PieceQueueEntry{definition.blocks, definition.color};
+        }
+
+        void updateDifficulty() {
+            const int previousLevel = level_;
+            level_ = (linesCleared_ / 8) + 1;
+            static constexpr std::array<float, 16> arcadeFallSeconds{
+                0.72f, 0.66f, 0.60f, 0.54f,
+                0.48f, 0.43f, 0.38f, 0.34f,
+                0.30f, 0.26f, 0.23f, 0.20f,
+                0.18f, 0.16f, 0.14f, 0.12f,
+            };
+
+            const std::size_t index = std::min<std::size_t>(arcadeFallSeconds.size() - 1, static_cast<std::size_t>(std::max(level_ - 1, 0)));
+            fallSeconds_ = arcadeFallSeconds[index];
+            if (level_ > previousLevel) {
+                triggerBackgroundTransition();
+            }
+        }
+
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        void ensureMusicPlaying() {
+            if (!music_) {
+                return;
+            }
+            if (musicTrack_ < 0) {
+                return;
+            }
+            if (!music_->isMusicPlaying(musicTrack_)) {
+                if (music_->playMusic(musicTrack_, -1) != 0) {
+                    throw mxvk::Exception("Could not start Tetris background music");
+                }
+            }
+        }
+#else
+        void ensureMusicPlaying() {}
+#endif
 
         void updateInput() {
             const auto now = std::chrono::steady_clock::now();
@@ -816,7 +893,7 @@ namespace {
                     score_ += 5;
                 }
                 linesCleared_ += cleared;
-                fallSeconds_ = std::max(0.16f, fallSeconds_ - static_cast<float>(cleared) * 0.025f);
+                updateDifficulty();
             }
             spawnPiece();
             lastFall_ = std::chrono::steady_clock::now();
@@ -857,13 +934,30 @@ namespace {
         }
 
         void drawBackground(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (background_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            if (sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
                 return;
             }
-            background_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+
+            updateBackgroundTransitionState();
+
+            mxvk::VK_Sprite *sprite = background_;
+            if (backgroundTransitionActive_ && backgroundTransitionSprite_ != nullptr) {
+                sprite = backgroundTransitionSprite_;
+            }
+            if (sprite == nullptr) {
+                return;
+            }
+
+            if (sprite == backgroundTransitionSprite_) {
+                const auto now = std::chrono::steady_clock::now();
+                const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
+                sprite->setShaderParams(elapsed, 0.0f, 0.0f, 0.0f);
+            }
+
+            sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
-            background_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
-            background_->clearQueue();
+            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            sprite->clearQueue();
         }
 
         void drawIntroOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
@@ -951,12 +1045,74 @@ namespace {
             block.model->render(cmd, imageIndex, false);
         }
 
+        void drawSpriteRect(mxvk::VK_Sprite *sprite, VkCommandBuffer cmd, const VkExtent2D &extent, int x, int y, int w, int h) {
+            if (sprite == nullptr) {
+                return;
+            }
+            sprite->drawSpriteRect(x, y, w, h);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
+            sprite->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
+            sprite->clearQueue();
+        }
+
+        void drawNextPiecePreview(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
+            if (introActive_ || previewBorderSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+                return;
+            }
+            (void)imageIndex;
+
+            const int panelSize = std::min({220, static_cast<int>(static_cast<float>(extent.width) * 0.28f), static_cast<int>(static_cast<float>(extent.height) * 0.34f)});
+            const int panelW = panelSize;
+            const int panelH = panelSize;
+            const int margin = 24;
+            const int panelX = static_cast<int>(extent.width) - panelW - margin;
+            const int panelY = 88;
+            const int border = 4;
+
+            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY, panelW, border);
+            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY + panelH - border, panelW, border);
+            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX, panelY, border, panelH);
+            drawSpriteRect(previewBorderSprite_, cmd, extent, panelX + panelW - border, panelY, border, panelH);
+
+            printText("Next", panelX + 12, panelY - 28, SDL_Color{255, 255, 255, 255});
+
+            int minX = nextPiece_.blocks[0].x;
+            int maxX = nextPiece_.blocks[0].x;
+            int minY = nextPiece_.blocks[0].y;
+            int maxY = nextPiece_.blocks[0].y;
+            for (const Block &block : nextPiece_.blocks) {
+                minX = std::min(minX, block.x);
+                maxX = std::max(maxX, block.x);
+                minY = std::min(minY, block.y);
+                maxY = std::max(maxY, block.y);
+            }
+
+            const float innerPadding = 28.0f;
+            const float innerSize = static_cast<float>(panelSize) - innerPadding * 2.0f;
+            const int blockSize = static_cast<int>(std::min(34.0f, innerSize / static_cast<float>(std::max(maxX - minX + 1, maxY - minY + 1))));
+            const float pieceW = static_cast<float>(maxX - minX + 1) * blockSize;
+            const float pieceH = static_cast<float>(maxY - minY + 1) * blockSize;
+            const float centerX = static_cast<float>(panelX) + static_cast<float>(panelW) * 0.5f;
+            const float centerY = static_cast<float>(panelY) + static_cast<float>(panelH) * 0.5f;
+            const float originX = centerX - pieceW * 0.5f;
+            const float originY = centerY - pieceH * 0.5f;
+            mxvk::VK_Sprite *blockSprite = blockPreviewSprites_[static_cast<std::size_t>(nextPiece_.color)];
+
+            for (std::size_t i = 0; i < nextPiece_.blocks.size(); ++i) {
+                const Block &pieceBlock = nextPiece_.blocks[i];
+                const float x = originX + static_cast<float>(pieceBlock.x - minX) * blockSize;
+                const float y = originY + static_cast<float>(pieceBlock.y - minY) * blockSize;
+                drawSpriteRect(blockSprite, cmd, extent, static_cast<int>(x), static_cast<int>(y), blockSize, blockSize);
+            }
+        }
+
         void drawHud() {
             if (introActive_) {
                 return;
             }
             printText(std::format("Score: {}", score_), 15, 15, SDL_Color{255, 255, 255, 255});
             printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, SDL_Color{255, 220, 120, 255});
+            printText(std::format("Level: {}", level_), 15, 75, SDL_Color{120, 220, 255, 255});
             if (gameOver_) {
                 const VkExtent2D extent = getSwapchainExtent();
                 const int centerX = static_cast<int>(extent.width) / 2;
@@ -974,6 +1130,22 @@ namespace {
                 return;
             }
             printText(text, centerX, y, color);
+        }
+
+        void triggerBackgroundTransition() {
+            backgroundTransitionActive_ = true;
+            backgroundTransitionStart_ = std::chrono::steady_clock::now();
+        }
+
+        void updateBackgroundTransitionState() {
+            if (!backgroundTransitionActive_) {
+                return;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - backgroundTransitionStart_).count();
+            if (elapsed >= backgroundTransitionSeconds_) {
+                backgroundTransitionActive_ = false;
+            }
         }
     };
 
