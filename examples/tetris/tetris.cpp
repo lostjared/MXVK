@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdlib>
 #include <format>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -41,6 +43,9 @@ namespace {
     constexpr int boardHeight = 20;
     constexpr float cubeScale = 0.085f;
     constexpr float cubeSpacing = cubeScale * 1.0f;
+    constexpr std::size_t nameMaxLength = 10;
+    constexpr char nameCharacters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    constexpr std::size_t nameCharacterCount = sizeof(nameCharacters) - 1;
 
     struct Cell {
         int color = -1;
@@ -78,6 +83,127 @@ namespace {
         int x = 0;
         int y = 0;
     };
+
+    struct HighScoreEntry {
+        std::string name;
+        int score = 0;
+    };
+
+    class HighScores {
+      public:
+        explicit HighScores(std::filesystem::path filePath)
+            : filePath_(std::move(filePath)) {
+            load();
+        }
+
+        void addScore(std::string name, int score) {
+            normalizeName(name);
+            entries_.push_back({std::move(name), score});
+            sortAndTrim();
+            write();
+        }
+
+        [[nodiscard]] bool qualifies(int score) const {
+            if (entries_.size() < kMaxEntries) {
+                return true;
+            }
+            return score > entries_.back().score;
+        }
+
+        [[nodiscard]] const std::vector<HighScoreEntry> &entries() const {
+            return entries_;
+        }
+
+        [[nodiscard]] int bestScore() const {
+            return entries_.empty() ? 0 : entries_.front().score;
+        }
+
+        void write() const {
+            std::ofstream out(filePath_, std::ios::trunc);
+            if (!out.is_open()) {
+                return;
+            }
+
+            for (const HighScoreEntry &entry : entries_) {
+                out << entry.name << ':' << entry.score << '\n';
+            }
+        }
+
+      private:
+        static constexpr std::size_t kMaxEntries = 10;
+        static constexpr std::size_t kMaxNameBytes = 16;
+
+        std::filesystem::path filePath_;
+        std::vector<HighScoreEntry> entries_{};
+
+        static void normalizeName(std::string &name) {
+            if (name.empty()) {
+                name = "Anonymous";
+            }
+
+            for (char &ch : name) {
+                if (ch == '\n' || ch == '\r' || ch == ':') {
+                    ch = '_';
+                }
+            }
+
+            if (name.size() > kMaxNameBytes) {
+                name.resize(kMaxNameBytes);
+            }
+        }
+
+        void sortAndTrim() {
+            std::sort(entries_.begin(), entries_.end(), [](const HighScoreEntry &a, const HighScoreEntry &b) {
+                if (a.score != b.score) {
+                    return a.score > b.score;
+                }
+                return a.name < b.name;
+            });
+
+            if (entries_.size() > kMaxEntries) {
+                entries_.resize(kMaxEntries);
+            }
+        }
+
+        void load() {
+            entries_.clear();
+
+            std::ifstream in(filePath_);
+            if (!in.is_open()) {
+                return;
+            }
+
+            std::string line;
+            while (std::getline(in, line)) {
+                const std::size_t separator = line.find(':');
+                if (separator == std::string::npos) {
+                    continue;
+                }
+
+                HighScoreEntry entry{};
+                entry.name = line.substr(0, separator);
+                entry.score = static_cast<int>(std::strtol(line.substr(separator + 1).c_str(), nullptr, 10));
+                normalizeName(entry.name);
+                entries_.push_back(std::move(entry));
+            }
+
+            sortAndTrim();
+        }
+    };
+
+    [[nodiscard]] std::filesystem::path resolveScoreFilePath() {
+        if (const char *basePath = SDL_GetBasePath(); basePath != nullptr && basePath[0] != '\0') {
+            return std::filesystem::path(basePath) / "scores.dat";
+        }
+
+        std::error_code ec;
+        const std::filesystem::path cwd = std::filesystem::current_path(ec);
+        if (!ec) {
+            return cwd / "scores.dat";
+        }
+
+        return std::filesystem::path("scores.dat");
+    }
 
     const std::array<PieceDefinition, 7> pieceDefinitions{{
         {{{{-1, 0}, {0, 0}, {1, 0}, {2, 0}}}, 0},
@@ -136,6 +262,7 @@ namespace {
         Intro,
         Menu,
         Game,
+        GameOver,
         Multiplayer,
         HighScores,
         Credits,
@@ -146,7 +273,8 @@ namespace {
         TetrisWindow(const std::string &path, int width, int height, bool fullscreen)
             : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION),
               assetRoot_((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
-              dataRoot_(assetRoot_ + "/data") {
+              dataRoot_(assetRoot_ + "/data"),
+              highScores_(resolveScoreFilePath()) {
             std::random_device rd;
             rng_.seed(rd());
             setFont(tetris_FONT_PATH, 22);
@@ -202,6 +330,7 @@ namespace {
                 music_->stopMusic();
             }
 #endif
+            stopNameEntry();
             closeGamepad();
             cleanupModels();
         }
@@ -216,6 +345,16 @@ namespace {
             if (e.type == SDL_EVENT_QUIT) {
                 exit();
                 return;
+            }
+
+            if (e.type == SDL_EVENT_KEY_DOWN) {
+                if (e.key.repeat) {
+                    return;
+                }
+                if (screen_ == AppScreen::GameOver && enteringName_) {
+                    handleNameEntryKey(e.key.key);
+                    return;
+                }
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
@@ -234,6 +373,10 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                if (screen_ == AppScreen::GameOver && enteringName_) {
+                    handleNameEntryButton(e.gbutton.button);
+                    return;
+                }
                 handleGamepadButtonDown(e.gbutton.button);
             }
         }
@@ -254,7 +397,7 @@ namespace {
             const VkExtent2D extent = getSwapchainExtent();
             drawScreenBackdrop(cmd, extent);
 
-            if (screen_ == AppScreen::Game) {
+            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
                 const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
                 glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.2f, cameraDistance_), glm::vec3(0.0f, 0.1f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
                 view = glm::rotate(view, glm::radians(gridPitch_), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -306,6 +449,7 @@ namespace {
         std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites_{};
         mxvk::VK_Sprite *introSprite_ = nullptr;
         mxvk::VK_Sprite *gameOverSprite_ = nullptr;
+        HighScores highScores_;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> music_{};
         int musicTrack_ = -1;
@@ -325,7 +469,6 @@ namespace {
         float gridRoll_ = 0.0f;
         float cameraDistance_ = 2.45f;
         int score_ = 0;
-        int bestScore_ = 0;
         int linesCleared_ = 0;
         int level_ = 1;
         int cursorPos = 0;
@@ -335,11 +478,16 @@ namespace {
         float gamepadMoveRepeatTimer_ = 0.0f;
         float gamepadSoftDropRepeatTimer_ = 0.0f;
         bool gameOver_ = false;
+        bool enteringName_ = false;
+        bool highScoresAfterSave_ = false;
+        std::size_t nameCharIndex_ = 0;
+        std::string playerName_{};
         bool hardDropHeld_ = false;
         bool rotateHeld_ = false;
         bool resetHeld_ = false;
         bool enterHeld_ = false;
         bool escapeHeld_ = false;
+        bool backspaceHeld_ = false;
         bool menuUpHeld_ = false;
         bool menuDownHeld_ = false;
         bool menuEnterHeld_ = false;
@@ -415,6 +563,7 @@ namespace {
         }
 
         void resetGame() {
+            stopNameEntry();
             clearLockedBlocks();
             for (auto &row : board_) {
                 for (Cell &cell : row) {
@@ -451,9 +600,7 @@ namespace {
             reloadActiveModels(active_.color);
             gameOver_ = collides(active_.x, active_.y, active_.blocks);
             if (gameOver_) {
-                bestScore_ = std::max(bestScore_, score_);
-                gameOverTransitionActive_ = true;
-                gameOverTransitionStart_ = std::chrono::steady_clock::now();
+                enterGameOverState();
             }
             nextPiece_ = randomPiece();
         }
@@ -542,6 +689,14 @@ namespace {
                 return;
             }
 
+            if (screen_ == AppScreen::GameOver) {
+                if (enteringName_) {
+                    return;
+                }
+                handleGameOverKeys(keys);
+                return;
+            }
+
             if (screen_ != AppScreen::Game) {
                 handleMenuKeys(keys);
                 return;
@@ -586,6 +741,9 @@ namespace {
                     } else if (cursorPos == 3) {
                         goToCredits();
                     }
+                } else if (screen_ == AppScreen::HighScores && highScoresAfterSave_) {
+                    highScoresAfterSave_ = false;
+                    restartIntroSequence();
                 } else {
                     goToMenu();
                 }
@@ -594,6 +752,7 @@ namespace {
                 if (screen_ == AppScreen::Menu) {
                     exit();
                 } else {
+                    highScoresAfterSave_ = false;
                     goToMenu();
                 }
             }
@@ -605,7 +764,7 @@ namespace {
         }
 
         void handleGamepadInput(float deltaSeconds) {
-            if (gamepad_ == nullptr || introActive_ || screen_ != AppScreen::Game || gameOver_ || lineClearActive_) {
+            if (gamepad_ == nullptr || introActive_ || (screen_ != AppScreen::Game && screen_ != AppScreen::GameOver) || gameOver_ || lineClearActive_) {
                 gamepadMoveDirection_ = 0;
                 gamepadMoveHeldSeconds_ = 0.0f;
                 gamepadSoftDropHeld_ = false;
@@ -733,10 +892,23 @@ namespace {
                     goToMenu();
                 }
                 break;
+            case AppScreen::GameOver:
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    if (enteringName_) {
+                        commitScoreEntry();
+                    } else {
+                        restartIntroSequence();
+                    }
+                } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
+                    highScoresAfterSave_ = false;
+                    goToMenu();
+                }
+                break;
             case AppScreen::Multiplayer:
             case AppScreen::HighScores:
             case AppScreen::Credits:
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
+                    highScoresAfterSave_ = false;
                     goToMenu();
                 }
                 break;
@@ -814,6 +986,7 @@ namespace {
 
         void restartIntroSequence() {
             resetGame();
+            highScoresAfterSave_ = false;
             introActive_ = true;
             introFadeStarted_ = false;
             introStart_ = std::chrono::steady_clock::now();
@@ -825,15 +998,103 @@ namespace {
             introSkipHeld_ = true;
         }
 
+        void enterGameOverState() {
+            screen_ = AppScreen::GameOver;
+            gameOverTransitionActive_ = true;
+            gameOverTransitionStart_ = std::chrono::steady_clock::now();
+            nameCharIndex_ = 0;
+            playerName_.clear();
+            enteringName_ = highScores_.qualifies(score_);
+            highScoresAfterSave_ = false;
+            resetMenuLatchState();
+        }
+
+        void stopNameEntry() {
+            enteringName_ = false;
+            nameCharIndex_ = 0;
+            playerName_.clear();
+        }
+
+        void commitScoreEntry() {
+            highScores_.addScore(playerName_, score_);
+            stopNameEntry();
+            highScoresAfterSave_ = true;
+            menuEnterHeld_ = true;
+            goToHighScores();
+        }
+
+        [[nodiscard]] char currentNameCharacter() const {
+            return nameCharacters[nameCharIndex_ % nameCharacterCount];
+        }
+
+        void cycleNameCharacter(int delta) {
+            if (!enteringName_) {
+                return;
+            }
+            const int count = static_cast<int>(nameCharacterCount);
+            const int next = (static_cast<int>(nameCharIndex_) + delta + count) % count;
+            nameCharIndex_ = static_cast<std::size_t>(next);
+        }
+
+        void appendCurrentNameCharacter() {
+            if (!enteringName_ || playerName_.size() >= nameMaxLength) {
+                return;
+            }
+            playerName_ += currentNameCharacter();
+        }
+
+        void deleteNameCharacter() {
+            if (!enteringName_ || playerName_.empty()) {
+                return;
+            }
+            playerName_.pop_back();
+        }
+
+        void handleNameEntryKey(SDL_Keycode key) {
+            if (key == SDLK_UP) {
+                cycleNameCharacter(-1);
+            } else if (key == SDLK_DOWN) {
+                cycleNameCharacter(1);
+            } else if (key == SDLK_SPACE) {
+                appendCurrentNameCharacter();
+            } else if (key == SDLK_BACKSPACE) {
+                deleteNameCharacter();
+            } else if (key == SDLK_RETURN) {
+                commitScoreEntry();
+            } else if (key == SDLK_ESCAPE) {
+                highScoresAfterSave_ = false;
+                goToMenu();
+            }
+        }
+
+        void handleNameEntryButton(Uint8 button) {
+            if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                cycleNameCharacter(-1);
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                cycleNameCharacter(1);
+            } else if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                appendCurrentNameCharacter();
+            } else if (button == SDL_GAMEPAD_BUTTON_WEST) {
+                commitScoreEntry();
+            } else if (button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                deleteNameCharacter();
+            }
+        }
+
         void goToMenu() {
-            if (screen_ == AppScreen::Game) {
+            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
                 gameOver_ = false;
             }
+            gameOverTransitionActive_ = false;
+            highScoresAfterSave_ = false;
+            stopNameEntry();
             cursorPos = 0;
             requestScreen(AppScreen::Menu);
         }
 
         void goToHighScores() {
+            gameOver_ = false;
+            stopNameEntry();
             requestScreen(AppScreen::HighScores);
         }
 
@@ -854,7 +1115,7 @@ namespace {
                 screen_ = nextScreen;
                 return;
             }
-            if (screen_ == AppScreen::Game) {
+            if (screen_ == AppScreen::Game || screen_ == AppScreen::GameOver) {
                 screenTransitionActive_ = false;
                 screen_ = nextScreen;
                 return;
@@ -902,6 +1163,7 @@ namespace {
             menuDownHeld_ = false;
             menuEnterHeld_ = false;
             introSkipHeld_ = false;
+            backspaceHeld_ = false;
         }
 
         void updateMenuInputLatchState() {
@@ -1021,6 +1283,63 @@ namespace {
             rotateHeld_ = rotateDown;
             resetHeld_ = resetDown;
             enterHeld_ = enterDown;
+        }
+
+        void handleGameOverKeys(const bool *keys) {
+            const bool enterDown = keys[SDL_SCANCODE_RETURN];
+            const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
+            const bool resetDown = keys[SDL_SCANCODE_R];
+            const bool highScoresDown = keys[SDL_SCANCODE_H];
+            const bool backspaceDown = keys[SDL_SCANCODE_BACKSPACE];
+
+            if (enteringName_) {
+                if (backspaceDown && !backspaceHeld_ && !playerName_.empty()) {
+                    playerName_.pop_back();
+                }
+                if (enterDown && !enterHeld_) {
+                    commitScoreEntry();
+                    backspaceHeld_ = backspaceDown;
+                    enterHeld_ = enterDown;
+                    escapeHeld_ = escapeDown;
+                    resetHeld_ = resetDown;
+                    menuEnterHeld_ = highScoresDown;
+                    return;
+                }
+
+                backspaceHeld_ = backspaceDown;
+                enterHeld_ = enterDown;
+                escapeHeld_ = escapeDown;
+                resetHeld_ = resetDown;
+                menuEnterHeld_ = highScoresDown;
+                return;
+            } else {
+                if (enterDown && !enterHeld_) {
+                    restartIntroSequence();
+                    backspaceHeld_ = backspaceDown;
+                    enterHeld_ = enterDown;
+                    escapeHeld_ = escapeDown;
+                    resetHeld_ = resetDown;
+                    menuEnterHeld_ = highScoresDown;
+                    return;
+                }
+            }
+
+            if (resetDown && !resetHeld_) {
+                restartIntroSequence();
+            }
+            if (highScoresDown && !menuEnterHeld_) {
+                stopNameEntry();
+                goToHighScores();
+            }
+            if (escapeDown && !escapeHeld_) {
+                goToMenu();
+            }
+
+            backspaceHeld_ = backspaceDown;
+            enterHeld_ = enterDown;
+            escapeHeld_ = escapeDown;
+            resetHeld_ = resetDown;
+            menuEnterHeld_ = highScoresDown;
         }
 
         [[nodiscard]] bool collides(int pieceX, int pieceY, const std::array<Block, 4> &blocks) const {
@@ -1244,7 +1563,8 @@ namespace {
         }
 
         void drawGameOverOverlay(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (!gameOver_ || gameOverSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
+            const bool shouldShow = (screen_ == AppScreen::Game && gameOver_) || screen_ == AppScreen::GameOver;
+            if (!shouldShow || gameOverSprite_ == nullptr || sprite_pipeline_ == VK_NULL_HANDLE || sprite_pipeline_layout_ == VK_NULL_HANDLE) {
                 return;
             }
 
@@ -1403,10 +1723,29 @@ namespace {
                 break;
             }
             case AppScreen::HighScores: {
-                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.16f);
                 printCenteredText("High Scores", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
-                printCenteredText(std::format("Best score: {}", bestScore_), centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
-                printCenteredText(std::format("Current score: {}", score_), centerX, baseY + 84, withAlpha(SDL_Color{255, 220, 120, 255}));
+                const auto &scores = highScores_.entries();
+                const int listLeftX = static_cast<int>(static_cast<float>(extent.width) * 0.34f);
+                const int listRightX = static_cast<int>(static_cast<float>(extent.width) * 0.70f);
+                const int lineHeight = 30;
+                for (std::size_t i = 0; i < 10U; ++i) {
+                    const int rowY = baseY + 54 + static_cast<int>(i) * lineHeight;
+                    const bool hasScore = i < scores.size();
+                    const std::string nameText = hasScore ? scores[i].name : "---";
+                    const std::string scoreText = hasScore ? std::format("{}", scores[i].score) : "---";
+                    printText(std::format("{:>2}. {}", i + 1U, nameText),
+                              listLeftX,
+                              rowY,
+                              withAlpha(SDL_Color{255, 255, 255, 255}));
+                    int scoreWidth = 0;
+                    int scoreHeight = 0;
+                    if (getTextDimensions(scoreText, scoreWidth, scoreHeight)) {
+                        printText(scoreText, listRightX - scoreWidth, rowY, withAlpha(SDL_Color{255, 255, 255, 255}));
+                    } else {
+                        printText(scoreText, listRightX, rowY, withAlpha(SDL_Color{255, 255, 255, 255}));
+                    }
+                }
                 printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
                 break;
             }
@@ -1425,6 +1764,32 @@ namespace {
                 printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
                 break;
             }
+            case AppScreen::GameOver: {
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.20f);
+                const float gameOverAlpha = gameOverFadeAlpha();
+                const auto withGameOverAlpha = [gameOverAlpha](SDL_Color color) {
+                    color.a = static_cast<Uint8>(static_cast<float>(color.a) * gameOverAlpha);
+                    return color;
+                };
+
+                printCenteredText("Game Over", centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText(std::format("Final Score: {}", score_), centerX, baseY + 42, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                if (enteringName_) {
+                    printCenteredText("New high score", centerX, baseY + 82, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText(std::format("Name: {}", playerName_.empty() ? "_" : playerName_),
+                                      centerX,
+                                      baseY + 118,
+                                      withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                    printCenteredText(std::format("Pick: [{}]", currentNameCharacter()), centerX, baseY + 154, withGameOverAlpha(SDL_Color{120, 255, 255, 255}));
+                    printCenteredText("Up/Down choose, A/Space add", centerX, baseY + 190, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                    printCenteredText("X/Enter save, B/Backspace delete", centerX, baseY + 224, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                } else {
+                    printCenteredText("R to restart from intro", centerX, baseY + 92, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText("H for high scores", centerX, baseY + 126, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                    printCenteredText("Enter to restart", centerX, baseY + 160, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                }
+                break;
+            }
             case AppScreen::Game:
                 printText(std::format("Score: {}", score_), 15, 15, withAlpha(SDL_Color{255, 255, 255, 255}));
                 printText(std::format("Lines Cleared: {}", linesCleared_), 15, 45, withAlpha(SDL_Color{255, 220, 120, 255}));
@@ -1437,7 +1802,7 @@ namespace {
                         return color;
                     };
                     printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
-                    printCenteredText("Press Enter to restart", centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText("Game over", centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
                 }
                 break;
             case AppScreen::Intro:
@@ -1483,6 +1848,7 @@ namespace {
                 return multiplayerBackgroundSprite_;
             case AppScreen::Intro:
             case AppScreen::Game:
+            case AppScreen::GameOver:
                 return nullptr;
             }
             return nullptr;
