@@ -318,6 +318,7 @@ namespace {
         std::chrono::steady_clock::time_point lineClearStart_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point backgroundTransitionStart_{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point screenTransitionStart_{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point gameOverTransitionStart_{std::chrono::steady_clock::now()};
         bool introActive_ = true;
         float gridYaw_ = 0.0f;
         float gridPitch_ = 0.0f;
@@ -345,6 +346,7 @@ namespace {
         bool introSkipHeld_ = false;
         bool introFadeStarted_ = false;
         bool screenTransitionActive_ = false;
+        bool gameOverTransitionActive_ = false;
         bool lineClearActive_ = false;
         bool backgroundTransitionActive_ = false;
         std::array<bool, boardHeight> clearingRows_{};
@@ -354,6 +356,7 @@ namespace {
         static constexpr float introHoldSeconds_ = 5.0f;
         static constexpr float introFadeSeconds_ = 1.0f;
         static constexpr float screenTransitionSeconds_ = 0.36f;
+        static constexpr float gameOverTransitionSeconds_ = 0.5f;
         static constexpr float backgroundTransitionSeconds_ = 1.25f;
         static constexpr Sint16 gamepadDeadzone_ = 10000;
         static constexpr float gamepadMoveInitialDelaySeconds_ = 0.22f;
@@ -419,6 +422,7 @@ namespace {
                 }
             }
             gameOver_ = false;
+            gameOverTransitionActive_ = false;
             lineClearActive_ = false;
             backgroundTransitionActive_ = false;
             clearingRows_.fill(false);
@@ -448,6 +452,8 @@ namespace {
             gameOver_ = collides(active_.x, active_.y, active_.blocks);
             if (gameOver_) {
                 bestScore_ = std::max(bestScore_, score_);
+                gameOverTransitionActive_ = true;
+                gameOverTransitionStart_ = std::chrono::steady_clock::now();
             }
             nextPiece_ = randomPiece();
         }
@@ -869,6 +875,15 @@ namespace {
             return std::clamp(elapsed / screenTransitionSeconds_, 0.0f, 1.0f);
         }
 
+        float gameOverFadeAlpha() const {
+            if (!gameOverTransitionActive_) {
+                return 1.0f;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - gameOverTransitionStart_).count();
+            return std::clamp(elapsed / gameOverTransitionSeconds_, 0.0f, 1.0f);
+        }
+
         void resetMenuLatchState() {
             menuUpHeld_ = false;
             menuDownHeld_ = false;
@@ -1214,6 +1229,8 @@ namespace {
                 return;
             }
 
+            const float alpha = gameOverFadeAlpha();
+            gameOverSprite_->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
             gameOverSprite_->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline_);
             gameOverSprite_->renderSprites(cmd, sprite_pipeline_layout_, extent.width, extent.height);
@@ -1395,9 +1412,14 @@ namespace {
                 printText(std::format("Level: {}", level_), 15, 75, withAlpha(SDL_Color{120, 220, 255, 255}));
                 if (gameOver_) {
                     const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.58f);
-                    printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withAlpha(SDL_Color{255, 255, 255, 255}));
-                    printCenteredText("Press Enter to start a new game", centerX, baseY + 34, withAlpha(SDL_Color{255, 220, 120, 255}));
-                    printCenteredText("Escape returns to menu", centerX, baseY + 68, withAlpha(SDL_Color{180, 180, 180, 255}));
+                    const float gameOverAlpha = gameOverFadeAlpha();
+                    const auto withGameOverAlpha = [gameOverAlpha](SDL_Color color) {
+                        color.a = static_cast<Uint8>(static_cast<float>(color.a) * gameOverAlpha);
+                        return color;
+                    };
+                    printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                    printCenteredText("Press Enter to start a new game", centerX, baseY + 34, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText("Escape returns to menu", centerX, baseY + 68, withGameOverAlpha(SDL_Color{180, 180, 180, 255}));
                 }
                 break;
             case AppScreen::Intro:
