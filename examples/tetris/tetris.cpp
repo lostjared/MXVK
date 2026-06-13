@@ -343,6 +343,7 @@ namespace {
         bool menuDownHeld_ = false;
         bool menuEnterHeld_ = false;
         bool introSkipHeld_ = false;
+        bool introFadeStarted_ = false;
         bool screenTransitionActive_ = false;
         bool lineClearActive_ = false;
         bool backgroundTransitionActive_ = false;
@@ -518,7 +519,9 @@ namespace {
                 const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
                 const bool skipDown = enterDown || spaceDown;
                 if (skipDown && !introSkipHeld_) {
-                    introActive_ = false;
+                    const auto now = std::chrono::steady_clock::now();
+                    introStart_ = now - std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(introHoldSeconds_));
+                    introFadeStarted_ = false;
                     requestScreen(AppScreen::Menu);
                 }
                 if (escapeDown && !escapeHeld_) {
@@ -780,9 +783,13 @@ namespace {
 
             const auto now = std::chrono::steady_clock::now();
             const float elapsed = std::chrono::duration<float>(now - introStart_).count();
+            if (!introFadeStarted_ && elapsed >= introHoldSeconds_) {
+                introFadeStarted_ = true;
+                requestScreen(AppScreen::Menu);
+            }
             if (elapsed >= (introHoldSeconds_ + introFadeSeconds_)) {
                 introActive_ = false;
-                requestScreen(AppScreen::Menu);
+                introFadeStarted_ = false;
                 lastFall_ = now;
             }
         }
