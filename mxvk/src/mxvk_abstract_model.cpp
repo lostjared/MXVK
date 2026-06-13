@@ -427,9 +427,15 @@ namespace mxvk {
             }
         }
 
+        if (imagePaths.empty()) {
+            logVKAbstractModelStep("no texture candidates found in manifest [" + textureManifestPath + "]");
+        }
+
         for (const std::string &path : imagePaths) {
+            logVKAbstractModelStep("trying texture [" + path + "]");
             SDL_Surface *surface = mxvk::LoadPNG(path.c_str());
             if (surface == nullptr) {
+                logVKAbstractModelStep("texture not found [" + path + "]");
                 continue;
             }
 
@@ -490,14 +496,18 @@ namespace mxvk {
     }
 
     void VKAbstractModel::loadTexturesFromMTL(const std::string &textureBasePath) {
+        bool foundTextureReference = false;
         for (const MXMaterial &material : obj.materials()) {
             if (material.map_kd.empty()) {
                 continue;
             }
 
+            foundTextureReference = true;
             const std::string path = textureBasePath.empty() ? material.map_kd : (textureBasePath + "/" + material.map_kd);
+            logVKAbstractModelStep("trying texture [" + path + "]");
             SDL_Surface *surface = mxvk::LoadPNG(path.c_str());
             if (surface == nullptr) {
+                logVKAbstractModelStep("texture not found [" + path + "]");
                 continue;
             }
 
@@ -554,6 +564,10 @@ namespace mxvk {
             vkDestroyBuffer(windowPtr->getDevice(), stagingBuffer, nullptr);
             vkFreeMemory(windowPtr->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
+        }
+
+        if (!foundTextureReference) {
+            logVKAbstractModelStep("no texture candidates found in MTL materials");
         }
     }
 
