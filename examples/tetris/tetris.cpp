@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <cstdlib>
+#include <cmath>
 #include <format>
 #include <filesystem>
 #include <fstream>
@@ -318,6 +319,7 @@ namespace {
                                         std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
             introStart_ = std::chrono::steady_clock::now();
             initModels();
+            initCreditsModel();
             resetGame();
         }
 
@@ -425,6 +427,9 @@ namespace {
                 drawFrame(cmd, imageIndex, view, proj);
                 drawNextPiecePreview(cmd, imageIndex, extent);
             }
+            if (screen_ == AppScreen::Credits) {
+                drawCreditsModel(cmd, imageIndex, extent);
+            }
             drawGameScreenTransitionOverlay(cmd, extent);
             drawIntroOverlay(cmd, extent);
             drawGameOverOverlay(cmd, extent);
@@ -449,6 +454,7 @@ namespace {
         std::array<mxvk::VK_Sprite *, 8> blockPreviewSprites_{};
         mxvk::VK_Sprite *introSprite_ = nullptr;
         mxvk::VK_Sprite *gameOverSprite_ = nullptr;
+        std::unique_ptr<mxvk::VKAbstractModel> creditsTuxModel_{};
         HighScores highScores_;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> music_{};
@@ -560,6 +566,21 @@ namespace {
                     fn(*block.model);
                 }
             }
+            if (creditsTuxModel_) {
+                fn(*creditsTuxModel_);
+            }
+        }
+
+        void initCreditsModel() {
+            creditsTuxModel_ = std::make_unique<mxvk::VKAbstractModel>();
+            creditsTuxModel_->load(this,
+                                   dataRoot_ + "/tux/tux.obj",
+                                   dataRoot_ + "/tux/tux.mtl",
+                                   dataRoot_ + "/tux",
+                                   0.35f);
+            creditsTuxModel_->setShaders(this,
+                                         std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
+                                         std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
         }
 
         void resetGame() {
@@ -1692,6 +1713,33 @@ namespace {
                 const float y = originY + static_cast<float>(pieceBlock.y - minY) * blockSize;
                 drawSpriteRect(blockSprite, cmd, extent, static_cast<int>(x), static_cast<int>(y), blockSize, blockSize);
             }
+        }
+
+        void drawCreditsModel(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
+            if (creditsTuxModel_ == nullptr) {
+                return;
+            }
+
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
+            glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.25f, 2.8f), glm::vec3(0.0f, 0.05f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            view = glm::rotate(view, glm::radians(-10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+            glm::mat4 proj = glm::perspective(glm::radians(40.0f), aspect, 0.1f, 100.0f);
+            proj[1][1] *= -1.0f;
+
+            const float elapsed = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, -0.34f, 0.0f));
+            model = glm::rotate(model, elapsed * 0.75f, glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::rotate(model, std::sin(elapsed * 0.6f) * 0.08f, glm::vec3(1.0f, 0.0f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.48f));
+
+            mxvk::UniformBufferObject ubo{};
+            ubo.model = model;
+            ubo.view = view;
+            ubo.proj = proj;
+            ubo.fx = glm::vec4(1.0f, 1.0f, 1.0f, elapsed);
+            creditsTuxModel_->updateUBO(imageIndex, ubo);
+            creditsTuxModel_->render(cmd, imageIndex, false);
         }
 
         void drawHud() {
