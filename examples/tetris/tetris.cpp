@@ -716,7 +716,7 @@ namespace {
             case AppScreen::Game:
                 if (gameOver_) {
                     if (button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_SOUTH) {
-                        startGame();
+                        restartIntroSequence();
                     } else if (button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
                         goToMenu();
                     }
@@ -810,6 +810,19 @@ namespace {
             screenTransitionStart_ = std::chrono::steady_clock::now();
             lastInputUpdate_ = std::chrono::steady_clock::now();
             resetMenuLatchState();
+        }
+
+        void restartIntroSequence() {
+            resetGame();
+            introActive_ = true;
+            introFadeStarted_ = false;
+            introStart_ = std::chrono::steady_clock::now();
+            screen_ = AppScreen::Intro;
+            screenTransitionActive_ = false;
+            transitionFromScreen_ = AppScreen::Intro;
+            lastInputUpdate_ = std::chrono::steady_clock::now();
+            resetMenuLatchState();
+            introSkipHeld_ = true;
         }
 
         void goToMenu() {
@@ -985,7 +998,13 @@ namespace {
                 goToMenu();
             }
             if (gameOver_ && enterDown && !enterHeld_) {
-                resetGame();
+                restartIntroSequence();
+                escapeHeld_ = escapeDown;
+                hardDropHeld_ = hardDropDown;
+                rotateHeld_ = rotateDown;
+                resetHeld_ = resetDown;
+                enterHeld_ = enterDown;
+                return;
             }
             if (hardDropDown && !hardDropHeld_) {
                 hardDrop();
@@ -1418,8 +1437,7 @@ namespace {
                         return color;
                     };
                     printCenteredText(std::format("Final Score: {}", score_), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
-                    printCenteredText("Press Enter to start a new game", centerX, baseY + 34, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
-                    printCenteredText("Escape returns to menu", centerX, baseY + 68, withGameOverAlpha(SDL_Color{180, 180, 180, 255}));
+                    printCenteredText("Press Enter to restart", centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
                 }
                 break;
             case AppScreen::Intro:
