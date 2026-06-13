@@ -264,7 +264,7 @@ namespace {
         Menu,
         Game,
         GameOver,
-        Multiplayer,
+        NetworkMultiplayer,
         HighScores,
         Credits,
     };
@@ -756,7 +756,7 @@ namespace {
                     if (cursorPos == 0) {
                         startGame();
                     } else if (cursorPos == 1) {
-                        goToMultiplayer();
+                        goToNetworkMultiplayer();
                     } else if (cursorPos == 2) {
                         goToHighScores();
                     } else if (cursorPos == 3) {
@@ -883,7 +883,7 @@ namespace {
                     if (cursorPos == 0) {
                         startGame();
                     } else if (cursorPos == 1) {
-                        goToMultiplayer();
+                        goToNetworkMultiplayer();
                     } else if (cursorPos == 2) {
                         goToHighScores();
                     } else if (cursorPos == 3) {
@@ -925,7 +925,7 @@ namespace {
                     goToMenu();
                 }
                 break;
-            case AppScreen::Multiplayer:
+            case AppScreen::NetworkMultiplayer:
             case AppScreen::HighScores:
             case AppScreen::Credits:
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_BACK || button == SDL_GAMEPAD_BUTTON_EAST) {
@@ -1123,8 +1123,8 @@ namespace {
             requestScreen(AppScreen::Credits);
         }
 
-        void goToMultiplayer() {
-            requestScreen(AppScreen::Multiplayer);
+        void goToNetworkMultiplayer() {
+            requestScreen(AppScreen::NetworkMultiplayer);
         }
 
         void requestScreen(AppScreen nextScreen) {
@@ -1762,7 +1762,7 @@ namespace {
                 printCenteredText("MXVK 3D Tetris", centerX, titleY, withAlpha(SDL_Color{255, 255, 0, 255}));
                 printCenteredText("Choose a mode", centerX, titleY + 42, withAlpha(SDL_Color{255, 255, 255, 255}));
 
-                const char *items[] = {"New Game", "New Multiplayer", "High Scores", "Credits"};
+                const char *items[] = {"New Game", "Network Multiplayer", "High Scores", "Credits"};
                 for (int i = 0; i < 4; ++i) {
                     const SDL_Color color = (i == cursorPos) ? SDL_Color{255, 255, 0, 255} : SDL_Color{255, 255, 255, 255};
                     printCenteredText(items[i], centerX, menuY + i * spacing, withAlpha(color));
@@ -1805,10 +1805,11 @@ namespace {
                 printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
                 break;
             }
-            case AppScreen::Multiplayer: {
+            case AppScreen::NetworkMultiplayer: {
                 const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
-                printCenteredText("Multiplayer", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
-                printCenteredText("Local multiplayer is not implemented yet", centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText("Network Multiplayer", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
+                printCenteredText("Matchmaking and session flow go here", centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText("Host, join, or connect to a server", centerX, baseY + 84, withAlpha(SDL_Color{255, 220, 120, 255}));
                 printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
                 break;
             }
@@ -1892,7 +1893,7 @@ namespace {
                 return highScoresBackgroundSprite_;
             case AppScreen::Credits:
                 return creditsBackgroundSprite_;
-            case AppScreen::Multiplayer:
+            case AppScreen::NetworkMultiplayer:
                 return multiplayerBackgroundSprite_;
             case AppScreen::Intro:
             case AppScreen::Game:
