@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <initializer_list>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -2145,6 +2146,17 @@ namespace {
             const int panelX = static_cast<int>(extent.width) - gridW - margin;
             const int panelY = panelTop + std::max(0, (availableHeight - gridH) / 2);
             const int border = std::max(2, blockSize / 5);
+            const auto textXInsideRightEdge = [this, &extent, margin, panelX](const std::initializer_list<std::string> &lines) {
+                int maxWidth = 0;
+                for (const std::string &line : lines) {
+                    int width = 0;
+                    int height = 0;
+                    if (getTextDimensions(line, width, height)) {
+                        maxWidth = std::max(maxWidth, width);
+                    }
+                }
+                return std::max(margin, std::min(panelX, static_cast<int>(extent.width) - margin - maxWidth));
+            };
 
             drawSpriteRect(previewBorderSprite, cmd, extent, panelX - border, panelY - border, gridW + border * 2, border);
             drawSpriteRect(previewBorderSprite, cmd, extent, panelX - border, panelY + gridH, gridW + border * 2, border);
@@ -2153,7 +2165,8 @@ namespace {
 
             printText("Opponent", panelX, panelY - 30, SDL_Color{255, 255, 255, 255});
             if (!opponentSnapshot.hasState) {
-                printText("Waiting...", panelX, panelY + gridH + 12, SDL_Color{255, 220, 120, 255});
+                const std::string waitingText = "Waiting...";
+                printText(waitingText, textXInsideRightEdge({waitingText}), panelY + gridH + 12, SDL_Color{255, 220, 120, 255});
                 return;
             }
 
@@ -2182,10 +2195,14 @@ namespace {
                 }
             }
 
-            printText(std::format("Score {}", opponentSnapshot.score), panelX, panelY + gridH + 12, SDL_Color{255, 255, 255, 255});
-            printText(std::format("Lines {}  Lv {}", opponentSnapshot.lines, opponentSnapshot.level), panelX, panelY + gridH + 38, SDL_Color{180, 220, 255, 255});
+            const std::string scoreText = std::format("Score {}", opponentSnapshot.score);
+            const std::string linesText = std::format("Lines {}  Lv {}", opponentSnapshot.lines, opponentSnapshot.level);
+            const std::string gameOverText = "Game Over";
+            const int statsX = textXInsideRightEdge({scoreText, linesText, gameOverText});
+            printText(scoreText, statsX, panelY + gridH + 12, SDL_Color{255, 255, 255, 255});
+            printText(linesText, statsX, panelY + gridH + 38, SDL_Color{180, 220, 255, 255});
             if (opponentSnapshot.gameOver) {
-                printText("Game Over", panelX, panelY + gridH + 64, SDL_Color{255, 120, 120, 255});
+                printText(gameOverText, statsX, panelY + gridH + 64, SDL_Color{255, 120, 120, 255});
             }
         }
 
