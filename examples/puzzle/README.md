@@ -1,5 +1,7 @@
 # Acid Drop
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/448cd09b-0173-47b0-8744-9feac3b4569a" />
+
 Acid Drop is a falling-block puzzle inspired by color-matching and line-clearing arcade games. It has an intro flow, a start menu, high scores, options, credits, and a name-entry screen for new records.
 
 ## Controls
