@@ -1,5 +1,7 @@
 # Walk
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/b7c8faf9-7b2a-463c-aee7-75cd98469088" />
+
 Walk is a first-person maze and exploration sample. It procedurally generates a world of walls, pillars, collectibles, and props, then lets you move through it in a very small FPS-style loop.
 
 ## Controls
