@@ -1,5 +1,7 @@
 # Fractal Zoom
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/2c9f34a0-e68d-4b33-b893-c891083c0559" />
+
 Fractal Zoom renders a Mandelbrot-style fractal with a custom fragment shader and exposes interactive navigation over the complex plane. The shader uses push constants for the current center, zoom, palette, iteration count, and elapsed time.
 
 ## Controls
