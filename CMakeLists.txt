@@ -240,6 +240,7 @@ find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
 message(FATAL_ERROR "glslc not found. Please install Vulkan SDK shader tools.")
 endif()
+find_package(Threads REQUIRED)
 string(TOUPPER "${WITH_MIXER}" MXVK_WITH_MIXER_REQUEST)
 if(NOT MXVK_WITH_MIXER_REQUEST MATCHES "^(AUTO|ON|OFF)$")
     message(FATAL_ERROR "WITH_MIXER must be AUTO, ON, or OFF")
@@ -314,6 +315,9 @@ if(NOT CV)
     message(STATUS "OpenCV capture support disabled (pass -DCV=ON to enable VK_Capture)")
 endif()
 add_subdirectory(volk)
+set(MXNETWORK_EXAMPLES OFF CACHE BOOL "MXNetwork examples ON/OFF" FORCE)
+add_subdirectory(MXNetwork)
+
 add_library(mxvk STATIC
     mxvk/src/mxvk.cpp
     mxvk/src/mxvk_console.cpp

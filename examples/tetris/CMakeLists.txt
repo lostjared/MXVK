@@ -2,7 +2,7 @@ add_executable(tetris
     ${CMAKE_SOURCE_DIR}/examples/tetris/tetris.cpp
 )
 
-target_link_libraries(tetris PRIVATE mxvk::mxvk)
+target_link_libraries(tetris PRIVATE mxvk::mxvk libmxnetwork::mxnetwork)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)

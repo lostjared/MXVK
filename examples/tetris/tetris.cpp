@@ -3,14 +3,16 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cstdlib>
 #include <cmath>
-#include <format>
+#include <cstdint>
+#include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -18,6 +20,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
+#include "mxnetwork/socket.hpp"
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
@@ -47,6 +50,7 @@ namespace {
     constexpr std::size_t nameMaxLength = 10;
     constexpr char nameCharacters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     constexpr std::size_t nameCharacterCount = sizeof(nameCharacters) - 1;
+    constexpr std::string_view multiplayerPort = "37373";
 
     struct Cell {
         int color = -1;
@@ -88,6 +92,33 @@ namespace {
     struct HighScoreEntry {
         std::string name;
         int score = 0;
+    };
+
+    struct MultiplayerSnapshot {
+        std::array<std::array<int, boardWidth>, boardHeight> cells{};
+        std::array<Block, 4> activeBlocks{};
+        int activeX = 0;
+        int activeY = 0;
+        int activeColor = 7;
+        int score = 0;
+        int lines = 0;
+        int level = 1;
+        bool gameOver = false;
+        bool hasState = false;
+
+        MultiplayerSnapshot() {
+            for (auto &row : cells) {
+                row.fill(-1);
+            }
+        }
+    };
+
+    enum class MultiplayerMode {
+        Idle,
+        Hosting,
+        Joining,
+        Connected,
+        Error,
     };
 
     class HighScores {
@@ -315,8 +346,8 @@ namespace {
             }
             gameOverSprite = createSprite(dataRoot + "/gameover.png");
             introSprite = createSprite(dataRoot + "/intro.png",
-                                        std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
-                                        std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
+                                       std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
+                                       std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
             introStart = std::chrono::steady_clock::now();
             initModels();
             initCreditsModel();
@@ -333,6 +364,7 @@ namespace {
             }
 #endif
             stopNameEntry();
+            closeMultiplayerSession();
             closeGamepad();
             cleanupModels();
         }
@@ -388,6 +420,7 @@ namespace {
             tryOpenFirstGamepad();
             updateIntroState();
             updateScreenTransition();
+            updateMultiplayerNetwork();
             updateInput();
             if (screen == AppScreen::Game) {
                 updateGame();
@@ -426,6 +459,7 @@ namespace {
 
                 drawFrame(cmd, imageIndex, view, proj);
                 drawNextPiecePreview(cmd, imageIndex, extent);
+                drawOpponentGrid(cmd, extent);
             }
             if (screen == AppScreen::Credits) {
                 drawCreditsModel(cmd, imageIndex, extent);
@@ -507,6 +541,22 @@ namespace {
         PieceQueueEntry nextPiece{};
         AppScreen screen = AppScreen::Intro;
         AppScreen transitionFromScreen = AppScreen::Intro;
+        mxnetwork::MXNetworkInit networkInit{};
+        mxnetwork::Socket listenSocket{};
+        mxnetwork::Socket peerSocket{};
+        MultiplayerSnapshot opponentSnapshot{};
+        MultiplayerMode multiplayerMode = MultiplayerMode::Idle;
+        std::string multiplayerHost{"127.0.0.1"};
+        std::string multiplayerStatus{"Enter host IP, then press J. Press H to host."};
+        std::string multiplayerResult{};
+        std::string networkReceiveBuffer{};
+        std::chrono::steady_clock::time_point lastNetworkSend{std::chrono::steady_clock::now()};
+        std::uint32_t networkSequence = 0;
+        int multiplayerCursor = 0;
+        bool multiplayerActive = false;
+        bool multiplayerHostSide = false;
+        bool hostHeld = false;
+        bool joinHeld = false;
         static constexpr float introHoldSeconds = 5.0f;
         static constexpr float introFadeSeconds = 1.0f;
         static constexpr float screenTransitionSeconds = 0.36f;
@@ -574,13 +624,13 @@ namespace {
         void initCreditsModel() {
             creditsTuxModel = std::make_unique<mxvk::VKAbstractModel>();
             creditsTuxModel->load(this,
-                                   dataRoot + "/tux/tux.obj",
-                                   dataRoot + "/tux/tux.mtl",
-                                   dataRoot + "/tux",
-                                   0.35f);
+                                  dataRoot + "/tux/tux.obj",
+                                  dataRoot + "/tux/tux.mtl",
+                                  dataRoot + "/tux",
+                                  0.35f);
             creditsTuxModel->setShaders(this,
-                                         std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
-                                         std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
+                                        std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
+                                        std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
         }
 
         void resetGame() {
@@ -593,6 +643,7 @@ namespace {
             }
             gameOver = false;
             gameOverTransitionActive = false;
+            multiplayerResult.clear();
             lineClearActive = false;
             backgroundTransitionActive = false;
             clearingRows.fill(false);
@@ -602,6 +653,240 @@ namespace {
             lastFall = std::chrono::steady_clock::now();
             nextPiece = randomPiece();
             spawnPiece();
+        }
+
+        void resetOpponentSnapshot() {
+            opponentSnapshot = MultiplayerSnapshot{};
+            networkReceiveBuffer.clear();
+        }
+
+        void closeMultiplayerSession(std::string status = "Enter host IP, then press J. Press H to host.") {
+            if (peerSocket.valid()) {
+                peerSocket.close();
+            }
+            if (listenSocket.valid()) {
+                listenSocket.close();
+            }
+            multiplayerActive = false;
+            multiplayerHostSide = false;
+            multiplayerMode = MultiplayerMode::Idle;
+            multiplayerStatus = std::move(status);
+            resetOpponentSnapshot();
+        }
+
+        [[nodiscard]] std::string multiplayerOutcomeText() const {
+            if (gameOver && !opponentSnapshot.gameOver) {
+                return "You lost. Opponent won.";
+            }
+            if (!gameOver && opponentSnapshot.gameOver) {
+                return "You won. Opponent lost.";
+            }
+            if (score > opponentSnapshot.score) {
+                return "You won by score.";
+            }
+            if (score < opponentSnapshot.score) {
+                return "You lost by score.";
+            }
+            return "Draw.";
+        }
+
+        void enterMultiplayerGameOver(std::string reason) {
+            const std::string outcome = multiplayerOutcomeText();
+            closeMultiplayerSession(std::move(reason));
+            multiplayerResult = outcome;
+            gameOver = true;
+            screen = AppScreen::GameOver;
+            gameOverTransitionActive = true;
+            gameOverTransitionStart = std::chrono::steady_clock::now();
+            enteringName = false;
+            highScoresAfterSave = false;
+            resetMenuLatchState();
+        }
+
+        void finishLocalMultiplayerGameOver() {
+            multiplayerResult = "You lost. Opponent won.";
+            sendMultiplayerSnapshot(true);
+            closeMultiplayerSession("Game over.");
+            enteringName = false;
+            highScoresAfterSave = false;
+        }
+
+        void beginHosting() {
+            closeMultiplayerSession();
+            listenSocket = mxnetwork::Socket(mxnetwork::SocketType::TYPE_INET);
+            if (!listenSocket.listen(multiplayerPort, 1)) {
+                multiplayerMode = MultiplayerMode::Error;
+                multiplayerStatus = std::format("Could not host on port {}", multiplayerPort);
+                return;
+            }
+            listenSocket.setblocking(false);
+            multiplayerMode = MultiplayerMode::Hosting;
+            multiplayerHostSide = true;
+            multiplayerStatus = std::format("Hosting on port {}. Waiting for peer...", multiplayerPort);
+        }
+
+        void joinHost() {
+            closeMultiplayerSession();
+            if (multiplayerHost.empty()) {
+                multiplayerMode = MultiplayerMode::Error;
+                multiplayerStatus = "Enter an IP address before joining.";
+                return;
+            }
+            peerSocket = mxnetwork::Socket(mxnetwork::SocketType::TYPE_INET);
+            multiplayerMode = MultiplayerMode::Joining;
+            multiplayerStatus = std::format("Connecting to {}:{}...", multiplayerHost, multiplayerPort);
+            if (!peerSocket.connect(multiplayerHost, multiplayerPort)) {
+                peerSocket.close();
+                multiplayerMode = MultiplayerMode::Error;
+                multiplayerStatus = std::format("Could not connect to {}:{}", multiplayerHost, multiplayerPort);
+                return;
+            }
+            peerSocket.setblocking(false);
+            multiplayerHostSide = false;
+            finishMultiplayerConnection("Connected as guest.");
+        }
+
+        void finishMultiplayerConnection(const std::string &status) {
+            if (listenSocket.valid()) {
+                listenSocket.close();
+            }
+            multiplayerMode = MultiplayerMode::Connected;
+            multiplayerStatus = status;
+            multiplayerActive = true;
+            resetOpponentSnapshot();
+            resetGame();
+            introActive = false;
+            screen = AppScreen::Game;
+            screenTransitionActive = false;
+            transitionFromScreen = AppScreen::Game;
+            lastInputUpdate = std::chrono::steady_clock::now();
+            lastNetworkSend = std::chrono::steady_clock::now();
+            resetMenuLatchState();
+            sendMultiplayerSnapshot(true);
+        }
+
+        void updateMultiplayerNetwork() {
+            if (multiplayerMode == MultiplayerMode::Hosting && listenSocket.valid()) {
+                try {
+                    std::optional<mxnetwork::Socket> accepted = listenSocket.accept();
+                    if (accepted) {
+                        peerSocket = std::move(*accepted);
+                        peerSocket.setblocking(false);
+                        finishMultiplayerConnection("Peer connected. Multiplayer started.");
+                    }
+                } catch (const std::exception &ex) {
+                    multiplayerMode = MultiplayerMode::Error;
+                    multiplayerStatus = std::format("Accept failed: {}", ex.what());
+                }
+            }
+
+            if (multiplayerMode != MultiplayerMode::Connected || !peerSocket.valid()) {
+                return;
+            }
+
+            receiveMultiplayerData();
+
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsed = std::chrono::duration<float>(now - lastNetworkSend).count();
+            if (elapsed >= 0.05f) {
+                sendMultiplayerSnapshot(false);
+                lastNetworkSend = now;
+            }
+        }
+
+        std::string makeMultiplayerSnapshotLine() {
+            std::ostringstream out;
+            out << "S " << networkSequence++ << ' ' << score << ' ' << linesCleared << ' ' << level << ' ' << (gameOver ? 1 : 0) << ' ';
+            for (int y = 0; y < boardHeight; ++y) {
+                for (int x = 0; x < boardWidth; ++x) {
+                    const int color = board[y][x].color;
+                    out << ((color >= 0 && color <= 7) ? static_cast<char>('0' + color) : '.');
+                }
+            }
+            out << ' ' << active.color << ' ' << active.x << ' ' << active.y;
+            for (const Block &block : active.blocks) {
+                out << ' ' << block.x << ' ' << block.y;
+            }
+            out << '\n';
+            return out.str();
+        }
+
+        void sendMultiplayerSnapshot(bool force) {
+            if (!force && (screen != AppScreen::Game && screen != AppScreen::GameOver)) {
+                return;
+            }
+            if (multiplayerMode != MultiplayerMode::Connected || !peerSocket.valid()) {
+                return;
+            }
+            const std::string line = makeMultiplayerSnapshotLine();
+            const ssize_t written = peerSocket.write(line.data(), line.size(), 0);
+            if (written == 0) {
+                enterMultiplayerGameOver("Peer disconnected.");
+            }
+        }
+
+        void receiveMultiplayerData() {
+            std::array<char, 2048> buffer{};
+            while (peerSocket.valid()) {
+                const ssize_t received = peerSocket.read(buffer.data(), buffer.size(), 0);
+                if (received > 0) {
+                    networkReceiveBuffer.append(buffer.data(), static_cast<std::size_t>(received));
+                    consumeMultiplayerLines();
+                    continue;
+                }
+                if (received == 0) {
+                    enterMultiplayerGameOver("Peer disconnected.");
+                }
+                break;
+            }
+        }
+
+        void consumeMultiplayerLines() {
+            std::size_t newline = networkReceiveBuffer.find('\n');
+            while (newline != std::string::npos) {
+                const std::string line = networkReceiveBuffer.substr(0, newline);
+                networkReceiveBuffer.erase(0, newline + 1);
+                parseMultiplayerSnapshot(line);
+                newline = networkReceiveBuffer.find('\n');
+            }
+            constexpr std::size_t maxBufferedBytes = 8192;
+            if (networkReceiveBuffer.size() > maxBufferedBytes) {
+                networkReceiveBuffer.clear();
+            }
+        }
+
+        void parseMultiplayerSnapshot(const std::string &line) {
+            std::istringstream in(line);
+            char type = 0;
+            std::uint32_t sequence = 0;
+            std::string cells;
+            int remoteGameOver = 0;
+            MultiplayerSnapshot snapshot{};
+
+            in >> type >> sequence >> snapshot.score >> snapshot.lines >> snapshot.level >> remoteGameOver >> cells;
+            (void)sequence;
+            if (type != 'S' || cells.size() != static_cast<std::size_t>(boardWidth * boardHeight)) {
+                return;
+            }
+
+            snapshot.gameOver = remoteGameOver != 0;
+            for (int y = 0; y < boardHeight; ++y) {
+                for (int x = 0; x < boardWidth; ++x) {
+                    const char ch = cells[static_cast<std::size_t>(y * boardWidth + x)];
+                    snapshot.cells[y][x] = (ch >= '0' && ch <= '7') ? ch - '0' : -1;
+                }
+            }
+
+            in >> snapshot.activeColor >> snapshot.activeX >> snapshot.activeY;
+            for (Block &block : snapshot.activeBlocks) {
+                in >> block.x >> block.y;
+            }
+            if (!in) {
+                return;
+            }
+            snapshot.activeColor = std::clamp(snapshot.activeColor, 0, 7);
+            snapshot.hasState = true;
+            opponentSnapshot = snapshot;
         }
 
         void clearLockedBlocks() {
@@ -645,10 +930,22 @@ namespace {
             const int previousLevel = level;
             level = (linesCleared / 8) + 1;
             static constexpr std::array<float, 16> arcadeFallSeconds{
-                0.72f, 0.66f, 0.60f, 0.54f,
-                0.48f, 0.43f, 0.38f, 0.34f,
-                0.30f, 0.26f, 0.23f, 0.20f,
-                0.18f, 0.16f, 0.14f, 0.12f,
+                0.72f,
+                0.66f,
+                0.60f,
+                0.54f,
+                0.48f,
+                0.43f,
+                0.38f,
+                0.34f,
+                0.30f,
+                0.26f,
+                0.23f,
+                0.20f,
+                0.18f,
+                0.16f,
+                0.14f,
+                0.12f,
             };
 
             const std::size_t index = std::min<std::size_t>(arcadeFallSeconds.size() - 1, static_cast<std::size_t>(std::max(level - 1, 0)));
@@ -718,6 +1015,11 @@ namespace {
                 return;
             }
 
+            if (screen == AppScreen::NetworkMultiplayer) {
+                handleMultiplayerKeys(keys);
+                return;
+            }
+
             if (screen != AppScreen::Game) {
                 handleMenuKeys(keys);
                 return;
@@ -784,6 +1086,100 @@ namespace {
             escapeHeld = escapeDown;
         }
 
+        void handleMultiplayerKeys(const bool *keys) {
+            const bool escapeDown = keys[SDL_SCANCODE_ESCAPE];
+            const bool enterDown = keys[SDL_SCANCODE_RETURN];
+            const bool hostDown = keys[SDL_SCANCODE_H];
+            const bool joinDown = keys[SDL_SCANCODE_J];
+            const bool backspaceDown = keys[SDL_SCANCODE_BACKSPACE];
+
+            if (escapeDown && !escapeHeld) {
+                closeMultiplayerSession();
+                goToMenu();
+            }
+            if (hostDown && !hostHeld) {
+                beginHosting();
+            }
+            if (joinDown && !joinHeld) {
+                joinHost();
+            }
+            if (enterDown && !menuEnterHeld) {
+                joinHost();
+            }
+            if (backspaceDown && !backspaceHeld && !multiplayerHost.empty()) {
+                multiplayerHost.pop_back();
+            }
+
+            appendMultiplayerAddressCharacters(keys);
+
+            escapeHeld = escapeDown;
+            menuEnterHeld = enterDown;
+            hostHeld = hostDown;
+            joinHeld = joinDown;
+            backspaceHeld = backspaceDown;
+        }
+
+        void appendMultiplayerAddressCharacters(const bool *keys) {
+            static constexpr std::array<SDL_Scancode, 10> digitKeys{{
+                SDL_SCANCODE_0,
+                SDL_SCANCODE_1,
+                SDL_SCANCODE_2,
+                SDL_SCANCODE_3,
+                SDL_SCANCODE_4,
+                SDL_SCANCODE_5,
+                SDL_SCANCODE_6,
+                SDL_SCANCODE_7,
+                SDL_SCANCODE_8,
+                SDL_SCANCODE_9,
+            }};
+            static constexpr std::array<SDL_Scancode, 10> keypadDigitKeys{{
+                SDL_SCANCODE_KP_0,
+                SDL_SCANCODE_KP_1,
+                SDL_SCANCODE_KP_2,
+                SDL_SCANCODE_KP_3,
+                SDL_SCANCODE_KP_4,
+                SDL_SCANCODE_KP_5,
+                SDL_SCANCODE_KP_6,
+                SDL_SCANCODE_KP_7,
+                SDL_SCANCODE_KP_8,
+                SDL_SCANCODE_KP_9,
+            }};
+
+            auto appendChar = [this](char ch) {
+                constexpr std::size_t maxAddressLength = 64;
+                if (multiplayerHost.size() < maxAddressLength) {
+                    multiplayerHost.push_back(ch);
+                }
+            };
+
+            for (int i = 0; i < 10; ++i) {
+                if ((keys[digitKeys[static_cast<std::size_t>(i)]] || keys[keypadDigitKeys[static_cast<std::size_t>(i)]]) && multiplayerCursor != (i + 1)) {
+                    appendChar(static_cast<char>('0' + i));
+                    multiplayerCursor = i + 1;
+                    return;
+                }
+            }
+            if ((keys[SDL_SCANCODE_PERIOD] || keys[SDL_SCANCODE_KP_PERIOD]) && multiplayerCursor != 11) {
+                appendChar('.');
+                multiplayerCursor = 11;
+                return;
+            }
+            if (keys[SDL_SCANCODE_MINUS] && multiplayerCursor != 12) {
+                appendChar('-');
+                multiplayerCursor = 12;
+                return;
+            }
+            if (!keys[SDL_SCANCODE_PERIOD] && !keys[SDL_SCANCODE_KP_PERIOD] && !keys[SDL_SCANCODE_MINUS]) {
+                bool anyDigitDown = false;
+                for (int i = 0; i < 10; ++i) {
+                    anyDigitDown = anyDigitDown || keys[digitKeys[static_cast<std::size_t>(i)]] || keys[keypadDigitKeys[static_cast<std::size_t>(i)]];
+                }
+                if (!anyDigitDown) {
+                    multiplayerCursor = 0;
+                }
+            }
+        }
+
         void handleGamepadInput(float deltaSeconds) {
             if (gamepad == nullptr || introActive || (screen != AppScreen::Game && screen != AppScreen::GameOver) || gameOver || lineClearActive) {
                 gamepadMoveDirection = 0;
@@ -800,7 +1196,7 @@ namespace {
             const Sint16 rightY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
 
             const int moveDirection = (leftX < -gamepadDeadzone) ? -1 : (leftX > gamepadDeadzone) ? 1
-                                                                                                    : 0;
+                                                                                                  : 0;
             if (moveDirection == 0) {
                 gamepadMoveDirection = 0;
                 gamepadMoveHeldSeconds = 0.0f;
@@ -844,8 +1240,8 @@ namespace {
             }
             if (std::abs(rightY) > gamepadDeadzone) {
                 gridPitch = std::clamp(gridPitch - static_cast<float>(rightY) * gamepadStickScale * gamepadStickPitchSpeed * deltaSeconds,
-                                        -70.0f,
-                                        70.0f);
+                                       -70.0f,
+                                       70.0f);
             }
 
             constexpr float gamepadZoomSpeed = 3.2f;
@@ -995,6 +1391,7 @@ namespace {
 
         void startGame() {
             const AppScreen previousScreen = screen;
+            closeMultiplayerSession();
             resetGame();
             introActive = false;
             screen = AppScreen::Game;
@@ -1025,6 +1422,11 @@ namespace {
             gameOverTransitionStart = std::chrono::steady_clock::now();
             nameCharIndex = 0;
             playerName.clear();
+            if (multiplayerActive) {
+                finishLocalMultiplayerGameOver();
+                resetMenuLatchState();
+                return;
+            }
             enteringName = highScores.qualifies(score);
             highScoresAfterSave = false;
             resetMenuLatchState();
@@ -1106,6 +1508,9 @@ namespace {
             if (screen == AppScreen::Game || screen == AppScreen::GameOver) {
                 gameOver = false;
             }
+            if (multiplayerActive || screen == AppScreen::NetworkMultiplayer) {
+                closeMultiplayerSession();
+            }
             gameOverTransitionActive = false;
             highScoresAfterSave = false;
             stopNameEntry();
@@ -1185,6 +1590,9 @@ namespace {
             menuEnterHeld = false;
             introSkipHeld = false;
             backspaceHeld = false;
+            hostHeld = false;
+            joinHeld = false;
+            multiplayerCursor = 0;
         }
 
         void updateMenuInputLatchState() {
@@ -1715,6 +2123,72 @@ namespace {
             }
         }
 
+        void drawOpponentGrid(VkCommandBuffer cmd, const VkExtent2D &extent) {
+            if (!multiplayerActive || screen != AppScreen::Game || introActive || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE || previewBorderSprite == nullptr) {
+                return;
+            }
+
+            const int margin = 24;
+            const int previewSize = std::min({220, static_cast<int>(static_cast<float>(extent.width) * 0.28f), static_cast<int>(static_cast<float>(extent.height) * 0.34f)});
+            const int previewBottom = 88 + previewSize;
+            const int panelTop = previewBottom + 56;
+            const int textAreaHeight = 78;
+            const int panelBottom = static_cast<int>(extent.height) - margin - textAreaHeight;
+            const int availableHeight = panelBottom - panelTop;
+            const int availableWidth = std::min(260, static_cast<int>(static_cast<float>(extent.width) * 0.24f));
+            if (availableWidth < 70 || availableHeight < 120) {
+                return;
+            }
+            const int blockSize = std::max(4, std::min(availableWidth / boardWidth, availableHeight / boardHeight));
+            const int gridW = blockSize * boardWidth;
+            const int gridH = blockSize * boardHeight;
+            const int panelX = static_cast<int>(extent.width) - gridW - margin;
+            const int panelY = panelTop + std::max(0, (availableHeight - gridH) / 2);
+            const int border = std::max(2, blockSize / 5);
+
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX - border, panelY - border, gridW + border * 2, border);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX - border, panelY + gridH, gridW + border * 2, border);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX - border, panelY - border, border, gridH + border * 2);
+            drawSpriteRect(previewBorderSprite, cmd, extent, panelX + gridW, panelY - border, border, gridH + border * 2);
+
+            printText("Opponent", panelX, panelY - 30, SDL_Color{255, 255, 255, 255});
+            if (!opponentSnapshot.hasState) {
+                printText("Waiting...", panelX, panelY + gridH + 12, SDL_Color{255, 220, 120, 255});
+                return;
+            }
+
+            for (int y = 0; y < boardHeight; ++y) {
+                for (int x = 0; x < boardWidth; ++x) {
+                    const int color = opponentSnapshot.cells[y][x];
+                    if (color < 0 || color >= static_cast<int>(blockPreviewSprites.size())) {
+                        continue;
+                    }
+                    const int screenX = panelX + x * blockSize;
+                    const int screenY = panelY + (boardHeight - 1 - y) * blockSize;
+                    drawSpriteRect(blockPreviewSprites[static_cast<std::size_t>(color)], cmd, extent, screenX, screenY, blockSize, blockSize);
+                }
+            }
+
+            if (!opponentSnapshot.gameOver) {
+                for (const Block &block : opponentSnapshot.activeBlocks) {
+                    const int x = opponentSnapshot.activeX + block.x;
+                    const int y = opponentSnapshot.activeY + block.y;
+                    if (x < 0 || x >= boardWidth || y < 0 || y >= boardHeight) {
+                        continue;
+                    }
+                    const int screenX = panelX + x * blockSize;
+                    const int screenY = panelY + (boardHeight - 1 - y) * blockSize;
+                    drawSpriteRect(blockPreviewSprites[static_cast<std::size_t>(opponentSnapshot.activeColor)], cmd, extent, screenX, screenY, blockSize, blockSize);
+                }
+            }
+
+            printText(std::format("Score {}", opponentSnapshot.score), panelX, panelY + gridH + 12, SDL_Color{255, 255, 255, 255});
+            printText(std::format("Lines {}  Lv {}", opponentSnapshot.lines, opponentSnapshot.level), panelX, panelY + gridH + 38, SDL_Color{180, 220, 255, 255});
+            if (opponentSnapshot.gameOver) {
+                printText("Game Over", panelX, panelY + gridH + 64, SDL_Color{255, 120, 120, 255});
+            }
+        }
+
         void drawCreditsModel(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
             if (creditsTuxModel == nullptr) {
                 return;
@@ -1806,11 +2280,14 @@ namespace {
                 break;
             }
             case AppScreen::NetworkMultiplayer: {
-                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.2f);
+                const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.16f);
                 printCenteredText("Network Multiplayer", centerX, baseY, withAlpha(SDL_Color{255, 255, 0, 255}));
-                printCenteredText("Matchmaking and session flow go here", centerX, baseY + 48, withAlpha(SDL_Color{255, 255, 255, 255}));
-                printCenteredText("Host, join, or connect to a server", centerX, baseY + 84, withAlpha(SDL_Color{255, 220, 120, 255}));
-                printCenteredText("Press Enter or Escape to return", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
+                printCenteredText(std::format("Port: {}", multiplayerPort), centerX, baseY + 42, withAlpha(SDL_Color{255, 220, 120, 255}));
+                printCenteredText(std::format("Peer IP: {}", multiplayerHost.empty() ? "_" : multiplayerHost), centerX, baseY + 86, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText(multiplayerStatus, centerX, baseY + 126, withAlpha(SDL_Color{180, 220, 255, 255}));
+                printCenteredText("H host    J/Enter join    Backspace edit", centerX, baseY + 178, withAlpha(SDL_Color{255, 255, 255, 255}));
+                printCenteredText("Run one copy as host, then connect from the other machine by IP.", centerX, baseY + 216, withAlpha(SDL_Color{200, 200, 200, 255}));
+                printCenteredText("Escape returns to menu", centerX, static_cast<int>(static_cast<float>(extent.height) * 0.82f), withAlpha(SDL_Color{200, 200, 200, 255}));
                 break;
             }
             case AppScreen::GameOver: {
@@ -1823,6 +2300,12 @@ namespace {
 
                 printCenteredText("Game Over", centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 0, 255}));
                 printCenteredText(std::format("Final Score: {}", score), centerX, baseY + 42, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                if (!multiplayerResult.empty()) {
+                    printCenteredText(multiplayerResult, centerX, baseY + 82, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText("Enter to restart", centerX, baseY + 124, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                    printCenteredText("Escape for menu", centerX, baseY + 158, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
+                    break;
+                }
                 if (enteringName) {
                     printCenteredText("New high score", centerX, baseY + 82, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
                     printCenteredText(std::format("Name: {}", playerName.empty() ? "_" : playerName),
@@ -1843,6 +2326,9 @@ namespace {
                 printText(std::format("Score: {}", score), 15, 15, withAlpha(SDL_Color{255, 255, 255, 255}));
                 printText(std::format("Lines Cleared: {}", linesCleared), 15, 45, withAlpha(SDL_Color{255, 220, 120, 255}));
                 printText(std::format("Level: {}", level), 15, 75, withAlpha(SDL_Color{120, 220, 255, 255}));
+                if (multiplayerActive) {
+                    printText(multiplayerHostSide ? "Multiplayer: Host" : "Multiplayer: Guest", 15, 105, withAlpha(SDL_Color{180, 255, 180, 255}));
+                }
                 if (gameOver) {
                     const int baseY = static_cast<int>(static_cast<float>(extent.height) * 0.58f);
                     const float gameOverAlpha = gameOverFadeAlpha();
@@ -1851,7 +2337,7 @@ namespace {
                         return color;
                     };
                     printCenteredText(std::format("Final Score: {}", score), centerX, baseY, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
-                    printCenteredText("Game over", centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
+                    printCenteredText(multiplayerResult.empty() ? "Game over" : multiplayerResult, centerX, baseY + 40, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
                 }
                 break;
             case AppScreen::Intro:
