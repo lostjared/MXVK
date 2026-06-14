@@ -775,9 +775,9 @@ namespace {
                         peerSocket.setblocking(false);
                         finishMultiplayerConnection("Peer connected. Multiplayer started.");
                     }
-                } catch (const std::exception &ex) {
+                } catch (const mxnetwork::Exception &ex) {
                     multiplayerMode = MultiplayerMode::Error;
-                    multiplayerStatus = std::format("Accept failed: {}", ex.what());
+                    multiplayerStatus = std::format("Accept failed: {}", ex.text());
                 }
             }
 
@@ -2467,6 +2467,9 @@ int main(int argc, char **argv) {
         const Arguments args = proc_args(argc, argv);
         TetrisWindow window(args.path, args.width, args.height, args.fullscreen);
         window.loop();
+    } catch (const mxnetwork::Exception &e) {
+        std::cerr << std::format("mxnetwork: Exception: {}\n", e.text());
+        return EXIT_FAILURE;
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
         return EXIT_FAILURE;
