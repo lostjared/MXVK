@@ -1,5 +1,7 @@
 # Model Example
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/29f6a563-4354-4da8-8eaa-50944d9c6c63" />
+
 This is a basic 3D model viewer for MXVK. By default it loads `data/pyramid.obj`, rotates it slowly, and renders it with a simple perspective camera.
 
 ## Controls
