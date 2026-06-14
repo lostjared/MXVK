@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 #endif
@@ -395,8 +396,21 @@ ssize_t mx_socket_send(MXSocket *sock, const void *buf, size_t len, int flags) {
     char c = 0;
 #ifdef _WIN32
     ssize_t r = recv(sock->sockfd, &c, 1, MSG_PEEK);
-#else
+#elif defined(MX_HAVE_MSG_DONTWAIT)
     ssize_t r = recv(sock->sockfd, &c, 1, MSG_PEEK | MSG_DONTWAIT);
+#else
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sock->sockfd, &readfds);
+
+    struct timeval timeout = {0, 0};
+    const int ready = select((int)(sock->sockfd + 1), &readfds, nullptr, nullptr, &timeout);
+    if (ready < 0)
+        return false;
+    if (ready == 0)
+        return true;
+
+    ssize_t r = recv(sock->sockfd, &c, 1, MSG_PEEK);
 #endif
     if (r == 0)
         return false;

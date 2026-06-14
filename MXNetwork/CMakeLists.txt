@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
-project(libmxnetwork VERSION 0.1.0)
+project(libmxnetwork VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile commands for tooling" FORCE)
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -14,8 +17,8 @@ include(CheckSymbolExists)
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 
-option(MXNETWORK_CLIENT "Qt6 relay client" OFF)
-option(MXNETWORK_EXAMPLES "MXNetwork examples ON/OFF" OFF)
+option(CLIENT "Qt6 relay client" OFF)
+option(MXNETWORK_EXAMPLES "Examples ON/OFF" ON)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
 add_compile_definitions(DEBUG_MODE)
@@ -34,7 +37,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL "GNU")
         -Wconversion
     )
 
-    if(NOT MXNETWORK_CLIENT)
+    if(NOT CLIENT)
         message(STATUS "Debug Enabled")
         add_compile_options(
             "$<$<CONFIG:Debug>:-fsanitize=address>"
@@ -54,6 +57,7 @@ else()
 endif()
 if(UNIX AND NOT APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    add_compile_definitions($<$<COMPILE_LANGUAGE:C>:_POSIX_C_SOURCE=200809L>)
 endif()
 
 
@@ -123,6 +127,7 @@ check_include_file(stdint.h HAVE_STDINT_H)
 check_include_file(string.h HAVE_STRING_H)
 if(UNIX)
 check_include_file(sys/socket.h HAVE_SOCKET_H)
+check_symbol_exists(MSG_DONTWAIT "sys/socket.h" HAVE_MSG_DONTWAIT)
 check_include_file(sys/un.h HAVE_UN_H)
 check_include_file(unistd.h HAVE_UNISTD_H)
 check_include_file(arpa/inet.h HAVE_ARPA_H)
@@ -165,6 +170,9 @@ unset(CMAKE_REQUIRED_FLAGS)
 message(STATUS "")
 find_package(Threads REQUIRED)
 add_library(mxnetwork STATIC src/mxsocket.c src/socket.cpp src/exception.cpp)
+if(HAVE_MSG_DONTWAIT)
+    target_compile_definitions(mxnetwork PRIVATE $<$<COMPILE_LANGUAGE:C>:MX_HAVE_MSG_DONTWAIT>)
+endif()
 target_link_libraries(mxnetwork PUBLIC Threads::Threads)
 target_include_directories(mxnetwork PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -176,6 +184,7 @@ if(WIN32)
 endif()
 if(MXNETWORK_EXAMPLES)
     add_subdirectory(examples/client)
+    add_subdirectory(examples/fileserve)
     add_subdirectory(examples/server)
     add_subdirectory(examples/udp-recv)
     add_subdirectory(examples/udp-send)
@@ -185,7 +194,7 @@ if(UNIX)
     add_subdirectory(examples/download)
     add_subdirectory(examples/relay)
 endif()
-    if(MXNETWORK_CLIENT)
+    if(CLIENT)
         message(STATUS "Qt6 client example")
         add_subdirectory(examples/relay-client)
     endif()
@@ -227,14 +236,4 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/mxnetworkConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/mxnetworkConfigVersion.cmake
     DESTINATION ${MXNETWORK_INSTALL_CMAKEDIR}
-)
-
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-    @ONLY
-)
-
-add_custom_target(mxnetwork_uninstall
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
 )
