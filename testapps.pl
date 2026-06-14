@@ -11,6 +11,7 @@ my @tests = qw(
     console_demo
     fractal_zoom
     model_example
+    starship
     planet
     asteroids
     glitch_cube

@@ -8,6 +8,7 @@
 ./run.pl console_demo
 ./run.pl fractal_zoom
 ./run.pl model_example
+./run.pl starship
 ./run.pl planet
 ./run.pl asteroids
 ./run.pl glitch_cube
