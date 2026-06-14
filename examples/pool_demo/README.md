@@ -1,5 +1,7 @@
 # 3D Pool Demo
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/4adfe451-020c-40e9-be78-83da3aa2a397" />
+
 This sample is a full 3D billiards game built with MXVK models, sprites, and physics. It includes an intro screen, a start menu, high scores, and the in-game cue-ball placement and shot logic.
 
 ## Controls
