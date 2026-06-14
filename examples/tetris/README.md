@@ -1,8 +1,14 @@
 # MXVK 3D Tetris
 
+### Windows
+
 <img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/5ff70936-76ad-41cc-ae20-be40adcba68d" />
 
+### Mac
+
 <img width="3360" height="2100" alt="image" src="https://github.com/user-attachments/assets/10c198a5-6308-4dbb-8c53-c31c02e33c45" />
+
+### Linux
 
 <img width="3840" height="2160" alt="vlcsnap-2026-06-14-01h47m52s174" src="https://github.com/user-attachments/assets/005df8b6-7c2c-4a15-8d32-c9373a021f5f" />
 
