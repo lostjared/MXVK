@@ -1,5 +1,7 @@
 # Starship Example
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/18cd329b-48f7-4fad-be21-3536f2e85d08" />
+
 This example loads `data/starship.obj` with its material file and texture set, then renders it as a rotating 3D ship with a moving starfield behind it.
 
 The ship uses the example's model shaders for textured Phong shading. The starfield is rendered as a separate point-sprite layer, and the engine exhaust is drawn as a small 3D cone aligned to the rear jet.
