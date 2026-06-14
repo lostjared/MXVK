@@ -1,5 +1,7 @@
 # Matrix Rain
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/10f87a3f-a440-49e1-ac3d-ef686aa97dfb" />
+
 Matrix Rain recreates the classic falling-glyph effect using SDL_ttf and MXVK sprites. The glyphs are rendered into an off-screen SDL surface, tinted by depth level, and uploaded into a texture every frame.
 
 ## Controls
