@@ -1,5 +1,7 @@
 # Glitch Cube
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/b73dd23b-4226-41a6-b734-3157dae5fd37" />
+
 Glitch Cube is a stylized 3D model viewer that renders a textured cube with a time-based transform and MXVK text overlays. It is intended as a compact example of model loading, camera control, and shader-driven presentation.
 
 ## Controls
