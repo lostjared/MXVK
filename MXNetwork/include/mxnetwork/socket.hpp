@@ -2,7 +2,7 @@
 #define MXSOCKET_H
 
 #include "mxnetwork/exception.hpp"
-#include "mxnetwork/mxsocket.hpp"
+#include "mxnetwork/mxsocket.h"
 #include <optional>
 #include <string>
 #include <string_view>
@@ -29,13 +29,13 @@ namespace mxnetwork {
         Socket() noexcept;
         Socket(SocketType type) noexcept;
         ~Socket() noexcept;
-        Socket(int sockfd, SocketType type);
+        Socket(mx_socket_fd sockfd, SocketType type);
         Socket(const MXSocket &s, SocketType type) noexcept;
         Socket(const Socket &s) = delete;
         Socket(Socket &&s) noexcept;
         Socket &operator=(const Socket &s) = delete;
         Socket &operator=(Socket &&s) noexcept;
-        [[nodiscard]] int sockfd() const;
+        [[nodiscard]] mx_socket_fd sockfd() const;
         bool connect(const std::string_view host, const std::string_view port);
         bool connect_unix(const std::string_view path);
         bool listen(std::string_view port, int backlog);

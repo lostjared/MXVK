@@ -164,7 +164,7 @@ endif()
 unset(CMAKE_REQUIRED_FLAGS)
 message(STATUS "")
 find_package(Threads REQUIRED)
-add_library(mxnetwork STATIC src/mxsocket.cpp src/socket.cpp src/exception.cpp)
+add_library(mxnetwork STATIC src/mxsocket.c src/socket.cpp src/exception.cpp)
 target_link_libraries(mxnetwork PUBLIC Threads::Threads)
 target_include_directories(mxnetwork PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

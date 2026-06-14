@@ -1,4 +1,4 @@
-#include "mxnetwork/mxsocket.hpp"
+#include "mxnetwork/mxsocket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -149,7 +149,7 @@
         sock->addrlen = rp->ai_addrlen;
         memcpy(&sock->inet, rp->ai_addr, rp->ai_addrlen);
     } else {
-        if (sfd >= 0)
+        if (sfd != NULL_SOCKET)
             mx_close_socket(sfd);
         return false;
     }

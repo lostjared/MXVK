@@ -64,6 +64,9 @@ typedef struct {
     struct sockaddr_in inet;
 } MXSocket;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 [[nodiscard]] bool mx_socket_init(MXSocket *s);
 [[nodiscard]] bool mx_socket_listen(MXSocket *s, const char *port, int backlog, int type);
 [[nodiscard]] bool mx_socket_unix_listen(MXSocket *s, const char *path, int backlog, int type);
@@ -86,5 +89,7 @@ ssize_t mx_socket_recvfrom(MXSocket *sock, void *buf, size_t bytes);
 ssize_t mx_socket_unix_sendto(MXSocket *sock, const void *buf, size_t bytes);
 ssize_t mx_socket_unix_recvfrom(MXSocket *sock, void *buf, size_t bytes);
 void mx_socket_ignore_pipe_signal();
-
+#ifdef __cplusplus
+}
+#endif
 #endif

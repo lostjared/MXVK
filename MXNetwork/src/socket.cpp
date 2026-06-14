@@ -30,7 +30,7 @@ namespace mxnetwork {
             return;
         else
             type = SocketType::TYPE_INVALID;
-        sock.sockfd = -1;
+        sock.sockfd = NULL_SOCKET;
     }
 
     Socket::~Socket() noexcept {
@@ -39,7 +39,7 @@ namespace mxnetwork {
         }
     }
 
-    Socket::Socket(int sockfd, SocketType stype) {
+    Socket::Socket(mx_socket_fd sockfd, SocketType stype) {
         if (!mx_socket_init(&sock))
             throw Exception("Error on socket init.\n");
 
@@ -57,16 +57,16 @@ namespace mxnetwork {
     Socket::Socket(Socket &&s) noexcept {
         type = s.type;
         setsocket(s.sock);
-        s.sock.sockfd = -1;
+        s.sock.sockfd = NULL_SOCKET;
     }
 
     Socket &Socket::operator=(Socket &&s) noexcept {
         if (this != &s) {
             type = s.type;
-            if (sock.sockfd >= 0)
+            if (mx_socket_valid(&sock))
                 ::mx_close_socket(sock.sockfd);
             setsocket(s.sock);
-            s.sock.sockfd = -1;
+            s.sock.sockfd = NULL_SOCKET;
         }
         return *this;
     }
@@ -154,7 +154,7 @@ namespace mxnetwork {
         return type;
     }
 
-    [[nodiscard]] int Socket::sockfd() const {
+    [[nodiscard]] mx_socket_fd Socket::sockfd() const {
         return sock.sockfd;
     }
 
