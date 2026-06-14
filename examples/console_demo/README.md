@@ -1,5 +1,7 @@
 # Console Demo
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/a3407341-ea68-438d-aa37-1ce0d96259b5" />
+
 This sample shows the MXVK in-window console layered over a moving shader background. It is mainly a demonstration of how the engine can combine regular rendering with an interactive text console.
 
 ## Controls
