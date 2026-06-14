@@ -1,5 +1,7 @@
 # Tic-Tac-Toe
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/c159ef40-7ff4-416e-8ef4-5d25f975092f" />
+
 Tic-Tac-Toe is a mouse-driven board game against a simple computer opponent. The board, marks, and status text are drawn with MXVK sprites and text, while the AI chooses moves directly on the game board array.
 
 ## Controls
