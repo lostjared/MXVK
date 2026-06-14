@@ -104,6 +104,7 @@ set(STARSHIP_EXAMPLE_TEXTURE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_cockpit_red.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_fin.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_engine.png
+    ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_engine_side.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_hull.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ship_wing.png
 )

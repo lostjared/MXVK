@@ -20,7 +20,8 @@ The example expects these files in `data/`:
 - `ship_hull.png` - main hull texture
 - `ship_wing.png` - wing texture
 - `ship_fin.png` - fin texture
-- `ship_engine.png` - engine texture
+- `ship_engine.png` - center rear engine texture
+- `ship_engine_side.png` - side engine pod texture
 - `ship_cockpit.png` - cockpit texture
 - `ship_cockpit_red.png` - red cockpit variant
 - `rear_cap_metal.png` - rear cap material texture
