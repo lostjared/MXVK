@@ -14,8 +14,9 @@ layout(push_constant) uniform Sprite3DPushConstants {
 
 void main() {
     vec4 tex = texture(sprite_tex, out_uv);
-    if (tex.a < pc.size_y_rotation_alpha.z || tex.r < 0.1) {
+    float alpha = tex.a * out_color.a;
+    if (alpha < pc.size_y_rotation_alpha.z) {
         discard;
     }
-    frag_color = vec4(out_color.rgb, 1.0);
+    frag_color = vec4(tex.rgb * out_color.rgb, alpha);
 }

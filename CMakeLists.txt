@@ -523,6 +523,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(static_example)
     add_subdirectory(examples/sprite_example)
     mxvk_configure_mingw_target(sprite_example)
+    add_subdirectory(examples/sprite3d_example)
+    mxvk_configure_mingw_target(sprite3d_example)
     add_subdirectory(examples/text_example)
     mxvk_configure_mingw_target(text_example)
     add_subdirectory(examples/model_example)
@@ -654,6 +656,7 @@ if(EXAMPLES)
         hello_world
         static_example
         sprite_example
+        sprite3d_example
         text_example
         model_example
         planet
