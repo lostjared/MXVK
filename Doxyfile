@@ -1,0 +1,106 @@
+# Doxygen configuration for MXVK
+#
+# Usage:
+#   doxygen Doxyfile
+#
+# Output is written to docs/doxygen/html by default.
+
+DOXYFILE_ENCODING       = UTF-8
+PROJECT_NAME            = "MXVK"
+PROJECT_NUMBER          = "0.1.0"
+PROJECT_BRIEF           = "A C++20 Vulkan rendering framework with SDL3 integration."
+OUTPUT_DIRECTORY        = docs/doxygen
+CREATE_SUBDIRS          = YES
+
+INPUT                   = README.md mxvk/include mxvk/src examples
+FILE_PATTERNS           = *.md *.dox *.h *.hh *.hpp *.hxx *.inl *.c *.cc *.cpp *.cxx
+RECURSIVE               = YES
+EXCLUDE                 = build build_local .git
+EXCLUDE_PATTERNS        = */build/* */build_local/* */.git/*
+EXCLUDE_SYMBOLS         = *_t
+
+USE_MDFILE_AS_MAINPAGE  = README.md
+MARKDOWN_SUPPORT        = YES
+TOC_INCLUDE_HEADINGS    = 3
+
+GENERATE_HTML           = YES
+GENERATE_LATEX          = NO
+GENERATE_MAN            = NO
+GENERATE_RTF            = NO
+GENERATE_XML            = NO
+
+HTML_OUTPUT             = html
+HTML_FILE_EXTENSION     = .html
+#HTML_EXTRA_STYLESHEET   = doxygen-dark.csu1
+HTML_HEADER             =
+HTML_FOOTER             =
+HTML_STYLESHEET         =
+HTML_COLORSTYLE         = LIGHT
+HTML_DYNAMIC_MENUS      = YES
+HTML_DYNAMIC_SECTIONS   = YES
+GENERATE_TREEVIEW       = YES
+FULL_SIDEBAR            = YES
+SEARCHENGINE            = YES
+SERVER_BASED_SEARCH     = NO
+SOURCE_BROWSER          = YES
+INLINE_SOURCES          = YES
+STRIP_CODE_COMMENTS     = NO
+SHOW_USED_FILES         = YES
+SORT_MEMBER_DOCS        = YES
+SORT_BRIEF_DOCS         = YES
+ALPHABETICAL_INDEX      = YES
+TAB_SIZE                = 4
+OPTIMIZE_OUTPUT_FOR_C   = NO
+OPTIMIZE_OUTPUT_JAVA    = NO
+OPTIMIZE_FOR_FORTRAN    = NO
+OPTIMIZE_OUTPUT_VHDL    = NO
+JAVADOC_AUTOBRIEF       = YES
+MULTILINE_CPP_IS_BRIEF  = YES
+RESOLVE_UNNAMED_PARAMS  = YES
+ALIASES                 = "note=\\par Note:\n" "warning=\\par Warning:\n"
+
+EXTRACT_ALL             = YES
+EXTRACT_PRIVATE         = NO
+EXTRACT_STATIC          = NO
+EXTRACT_LOCAL_CLASSES   = YES
+EXTRACT_LOCAL_METHODS   = NO
+EXTRACT_ANON_NSPACES    = YES
+HIDE_UNDOC_MEMBERS      = NO
+HIDE_UNDOC_CLASSES      = NO
+HIDE_FRIEND_COMPOUNDS   = NO
+HIDE_IN_BODY_DOCS       = NO
+INTERNAL_DOCS           = NO
+CASE_SENSE_NAMES        = YES
+INLINE_INHERITED_MEMB   = YES
+
+QUIET                   = NO
+WARNINGS                = YES
+WARN_IF_UNDOCUMENTED    = NO
+WARN_IF_DOC_ERROR       = YES
+WARN_NO_PARAMDOC        = NO
+WARN_AS_ERROR           = NO
+
+INCLUDE_PATH            = .
+STRIP_FROM_PATH         = .
+STRIP_FROM_INC_PATH     = .
+
+PREDEFINED              += VKAPI_ATTR= VKAPI_CALL= VKAPI_PTR=
+PREDEFINED              += __cplusplus=202002L
+
+MACRO_EXPANSION         = YES
+EXPAND_ONLY_PREDEF      = NO
+ENABLE_PREPROCESSING    = YES
+SKIP_FUNCTION_MACROS    = YES
+
+BUILTIN_STL_SUPPORT     = YES
+CPP_CLI_SUPPORT         = YES
+CLANG_ASSISTED_PARSING  = NO
+
+HAVE_DOT                = NO
+DOT_IMAGE_FORMAT        = svg
+INTERACTIVE_SVG         = YES
+DOT_MULTI_TARGETS       = YES
+
+IMAGE_PATH              =
+INPUT_FILTER            =
+FILTER_PATTERNS         =
