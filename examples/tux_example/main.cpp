@@ -1,9 +1,12 @@
 #include <cstdlib>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <format>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -15,6 +18,116 @@
 #include "mxvk/mxvk_exception.hpp"
 
 namespace example {
+
+    struct SnowFlake {
+        float x;
+        float y;
+        float z;
+        float intensity;
+        float size;
+        float speed;
+        float angle;
+        float rotation;
+        float rotationSpeed;
+        float rotationAngle;
+        float rotationDirection;
+        float rotationIntensity;
+        float rotationSize;
+        float rotationSpeedSize;
+        float rotationSpeedIntensity;
+    };
+
+    class SnowEffect3D {
+      public:
+        static constexpr int MAX_SNOWFLAKES = 600;
+
+        void init(mxvk::VK_Window *window, const std::string &assetRoot) {
+            if (snowSprite != nullptr) {
+                return;
+            }
+
+            snowSprite = window->createSprite3D(assetRoot + "/data/snowflake.png");
+
+            snowflakes.reserve(MAX_SNOWFLAKES);
+            for (int i = 0; i < MAX_SNOWFLAKES; ++i) {
+                snowflakes.push_back(makeFlake());
+            }
+        }
+
+        void update(float deltaSeconds) {
+            windTime += deltaSeconds * 1.2f;
+            const float windOffsetX = std::sin(windTime) * 0.12f;
+            const float windOffsetZ = std::cos(windTime * 0.7f) * 0.04f;
+
+            for (auto &flake : snowflakes) {
+                flake.y -= flake.speed * deltaSeconds;
+                flake.x += windOffsetX * deltaSeconds;
+                flake.z += windOffsetZ * deltaSeconds;
+                flake.rotation += flake.rotationSpeed * deltaSeconds;
+
+                if (flake.y < -3.8f) {
+                    flake = makeFlake();
+                    flake.y = 3.8f;
+                }
+            }
+        }
+
+        void drawLayer(VkCommandBuffer cmd, uint32_t imageIndex, const glm::mat4 &view, const glm::mat4 &proj, bool frontLayer) {
+            if (snowSprite == nullptr) {
+                return;
+            }
+
+            snowSprite->updateCamera(imageIndex, view, proj);
+            for (const SnowFlake &flake : snowflakes) {
+                const bool isFront = flake.z >= 0.0f;
+                if (isFront != frontLayer) {
+                    continue;
+                }
+
+                snowSprite->drawSprite(glm::vec3(flake.x, flake.y, flake.z),
+                                       glm::vec2(flake.size, flake.size),
+                                       glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+                                       flake.rotation);
+            }
+
+            snowSprite->render(cmd, imageIndex);
+            snowSprite->clearQueue();
+        }
+
+      private:
+        static float randomSignedCoordinate() {
+            return static_cast<float>(std::rand() % 900 - 450) / 100.0f;
+        }
+
+        static float randomDepth() {
+            return static_cast<float>(std::rand() % 5000 - 2500) / 1000.0f;
+        }
+
+        static SnowFlake makeFlake() {
+            SnowFlake flake{};
+            flake.x = randomSignedCoordinate();
+            flake.y = static_cast<float>(std::rand() % 760 - 380) / 100.0f;
+            flake.z = randomDepth();
+            flake.intensity = 1.0f;
+            flake.size = 0.06f + static_cast<float>(std::rand() % 180) / 1600.0f;
+            flake.speed = 0.25f + static_cast<float>(std::rand() % 100) / 600.0f;
+            constexpr float pi = 3.14159265358979323846f;
+            flake.angle = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
+            flake.rotation = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
+            flake.rotationSpeed = (static_cast<float>(std::rand() % 100) / 1000.0f) - 0.025f;
+            flake.rotationAngle = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
+            flake.rotationDirection = (std::rand() % 2) ? 1.0f : -1.0f;
+            flake.rotationIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
+            flake.rotationSize = 0.01f + static_cast<float>(std::rand() % 100) / 4000.0f;
+            flake.rotationSpeedSize = (static_cast<float>(std::rand() % 100) / 2000.0f) - 0.025f;
+            flake.rotationSpeedIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
+            return flake;
+        }
+
+        std::vector<SnowFlake> snowflakes;
+        mxvk::VK_Sprite3D *snowSprite = nullptr;
+        float windTime = 0.0f;
+    };
 
     class ModelWindow : public mxvk::VK_Window {
       public:
@@ -30,6 +143,7 @@ namespace example {
 
             setFont(assetRoot + "/data/font.ttf", 24);
             background = createSprite(backgroundPath, backgroundVertPath, backgroundFragPath);
+            snow.init(this, assetRoot);
             model.load(this, modelPath, "", assetRoot + "/data", 1.0f);
             model.setShaders(this, vertPath, fragPath);
         }
@@ -56,7 +170,8 @@ namespace example {
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
-            const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
+            const auto now = std::chrono::steady_clock::now();
+            const float elapsedSeconds = std::chrono::duration<float>(now - start).count();
             const VkExtent2D extent = getSwapchainExtent();
 
             if (background != nullptr && sprite_pipeline != VK_NULL_HANDLE && sprite_pipeline_layout != VK_NULL_HANDLE) {
@@ -66,6 +181,10 @@ namespace example {
                 // Prevent the generic overlay pass from drawing the same full-screen sprite on top.
                 background->clearQueue();
             }
+
+            const float deltaSeconds = std::chrono::duration<float>(now - lastSnowUpdate).count();
+            lastSnowUpdate = now;
+            snow.update(deltaSeconds);
 
             const float aspect = (extent.height > 0U)
                                      ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
@@ -80,14 +199,20 @@ namespace example {
             ubo.proj[1][1] *= -1.0f;
 
             model.updateUBO(imageIndex, ubo);
+
+            snow.drawLayer(cmd, imageIndex, ubo.view, ubo.proj, false);
             model.render(cmd, imageIndex, false);
+
+            snow.drawLayer(cmd, imageIndex, ubo.view, ubo.proj, true);
         }
 
       private:
         std::string assetRoot;
         mxvk::VK_Sprite *background = nullptr;
         mxvk::VKAbstractModel model{};
+        SnowEffect3D snow{};
         std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point lastSnowUpdate{std::chrono::steady_clock::now()};
     };
 
 } // namespace example

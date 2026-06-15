@@ -223,6 +223,10 @@ namespace mxvk {
             std::cout << std::format("vk: releasing {} sprite(s)\n", sprites.size());
             sprites.clear();
         }
+        if (!sprites3d.empty()) {
+            std::cout << std::format("vk: releasing {} 3D sprite batch(es)\n", sprites3d.size());
+            sprites3d.clear();
+        }
         sprite_state_dirty = false;
         destroySpritePipeline();
         if (sprite_descriptor_set_layout != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
@@ -1237,6 +1241,11 @@ namespace mxvk {
         for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->setCommandPool(command_pool);
+            }
+        }
+        for (const std::unique_ptr<VK_Sprite3D> &sprite : sprites3d) {
+            if (sprite) {
+                sprite->resize(this);
             }
         }
 
@@ -2297,6 +2306,61 @@ namespace mxvk {
         VK_Sprite *const sprite_ptr = sprite.get();
         sprites.push_back(std::move(sprite));
         sprite_state_dirty = true;
+        return sprite_ptr;
+    }
+
+    VK_Sprite3D *VK_Window::createSprite3D(const std::string &pngPath, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create 3D sprite before Vulkan device initialization");
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
+        }
+
+        const std::string vertPath = vertexShaderPath.empty()
+                                         ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR)
+                                         : vertexShaderPath;
+        const std::string fragPath = fragmentShaderPath.empty()
+                                         ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR)
+                                         : fragmentShaderPath;
+
+        auto sprite = std::make_unique<VK_Sprite3D>();
+        sprite->load(this, pngPath, vertPath, fragPath);
+
+        VK_Sprite3D *const sprite_ptr = sprite.get();
+        sprites3d.push_back(std::move(sprite));
+        return sprite_ptr;
+    }
+
+    VK_Sprite3D *VK_Window::createSprite3D(SDL_Surface *surface, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        if (surface == nullptr) {
+            throw mxvk::Exception("Cannot create 3D sprite from a null SDL surface");
+        }
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create 3D sprite before Vulkan device initialization");
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
+        }
+
+        const std::string vertPath = vertexShaderPath.empty()
+                                         ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR)
+                                         : vertexShaderPath;
+        const std::string fragPath = fragmentShaderPath.empty()
+                                         ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR)
+                                         : fragmentShaderPath;
+
+        auto sprite = std::make_unique<VK_Sprite3D>();
+        sprite->load(this, surface, vertPath, fragPath);
+
+        VK_Sprite3D *const sprite_ptr = sprite.get();
+        sprites3d.push_back(std::move(sprite));
         return sprite_ptr;
     }
 

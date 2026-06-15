@@ -324,6 +324,7 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_controller.cpp
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_sprite.cpp
+    mxvk/src/mxvk_sprite3d.cpp
     mxvk/src/mxvk_text.cpp
     mxvk/src/mxvk_model.cpp
     mxvk/src/mxvk_abstract_model.cpp
@@ -347,6 +348,10 @@ set(mxvk_TEXT_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/text.vert)
 set(mxvk_TEXT_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/text.frag)
 set(mxvk_TEXT_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/text.vert.spv)
 set(mxvk_TEXT_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/text.frag.spv)
+set(mxvk_SPRITE3D_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite3d.vert)
+set(mxvk_SPRITE3D_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite3d.frag)
+set(mxvk_SPRITE3D_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite3d.vert.spv)
+set(mxvk_SPRITE3D_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite3d.frag.spv)
 
 add_custom_command(
     OUTPUT ${mxvk_VERTEX_SPV}
@@ -384,12 +389,32 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${mxvk_SPRITE3D_VERTEX_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_SPRITE3D_VERTEX_SHADER} -o ${mxvk_SPRITE3D_VERTEX_SPV}
+    DEPENDS ${mxvk_SPRITE3D_VERTEX_SHADER}
+    COMMENT "Compiling MXVK 3D sprite vertex shader"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${mxvk_SPRITE3D_FRAGMENT_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${mxvk_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${mxvk_SPRITE3D_FRAGMENT_SHADER} -o ${mxvk_SPRITE3D_FRAGMENT_SPV}
+    DEPENDS ${mxvk_SPRITE3D_FRAGMENT_SHADER}
+    COMMENT "Compiling MXVK 3D sprite fragment shader"
+    VERBATIM
+)
+
 add_custom_target(mxvk_shaders
     DEPENDS
         ${mxvk_VERTEX_SPV}
         ${mxvk_FRAGMENT_SPV}
     ${mxvk_TEXT_VERTEX_SPV}
     ${mxvk_TEXT_FRAGMENT_SPV}
+    ${mxvk_SPRITE3D_VERTEX_SPV}
+    ${mxvk_SPRITE3D_FRAGMENT_SPV}
 )
 if(CV)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_cv.cpp)
@@ -480,6 +505,7 @@ add_dependencies(mxvk mxvk_shaders)
 target_compile_definitions(mxvk PUBLIC
     MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
     MXVK_TEXT_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
+    MXVK_SPRITE3D_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
 )
 if(CV OR MXVK_CUDA_ENABLED)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
@@ -572,6 +598,12 @@ if(EXAMPLES)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_TEXT_FRAGMENT_SPV}
                 ${target_runtime_dir}/data/text_frag.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_SPRITE3D_VERTEX_SPV}
+                ${target_runtime_dir}/data/sprite3d.vert.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_SPRITE3D_FRAGMENT_SPV}
+                ${target_runtime_dir}/data/sprite3d.frag.spv
         )
 
         get_target_property(target_source_dir ${target_name} SOURCE_DIR)

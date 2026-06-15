@@ -2,6 +2,7 @@
 #define _MXVK_MXVK_H_
 
 #include "mxvk_sprite.hpp"
+#include "mxvk_sprite3d.hpp"
 #include "mxvk_text.hpp"
 #include <SDL3/SDL.h>
 #include <array>
@@ -193,6 +194,24 @@ namespace mxvk {
         VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
+         * @brief Create a world-space billboard sprite from a PNG file.
+         * @param pngPath Path to the PNG file.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @return Non-owning pointer to the created 3D sprite batch.
+         */
+        VK_Sprite3D *createSprite3D(const std::string &pngPath, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+
+        /**
+         * @brief Create a world-space billboard sprite from an SDL surface.
+         * @param surface Source surface pointer.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @return Non-owning pointer to the created 3D sprite batch.
+         */
+        VK_Sprite3D *createSprite3D(SDL_Surface *surface, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+
+        /**
          * @brief Check whether Vulkan validation layers are currently enabled.
          * @return true if validation layers are enabled, false otherwise.
          */
@@ -361,6 +380,7 @@ namespace mxvk {
         static constexpr uint64_t resize_settle_delay_ms = 150;
 
         std::vector<std::unique_ptr<VK_Sprite>> sprites{};
+        std::vector<std::unique_ptr<VK_Sprite3D>> sprites3d{};
         VkDescriptorSetLayout sprite_descriptor_set_layout = VK_NULL_HANDLE;
         VkPipelineLayout sprite_pipeline_layout = VK_NULL_HANDLE;
         VkPipeline sprite_pipeline = VK_NULL_HANDLE;
