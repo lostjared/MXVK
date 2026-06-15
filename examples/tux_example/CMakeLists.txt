@@ -19,6 +19,8 @@ set(tux_example_BACKGROUND_VERTEX_SHADER ${tux_example_SHADER_SOURCE_DIR}/backgr
 set(tux_example_BACKGROUND_FRAGMENT_SHADER ${tux_example_SHADER_SOURCE_DIR}/background.frag)
 set(tux_example_BACKGROUND_VERTEX_SPV ${tux_example_SHADER_OUTPUT_DIR}/background.vert.spv)
 set(tux_example_BACKGROUND_FRAGMENT_SPV ${tux_example_SHADER_OUTPUT_DIR}/background.frag.spv)
+set(tux_example_SNOWFLAKE_FRAGMENT_SHADER ${CMAKE_CURRENT_SOURCE_DIR}/data/snowflake.frag)
+set(tux_example_SNOWFLAKE_FRAGMENT_SPV ${tux_example_SHADER_OUTPUT_DIR}/snowflake.frag.spv)
 
 add_custom_command(
     OUTPUT ${tux_example_VERTEX_SPV}
@@ -56,12 +58,22 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${tux_example_SNOWFLAKE_FRAGMENT_SPV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${tux_example_SHADER_OUTPUT_DIR}
+    COMMAND ${GLSLC_EXECUTABLE} ${tux_example_SNOWFLAKE_FRAGMENT_SHADER} -o ${tux_example_SNOWFLAKE_FRAGMENT_SPV}
+    DEPENDS ${tux_example_SNOWFLAKE_FRAGMENT_SHADER}
+    COMMENT "Compiling tux example snowflake fragment shader"
+    VERBATIM
+)
+
 add_custom_target(tux_example_shaders
     DEPENDS
         ${tux_example_VERTEX_SPV}
         ${tux_example_FRAGMENT_SPV}
     ${tux_example_BACKGROUND_VERTEX_SPV}
     ${tux_example_BACKGROUND_FRAGMENT_SPV}
+    ${tux_example_SNOWFLAKE_FRAGMENT_SPV}
 )
 
 add_dependencies(tux_example tux_example_shaders)

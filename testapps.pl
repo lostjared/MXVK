@@ -6,6 +6,7 @@ my @tests = qw(
     hello_world
     text_example
     sprite_example
+    sprite3d_example
     static_example
     matrix
     console_demo

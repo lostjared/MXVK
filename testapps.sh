@@ -3,6 +3,7 @@
 ./run.pl hello_world
 ./run.pl text_example
 ./run.pl sprite_example
+./run.pl sprite3d_example
 ./run.pl static_example
 ./run.pl matrix
 ./run.pl console_demo

@@ -42,12 +42,12 @@ namespace example {
         static constexpr int MAX_SNOWFLAKES = 600;
         static constexpr float modelDepthClearance = 0.55f;
 
-        void init(mxvk::VK_Window *window, const std::string &assetRoot) {
+        void init(mxvk::VK_Window *window, const std::string &assetRoot, const std::string &fragmentShaderPath) {
             if (snowSprite != nullptr) {
                 return;
             }
 
-            snowSprite = window->createSprite3D(assetRoot + "/data/snowflake.png");
+            snowSprite = window->createSprite3D(assetRoot + "/data/snowflake.png", "", fragmentShaderPath);
             snowSprite->setDepthTestEnabled(true);
             snowSprite->setDepthWriteEnabled(false);
             snowSprite->setAlphaDiscardThreshold(0.1f);
@@ -157,11 +157,12 @@ namespace example {
             const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
             const std::string backgroundVertPath = std::string(tux_example_SHADER_DIR) + "/background.vert.spv";
             const std::string backgroundFragPath = std::string(tux_example_SHADER_DIR) + "/background.frag.spv";
+            const std::string snowflakeFragPath = std::string(tux_example_SHADER_DIR) + "/snowflake.frag.spv";
             const std::string backgroundPath = assetRoot + "/data/ant-bg.png";
 
             setFont(assetRoot + "/data/font.ttf", 24);
             background = createSprite(backgroundPath, backgroundVertPath, backgroundFragPath);
-            snow.init(this, assetRoot);
+            snow.init(this, assetRoot, snowflakeFragPath);
             model.load(this, modelPath, "", assetRoot + "/data", 1.0f);
             model.setShaders(this, vertPath, fragPath);
         }
