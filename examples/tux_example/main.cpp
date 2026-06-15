@@ -62,6 +62,7 @@ namespace example {
             windTime += deltaSeconds * 1.2f;
             const float windOffsetX = std::sin(windTime) * 0.12f;
             const float windOffsetZ = std::cos(windTime * 0.7f) * 0.04f;
+            constexpr float twoPi = 6.28318530717958647692f;
 
             for (auto &flake : snowflakes) {
                 flake.y -= flake.speed * deltaSeconds;
@@ -70,7 +71,14 @@ namespace example {
                 if (std::abs(flake.z) < modelDepthClearance) {
                     flake.z = (flake.z >= 0.0f) ? modelDepthClearance : -modelDepthClearance;
                 }
-                flake.rotation += flake.rotationSpeed * deltaSeconds;
+                flake.rotation += (flake.rotationSpeed + std::sin(windTime + flake.rotationAngle) *
+                                                        flake.rotationSpeedIntensity * 0.5f) *
+                                  deltaSeconds;
+                if (flake.rotation > twoPi) {
+                    flake.rotation -= twoPi;
+                } else if (flake.rotation < -twoPi) {
+                    flake.rotation += twoPi;
+                }
 
                 if (flake.y < -3.8f) {
                     flake = makeFlake();
@@ -123,10 +131,11 @@ namespace example {
             constexpr float pi = 3.14159265358979323846f;
             flake.angle = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
             flake.rotation = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
-            flake.rotationSpeed = (static_cast<float>(std::rand() % 100) / 1000.0f) - 0.025f;
             flake.rotationAngle = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
             flake.rotationDirection = (std::rand() % 2) ? 1.0f : -1.0f;
             flake.rotationIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
+            flake.rotationSpeed = flake.rotationDirection * (0.8f + flake.rotationIntensity * 2.0f) +
+                                  ((static_cast<float>(std::rand() % 100) / 1000.0f) - 0.05f);
             flake.rotationSize = 0.01f + static_cast<float>(std::rand() % 100) / 4000.0f;
             flake.rotationSpeedSize = (static_cast<float>(std::rand() % 100) / 2000.0f) - 0.025f;
             flake.rotationSpeedIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
