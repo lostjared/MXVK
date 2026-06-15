@@ -40,6 +40,7 @@ namespace example {
     class SnowEffect3D {
       public:
         static constexpr int MAX_SNOWFLAKES = 600;
+        static constexpr float modelDepthClearance = 0.55f;
 
         void init(mxvk::VK_Window *window, const std::string &assetRoot) {
             if (snowSprite != nullptr) {
@@ -47,6 +48,9 @@ namespace example {
             }
 
             snowSprite = window->createSprite3D(assetRoot + "/data/snowflake.png");
+            snowSprite->setDepthTestEnabled(true);
+            snowSprite->setDepthWriteEnabled(false);
+            snowSprite->setAlphaDiscardThreshold(0.1f);
 
             snowflakes.reserve(MAX_SNOWFLAKES);
             for (int i = 0; i < MAX_SNOWFLAKES; ++i) {
@@ -63,6 +67,9 @@ namespace example {
                 flake.y -= flake.speed * deltaSeconds;
                 flake.x += windOffsetX * deltaSeconds;
                 flake.z += windOffsetZ * deltaSeconds;
+                if (std::abs(flake.z) < modelDepthClearance) {
+                    flake.z = (flake.z >= 0.0f) ? modelDepthClearance : -modelDepthClearance;
+                }
                 flake.rotation += flake.rotationSpeed * deltaSeconds;
 
                 if (flake.y < -3.8f) {
@@ -100,7 +107,9 @@ namespace example {
         }
 
         static float randomDepth() {
-            return static_cast<float>(std::rand() % 5000 - 2500) / 1000.0f;
+            const float depthRange = 2.5f - modelDepthClearance;
+            const float depth = modelDepthClearance + static_cast<float>(std::rand() % 1000) * (depthRange / 999.0f);
+            return (std::rand() % 2 == 0) ? -depth : depth;
         }
 
         static SnowFlake makeFlake() {
@@ -158,6 +167,7 @@ namespace example {
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
+                return;
             }
         }
 
@@ -191,7 +201,7 @@ namespace example {
                                      : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
-            ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * 0.65f, glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * autoSpinSpeed, glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
             ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
             ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 4.2f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -202,7 +212,6 @@ namespace example {
 
             snow.drawLayer(cmd, imageIndex, ubo.view, ubo.proj, false);
             model.render(cmd, imageIndex, false);
-
             snow.drawLayer(cmd, imageIndex, ubo.view, ubo.proj, true);
         }
 
@@ -213,6 +222,7 @@ namespace example {
         SnowEffect3D snow{};
         std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lastSnowUpdate{std::chrono::steady_clock::now()};
+        float autoSpinSpeed = 0.65f;
     };
 
 } // namespace example

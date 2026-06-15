@@ -14,8 +14,8 @@ void main() {
     float lighting = 0.55 + diffuse * 0.45;
 
     vec4 base = texture(texSampler, fragTexCoord);
-    if (base.a <= 0.0001) {
-        base = vec4(0.96, 0.97, 1.0, 1.0);
+    if (base.a < 0.1) {
+        discard;
     }
 
     outColor = vec4(base.rgb * lighting, 1.0);
