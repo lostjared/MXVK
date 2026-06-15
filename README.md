@@ -137,6 +137,9 @@ Examples:
 ./run.pl console_demo -r 1280x720
 ./run.pl matrix
 ./run.pl glitch_cube -r 1280x720
+./run.pl starship
+./run.pl walk
+./run.pl compute_shader --camera 0
 ./run.pl opencv_example --camera 0 -r 1280x720
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
@@ -175,6 +178,10 @@ Current example executables:
 ### `tux_example`
 - Renders a 3D model with a textured animated background and on-screen text.
 
+### `starship`
+- 3D ship viewer with textured Phong shading, a moving starfield, and a small exhaust effect.
+- Shows how to layer model rendering with sprite-based background effects.
+
 ### `glitch_cube`
 - MXVK Vulkan port of the legacy `gl_glitch_cube` demo from MX2.
 - Uses `VKAbstractModel` with GLSL 450 shaders (`model.vert/.frag`) and runtime-compiled SPIR-V.
@@ -197,6 +204,10 @@ Current example executables:
 - Shows sprite-based board rendering, text UI, click-to-play interaction, and quick restart flow with `R` or after a finished game.
 - Uses the shared font asset plus a background image staged into the example output directory.
 
+### `walk`
+- First-person maze and exploration sample with procedural level generation.
+- Demonstrates collision handling, projectile combat, collectibles, and a debug console in an FPS-style loop.
+
 ### `pool_demo` (`Pool3D` executable)
 - 3D pool/billiards demo built directly on MXVK dynamic rendering.
 - Demonstrates multi-model scene composition, per-object transforms, and interactive cue/ball simulation flow.
@@ -216,6 +227,10 @@ Current example executables:
 ### `console_demo`
 - Immediate-mode style in-app console and command handling demo.
 - Demonstrates custom post-build asset staging (font/texture/shaders) and runtime data loading.
+
+### `compute_shader` (requires `-DCV=ON`)
+- Streams camera frames through selectable Vulkan compute shaders and displays the processed result.
+- Useful for testing OpenCV capture, GPU image processing, and shader hot selection from `data/index.txt`.
 
 ### `opencv_example` (requires `-DCV=ON`)
 - Displays camera or video-file frames on a sprite in real time.
