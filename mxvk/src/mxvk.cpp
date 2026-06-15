@@ -372,7 +372,7 @@ namespace mxvk {
         app_info.pApplicationName = "mxvk";
         app_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
         app_info.pEngineName = "mxvk";
-        app_info.engineVersion = VK_MAKE_VERSION(0, 1, 0);
+        app_info.engineVersion = VK_MAKE_VERSION(MXVK_VERSION_CODE_MAJOR, MXVK_VERSION_CODE_MINOR, MXVK_VERSION_CODE_PATCH);
         app_info.apiVersion = VK_API_VERSION_1_4;
 
         VkInstanceCreateInfo create_info{};
@@ -409,6 +409,10 @@ namespace mxvk {
                   << VK_VERSION_MAJOR(instanceVersion) << "."
                   << VK_VERSION_MINOR(instanceVersion) << "."
                   << VK_VERSION_PATCH(instanceVersion) << "\n";
+        std::cout << "mxvk: engine version: "
+                  << MXVK_VERSION_CODE_MAJOR << "."
+                  << MXVK_VERSION_CODE_MINOR << "."
+                  << MXVK_VERSION_CODE_PATCH << "\n";
 
         std::cout << "SDL3: creating Vulkan presentation surface from SDL window\n";
         if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr, &surface)) {

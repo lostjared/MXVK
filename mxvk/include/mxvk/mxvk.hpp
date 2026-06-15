@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <volk/volk.h>
+#include <mxvk/mxvk_version.hpp>
 
 #ifdef ENABLE_VALIDATION
 #define MXVK_VALIDATION true

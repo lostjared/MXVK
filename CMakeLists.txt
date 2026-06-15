@@ -338,6 +338,10 @@ if(JPEG)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_jpeg.cpp)
 endif()
 
+set(mxvk_VERSION_HEADER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk_version.hpp.in)
+set(mxvk_VERSION_HEADER_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mxvk/include/mxvk/mxvk_version.hpp)
+configure_file(${mxvk_VERSION_HEADER_SOURCE} ${mxvk_VERSION_HEADER_OUTPUT} @ONLY)
+
 set(mxvk_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/shaders)
 set(mxvk_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/mxvk/shaders)
 set(mxvk_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite.vert)
@@ -422,6 +426,7 @@ endif()
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/mxvk/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
@@ -686,6 +691,11 @@ install(TARGETS mxvk
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include/mxvk
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES
+    ${mxvk_VERSION_HEADER_OUTPUT}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mxvk
 )
 
 write_basic_package_version_file(
