@@ -1,5 +1,7 @@
 # MXVK
 
+<img width="640" height="214" alt="mxvk_logo_640" src="https://github.com/user-attachments/assets/88c614ba-c7d1-4001-bcba-313b9da5450c" />
+
 MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on practical 2D and 3D application development.
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage.
 
