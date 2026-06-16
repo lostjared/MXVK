@@ -619,6 +619,7 @@ struct Arguments {
     std::string texture;     ///< Optional texture file path (@c --texture).
     std::string shaderPath; ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     int camera_index = 0;   ///< Optional camera index
+    std::string resource;  ///< Resource file
 };
 
 /**
@@ -651,6 +652,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionSingle('f', "fullscreen")
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDoubleValue(256, "filename", "input filename")
+	.addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
@@ -665,9 +667,13 @@ inline Arguments proc_args(int &argc, char **argv) {
     std::string texture;
     std::string shaderPath;
     int camera_index = 0;
+    std::string resource;
     try {
         while ((value = parser.proc(arg)) != -1) {
             switch (value) {
+	    case 302:
+		resource = arg.arg_value;
+		break;
             case 256:
                 filename = arg.arg_value;
                 break;
@@ -729,6 +735,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.camera_index = camera_index;
+    args.resource = resource;
     return args;
 }
 
