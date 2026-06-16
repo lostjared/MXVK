@@ -9,6 +9,7 @@ my @tests = qw(
     sprite3d_example
     static_example
     matrix
+    masterpiece
     console_demo
     fractal_zoom
     model_example
