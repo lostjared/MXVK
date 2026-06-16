@@ -639,18 +639,17 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width = 1280;       ///< Viewport width in pixels (default: 1280).
-    int height = 720;       ///< Viewport height in pixels (default: 720).
-    std::string path = "."; ///< Asset search path (default: ".").
-    bool fullscreen = false; ///< Whether fullscreen mode was requested.
-    std::string filename;    ///< Optional input filename (@c --filename).
-    std::string texture;     ///< Optional texture file path (@c --texture).
-    std::string shaderPath; ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    int camera_index = 0;   ///< Optional camera index
-    std::string resource;  ///< Resource file
+    int width = 1280;          ///< Viewport width in pixels (default: 1280).
+    int height = 720;          ///< Viewport height in pixels (default: 720).
+    std::string path = ".";    ///< Asset search path (default: ".").
+    bool fullscreen = false;   ///< Whether fullscreen mode was requested.
+    std::string filename;      ///< Optional input filename (@c --filename).
+    std::string texture;       ///< Optional texture file path (@c --texture).
+    std::string shaderPath;    ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    int camera_index = 0;      ///< Optional camera index
+    std::string resource;      ///< Resource file
     std::string resource_path; ///< Resource path
 };
-
 
 /**
  * @brief Parse standard libmx2 command-line options from main()'s argv.
@@ -682,8 +681,8 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionSingle('f', "fullscreen")
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDoubleValue(256, "filename", "input filename")
-	.addOptionDoubleValue(302, "resource", "resource file")
-	.addOptionDoubleValue(303, "resource_path", "resource data path")
+        .addOptionDoubleValue(302, "resource", "resource file")
+        .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
@@ -704,11 +703,11 @@ inline Arguments proc_args(int &argc, char **argv) {
         while ((value = parser.proc(arg)) != -1) {
             switch (value) {
             case 303:
-		 resource_path = arg.arg_value;
-		 break;
-	    case 302:
-		resource = arg.arg_value;
-		break;
+                resource_path = arg.arg_value;
+                break;
+            case 302:
+                resource = arg.arg_value;
+                break;
             case 256:
                 filename = arg.arg_value;
                 break;
