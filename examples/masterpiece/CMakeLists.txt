@@ -44,14 +44,15 @@ target_compile_definitions(masterpiece PRIVATE
     MASTERPIECE_ASSET_DIR="${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-set(masterpiece_RUNTIME_DATA_STAMP ${CMAKE_CURRENT_BINARY_DIR}/masterpiece_runtime_data.stamp)
-add_custom_command(
-    OUTPUT ${masterpiece_RUNTIME_DATA_STAMP}
+add_custom_target(masterpiece_runtime_data
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${masterpiece_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${masterpiece_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         ${masterpiece_RUNTIME_DATA_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/mxvk_logo.png
+        ${masterpiece_RUNTIME_DATA_DIR}/mxvk_logo.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${mxvk_VERTEX_SPV}
         ${masterpiece_RUNTIME_DATA_DIR}/sprite.vert.spv
@@ -79,16 +80,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${masterpiece_INTRO_FRAGMENT_SPV}
         ${masterpiece_RUNTIME_DATA_DIR}/intro.frag.spv
-    COMMAND ${CMAKE_COMMAND} -E touch ${masterpiece_RUNTIME_DATA_STAMP}
     DEPENDS
         ${masterpiece_RUNTIME_DATA_FILES}
         ${masterpiece_INTRO_FRAGMENT_SPV}
     COMMENT "Copying MasterPiece runtime data"
     VERBATIM
-)
-
-add_custom_target(masterpiece_runtime_data
-    DEPENDS ${masterpiece_RUNTIME_DATA_STAMP}
 )
 
 add_dependencies(masterpiece_runtime_data masterpiece_shaders)

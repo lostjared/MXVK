@@ -43,6 +43,8 @@ namespace {
     constexpr int lines_per_speedup = 10;
     constexpr int score_points_per_match = 6;
     constexpr int max_name_length = 16;
+    constexpr Uint32 joy_repeat_delay_ms = 180;
+    constexpr Sint16 joystick_dead_zone = 16000;
 
     enum class Screen {
         Intro,
@@ -257,11 +259,34 @@ namespace example {
             loadSprites();
             resetGame();
             setScreen(Screen::Intro);
+            tryOpenFirstGamepad();
+        }
+
+        ~MasterPieceWindow() override {
+            closeGamepad();
         }
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_QUIT) {
                 exit();
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+                openGamepad(e.gdevice.which);
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                if (gamepad != nullptr && e.gdevice.which == gamepadId) {
+                    closeGamepad();
+                    tryOpenFirstGamepad();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                handleControllerButton(e.gbutton.button);
                 return;
             }
 
@@ -301,6 +326,7 @@ namespace example {
         void proc() override {
             const Uint64 now = SDL_GetTicks();
             layout = computeLayout();
+            pollController(now);
 
             switch (screen) {
             case Screen::Intro:
@@ -371,6 +397,7 @@ namespace example {
         mxvk::Font title_font{};
         mxvk::Font ui_font{};
         mxvk::VK_Sprite *background_intro = nullptr;
+	mxvk::VK_Sprite *mxvk_logo = nullptr;
         mxvk::VK_Sprite *background_menu = nullptr;
         mxvk::VK_Sprite *background_game = nullptr;
         mxvk::VK_Sprite *cursor = nullptr;
@@ -388,6 +415,12 @@ namespace example {
         Uint64 intro_start_ms = 0;
         Uint64 last_update_ms = 0;
         Uint64 fall_accumulator_ms = 0;
+        Uint32 joy_repeat_left_ms = 0;
+        Uint32 joy_repeat_right_ms = 0;
+        Uint32 joy_repeat_up_ms = 0;
+        Uint32 joy_repeat_down_ms = 0;
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepadId = 0;
         bool paused = false;
         bool awaiting_name = false;
         bool score_added = false;
@@ -468,6 +501,7 @@ namespace example {
             background_intro = loadEffectSprite("intro.png");
             background_menu = loadEffectSprite("start.png");
             background_game = createSprite(puzzleDataPath("gamebg.png"));
+	    mxvk_logo = createSprite(puzzleDataPath("mxvk_logo.png"));
             cursor = loadPngSprite("cursor.png");
 
             for (std::size_t i = 0; i < block_files.size(); ++i) {
@@ -563,6 +597,12 @@ namespace example {
             return true;
         }
 
+        void dropPiece() {
+            while (movePiece(0, 1)) {
+            }
+            lockPiece(SDL_GetTicks());
+        }
+
         void rotatePieceColors(bool forward) {
             if (forward) {
                 const int temp = piece.colors.back();
@@ -574,6 +614,99 @@ namespace example {
                 piece.colors[0] = piece.colors[1];
                 piece.colors[1] = piece.colors[2];
                 piece.colors[2] = temp;
+            }
+        }
+
+        void handleControllerButton(Uint8 button) {
+            switch (screen) {
+            case Screen::Intro:
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    setScreen(Screen::Menu);
+                }
+                break;
+            case Screen::Menu:
+                if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                    menu_selection = (menu_selection + menu_item_count - 1) % menu_item_count;
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                    menu_selection = (menu_selection + 1) % menu_item_count;
+                } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    handleMenuSelection();
+                } else if (button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                    exit();
+                }
+                break;
+            case Screen::Game:
+                if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                    setScreen(Screen::Menu);
+                } else if (button == SDL_GAMEPAD_BUTTON_START) {
+                    paused = !paused;
+                } else if (paused || awaiting_name) {
+                    break;
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
+                    movePiece(-1, 0);
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
+                    movePiece(1, 0);
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                    if (!movePiece(0, 1)) {
+                        lockPiece(SDL_GetTicks());
+                    }
+                } else if (button == SDL_GAMEPAD_BUTTON_DPAD_UP || button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                    rotatePieceColors(true);
+                } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
+                    rotatePieceColors(false);
+                } else if (button == SDL_GAMEPAD_BUTTON_NORTH) {
+                    dropPiece();
+                }
+                break;
+            case Screen::Scores:
+                if (awaiting_name) {
+                    if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                        commitScore();
+                    } else if (button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                        score_added = true;
+                        SDL_StopTextInput(window.get());
+                        setScreen(Screen::Scores);
+                    }
+                } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START ||
+                           button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                    setScreen(Screen::Menu);
+                }
+                break;
+            case Screen::Credits:
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START ||
+                    button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                    setScreen(Screen::Menu);
+                }
+                break;
+            case Screen::NameEntry:
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    commitScore();
+                } else if (button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                    score_added = true;
+                    SDL_StopTextInput(window.get());
+                    setScreen(Screen::Scores);
+                }
+                break;
+            }
+        }
+
+        void handleMenuSelection() {
+            switch (menu_selection) {
+            case 0:
+                resetGame();
+                setScreen(Screen::Game);
+                break;
+            case 1:
+                setScreen(Screen::Scores);
+                break;
+            case 2:
+                setScreen(Screen::Credits);
+                break;
+            case 3:
+                exit();
+                break;
+            default:
+                break;
             }
         }
 
@@ -597,23 +730,7 @@ namespace example {
                 return;
             }
 
-            switch (menu_selection) {
-            case 0:
-                resetGame();
-                setScreen(Screen::Game);
-                break;
-            case 1:
-                setScreen(Screen::Scores);
-                break;
-            case 2:
-                setScreen(Screen::Credits);
-                break;
-            case 3:
-                exit();
-                break;
-            default:
-                break;
-            }
+            handleMenuSelection();
         }
 
         void handleGameKey(SDL_Keycode key) {
@@ -992,6 +1109,13 @@ namespace example {
             drawSprite(background_menu, 0, 0, layout.width, layout.height);
             drawSprite(overlay, scaled(30, layout.scale_x), scaled(85, layout.scale_y),
                        layout.width - scaled(60, layout.scale_x), scaled(260, layout.scale_y));
+            const int logo_w = layout.width / 2;
+            const int logo_h = static_cast<int>(std::lround(
+                static_cast<float>(logo_w) * static_cast<float>(mxvk_logo->getHeight()) /
+                static_cast<float>(mxvk_logo->getWidth())));
+            const int logo_x = (layout.width - logo_w) / 2;
+            const int logo_y = (layout.height - logo_h) / 2;
+            drawSprite(mxvk_logo, logo_x, logo_y, logo_w, logo_h);
             drawCenteredText("Credits", scaled(96, layout.scale_y), SDL_Color{255, 245, 200, 255}, title_font);
             printText("Original game: MasterPiece.SDL", scaled(70, layout.scale_x), scaled(180, layout.scale_y), SDL_Color{255, 255, 255, 255}, ui_font);
             printText("MXVK port and cleanup: 2D Vulkan example", scaled(70, layout.scale_x), scaled(214, layout.scale_y), SDL_Color{255, 255, 255, 255}, ui_font);
@@ -1083,6 +1207,120 @@ namespace example {
                       static_cast<int>(80.0f * scaleY) - 24,
                       SDL_Color{255, 255, 255, 255},
                       ui_font);
+        }
+
+        void handleControllerAxis(Sint16 lx, Sint16 ly) {
+            const Uint32 now = SDL_GetTicks();
+
+            if (screen == Screen::Menu) {
+                if (ly < -joystick_dead_zone) {
+                    if (now - joy_repeat_up_ms > joy_repeat_delay_ms) {
+                        menu_selection = (menu_selection + menu_item_count - 1) % menu_item_count;
+                        joy_repeat_up_ms = now;
+                    }
+                } else {
+                    joy_repeat_up_ms = 0U;
+                }
+
+                if (ly > joystick_dead_zone) {
+                    if (now - joy_repeat_down_ms > joy_repeat_delay_ms) {
+                        menu_selection = (menu_selection + 1) % menu_item_count;
+                        joy_repeat_down_ms = now;
+                    }
+                } else {
+                    joy_repeat_down_ms = 0U;
+                }
+                return;
+            }
+
+            if (screen != Screen::Game || paused || awaiting_name) {
+                return;
+            }
+
+            if (lx < -joystick_dead_zone) {
+                if (now - joy_repeat_left_ms > joy_repeat_delay_ms) {
+                    movePiece(-1, 0);
+                    joy_repeat_left_ms = now;
+                }
+            } else {
+                joy_repeat_left_ms = 0U;
+            }
+
+            if (lx > joystick_dead_zone) {
+                if (now - joy_repeat_right_ms > joy_repeat_delay_ms) {
+                    movePiece(1, 0);
+                    joy_repeat_right_ms = now;
+                }
+            } else {
+                joy_repeat_right_ms = 0U;
+            }
+
+            if (ly > joystick_dead_zone) {
+                if (now - joy_repeat_down_ms > joy_repeat_delay_ms) {
+                    if (!movePiece(0, 1)) {
+                        lockPiece(now);
+                    }
+                    joy_repeat_down_ms = now;
+                }
+            } else {
+                joy_repeat_down_ms = 0U;
+            }
+
+            if (lx == 0 && ly == 0) {
+                joy_repeat_up_ms = 0U;
+            }
+        }
+
+        void pollController(Uint64 now) {
+            (void)now;
+            if (gamepad == nullptr) {
+                return;
+            }
+
+            const Sint16 lx = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+            const Sint16 ly = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+            handleControllerAxis(lx, ly);
+        }
+
+        bool openGamepad(SDL_JoystickID id) {
+            if (gamepad != nullptr && gamepadId == id) {
+                return true;
+            }
+
+            closeGamepad();
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
+                return false;
+            }
+
+            gamepadId = id;
+            return true;
+        }
+
+        void tryOpenFirstGamepad() {
+            if (gamepad != nullptr) {
+                return;
+            }
+
+            int count = 0;
+            SDL_JoystickID *ids = SDL_GetGamepads(&count);
+            if (ids == nullptr || count <= 0) {
+                if (ids != nullptr) {
+                    SDL_free(ids);
+                }
+                return;
+            }
+
+            openGamepad(ids[0]);
+            SDL_free(ids);
+        }
+
+        void closeGamepad() {
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+            }
+            gamepadId = 0;
         }
 
     };
