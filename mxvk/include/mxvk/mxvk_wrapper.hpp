@@ -48,9 +48,9 @@ namespace mxvk {
 
         /**
          * @brief Construct in the empty (nullopt) state.
-         * @param n std::nullopt.
+         * @param nullopt std::nullopt.
          */
-        Wrapper(std::nullopt_t) : type{std::nullopt} {}
+        Wrapper(std::nullopt_t nullopt) : type{nullopt} {}
 
         /** @brief Copy constructor. */
         Wrapper(const Wrapper<T> &) = default;
@@ -72,11 +72,11 @@ namespace mxvk {
 
         /**
          * @brief Reset to the empty (nullopt) state.
-         * @param n std::nullopt.
+         * @param nullopt std::nullopt.
          * @return Reference to this.
          */
-        Wrapper<T> &operator=(std::nullopt_t) {
-            type = std::nullopt;
+        Wrapper<T> &operator=(std::nullopt_t nullopt) {
+            type = nullopt;
             return *this;
         }
 
@@ -130,8 +130,8 @@ namespace mxvk {
 
         /**
          * @brief Return the stored pointer or a fallback if null.
-         * @param value Fallback pointer returned when no value is held.
-         * @return The stored pointer, or @p value if null/absent.
+         * @param fallback Pointer returned when no value is held.
+         * @return The stored pointer, or @p fallback if null/absent.
          */
         [[nodiscard]] T unwrap_or(T fallback) const noexcept {
             if (has_value()) {
