@@ -1,5 +1,7 @@
 # MasterPiece
 
+<img width="1440" height="1080" alt="image" src="https://github.com/user-attachments/assets/9eae0d40-7377-4492-ad49-e6772e2b993e" />
+
 MasterPiece is a cleaned-up MXVK port of the original `MasterPiece.SDL` block puzzle game. It keeps the same core loop while replacing the art with updated PNG assets for the intro screen, start menu, cursor, and block tiles.
 
 The example includes:
