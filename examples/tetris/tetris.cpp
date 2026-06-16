@@ -588,8 +588,8 @@ namespace {
             block.model = std::make_unique<mxvk::VKAbstractModel>();
             block.model->load(this, dataRoot + "/cube.mxmod.z", dataRoot + "/" + textureManifests[color], dataRoot, 1.0f);
             block.model->setShaders(this,
-                                    std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
-                                    std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
+                                    std::string(tetris_SHADER_DIR) + "/tetris_piece.vert.spv",
+                                    std::string(tetris_SHADER_DIR) + "/tetris_piece.frag.spv");
             return block;
         }
 
