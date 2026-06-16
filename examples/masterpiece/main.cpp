@@ -251,7 +251,7 @@ namespace example {
               high_scores(scorePath(asset_root)) {
             setClearColor(0.02f, 0.02f, 0.03f, 1.0f);
 
-            const std::string font_path = dataPath("arial.ttf");
+            const std::string font_path = dataPath("font.ttf");
             title_font.reset(font_path, 34);
             ui_font.reset(font_path, 20);
             setFont(font_path, 20);
