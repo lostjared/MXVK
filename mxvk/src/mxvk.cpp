@@ -1622,12 +1622,12 @@ namespace mxvk {
 
         // Draw 2D overlays after custom scene rendering so HUD/text stays on top.
         if (!sprites.empty()) {
-            if (sprite_pipeline != VK_NULL_HANDLE) {
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
-            }
             for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
                 if (!sprite) {
                     continue;
+                }
+                if (sprite_pipeline != VK_NULL_HANDLE) {
+                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
                 }
                 sprite->renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
             }
