@@ -18,12 +18,12 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-        ModelWindow(const std::string filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
+        ModelWindow(const std::string filename, const std::string &path, const std::string &resource, const std::string &resource_path, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path) {
             const std::string modelPath = filename;
-            const std::string textureManifestPath = assetRoot + "/data/texture_manifest.txt";
-            const std::string textureBasePath = assetRoot + "/data";
+            const std::string textureManifestPath = resource.empty() ? assetRoot + "/data/texture_manifest.txt" : resource;
+            const std::string textureBasePath = resource_path.empty() ? assetRoot + "/data" :  resource_path;
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
 
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
         if (args.filename.empty()) {
             filename = args.path + "/data/pyramid.obj";
         }
-        example::ModelWindow window(filename, args.path, "MXVK Model Example", args.width, args.height, args.fullscreen);
+        example::ModelWindow window(filename, args.path, args.resource, args.resource_path, "MXVK Model Example", args.width, args.height, args.fullscreen);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

@@ -620,7 +620,9 @@ struct Arguments {
     std::string shaderPath; ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     int camera_index = 0;   ///< Optional camera index
     std::string resource;  ///< Resource file
+    std::string resource_path; ///< Resource path
 };
+
 
 /**
  * @brief Parse standard libmx2 command-line options from main()'s argv.
@@ -653,6 +655,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDoubleValue(256, "filename", "input filename")
 	.addOptionDoubleValue(302, "resource", "resource file")
+	.addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
@@ -668,9 +671,13 @@ inline Arguments proc_args(int &argc, char **argv) {
     std::string shaderPath;
     int camera_index = 0;
     std::string resource;
+    std::string resource_path;
     try {
         while ((value = parser.proc(arg)) != -1) {
             switch (value) {
+            case 303:
+		 resource_path = arg.arg_value;
+		 break;
 	    case 302:
 		resource = arg.arg_value;
 		break;
@@ -736,6 +743,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.shaderPath = shaderPath;
     args.camera_index = camera_index;
     args.resource = resource;
+    args.resource_path = resource_path;
     return args;
 }
 
