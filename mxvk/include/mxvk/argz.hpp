@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <ranges>
 #include <string>
 #include <type_traits>
@@ -108,15 +109,18 @@ struct ArgumentData {
     ArgumentData() = default;
     ArgumentData(const ArgumentData<String> &a) : args{a.args}, argc{a.argc} {}
     ArgumentData &operator=(const ArgumentData<String> &a) {
-        if (!args.empty()) {
-            args.erase(args.begin(), args.end());
+        if (this == &a) {
+            return *this;
         }
-        std::copy(a.args.begin(), a.args.end(), std::back_inserter(args));
+        args = a.args;
         argc = a.argc;
         return *this;
     }
     ArgumentData(ArgumentData<String> &&a) : args{std::move(a.args)}, argc{a.argc} {}
     ArgumentData<String> &operator=(ArgumentData<String> &&a) {
+        if (this == &a) {
+            return *this;
+        }
         args = std::move(a.args);
         argc = a.argc;
         return *this;
@@ -162,13 +166,11 @@ class Argz {
     Argz(const Argz<String> &a) : arg_data{a.arg_data}, arg_info{a.arg_info}, index{a.index}, cindex{a.cindex} {}
 
     Argz<String> &operator=(const Argz<String> &a) {
+        if (this == &a) {
+            return *this;
+        }
         arg_data = a.arg_data;
-        if (!arg_info.empty()) {
-            arg_info.erase(arg_info.begin(), arg_info.end());
-        }
-        for (const auto &i : a.arg_info) {
-            arg_info[i.first] = i.second;
-        }
+        arg_info = a.arg_info;
         index = a.index;
         cindex = a.cindex;
         return *this;
@@ -177,6 +179,9 @@ class Argz {
     Argz(Argz<String> &&a) : arg_data{std::move(a.arg_data)}, arg_info{std::move(a.arg_info)}, index{a.index}, cindex{a.cindex} {}
 
     Argz<String> &operator=(Argz<String> &&a) {
+        if (this == &a) {
+            return *this;
+        }
         arg_data = std::move(a.arg_data);
         arg_info = std::move(a.arg_info);
         index = a.index;
@@ -192,20 +197,26 @@ class Argz {
      */
     Argz<String> &initArgs(int argc, char **argv) {
         arg_data.argc = argc;
+        arg_data.args.clear();
+        if (argc > 1) {
+            arg_data.args.reserve(static_cast<size_t>(argc - 1));
+        }
         if constexpr (std::is_same<typename String::value_type, char>::value) {
             for (int i = 1; i < argc; ++i) {
-                const char *a = argv[i];
-                arg_data.args.push_back(a);
+                const char *a = (argv != nullptr) ? argv[i] : nullptr;
+                arg_data.args.emplace_back(a != nullptr ? a : "");
             }
             reset();
             return *this;
         }
         if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
             for (int i = 1; i < argc; ++i) {
-                const char *a = argv[i];
+                const char *a = (argv != nullptr) ? argv[i] : nullptr;
                 String data;
-                for (size_t z = 0; a[z] != 0; ++z) {
-                    data += static_cast<typename String::value_type>(a[z]);
+                if (a != nullptr) {
+                    for (size_t z = 0; a[z] != 0; ++z) {
+                        data += static_cast<typename String::value_type>(a[z]);
+                    }
                 }
                 arg_data.args.push_back(data);
             }
@@ -309,7 +320,7 @@ class Argz {
     int proc(Argument<String> &a) {
         if (index < static_cast<int>(arg_data.args.size())) {
             const String &type{arg_data.args[index]};
-            if (type.length() > 3 && type[0] == '-' && type[1] == '-') {
+            if (type.length() > 2 && type[0] == '-' && type[1] == '-') {
                 String name{};
                 for (size_t z = 2; z < type.length(); ++z)
                     name += type[z];
@@ -600,12 +611,12 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width;              ///< Viewport width in pixels (default: 1280).
-    int height;             ///< Viewport height in pixels (default: 720).
-    std::string path;       ///< Asset search path (default: ".").
-    bool fullscreen;        ///< Whether fullscreen mode was requested.
-    std::string filename;   ///< Optional input filename (@c --filename).
-    std::string texture;    ///< Optional texture file path (@c --texture).
+    int width = 1280;       ///< Viewport width in pixels (default: 1280).
+    int height = 720;       ///< Viewport height in pixels (default: 720).
+    std::string path = "."; ///< Asset search path (default: ".").
+    bool fullscreen = false; ///< Whether fullscreen mode was requested.
+    std::string filename;    ///< Optional input filename (@c --filename).
+    std::string texture;     ///< Optional texture file path (@c --texture).
     std::string shaderPath; ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     int camera_index = 0;   ///< Optional camera index
 };
