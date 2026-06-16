@@ -622,12 +622,17 @@ namespace example {
                     throw mxvk::Exception("Failed to create star pipeline layout");
                 }
 
-                VkFormat colorFormat = getSwapchainFormat();
+                const VkFormat colorFormat = getSwapchainFormat();
+                const VkFormat depthFormat = getDepthFormat();
 
                 VkPipelineRenderingCreateInfo renderingInfo{};
                 renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
                 renderingInfo.colorAttachmentCount = 1;
                 renderingInfo.pColorAttachmentFormats = &colorFormat;
+                if (depthFormat != VK_FORMAT_UNDEFINED) {
+                    renderingInfo.depthAttachmentFormat = depthFormat;
+                }
+                renderingInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
                 VkGraphicsPipelineCreateInfo pipelineInfo{};
                 pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
