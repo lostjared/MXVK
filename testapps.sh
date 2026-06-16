@@ -6,6 +6,7 @@
 ./run.pl sprite3d_example
 ./run.pl static_example
 ./run.pl matrix
+./run.pl binary_matrix
 ./run.pl masterpiece
 ./run.pl console_demo
 ./run.pl fractal_zoom

@@ -557,6 +557,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(console_demo)
     add_subdirectory(examples/matrix)
     mxvk_configure_mingw_target(matrix)
+    add_subdirectory(examples/binary_matrix)
+    mxvk_configure_mingw_target(binary_matrix)
     add_subdirectory(examples/walk)
     mxvk_configure_mingw_target(walk_example)
     if(CV)
@@ -672,6 +674,7 @@ if(EXAMPLES)
         fractal_zoom
         console_demo
         matrix
+        binary_matrix
         walk_example
     )
     if(CV)
