@@ -80,7 +80,7 @@ namespace {
 } // namespace
 
 namespace example {
-    class BinaryMatrixWindow : public mxvk::VK_Window {
+    class BinaryMatrixWindow final : public mxvk::VK_Window {
       public:
         BinaryMatrixWindow(const std::string &path,
                            const std::string &title,
