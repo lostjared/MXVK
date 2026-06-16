@@ -322,13 +322,28 @@ class Argz {
             const String &type{arg_data.args[index]};
             if (type.length() > 2 && type[0] == '-' && type[1] == '-') {
                 String name{};
+                String inline_value{};
+                const auto eq_pos = type.find(static_cast<typename String::value_type>('='));
+                const bool has_inline_value = (eq_pos != String::npos);
                 for (size_t z = 2; z < type.length(); ++z)
-                    name += type[z];
+                    if (!has_inline_value || z < eq_pos) {
+                        name += type[z];
+                    } else if (z > eq_pos) {
+                        inline_value += type[z];
+                    }
                 int code = lookUpCode(name);
                 if (code != -1) {
                     auto pos = arg_info.find(code);
                     if (pos != arg_info.end()) {
                         if (pos->second.arg_type == ArgType::ARG_DOUBLE) {
+                            if (has_inline_value) {
+                                if constexpr (std::is_same<typename String::value_type, char>::value) {
+                                    throw ArgException<String>("Invalid switch not found!");
+                                }
+                                if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
+                                    throw ArgException<String>(L"Invalid switch not found!");
+                                }
+                            }
                             a = pos->second;
                             a.arg_name = name;
                             index++;
@@ -336,6 +351,19 @@ class Argz {
                         } else {
                             a = pos->second;
                             a.arg_name = name;
+                            if (has_inline_value) {
+                                if (inline_value.empty()) {
+                                    if constexpr (std::is_same<typename String::value_type, char>::value) {
+                                        throw ArgException<String>("Expected Value");
+                                    }
+                                    if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
+                                        throw ArgException<String>(L"Expected Value");
+                                    }
+                                }
+                                a.arg_value = inline_value;
+                                index++;
+                                return code;
+                            }
                             if (++index < static_cast<int>(arg_data.args.size())) {
                                 const String &s{arg_data.args[index]};
                                 if (canUseAsOptionValue(s)) {
