@@ -1,4 +1,5 @@
 #include "mxvk/mxvk_abstract_model.hpp"
+#include "mxvk/mxvk_opencv_compat.hpp"
 
 #include <cstring>
 
@@ -12,7 +13,6 @@
 #include <iostream>
 #include <sstream>
 #ifdef MXVK_CUDA
-#include <opencv2/core/cuda_stream_accessor.hpp>
 #include <unistd.h>
 #endif
 
@@ -1143,7 +1143,7 @@ namespace mxvk {
             return false;
         }
 
-        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        cudaStream_t cudaStream = cuda_stream_handle(stream);
         if (!texture.cudaUploadLogged) {
             logVKAbstractModelStep(std::format(
                 "CUDA interop upload: copying {}x{} RGBA GpuMat to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes, copy row bytes={})",

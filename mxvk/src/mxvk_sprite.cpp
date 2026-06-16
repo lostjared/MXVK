@@ -3,10 +3,10 @@
  * @brief Implementation of mx::VKSprite Vulkan 2-D sprite renderer.
  */
 #include "mxvk/mxvk_sprite.hpp"
+#include "mxvk/mxvk_opencv_compat.hpp"
 #include "mxvk/mxvk_png.hpp"
 #include <filesystem>
 #ifdef MXVK_CUDA
-#include <opencv2/core/cuda_stream_accessor.hpp>
 #include <unistd.h>
 #endif
 
@@ -1439,7 +1439,7 @@ namespace mxvk {
             return false;
         }
 
-        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        cudaStream_t cudaStream = cuda_stream_handle(stream);
         if (!cudaUploadLogged) {
             std::cout << std::format("mxvk: CUDA interop upload: copying {}x{} RGBA GpuMat to Vulkan image array (pitch={} bytes)\n",
                                      rgba.cols, rgba.rows, static_cast<unsigned long long>(rgba.step));

@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_opencv_compat.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -16,7 +17,6 @@
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/core/cuda.hpp>
-#include <opencv2/core/cuda_stream_accessor.hpp>
 #include <unistd.h>
 #endif
 
@@ -1139,7 +1139,7 @@ class ComputeWindow : public mxvk::VK_Window {
             return false;
         }
 
-        cudaStream_t cudaStream = cv::cuda::StreamAccessor::getStream(stream);
+        cudaStream_t cudaStream = mxvk::cuda_stream_handle(stream);
         if (!img.cudaUploadLogged) {
             std::cout << "compute_shader: CUDA interop upload: copying "
                       << rgba.cols << "x" << rgba.rows

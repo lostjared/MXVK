@@ -130,7 +130,7 @@ namespace mxvk {
         bool readToModelTexture(VKAbstractModel &model, bool flipY = false);
 #ifdef MXVK_CUDA
         bool readGpuRgba(cv::cuda::GpuMat &rgba, bool flipY = false);
-        cv::cuda::Stream &cudaStream() { return cudaStream; }
+        cv::cuda::Stream &cudaStream() { return cuda_stream; }
 #endif
 
         /**
@@ -169,7 +169,7 @@ namespace mxvk {
         bool cudaMappedInput = false;
         bool cudaPipelineLogged = false;
         bool cudaFlipYForVulkan = true;
-        cv::cuda::Stream cudaStream{};
+        cv::cuda::Stream cuda_stream{};
         cv::cuda::GpuMat gpuFrame{};
         cv::cuda::GpuMat gpuRgba{};
         cv::cuda::GpuMat gpuVulkanRgba{};

@@ -4,6 +4,7 @@
  */
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
+#include "mxvk/mxvk_opencv_compat.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -80,20 +81,20 @@ namespace mxvk {
                     if (!cap.read(mappedFrame) || mappedFrame.empty()) {
                         return false;
                     }
-                    cpuFallbackFrame = mappedFrame.createMatHeader();
-                    const cv::cuda::GpuMat mappedInput = mappedFrame.createGpuMatHeader();
-                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    cpuFallbackFrame = host_mem_mat_header(mappedFrame);
+                    const cv::cuda::GpuMat mappedInput = host_mem_gpu_header(mappedFrame);
+                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 } else {
                     if (!cap.read(frame) || frame.empty()) {
                         return false;
                     }
                     cpuFallbackFrame = frame;
-                    gpuFrame.upload(frame, cudaStream);
-                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    gpuFrame.upload(frame, cuda_stream);
+                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 }
 
                 if (flipY) {
-                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cudaStream);
+                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
                 } else {
                     gpuVulkanRgba = gpuRgba;
                 }
@@ -106,9 +107,9 @@ namespace mxvk {
                 }
 
                 pinnedRgba.create(gpuVulkanRgba.size(), gpuVulkanRgba.type());
-                gpuVulkanRgba.download(pinnedRgba, cudaStream);
-                cudaStream.waitForCompletion();
-                rgba = pinnedRgba.createMatHeader();
+                gpuVulkanRgba.download(pinnedRgba, cuda_stream);
+                cuda_stream.waitForCompletion();
+                rgba = host_mem_mat_header(pinnedRgba);
                 return true;
             }
         } catch (const cv::Exception &e) {
@@ -192,9 +193,9 @@ namespace mxvk {
                     return false;
                 }
 
-                cpuFallbackFrame = mappedFrame.createMatHeader();
-                const cv::cuda::GpuMat mappedInput = mappedFrame.createGpuMatHeader();
-                cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                cpuFallbackFrame = host_mem_mat_header(mappedFrame);
+                const cv::cuda::GpuMat mappedInput = host_mem_gpu_header(mappedFrame);
+                cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
             } else {
                 if (!cap.read(frame)) {
                     return false;
@@ -204,17 +205,17 @@ namespace mxvk {
                 }
 
                 cpuFallbackFrame = frame;
-                gpuFrame.upload(frame, cudaStream);
-                cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                gpuFrame.upload(frame, cuda_stream);
+                cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
             }
 
             if (cudaFlipYForVulkan) {
-                cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cudaStream);
+                cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
             } else {
                 gpuVulkanRgba = gpuRgba;
             }
 
-            if (sprite && sprite->updateTextureCuda(gpuVulkanRgba, cudaStream)) {
+            if (sprite && sprite->updateTextureCuda(gpuVulkanRgba, cuda_stream)) {
                 if (!cudaPipelineLogged) {
                     std::cout << std::format(
                         "mxvk_cv: CUDA interop active: RGBA GpuMat -> {} -> Vulkan external-memory image\n",
@@ -229,10 +230,10 @@ namespace mxvk {
                 cudaPipelineLogged = true;
             }
             pinnedRgba.create(gpuVulkanRgba.size(), gpuVulkanRgba.type());
-            gpuVulkanRgba.download(pinnedRgba, cudaStream);
-            cudaStream.waitForCompletion();
+            gpuVulkanRgba.download(pinnedRgba, cuda_stream);
+            cuda_stream.waitForCompletion();
 
-            pinnedRgbaMat = pinnedRgba.createMatHeader();
+            pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
             sprite->updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
                                   static_cast<int>(pinnedRgbaMat.step));
             return true;
@@ -261,18 +262,18 @@ namespace mxvk {
                 if (!cap.read(mappedFrame) || mappedFrame.empty()) {
                     return false;
                 }
-                const cv::cuda::GpuMat mappedInput = mappedFrame.createGpuMatHeader();
-                cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                const cv::cuda::GpuMat mappedInput = host_mem_gpu_header(mappedFrame);
+                cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
             } else {
                 if (!cap.read(frame) || frame.empty()) {
                     return false;
                 }
-                gpuFrame.upload(frame, cudaStream);
-                cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                gpuFrame.upload(frame, cuda_stream);
+                cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
             }
 
             if (flipY) {
-                cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cudaStream);
+                cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
             } else {
                 gpuVulkanRgba = gpuRgba;
             }
@@ -304,25 +305,25 @@ namespace mxvk {
                     if (!cap.read(mappedFrame) || mappedFrame.empty()) {
                         return false;
                     }
-                    cpuFallbackFrame = mappedFrame.createMatHeader();
-                    const cv::cuda::GpuMat mappedInput = mappedFrame.createGpuMatHeader();
-                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    cpuFallbackFrame = host_mem_mat_header(mappedFrame);
+                    const cv::cuda::GpuMat mappedInput = host_mem_gpu_header(mappedFrame);
+                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 } else {
                     if (!cap.read(frame) || frame.empty()) {
                         return false;
                     }
                     cpuFallbackFrame = frame;
-                    gpuFrame.upload(frame, cudaStream);
-                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    gpuFrame.upload(frame, cuda_stream);
+                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 }
 
                 if (flipY) {
-                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cudaStream);
+                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
                 } else {
                     gpuVulkanRgba = gpuRgba;
                 }
 
-                if (model.updatePrimaryTextureCuda(gpuVulkanRgba, cudaStream)) {
+                if (model.updatePrimaryTextureCuda(gpuVulkanRgba, cuda_stream)) {
                     if (!cudaPipelineLogged) {
                         std::cout << std::format(
                             "mxvk_cv: CUDA interop active for model texture: RGBA GpuMat -> {} -> Vulkan external-memory image array (no download)\n",
@@ -337,10 +338,10 @@ namespace mxvk {
                     cudaPipelineLogged = true;
                 }
                 pinnedRgba.create(gpuVulkanRgba.size(), gpuVulkanRgba.type());
-                gpuVulkanRgba.download(pinnedRgba, cudaStream);
-                cudaStream.waitForCompletion();
+                gpuVulkanRgba.download(pinnedRgba, cuda_stream);
+                cuda_stream.waitForCompletion();
 
-                pinnedRgbaMat = pinnedRgba.createMatHeader();
+                pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
                 return model.updatePrimaryTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
                                                   static_cast<int>(pinnedRgbaMat.step));
             } catch (const cv::Exception &e) {
@@ -375,25 +376,25 @@ namespace mxvk {
                     if (!cap.read(mappedFrame) || mappedFrame.empty()) {
                         return false;
                     }
-                    cpuFallbackFrame = mappedFrame.createMatHeader();
-                    const cv::cuda::GpuMat mappedInput = mappedFrame.createGpuMatHeader();
-                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    cpuFallbackFrame = host_mem_mat_header(mappedFrame);
+                    const cv::cuda::GpuMat mappedInput = host_mem_gpu_header(mappedFrame);
+                    cv::cuda::cvtColor(mappedInput, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 } else {
                     if (!cap.read(frame) || frame.empty()) {
                         return false;
                     }
                     cpuFallbackFrame = frame;
-                    gpuFrame.upload(frame, cudaStream);
-                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cudaStream);
+                    gpuFrame.upload(frame, cuda_stream);
+                    cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 }
 
                 if (cudaFlipYForVulkan) {
-                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cudaStream);
+                    cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
                 } else {
                     gpuVulkanRgba = gpuRgba;
                 }
 
-                if (targetSprite.updateTextureCuda(gpuVulkanRgba, cudaStream)) {
+                if (targetSprite.updateTextureCuda(gpuVulkanRgba, cuda_stream)) {
                     if (!cudaPipelineLogged) {
                         std::cout << std::format(
                             "mxvk_cv: CUDA interop active for external sprite: RGBA GpuMat -> {} -> Vulkan external-memory image\n",
@@ -408,10 +409,10 @@ namespace mxvk {
                     cudaPipelineLogged = true;
                 }
                 pinnedRgba.create(gpuVulkanRgba.size(), gpuVulkanRgba.type());
-                gpuVulkanRgba.download(pinnedRgba, cudaStream);
-                cudaStream.waitForCompletion();
+                gpuVulkanRgba.download(pinnedRgba, cuda_stream);
+                cuda_stream.waitForCompletion();
 
-                pinnedRgbaMat = pinnedRgba.createMatHeader();
+                pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
                 targetSprite.updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
                                            static_cast<int>(pinnedRgbaMat.step));
                 return true;
