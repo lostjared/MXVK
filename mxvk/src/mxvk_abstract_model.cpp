@@ -55,6 +55,52 @@ namespace mxvk {
             }
             return module;
         }
+
+        [[nodiscard]] std::string parseMTLTexturePath(std::istream &stream) {
+            std::string texturePath{};
+            std::string token{};
+            while (stream >> token) {
+                if (!token.empty() && token[0] == '-') {
+                    if (token == "-blendu" || token == "-blendv" || token == "-cc" ||
+                        token == "-clamp" || token == "-imfchan" || token == "-type") {
+                        stream >> token;
+                    } else if (token == "-mm") {
+                        stream >> token;
+                        stream >> token;
+                    } else if (token == "-o" || token == "-s" || token == "-t") {
+                        stream >> token;
+                        stream >> token;
+                        stream >> token;
+                    } else if (token == "-bm" || token == "-boost" || token == "-texres") {
+                        stream >> token;
+                    }
+                    continue;
+                }
+
+                if (!texturePath.empty()) {
+                    texturePath += ' ';
+                }
+                texturePath += token;
+            }
+            return texturePath;
+        }
+
+        [[nodiscard]] std::string resolveTexturePath(const std::string &textureBasePath, const std::string &texturePath) {
+            if (texturePath.empty()) {
+                return {};
+            }
+
+            std::filesystem::path resolvedPath(texturePath);
+            if (resolvedPath.is_absolute()) {
+                resolvedPath = resolvedPath.filename();
+            }
+
+            if (textureBasePath.empty()) {
+                return resolvedPath.string();
+            }
+
+            return (std::filesystem::path(textureBasePath) / resolvedPath).string();
+        }
     } // namespace
 
     void VKAbstractModel::load(VK_Window *targetWindow,
@@ -398,14 +444,18 @@ namespace mxvk {
         const std::string prefix = textureBasePath;
 
         if (isMtlLike) {
+            int currentMaterialTexture = -1;
             for (const std::string &ln : lines) {
                 std::istringstream stream(ln);
                 std::string keyword;
                 stream >> keyword;
-                if (keyword == "map_Kd") {
-                    std::string image;
-                    if (stream >> image) {
-                        imagePaths.push_back(prefix.empty() ? image : (prefix + "/" + image));
+                if (keyword == "newmtl") {
+                    imagePaths.emplace_back();
+                    currentMaterialTexture = static_cast<int>(imagePaths.size()) - 1;
+                } else if (keyword == "map_Kd") {
+                    const std::string image = parseMTLTexturePath(stream);
+                    if (!image.empty() && currentMaterialTexture >= 0) {
+                        imagePaths[static_cast<size_t>(currentMaterialTexture)] = resolveTexturePath(prefix, image);
                     }
                 }
             }
@@ -417,13 +467,13 @@ namespace mxvk {
                 if (keyword == "texture") {
                     std::string image;
                     if (stream >> image) {
-                        imagePaths.push_back(prefix.empty() ? image : (prefix + "/" + image));
+                        imagePaths.push_back(resolveTexturePath(prefix, image));
                     }
                 }
             }
         } else {
             for (const std::string &ln : lines) {
-                imagePaths.push_back(prefix.empty() ? ln : (prefix + "/" + ln));
+                imagePaths.push_back(resolveTexturePath(prefix, ln));
             }
         }
 
@@ -432,10 +482,17 @@ namespace mxvk {
         }
 
         for (const std::string &path : imagePaths) {
+            if (path.empty()) {
+                logVKAbstractModelStep("material has no texture map; using fallback texture slot");
+                createFallbackTexture();
+                continue;
+            }
+
             logVKAbstractModelStep("trying texture [" + path + "]");
             SDL_Surface *surface = mxvk::LoadPNG(path.c_str());
             if (surface == nullptr) {
                 logVKAbstractModelStep("texture not found [" + path + "]");
+                createFallbackTexture();
                 continue;
             }
 
@@ -499,15 +556,17 @@ namespace mxvk {
         bool foundTextureReference = false;
         for (const MXMaterial &material : obj.materials()) {
             if (material.map_kd.empty()) {
+                createFallbackTexture();
                 continue;
             }
 
             foundTextureReference = true;
-            const std::string path = textureBasePath.empty() ? material.map_kd : (textureBasePath + "/" + material.map_kd);
+            const std::string path = resolveTexturePath(textureBasePath, material.map_kd);
             logVKAbstractModelStep("trying texture [" + path + "]");
             SDL_Surface *surface = mxvk::LoadPNG(path.c_str());
             if (surface == nullptr) {
                 logVKAbstractModelStep("texture not found [" + path + "]");
+                createFallbackTexture();
                 continue;
             }
 

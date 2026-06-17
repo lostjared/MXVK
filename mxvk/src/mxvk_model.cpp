@@ -1,9 +1,11 @@
 #include "mxvk/mxvk_model.hpp"
 
 #include <cmath>
-#include <cstdio>
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -34,6 +36,252 @@ namespace mxvk {
             std::vector<uint32_t> indices{};
             std::vector<SubMesh> subMeshes{};
         };
+
+        struct OBJFaceVertex {
+            VKVertex vertex{};
+            bool hasNormal = false;
+        };
+
+        struct OBJIndex {
+            int position = 0;
+            int texcoord = 0;
+            int normal = 0;
+        };
+
+        void trim(std::string &s) {
+            const size_t begin = s.find_first_not_of(" \t\r\n");
+            if (begin == std::string::npos) {
+                s.clear();
+                return;
+            }
+            const size_t end = s.find_last_not_of(" \t\r\n");
+            s = s.substr(begin, end - begin + 1);
+        }
+
+        void stripTrailingComment(std::string &s) {
+            const size_t commentPos = s.find('#');
+            if (commentPos != std::string::npos) {
+                s = s.substr(0, commentPos);
+            }
+            trim(s);
+        }
+
+        [[nodiscard]] bool parseOBJIndexValue(const std::string &text, int &value) {
+            if (text.empty()) {
+                value = 0;
+                return true;
+            }
+
+            size_t consumed = 0;
+            try {
+                value = std::stoi(text, &consumed, 10);
+            } catch (const std::exception &) {
+                return false;
+            }
+
+            return consumed == text.size();
+        }
+
+        [[nodiscard]] bool parseOBJFaceToken(const std::string &token, OBJIndex &index) {
+            std::array<std::string, 3> fields{};
+            size_t fieldIndex = 0;
+            size_t fieldBegin = 0;
+
+            while (true) {
+                if (fieldIndex >= fields.size()) {
+                    return false;
+                }
+
+                const size_t slashPos = token.find('/', fieldBegin);
+                fields[fieldIndex++] = token.substr(fieldBegin, slashPos == std::string::npos ? std::string::npos : slashPos - fieldBegin);
+                if (slashPos == std::string::npos) {
+                    break;
+                }
+                fieldBegin = slashPos + 1;
+            }
+
+            if (!parseOBJIndexValue(fields[0], index.position) ||
+                !parseOBJIndexValue(fields[1], index.texcoord) ||
+                !parseOBJIndexValue(fields[2], index.normal)) {
+                return false;
+            }
+
+            return index.position != 0;
+        }
+
+        template <typename T>
+        [[nodiscard]] int resolveOBJIndex(int objIndex, const std::vector<T> &values) {
+            if (objIndex > 0) {
+                return objIndex - 1;
+            }
+            if (objIndex < 0) {
+                return static_cast<int>(values.size()) + objIndex;
+            }
+            return -1;
+        }
+
+        [[nodiscard]] Vec3 faceNormal(const VKVertex &a, const VKVertex &b, const VKVertex &c) {
+            const float ax = b.pos[0] - a.pos[0];
+            const float ay = b.pos[1] - a.pos[1];
+            const float az = b.pos[2] - a.pos[2];
+            const float bx = c.pos[0] - a.pos[0];
+            const float by = c.pos[1] - a.pos[1];
+            const float bz = c.pos[2] - a.pos[2];
+
+            Vec3 normal{
+                ay * bz - az * by,
+                az * bx - ax * bz,
+                ax * by - ay * bx,
+            };
+            const float len = std::sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+            if (len > 0.0f) {
+                normal.x /= len;
+                normal.y /= len;
+                normal.z /= len;
+            }
+            return normal;
+        }
+
+        void assignNormalIfMissing(OBJFaceVertex &a, OBJFaceVertex &b, OBJFaceVertex &c) {
+            if (a.hasNormal && b.hasNormal && c.hasNormal) {
+                return;
+            }
+
+            const Vec3 normal = faceNormal(a.vertex, b.vertex, c.vertex);
+            for (OBJFaceVertex *faceVertex : {&a, &b, &c}) {
+                if (faceVertex->hasNormal) {
+                    continue;
+                }
+                faceVertex->vertex.normal[0] = normal.x;
+                faceVertex->vertex.normal[1] = normal.y;
+                faceVertex->vertex.normal[2] = normal.z;
+                faceVertex->hasNormal = true;
+            }
+        }
+
+        [[nodiscard]] float projectedArea2(const std::vector<OBJFaceVertex> &face, int dropAxis) {
+            float area = 0.0f;
+            for (size_t i = 0; i < face.size(); ++i) {
+                const VKVertex &a = face[i].vertex;
+                const VKVertex &b = face[(i + 1) % face.size()].vertex;
+                const float ax = a.pos[(dropAxis + 1) % 3];
+                const float ay = a.pos[(dropAxis + 2) % 3];
+                const float bx = b.pos[(dropAxis + 1) % 3];
+                const float by = b.pos[(dropAxis + 2) % 3];
+                area += ax * by - bx * ay;
+            }
+            return area;
+        }
+
+        [[nodiscard]] float edgeCross2(const VKVertex &a, const VKVertex &b, const VKVertex &c, int dropAxis) {
+            const float ax = a.pos[(dropAxis + 1) % 3];
+            const float ay = a.pos[(dropAxis + 2) % 3];
+            const float bx = b.pos[(dropAxis + 1) % 3];
+            const float by = b.pos[(dropAxis + 2) % 3];
+            const float cx = c.pos[(dropAxis + 1) % 3];
+            const float cy = c.pos[(dropAxis + 2) % 3];
+            return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+        }
+
+        [[nodiscard]] bool pointInProjectedTriangle(const VKVertex &point,
+                                                    const VKVertex &a,
+                                                    const VKVertex &b,
+                                                    const VKVertex &c,
+                                                    int dropAxis,
+                                                    float windingSign) {
+            constexpr float epsilon = 1e-6f;
+            const float ab = edgeCross2(a, b, point, dropAxis) * windingSign;
+            const float bc = edgeCross2(b, c, point, dropAxis) * windingSign;
+            const float ca = edgeCross2(c, a, point, dropAxis) * windingSign;
+            return ab >= -epsilon && bc >= -epsilon && ca >= -epsilon;
+        }
+
+        void appendOBJTriangle(std::vector<VKVertex> &vertices, OBJFaceVertex a, OBJFaceVertex b, OBJFaceVertex c) {
+            assignNormalIfMissing(a, b, c);
+            vertices.push_back(a.vertex);
+            vertices.push_back(b.vertex);
+            vertices.push_back(c.vertex);
+        }
+
+        void triangulateOBJFace(const std::vector<OBJFaceVertex> &face, std::vector<VKVertex> &vertices) {
+            if (face.size() < 3) {
+                return;
+            }
+
+            if (face.size() == 3) {
+                appendOBJTriangle(vertices, face[0], face[1], face[2]);
+                return;
+            }
+
+            const Vec3 normal = faceNormal(face[0].vertex, face[1].vertex, face[2].vertex);
+            int dropAxis = 0;
+            if (std::fabs(normal.y) > std::fabs(normal.x) && std::fabs(normal.y) >= std::fabs(normal.z)) {
+                dropAxis = 1;
+            } else if (std::fabs(normal.z) > std::fabs(normal.x) && std::fabs(normal.z) > std::fabs(normal.y)) {
+                dropAxis = 2;
+            }
+
+            float windingSign = projectedArea2(face, dropAxis) >= 0.0f ? 1.0f : -1.0f;
+            if (std::fabs(projectedArea2(face, dropAxis)) <= 1e-6f) {
+                for (size_t i = 2; i < face.size(); ++i) {
+                    appendOBJTriangle(vertices, face[0], face[i - 1], face[i]);
+                }
+                return;
+            }
+
+            std::vector<size_t> remaining(face.size());
+            for (size_t i = 0; i < remaining.size(); ++i) {
+                remaining[i] = i;
+            }
+
+            while (remaining.size() > 3) {
+                bool clippedEar = false;
+                for (size_t i = 0; i < remaining.size(); ++i) {
+                    const size_t previous = remaining[(i + remaining.size() - 1) % remaining.size()];
+                    const size_t current = remaining[i];
+                    const size_t next = remaining[(i + 1) % remaining.size()];
+
+                    const float cross = edgeCross2(face[previous].vertex, face[current].vertex, face[next].vertex, dropAxis) * windingSign;
+                    if (cross <= 1e-6f) {
+                        continue;
+                    }
+
+                    bool containsPoint = false;
+                    for (const size_t test : remaining) {
+                        if (test == previous || test == current || test == next) {
+                            continue;
+                        }
+                        if (pointInProjectedTriangle(face[test].vertex,
+                                                     face[previous].vertex,
+                                                     face[current].vertex,
+                                                     face[next].vertex,
+                                                     dropAxis,
+                                                     windingSign)) {
+                            containsPoint = true;
+                            break;
+                        }
+                    }
+
+                    if (containsPoint) {
+                        continue;
+                    }
+
+                    appendOBJTriangle(vertices, face[previous], face[current], face[next]);
+                    remaining.erase(remaining.begin() + static_cast<std::ptrdiff_t>(i));
+                    clippedEar = true;
+                    break;
+                }
+
+                if (!clippedEar) {
+                    for (size_t i = 2; i < remaining.size(); ++i) {
+                        appendOBJTriangle(vertices, face[remaining[0]], face[remaining[i - 1]], face[remaining[i]]);
+                    }
+                    return;
+                }
+            }
+
+            appendOBJTriangle(vertices, face[remaining[0]], face[remaining[1]], face[remaining[2]]);
+        }
 
         [[nodiscard]] std::string inflateCompressedText(const std::vector<unsigned char> &compressedData) {
             z_stream stream{};
@@ -86,27 +334,9 @@ namespace mxvk {
             TriBlock *current = nullptr;
             int sectionType = -1;
 
-            auto trim = [](std::string &s) {
-                const size_t begin = s.find_first_not_of(" \t\r\n");
-                if (begin == std::string::npos) {
-                    s.clear();
-                    return;
-                }
-                const size_t end = s.find_last_not_of(" \t\r\n");
-                s = s.substr(begin, end - begin + 1);
-            };
-
             std::string line{};
             while (std::getline(file, line)) {
-                if (line.empty()) {
-                    continue;
-                }
-
-                const size_t commentPos = line.find('#');
-                if (commentPos != std::string::npos) {
-                    line = line.substr(0, commentPos);
-                }
-                trim(line);
+                stripTrailingComment(line);
                 if (line.empty()) {
                     continue;
                 }
@@ -366,7 +596,8 @@ namespace mxvk {
 
         std::string line{};
         while (std::getline(file, line)) {
-            if (line.empty() || line[0] == '#') {
+            stripTrailingComment(line);
+            if (line.empty()) {
                 continue;
             }
 
@@ -405,9 +636,15 @@ namespace mxvk {
 
             if (tag == "mtllib") {
                 std::string mtlFile{};
-                if (stream >> mtlFile) {
+                std::getline(stream, mtlFile);
+                trim(mtlFile);
+                if (!mtlFile.empty()) {
                     const std::filesystem::path objPath(path);
-                    mtlLibraryPath = (objPath.parent_path() / mtlFile).string();
+                    std::filesystem::path mtlPath(mtlFile);
+                    if (mtlPath.is_absolute()) {
+                        mtlPath = mtlPath.filename();
+                    }
+                    mtlLibraryPath = (objPath.parent_path() / mtlPath).string();
                 }
                 continue;
             }
@@ -419,7 +656,8 @@ namespace mxvk {
 
             if (tag == "usemtl") {
                 std::string materialName{};
-                stream >> materialName;
+                std::getline(stream, materialName);
+                trim(materialName);
                 if (!materialName.empty() && materialName != currentMaterialName) {
                     finalizeGroup();
                     currentMaterialName = materialName;
@@ -431,58 +669,47 @@ namespace mxvk {
                 continue;
             }
 
-            std::vector<VKVertex> faceVerts{};
+            std::vector<OBJFaceVertex> faceVerts{};
             std::string token{};
             while (stream >> token) {
-                int vi = 0;
-                int ti = 0;
-                int ni = 0;
-
-                if (std::sscanf(token.c_str(), "%d/%d/%d", &vi, &ti, &ni) != 3) {
-                    if (std::sscanf(token.c_str(), "%d//%d", &vi, &ni) == 2) {
-                        ti = 0;
-                    } else if (std::sscanf(token.c_str(), "%d/%d", &vi, &ti) == 2) {
-                        ni = 0;
-                    } else {
-                        std::sscanf(token.c_str(), "%d", &vi);
-                        ti = 0;
-                        ni = 0;
-                    }
+                OBJIndex objIndex{};
+                if (!parseOBJFaceToken(token, objIndex)) {
+                    throw mxvk::Exception("MXModel::loadOBJ malformed face token '" + token + "' in " + path);
                 }
 
-                VKVertex vertex{};
-                if (vi != 0) {
-                    const int idx = vi > 0 ? vi - 1 : static_cast<int>(positions.size()) + vi;
-                    if (idx >= 0 && idx < static_cast<int>(positions.size())) {
-                        vertex.pos[0] = positions[static_cast<size_t>(idx)].x;
-                        vertex.pos[1] = positions[static_cast<size_t>(idx)].y;
-                        vertex.pos[2] = positions[static_cast<size_t>(idx)].z;
-                    }
+                OBJFaceVertex faceVertex{};
+                const int positionIndex = resolveOBJIndex(objIndex.position, positions);
+                if (positionIndex < 0 || positionIndex >= static_cast<int>(positions.size())) {
+                    throw mxvk::Exception("MXModel::loadOBJ face position index out of range in " + path);
                 }
-                if (ti != 0) {
-                    const int idx = ti > 0 ? ti - 1 : static_cast<int>(texcoords.size()) + ti;
-                    if (idx >= 0 && idx < static_cast<int>(texcoords.size())) {
-                        vertex.texCoord[0] = texcoords[static_cast<size_t>(idx)].x;
-                        vertex.texCoord[1] = texcoords[static_cast<size_t>(idx)].y;
+                faceVertex.vertex.pos[0] = positions[static_cast<size_t>(positionIndex)].x;
+                faceVertex.vertex.pos[1] = positions[static_cast<size_t>(positionIndex)].y;
+                faceVertex.vertex.pos[2] = positions[static_cast<size_t>(positionIndex)].z;
+
+                if (objIndex.texcoord != 0) {
+                    const int texcoordIndex = resolveOBJIndex(objIndex.texcoord, texcoords);
+                    if (texcoordIndex < 0 || texcoordIndex >= static_cast<int>(texcoords.size())) {
+                        throw mxvk::Exception("MXModel::loadOBJ face texture index out of range in " + path);
                     }
-                }
-                if (ni != 0) {
-                    const int idx = ni > 0 ? ni - 1 : static_cast<int>(normals.size()) + ni;
-                    if (idx >= 0 && idx < static_cast<int>(normals.size())) {
-                        vertex.normal[0] = normals[static_cast<size_t>(idx)].x;
-                        vertex.normal[1] = normals[static_cast<size_t>(idx)].y;
-                        vertex.normal[2] = normals[static_cast<size_t>(idx)].z;
-                    }
+                    faceVertex.vertex.texCoord[0] = texcoords[static_cast<size_t>(texcoordIndex)].x;
+                    faceVertex.vertex.texCoord[1] = texcoords[static_cast<size_t>(texcoordIndex)].y;
                 }
 
-                faceVerts.push_back(vertex);
+                if (objIndex.normal != 0) {
+                    const int normalIndex = resolveOBJIndex(objIndex.normal, normals);
+                    if (normalIndex < 0 || normalIndex >= static_cast<int>(normals.size())) {
+                        throw mxvk::Exception("MXModel::loadOBJ face normal index out of range in " + path);
+                    }
+                    faceVertex.vertex.normal[0] = normals[static_cast<size_t>(normalIndex)].x;
+                    faceVertex.vertex.normal[1] = normals[static_cast<size_t>(normalIndex)].y;
+                    faceVertex.vertex.normal[2] = normals[static_cast<size_t>(normalIndex)].z;
+                    faceVertex.hasNormal = true;
+                }
+
+                faceVerts.push_back(faceVertex);
             }
 
-            for (size_t i = 2; i < faceVerts.size(); ++i) {
-                currentVerts.push_back(faceVerts[0]);
-                currentVerts.push_back(faceVerts[i - 1]);
-                currentVerts.push_back(faceVerts[i]);
-            }
+            triangulateOBJFace(faceVerts, currentVerts);
         }
 
         finalizeGroup();
@@ -828,7 +1055,8 @@ namespace mxvk {
         MXMaterial *current = nullptr;
         std::string line{};
         while (std::getline(file, line)) {
-            if (line.empty() || line[0] == '#') {
+            stripTrailingComment(line);
+            if (line.empty()) {
                 continue;
             }
 
@@ -839,7 +1067,8 @@ namespace mxvk {
             if (tag == "newmtl") {
                 materialList.emplace_back();
                 current = &materialList.back();
-                stream >> current->name;
+                std::getline(stream, current->name);
+                trim(current->name);
                 continue;
             }
 
@@ -860,7 +1089,34 @@ namespace mxvk {
             } else if (tag == "illum") {
                 stream >> current->illum;
             } else if (tag == "map_Kd") {
-                stream >> current->map_kd;
+                std::string mapPath{};
+                std::string mapToken{};
+                while (stream >> mapToken) {
+                    if (!mapToken.empty() && mapToken[0] == '-') {
+                        if (mapToken == "-blendu" || mapToken == "-blendv" || mapToken == "-cc" ||
+                            mapToken == "-clamp" || mapToken == "-imfchan" || mapToken == "-type") {
+                            stream >> mapToken;
+                        } else if (mapToken == "-mm") {
+                            stream >> mapToken;
+                            stream >> mapToken;
+                        } else if (mapToken == "-o" || mapToken == "-s" || mapToken == "-t") {
+                            stream >> mapToken;
+                            stream >> mapToken;
+                            stream >> mapToken;
+                        } else if (mapToken == "-bm" || mapToken == "-boost" || mapToken == "-texres") {
+                            stream >> mapToken;
+                        }
+                        continue;
+                    }
+
+                    if (!mapPath.empty()) {
+                        mapPath += ' ';
+                    }
+                    mapPath += mapToken;
+                }
+                if (!mapPath.empty()) {
+                    current->map_kd = mapPath;
+                }
             }
         }
     }
