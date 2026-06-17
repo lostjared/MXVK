@@ -1,6 +1,7 @@
 #include <cstdlib>
 
 #include <algorithm>
+#include <chrono>
 #include <format>
 #include <iostream>
 #include <string>
@@ -44,6 +45,14 @@ namespace example {
                 return;
             }
 
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE) {
+                if (e.key.repeat) {
+                    return;
+                }
+                autoSpinEnabled = !autoSpinEnabled;
+                return;
+            }
+
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
                 mouseDragging = true;
                 lastMouseX = static_cast<int>(e.button.x);
@@ -84,6 +93,13 @@ namespace example {
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
+            const auto now = std::chrono::steady_clock::now();
+            const float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
+            lastFrameTime = now;
+            if (autoSpinEnabled) {
+                autoSpinRadians += deltaSeconds * autoSpinSpeed;
+            }
+
             const VkExtent2D extent = getSwapchainExtent();
 
             const float aspect = (extent.height > 0U)
@@ -92,7 +108,7 @@ namespace example {
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
-            ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees), glm::vec3(0.0f, 1.0f, 0.0f));
+            ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees) + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
             ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
             ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -107,12 +123,16 @@ namespace example {
         std::string assetRoot;
         mxvk::VKAbstractModel model{};
         bool mouseDragging = false;
+        bool autoSpinEnabled = true;
         int lastMouseX = 0;
         int lastMouseY = 0;
         float yawDegrees = 0.0f;
         float pitchDegrees = 12.0f;
         float cameraDistance = 4.2f;
         float mouseSensitivity = 0.35f;
+        float autoSpinSpeed = 0.65f;
+        float autoSpinRadians = 0.0f;
+        std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
     };
 
 } // namespace example

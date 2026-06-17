@@ -8,8 +8,9 @@ This is a basic 3D model viewer for MXVK. By default it loads `data/pyramid.obj`
 
 - `Escape` - quit
 - `Left mouse drag` - rotate the model
+- `Space` - toggle the model's automatic spin
 - `Mouse wheel` - zoom in or out
 
 ## How It Works
 
-The model is loaded through `VKAbstractModel` along with its texture manifest and texture directory. Each frame updates a model/view/projection UBO, then draws the mesh with the example's model shaders. Mouse drag adjusts the model orientation, while the wheel changes camera distance. It is the simplest reference for loading and displaying a textured OBJ or MXMOD asset.
+The model is loaded through `VKAbstractModel` along with its texture manifest and texture directory. Each frame updates a model/view/projection UBO, then draws the mesh with the example's model shaders. Mouse drag adjusts the model orientation, the wheel changes camera distance, and the automatic Y-axis spin can be toggled with `Space`. It is the simplest reference for loading and displaying a textured OBJ or MXMOD asset.
