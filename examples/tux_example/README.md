@@ -1,6 +1,6 @@
 # Tux Example
 
-<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/9b8e191e-4095-450e-b8aa-0dd5ac744eb5" />
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/a850f2c2-851a-4b2e-9394-88b87facd2d1" />
 
 Tux Example loads a textured Tux model and draws it over a moving background sprite. It is a small showcase for combining a model, a full-screen sprite effect, and text overlays in one scene.
 

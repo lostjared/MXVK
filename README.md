@@ -260,7 +260,7 @@ Current example executables:
 
 ## Early Screenshots
 
-<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/18c9ead9-c935-4847-92f7-d6560577f8e6" />
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/b7d0af91-993a-44ab-8045-126459df13a1" />
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/3560a610-992a-4c8f-b6bc-379473b6a171" />
 
