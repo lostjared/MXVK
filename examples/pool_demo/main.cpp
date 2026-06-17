@@ -31,36 +31,36 @@
 
 namespace {
 
-    constexpr float kTableW = 12.0f;
-    constexpr float kTableH = 6.0f;
-    constexpr float kTableHalfW = kTableW / 2.0f;
-    constexpr float kTableHalfH = kTableH / 2.0f;
-    constexpr float kPocketR = 0.25f;
-    constexpr float kBallRadius = 0.18f;
-    constexpr float kCueLength = 2.5f;
-    constexpr float kCueThickness = 0.03f;
-    constexpr float kAimLength = 2.0f;
-    constexpr float kAimThicknessY = 0.008f;
-    constexpr float kAimThicknessZ = 0.015f;
-    constexpr int kNumBalls = 16;
-    constexpr float kFriction = 0.9988f;
-    constexpr float kMinSpeed = 0.001f;
-    constexpr float kMaxPower = 1.5f;
-    constexpr float kCamBaseTotalScale = 1.359411f;
-    constexpr float kSinkDuration = 0.45f;
-    constexpr float kPi = 3.14159265358979323846f;
+    constexpr float TABLE_W = 12.0f;
+    constexpr float TABLE_H = 6.0f;
+    constexpr float TABLE_HALF_W = TABLE_W / 2.0f;
+    constexpr float TABLE_HALF_H = TABLE_H / 2.0f;
+    constexpr float POCKET_R = 0.25f;
+    constexpr float BALL_RADIUS = 0.18f;
+    constexpr float CUE_LENGTH = 2.5f;
+    constexpr float CUE_THICKNESS = 0.03f;
+    constexpr float AIM_LENGTH = 2.0f;
+    constexpr float AIM_THICKNESS_Y = 0.008f;
+    constexpr float AIM_THICKNESS_Z = 0.015f;
+    constexpr int NUM_BALLS = 16;
+    constexpr float FRICTION = 0.9988f;
+    constexpr float MIN_SPEED = 0.001f;
+    constexpr float MAX_POWER = 1.5f;
+    constexpr float CAM_BASE_TOTAL_SCALE = 1.359411f;
+    constexpr float SINK_DURATION = 0.45f;
+    constexpr float PI = 3.14159265358979323846f;
 
-    constexpr float kPocketInset = 0.25f;
-    const std::array<glm::vec2, 6> kPockets = {
-        glm::vec2{-kTableHalfW + kPocketInset, kTableHalfH - kPocketInset},
-        glm::vec2{0.0f, kTableHalfH - 0.15f},
-        glm::vec2{kTableHalfW - kPocketInset, kTableHalfH - kPocketInset},
-        glm::vec2{-kTableHalfW + kPocketInset, -kTableHalfH + kPocketInset},
-        glm::vec2{0.0f, -kTableHalfH + 0.15f},
-        glm::vec2{kTableHalfW - kPocketInset, -kTableHalfH + kPocketInset},
+    constexpr float POCKET_INSET = 0.25f;
+    const std::array<glm::vec2, 6> POCKETS = {
+        glm::vec2{-TABLE_HALF_W + POCKET_INSET, TABLE_HALF_H - POCKET_INSET},
+        glm::vec2{0.0f, TABLE_HALF_H - 0.15f},
+        glm::vec2{TABLE_HALF_W - POCKET_INSET, TABLE_HALF_H - POCKET_INSET},
+        glm::vec2{-TABLE_HALF_W + POCKET_INSET, -TABLE_HALF_H + POCKET_INSET},
+        glm::vec2{0.0f, -TABLE_HALF_H + 0.15f},
+        glm::vec2{TABLE_HALF_W - POCKET_INSET, -TABLE_HALF_H + POCKET_INSET},
     };
 
-    const std::array<glm::vec3, kNumBalls> kBallColors = {
+    const std::array<glm::vec3, NUM_BALLS> BALL_COLORS = {
         glm::vec3{1.0f, 1.0f, 1.0f},
         glm::vec3{1.0f, 0.84f, 0.0f},
         glm::vec3{0.0f, 0.0f, 0.8f},
@@ -149,7 +149,7 @@ namespace {
         float spinAngle = 0.0f;
 
         bool isMoving() const {
-            return glm::length(vel) > kMinSpeed;
+            return glm::length(vel) > MIN_SPEED;
         }
     };
 
@@ -578,59 +578,59 @@ namespace demo {
             drawModel(pocketModel, imageIndex, cmd, view, proj,
                       composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{0.08f, 0.08f, 0.08f, 1.0f}, time);
 
-            for (int i = 0; i < kNumBalls; ++i) {
+            for (int i = 0; i < NUM_BALLS; ++i) {
                 if (!balls[i].active || balls[i].pocketed) {
                     continue;
                 }
                 glm::mat4 m{1.0f};
-                m = glm::translate(m, glm::vec3{balls[i].pos.x, kBallRadius, balls[i].pos.y});
+                m = glm::translate(m, glm::vec3{balls[i].pos.x, BALL_RADIUS, balls[i].pos.y});
                 m = glm::rotate(m, balls[i].spinAngle, glm::vec3{0.0f, 1.0f, 0.0f});
-                m = glm::scale(m, glm::vec3{kBallRadius});
+                m = glm::scale(m, glm::vec3{BALL_RADIUS});
                 drawModel(ballModels[static_cast<std::size_t>(i)],
                           imageIndex,
                           cmd,
                           view,
                           proj,
                           m,
-                          glm::vec4{kBallColors[static_cast<std::size_t>(i)], 1.0f},
+                          glm::vec4{BALL_COLORS[static_cast<std::size_t>(i)], 1.0f},
                           time);
             }
 
             for (const auto &anim : sinkAnims) {
-                const float t = anim.timer / kSinkDuration;
-                const float y = glm::mix(kBallRadius, -kBallRadius * 3.5f, t);
-                const float sc = kBallRadius * (1.0f - t * 0.75f);
+                const float t = anim.timer / SINK_DURATION;
+                const float y = glm::mix(BALL_RADIUS, -BALL_RADIUS * 3.5f, t);
+                const float sc = BALL_RADIUS * (1.0f - t * 0.75f);
                 glm::mat4 m{1.0f};
                 m = glm::translate(m, glm::vec3{anim.pocketPos.x, y, anim.pocketPos.y});
                 m = glm::rotate(m, anim.spinAngle + t * 6.0f, glm::vec3{0.0f, 1.0f, 0.0f});
                 m = glm::scale(m, glm::vec3{sc});
-                const std::size_t sinkIndex = static_cast<std::size_t>(glm::clamp(anim.ballIndex, 0, kNumBalls - 1));
+                const std::size_t sinkIndex = static_cast<std::size_t>(glm::clamp(anim.ballIndex, 0, NUM_BALLS - 1));
                 drawModel(ballModels[sinkIndex], imageIndex, cmd, view, proj, m, glm::vec4{anim.color, 1.0f}, time);
             }
 
             if ((phase == GamePhase::Aiming || phase == GamePhase::Charging) && balls[0].active) {
-                const float offset = (phase == GamePhase::Charging) ? (chargeAmount / kMaxPower) : 0.0f;
-                const float stickDist = kBallRadius + 0.3f + offset;
+                const float offset = (phase == GamePhase::Charging) ? (chargeAmount / MAX_POWER) : 0.0f;
+                const float stickDist = BALL_RADIUS + 0.3f + offset;
                 const float worldCueAngle = cueAngle + camAngle;
                 const glm::vec2 dir{std::cos(worldCueAngle), std::sin(worldCueAngle)};
 
-                const glm::vec2 stickCenter = balls[0].pos - dir * (stickDist + kCueLength * 0.5f);
+                const glm::vec2 stickCenter = balls[0].pos - dir * (stickDist + CUE_LENGTH * 0.5f);
                 glm::mat4 cueTransform{1.0f};
-                cueTransform = glm::translate(cueTransform, glm::vec3{stickCenter.x, kBallRadius + 0.05f, stickCenter.y});
+                cueTransform = glm::translate(cueTransform, glm::vec3{stickCenter.x, BALL_RADIUS + 0.05f, stickCenter.y});
                 cueTransform = glm::rotate(cueTransform, -worldCueAngle, glm::vec3{0.0f, 1.0f, 0.0f});
-                cueTransform = glm::scale(cueTransform, glm::vec3{kCueLength * 0.5f, kCueThickness, kCueThickness});
+                cueTransform = glm::scale(cueTransform, glm::vec3{CUE_LENGTH * 0.5f, CUE_THICKNESS, CUE_THICKNESS});
 
-                const float pct = chargeAmount / kMaxPower;
+                const float pct = chargeAmount / MAX_POWER;
                 const glm::vec4 cueColor = (phase == GamePhase::Charging)
                                                ? glm::vec4{0.55f + pct * 0.45f, 0.27f * (1.0f - pct), 0.07f * (1.0f - pct), 1.0f}
                                                : glm::vec4{0.55f, 0.27f, 0.07f, 1.0f};
                 drawModel(cueStickModel, imageIndex, cmd, view, proj, cueTransform, cueColor, time);
 
-                const glm::vec2 aimCenter = balls[0].pos + dir * (kBallRadius + kAimLength * 0.5f);
+                const glm::vec2 aimCenter = balls[0].pos + dir * (BALL_RADIUS + AIM_LENGTH * 0.5f);
                 glm::mat4 aimTransform{1.0f};
-                aimTransform = glm::translate(aimTransform, glm::vec3{aimCenter.x, kBallRadius + 0.06f, aimCenter.y});
+                aimTransform = glm::translate(aimTransform, glm::vec3{aimCenter.x, BALL_RADIUS + 0.06f, aimCenter.y});
                 aimTransform = glm::rotate(aimTransform, -worldCueAngle, glm::vec3{0.0f, 1.0f, 0.0f});
-                aimTransform = glm::scale(aimTransform, glm::vec3{kAimLength * 0.5f, kAimThicknessY, kAimThicknessZ});
+                aimTransform = glm::scale(aimTransform, glm::vec3{AIM_LENGTH * 0.5f, AIM_THICKNESS_Y, AIM_THICKNESS_Z});
                 drawModel(cueAimModel, imageIndex, cmd, view, proj, aimTransform, glm::vec4{1.0f, 1.0f, 0.0f, 1.0f}, time);
             }
         }
@@ -755,12 +755,12 @@ namespace demo {
             }
 
             const Uint64 elapsed = SDL_GetTicks() - startTicks;
-            constexpr Uint64 kTotal = 5000;
-            constexpr Uint64 kFadeDur = 1500;
+            constexpr Uint64 TOTAL = 5000;
+            constexpr Uint64 FADE_DUR = 1500;
 
             float fadeOut = 1.0f;
-            if (elapsed > (kTotal - kFadeDur)) {
-                fadeOut = 1.0f - static_cast<float>(elapsed - (kTotal - kFadeDur)) / static_cast<float>(kFadeDur);
+            if (elapsed > (TOTAL - FADE_DUR)) {
+                fadeOut = 1.0f - static_cast<float>(elapsed - (TOTAL - FADE_DUR)) / static_cast<float>(FADE_DUR);
             }
 
             if (startSprite != nullptr) {
@@ -772,7 +772,7 @@ namespace demo {
                 introSprite->drawSpriteRect(0, 0, width, height);
             }
 
-            if (elapsed >= kTotal) {
+            if (elapsed >= TOTAL) {
                 startTicks = 0U;
                 setScreen(GameScreen::Start);
             }
@@ -876,7 +876,7 @@ namespace demo {
 
             printText("Shots: " + std::to_string(shotCount), 15, 45, SDL_Color{255, 255, 0, 255});
             int rem = 0;
-            for (int i = 1; i < kNumBalls; ++i) {
+            for (int i = 1; i < NUM_BALLS; ++i) {
                 if (balls[i].active && !balls[i].pocketed) {
                     ++rem;
                 }
@@ -887,7 +887,7 @@ namespace demo {
                 printText("Mouse: move aim + hold/release | Right-drag: rotate table | Wheel/Pinch: zoom", 15, height - 40,
                           SDL_Color{180, 180, 180, 255});
             } else if (phase == GamePhase::Charging) {
-                const int pct = static_cast<int>(chargeAmount / kMaxPower * 100.0f);
+                const int pct = static_cast<int>(chargeAmount / MAX_POWER * 100.0f);
                 printText("Power: " + std::to_string(pct) + "%", 15, 105,
                           SDL_Color{255, static_cast<Uint8>(std::max(0, 255 - pct * 2)), 0, 255});
             } else if (phase == GamePhase::Placing) {
@@ -911,7 +911,7 @@ namespace demo {
                         phase = GamePhase::Placing;
                         balls[0].active = true;
                         balls[0].pocketed = false;
-                        balls[0].pos = glm::vec2{-kTableHalfW * 0.5f, 0.0f};
+                        balls[0].pos = glm::vec2{-TABLE_HALF_W * 0.5f, 0.0f};
                         balls[0].vel = glm::vec2{0.0f};
                     } else {
                         phase = GamePhase::Aiming;
@@ -937,7 +937,7 @@ namespace demo {
             }
             sinkAnims.erase(
                 std::remove_if(sinkAnims.begin(), sinkAnims.end(), [](const SinkAnim &anim) {
-                    return anim.timer >= kSinkDuration;
+                    return anim.timer >= SINK_DURATION;
                 }),
                 sinkAnims.end());
         }
@@ -1106,13 +1106,13 @@ namespace demo {
 
         void rackBalls() {
             balls[0] = {};
-            balls[0].pos = glm::vec2{-kTableHalfW * 0.5f, 0.0f};
+            balls[0].pos = glm::vec2{-TABLE_HALF_W * 0.5f, 0.0f};
             balls[0].active = true;
             balls[0].number = 0;
 
             const int order[15] = {1, 2, 3, 8, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15};
-            const float sx = kTableHalfW * 0.3f;
-            const float sp = kBallRadius * 2.1f;
+            const float sx = TABLE_HALF_W * 0.3f;
+            const float sp = BALL_RADIUS * 2.1f;
             int idx = 0;
 
             for (int row = 0; row < 5; ++row) {
@@ -1125,7 +1125,7 @@ namespace demo {
                     balls[bn].pos = glm::vec2{sx + row * sp * 0.866f, (col - row * 0.5f) * sp};
                     balls[bn].active = true;
                     balls[bn].number = bn;
-                    balls[bn].spinAngle = randFloat(0.0f, 2.0f * kPi);
+                    balls[bn].spinAngle = randFloat(0.0f, 2.0f * PI);
                 }
             }
         }
@@ -1148,9 +1148,9 @@ namespace demo {
             if (keys[SDL_SCANCODE_RIGHT]) {
                 cueAngle += 1.5f * dt;
             }
-            chargeAmount += kMaxPower * 0.8f * dt;
-            if (chargeAmount > kMaxPower) {
-                chargeAmount = kMaxPower;
+            chargeAmount += MAX_POWER * 0.8f * dt;
+            if (chargeAmount > MAX_POWER) {
+                chargeAmount = MAX_POWER;
             }
         }
 
@@ -1177,9 +1177,9 @@ namespace demo {
         }
 
         void clampCueBall() {
-            const float m = kBallRadius + 0.1f;
-            balls[0].pos.x = glm::clamp(balls[0].pos.x, -kTableHalfW + m, kTableHalfW - m);
-            balls[0].pos.y = glm::clamp(balls[0].pos.y, -kTableHalfH + m, kTableHalfH - m);
+            const float m = BALL_RADIUS + 0.1f;
+            balls[0].pos.x = glm::clamp(balls[0].pos.x, -TABLE_HALF_W + m, TABLE_HALF_W - m);
+            balls[0].pos.y = glm::clamp(balls[0].pos.y, -TABLE_HALF_H + m, TABLE_HALF_H - m);
         }
 
         void updatePhysics(float dt) {
@@ -1190,10 +1190,10 @@ namespace demo {
                 }
             }
 
-            const float maxMovePerStep = kBallRadius * 0.75f;
+            const float maxMovePerStep = BALL_RADIUS * 0.75f;
             const int steps = std::max(8, static_cast<int>(std::ceil(maxSpeed * dt * 60.0f / maxMovePerStep)));
             const float sub = dt / static_cast<float>(steps);
-            const float stepFriction = std::pow(kFriction, 4.0f / static_cast<float>(steps));
+            const float stepFriction = std::pow(FRICTION, 4.0f / static_cast<float>(steps));
 
             for (int s = 0; s < steps; ++s) {
                 for (auto &ball : balls) {
@@ -1203,11 +1203,11 @@ namespace demo {
                     ball.pos += ball.vel * sub * 60.0f;
                 }
 
-                for (int i = 0; i < kNumBalls; ++i) {
+                for (int i = 0; i < NUM_BALLS; ++i) {
                     if (!balls[i].active || balls[i].pocketed) {
                         continue;
                     }
-                    for (int j = i + 1; j < kNumBalls; ++j) {
+                    for (int j = i + 1; j < NUM_BALLS; ++j) {
                         if (!balls[j].active || balls[j].pocketed) {
                             continue;
                         }
@@ -1234,7 +1234,7 @@ namespace demo {
                         continue;
                     }
                     ball.vel *= stepFriction;
-                    if (glm::length(ball.vel) < kMinSpeed) {
+                    if (glm::length(ball.vel) < MIN_SPEED) {
                         ball.vel = glm::vec2{0.0f};
                     }
                 }
@@ -1244,7 +1244,7 @@ namespace demo {
         void resolveBall(PoolBall &a, PoolBall &b) {
             const glm::vec2 d = b.pos - a.pos;
             const float dist = glm::length(d);
-            const float minD = kBallRadius * 2.0f;
+            const float minD = BALL_RADIUS * 2.0f;
             if (dist >= minD || dist <= 0.0001f) {
                 return;
             }
@@ -1262,10 +1262,10 @@ namespace demo {
         }
 
         void resolveWall(PoolBall &ball) {
-            const float l = -kTableHalfW + kBallRadius;
-            const float r = kTableHalfW - kBallRadius;
-            const float t = -kTableHalfH + kBallRadius;
-            const float b = kTableHalfH - kBallRadius;
+            const float l = -TABLE_HALF_W + BALL_RADIUS;
+            const float r = TABLE_HALF_W - BALL_RADIUS;
+            const float t = -TABLE_HALF_H + BALL_RADIUS;
+            const float b = TABLE_HALF_H - BALL_RADIUS;
 
             if (ball.pos.x < l) {
                 ball.pos.x = l;
@@ -1286,11 +1286,11 @@ namespace demo {
         }
 
         void checkPocket(PoolBall &ball) {
-            for (const auto &pocket : kPockets) {
-                if (glm::length(ball.pos - pocket) < kPocketR) {
+            for (const auto &pocket : POCKETS) {
+                if (glm::length(ball.pos - pocket) < POCKET_R) {
                     const int idx = static_cast<int>(&ball - &balls[0]);
                     sinkAnims.push_back(SinkAnim{pocket,
-                                                  kBallColors[static_cast<std::size_t>(idx)],
+                                                  BALL_COLORS[static_cast<std::size_t>(idx)],
                                                   ball.spinAngle,
                                                   0.0f,
                                                   idx});
@@ -1311,7 +1311,7 @@ namespace demo {
         }
 
         [[nodiscard]] bool allObjectBallsPocketed() const {
-            for (int i = 1; i < kNumBalls; ++i) {
+            for (int i = 1; i < NUM_BALLS; ++i) {
                 if (balls[i].active && !balls[i].pocketed) {
                     return false;
                 }
@@ -1343,7 +1343,7 @@ namespace demo {
         }
 
         [[nodiscard]] glm::vec3 getCameraPosition() const {
-            const float orbitDist = camZoom * kCamBaseTotalScale;
+            const float orbitDist = camZoom * CAM_BASE_TOTAL_SCALE;
             const float horiz = orbitDist * std::cos(camPitch);
             const float y = orbitDist * std::sin(camPitch);
             return glm::vec3{std::sin(camAngle) * horiz, y, std::cos(camAngle) * horiz};
@@ -1420,11 +1420,11 @@ namespace demo {
                 return;
             }
             if (phase == GamePhase::Placing) {
-                constexpr float kMoveScale = 0.02f;
+                constexpr float MOVE_SCALE = 0.02f;
                 const glm::vec2 camRight{std::cos(camAngle), -std::sin(camAngle)};
                 const glm::vec2 camFwd{-std::sin(camAngle), -std::cos(camAngle)};
-                balls[0].pos += camRight * (static_cast<float>(dx) * kMoveScale);
-                balls[0].pos -= camFwd * (static_cast<float>(dy) * kMoveScale);
+                balls[0].pos += camRight * (static_cast<float>(dx) * MOVE_SCALE);
+                balls[0].pos -= camFwd * (static_cast<float>(dy) * MOVE_SCALE);
                 clampCueBall();
             }
         }
@@ -1444,11 +1444,11 @@ namespace demo {
         }
 
         [[nodiscard]] bool canPlaceCueBall() const {
-            for (int i = 1; i < kNumBalls; ++i) {
+            for (int i = 1; i < NUM_BALLS; ++i) {
                 if (!balls[i].active || balls[i].pocketed) {
                     continue;
                 }
-                if (glm::length(balls[0].pos - balls[i].pos) < kBallRadius * 2.5f) {
+                if (glm::length(balls[0].pos - balls[i].pos) < BALL_RADIUS * 2.5f) {
                     return false;
                 }
             }
@@ -1622,11 +1622,11 @@ namespace demo {
         mxvk::VKAbstractModel feltModel{};
         mxvk::VKAbstractModel woodModel{};
         mxvk::VKAbstractModel pocketModel{};
-        std::array<mxvk::VKAbstractModel, kNumBalls> ballModels{};
+        std::array<mxvk::VKAbstractModel, NUM_BALLS> ballModels{};
         mxvk::VKAbstractModel cueStickModel{};
         mxvk::VKAbstractModel cueAimModel{};
 
-        std::array<PoolBall, kNumBalls> balls{};
+        std::array<PoolBall, NUM_BALLS> balls{};
         std::vector<SinkAnim> sinkAnims{};
 
         GameScreen screen = GameScreen::Intro;

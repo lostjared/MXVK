@@ -62,7 +62,7 @@ namespace {
         glm::vec4 params{0.0f};
     };
 
-    constexpr float kPi = 3.14159265358979323846f;
+    constexpr float PI = 3.14159265358979323846f;
 
 } // namespace
 
@@ -177,7 +177,7 @@ namespace example {
         }
 
         void respawnStar(Star &star) {
-            const float theta = randomFloat(0.0f, 2.0f * kPi);
+            const float theta = randomFloat(0.0f, 2.0f * PI);
             const float phi = std::acos(randomFloat(-1.0f, 1.0f));
             const float radius = randomFloat(50.0f, 200.0f);
 
@@ -849,8 +849,8 @@ namespace example {
             auto addCone = [&](float radius, const glm::vec4 &baseColor, const glm::vec4 &tipColor) {
                 const glm::vec3 tip{0.0f, baseY, tipZ};
                 for (int i = 0; i < segments; ++i) {
-                    const float a0 = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * kPi;
-                    const float a1 = (static_cast<float>(i + 1) / static_cast<float>(segments)) * 2.0f * kPi;
+                    const float a0 = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * PI;
+                    const float a1 = (static_cast<float>(i + 1) / static_cast<float>(segments)) * 2.0f * PI;
                     const glm::vec3 p0{std::cos(a0) * radius, baseY + std::sin(a0) * radius, baseZ};
                     const glm::vec3 p1{std::cos(a1) * radius, baseY + std::sin(a1) * radius, baseZ};
                     vertices.push_back({p0, baseColor});

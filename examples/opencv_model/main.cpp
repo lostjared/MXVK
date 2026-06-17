@@ -231,10 +231,10 @@ namespace example {
         }
 
         [[nodiscard]] static float wrapAngle(float angleRadians) {
-            constexpr float kTwoPi = 6.28318530718f;
-            float wrapped = std::fmod(angleRadians, kTwoPi);
+            constexpr float TWO_PI = 6.28318530718f;
+            float wrapped = std::fmod(angleRadians, TWO_PI);
             if (wrapped < 0.0f) {
-                wrapped += kTwoPi;
+                wrapped += TWO_PI;
             }
             return wrapped;
         }
@@ -245,29 +245,29 @@ namespace example {
                 return;
             }
 
-            constexpr float kManualSpeed = glm::radians(120.0f);
-            constexpr float kAutoSpinSpeed = 0.55f;
+            constexpr float MANUAL_SPEED = glm::radians(120.0f);
+            constexpr float AUTO_SPIN_SPEED = 0.55f;
 
             bool usingArrowKeys = false;
             if (keys[SDL_SCANCODE_LEFT]) {
-                yawRadians -= kManualSpeed * deltaSeconds;
+                yawRadians -= MANUAL_SPEED * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_RIGHT]) {
-                yawRadians += kManualSpeed * deltaSeconds;
+                yawRadians += MANUAL_SPEED * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_UP]) {
-                pitchRadians -= kManualSpeed * deltaSeconds;
+                pitchRadians -= MANUAL_SPEED * deltaSeconds;
                 usingArrowKeys = true;
             }
             if (keys[SDL_SCANCODE_DOWN]) {
-                pitchRadians += kManualSpeed * deltaSeconds;
+                pitchRadians += MANUAL_SPEED * deltaSeconds;
                 usingArrowKeys = true;
             }
 
             if (!usingArrowKeys) {
-                autoSpinRadians += kAutoSpinSpeed * deltaSeconds;
+                autoSpinRadians += AUTO_SPIN_SPEED * deltaSeconds;
             }
 
             yawRadians = wrapAngle(yawRadians);

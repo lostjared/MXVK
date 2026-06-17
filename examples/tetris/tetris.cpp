@@ -137,7 +137,7 @@ namespace {
         }
 
         [[nodiscard]] bool qualifies(int score) const {
-            if (scoreEntries.size() < kMaxEntries) {
+            if (scoreEntries.size() < MAX_ENTRIES) {
                 return true;
             }
             return score > scoreEntries.back().score;
@@ -163,8 +163,8 @@ namespace {
         }
 
       private:
-        static constexpr std::size_t kMaxEntries = 10;
-        static constexpr std::size_t kMaxNameBytes = 16;
+        static constexpr std::size_t MAX_ENTRIES = 10;
+        static constexpr std::size_t MAX_NAME_BYTES = 16;
 
         std::filesystem::path filePath;
         std::vector<HighScoreEntry> scoreEntries{};
@@ -180,8 +180,8 @@ namespace {
                 }
             }
 
-            if (name.size() > kMaxNameBytes) {
-                name.resize(kMaxNameBytes);
+            if (name.size() > MAX_NAME_BYTES) {
+                name.resize(MAX_NAME_BYTES);
             }
         }
 
@@ -193,8 +193,8 @@ namespace {
                 return a.name < b.name;
             });
 
-            if (scoreEntries.size() > kMaxEntries) {
-                scoreEntries.resize(kMaxEntries);
+            if (scoreEntries.size() > MAX_ENTRIES) {
+                scoreEntries.resize(MAX_ENTRIES);
             }
         }
 
