@@ -1,19 +1,13 @@
-# Smooth metallic material for blaster.obj
-newmtl BlasterMetal
-Ka 0.15 0.15 0.16
-Kd 0.80 0.81 0.83
-Ks 0.48 0.50 0.52
-Ns 220.0
-d 1.0
-illum 2
+# Blender 5.1.2 MTL File: 'blaster.blend'
+# www.blender.org
 
-# Texture maps
+newmtl BlasterMetal
+Ka 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
 map_Kd blaster_metal.png
 map_Ks blaster_metal.png
-map_Bump -bm 0.65 blaster_metal_normal.png
 map_Ns blaster_metal_roughness.png
-
-# PBR extensions (used by some OBJ importers)
-Pr 0.62
-map_Pr blaster_metal_roughness.png
-Pm 1.0
+map_Bump -bm 0.650000 blaster_metal_normal.png
