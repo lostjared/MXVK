@@ -12,9 +12,18 @@ layout(push_constant) uniform PC {
     int historyIdx;
     int square_size;
     int history_dir;
+    float alpha;
+    int do_swap;
+    int do_invert;
 } pc;
 
 const float INV_255 = 1.0 / 255.0;
+const float PI = 3.14159265359;
+const float TAU = 6.28318530718;
+
+ivec2 clampPos(ivec2 p, ivec2 sz) {
+    return clamp(p, ivec2(0), sz - ivec2(1));
+}
 
 uvec3 toU8(vec3 c) {
     return uvec3(clamp(c * 255.0 + 0.5, 0.0, 255.0));
@@ -24,12 +33,20 @@ vec3 toRGB(uvec3 c) {
     return vec3(c) * INV_255;
 }
 
-uvec3 fetchSourceU8(ivec2 p) {
-    return toU8(texelFetch(sourceTex, p, 0).rgb);
+vec3 sampleSource(ivec2 p, ivec2 sz) {
+    return texelFetch(sourceTex, clampPos(p, sz), 0).rgb;
 }
 
-uvec3 fetchHistoryU8(int idx, ivec2 p) {
-    return toU8(texelFetch(historyTex[idx], p, 0).rgb);
+vec3 sampleHistory(int idx, ivec2 p, ivec2 sz) {
+    return texelFetch(historyTex[idx], clampPos(p, sz), 0).rgb;
+}
+
+uvec3 sampleSourceU8(ivec2 p, ivec2 sz) {
+    return toU8(sampleSource(p, sz));
+}
+
+uvec3 sampleHistoryU8(int idx, ivec2 p, ivec2 sz) {
+    return toU8(sampleHistory(idx, p, sz));
 }
 
 uvec3 mul8(uvec3 value, int scale) {
@@ -37,75 +54,468 @@ uvec3 mul8(uvec3 value, int scale) {
     return (value * s) & uvec3(255u);
 }
 
-uvec3 avgHistoryU8(ivec2 p, int count) {
-    uvec3 sum = uvec3(0);
-    int safeCount = clamp(count, 0, 8);
-    for (int i = 0; i < 8; ++i) {
-        if (i >= safeCount) {
-            break;
+float luma(vec3 c) {
+    return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+float hash12(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+vec2 rot2(vec2 p, float a) {
+    float s = sin(a);
+    float c = cos(a);
+    return mat2(c, -s, s, c) * p;
+}
+
+vec3 posterize(vec3 c, float levels) {
+    float s = max(levels, 2.0);
+    return floor(clamp(c, 0.0, 1.0) * (s - 1.0) + 0.5) / (s - 1.0);
+}
+
+vec3 sat(vec3 c, float amount) {
+    float y = luma(c);
+    return clamp(mix(vec3(y), c, amount), 0.0, 1.0);
+}
+
+vec3 gammaDarken(vec3 c, float g) {
+    return pow(clamp(c, 0.0, 1.0), vec3(g));
+}
+
+vec3 hueRotate(vec3 c, float angle) {
+    vec3 axis = normalize(vec3(1.0, 1.0, 1.0));
+    float s = sin(angle);
+    float co = cos(angle);
+    return clamp(c * co + cross(axis, c) * s + axis * dot(axis, c) * (1.0 - co), 0.0, 1.0);
+}
+
+vec3 sepia(vec3 c) {
+    vec3 o;
+    o.r = dot(c, vec3(0.393, 0.769, 0.189));
+    o.g = dot(c, vec3(0.349, 0.686, 0.168));
+    o.b = dot(c, vec3(0.272, 0.534, 0.131));
+    return clamp(o, 0.0, 1.0);
+}
+
+vec3 gradientRamp(float t) {
+    t = clamp(t, 0.0, 1.0);
+    vec3 a = vec3(0.04, 0.08, 0.18);
+    vec3 b = vec3(0.14, 0.60, 0.95);
+    vec3 c = vec3(0.95, 0.85, 0.20);
+    vec3 d = vec3(1.00, 0.30, 0.10);
+    if (t < 0.33) {
+        return mix(a, b, t / 0.33);
+    }
+    if (t < 0.66) {
+        return mix(b, c, (t - 0.33) / 0.33);
+    }
+    return mix(c, d, (t - 0.66) / 0.34);
+}
+
+vec3 median3(vec3 a, vec3 b, vec3 c) {
+    return a + b + c - min(min(a, b), c) - max(max(a, b), c);
+}
+
+vec3 boxBlur(ivec2 pos, ivec2 sz, int radius) {
+    vec3 sum = vec3(0.0);
+    float count = 0.0;
+    for (int y = -radius; y <= radius; ++y) {
+        for (int x = -radius; x <= radius; ++x) {
+            sum += sampleSource(pos + ivec2(x, y), sz);
+            count += 1.0;
         }
-        sum += fetchHistoryU8(i, p);
     }
-    if (safeCount <= 0) {
-        return uvec3(0);
+    return sum / count;
+}
+
+vec3 dilate3(ivec2 pos, ivec2 sz) {
+    vec3 mx = vec3(0.0);
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            mx = max(mx, sampleSource(pos + ivec2(x, y), sz));
+        }
     }
-    return sum / uint(safeCount);
+    return mx;
 }
 
-vec3 modeDiagPixelate(ivec2 pos, ivec2 imgSize) {
-    int block = max(pc.square_size, 1);
-    ivec2 blockOrigin = (pos / block) * block;
-    ivec2 samplePos = clamp(blockOrigin, ivec2(0), imgSize - ivec2(1));
-    vec3 cur = texelFetch(sourceTex, pos, 0).rgb;
-    vec3 blockColor = texelFetch(sourceTex, samplePos, 0).rgb;
-    return mix(cur, blockColor, 0.5);
+vec3 erode3(ivec2 pos, ivec2 sz) {
+    vec3 mn = vec3(1.0);
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            mn = min(mn, sampleSource(pos + ivec2(x, y), sz));
+        }
+    }
+    return mn;
 }
 
-vec3 modeCombinePixels(ivec2 pos, ivec2 imgSize) {
-    uvec3 cur = fetchSourceU8(pos);
-    ivec2 p0 = clamp(pos + ivec2(1, 0), ivec2(0), imgSize - ivec2(1));
-    ivec2 p1 = clamp(pos + ivec2(0, 1), ivec2(0), imgSize - ivec2(1));
-    ivec2 p2 = clamp(pos + ivec2(1, 1), ivec2(0), imgSize - ivec2(1));
-    uvec3 neighborSum = fetchSourceU8(p0) + fetchSourceU8(p1) + fetchSourceU8(p2);
-    uvec3 xored = cur ^ neighborSum;
-    uvec3 scaled = mul8(xored, max(pc.square_size, 1));
-    uvec3 blended = (scaled >> 1) + (cur >> 1);
-    return toRGB(blended);
+vec3 sobel(ivec2 pos, ivec2 sz) {
+    float gx = 0.0;
+    float gy = 0.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            float wX = (x == 0 ? 0.0 : float(x)) * (y == 0 ? 2.0 : 1.0);
+            float wY = (y == 0 ? 0.0 : float(y)) * (x == 0 ? 2.0 : 1.0);
+            float l = luma(sampleSource(pos + ivec2(x, y), sz));
+            gx += wX * l;
+            gy += wY * l;
+        }
+    }
+    float e = clamp(length(vec2(gx, gy)) * 0.6, 0.0, 1.0);
+    return vec3(e);
 }
 
-vec3 modeHistoryXor(ivec2 pos) {
-    uvec3 cur = fetchSourceU8(pos);
-    uvec3 hist = avgHistoryU8(pos, pc.historyCount);
-    uvec3 xored = cur ^ hist;
-    uvec3 scaled = mul8(xored, max(pc.square_size, 1));
-    return toRGB(scaled);
+vec3 edgeDetect(ivec2 pos, ivec2 sz) {
+    vec3 h = abs(sampleSource(pos + ivec2(1, 0), sz) - sampleSource(pos + ivec2(-1, 0), sz));
+    vec3 v = abs(sampleSource(pos + ivec2(0, 1), sz) - sampleSource(pos + ivec2(0, -1), sz));
+    return clamp((h + v) * 1.5, 0.0, 1.0);
 }
 
-vec3 modeTemporalBlend(ivec2 pos) {
-    vec3 cur = texelFetch(sourceTex, pos, 0).rgb;
+vec3 sharpen(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    vec3 blur = boxBlur(pos, sz, 1);
+    return clamp(c * 1.7 - blur * 0.7, 0.0, 1.0);
+}
+
+vec3 emboss(ivec2 pos, ivec2 sz) {
+    vec3 a = sampleSource(pos + ivec2(-1, -1), sz);
+    vec3 b = sampleSource(pos + ivec2(1, 1), sz);
+    return clamp((b - a) * 0.5 + 0.5, 0.0, 1.0);
+}
+
+vec3 rgbSplit(ivec2 pos, ivec2 sz, int amt) {
+    ivec2 r = ivec2(amt, 0);
+    ivec2 g = ivec2(0, amt);
+    ivec2 b = ivec2(-amt, -amt);
+    return vec3(
+        sampleSource(pos + r, sz).r,
+        sampleSource(pos + g, sz).g,
+        sampleSource(pos + b, sz).b);
+}
+
+vec3 wave(ivec2 pos, ivec2 sz) {
+    int amp = max(pc.square_size, 1);
+    float phase = float(pos.y + pc.historyIdx * pc.history_dir * amp) / float(amp) * 0.35;
+    int shift = int(round(sin(phase) * float(amp) * 0.75));
+    return sampleSource(pos + ivec2(shift, 0), sz);
+}
+
+vec3 ripple(ivec2 pos, ivec2 sz) {
+    vec2 center = vec2(sz) * 0.5;
+    vec2 d = vec2(pos) - center;
+    float dist = length(d) + 0.0001;
+    float phase = dist * 0.05 + float(pc.historyIdx + pc.history_dir) * 0.5;
+    float amt = sin(phase) * max(float(pc.square_size), 1.0) * 0.8;
+    vec2 uv = vec2(pos) + normalize(d) * amt;
+    return sampleSource(ivec2(uv), sz);
+}
+
+vec3 twirl(ivec2 pos, ivec2 sz) {
+    vec2 center = vec2(sz) * 0.5;
+    vec2 d = vec2(pos) - center;
+    float dist = length(d) / max(length(center), 1.0);
+    float angle = dist * 2.8 + float(pc.historyIdx * pc.history_dir) * 0.25;
+    vec2 uv = center + rot2(d, angle);
+    return sampleSource(ivec2(uv), sz);
+}
+
+vec3 zoomPulse(ivec2 pos, ivec2 sz) {
+    vec2 center = vec2(sz) * 0.5;
+    vec2 d = vec2(pos) - center;
+    float pulse = 1.0 + 0.12 * sin(float(pc.historyIdx + pc.history_dir * 3) * 0.7);
+    float scale = mix(1.0, pulse, clamp(pc.alpha, 0.0, 1.0));
+    vec2 uv = center + d / scale;
+    return sampleSource(ivec2(uv), sz);
+}
+
+vec3 blockPixelate(ivec2 pos, ivec2 sz, int block) {
+    ivec2 origin = (pos / block) * block;
+    return sampleSource(origin, sz);
+}
+
+vec3 blockMirrorX(ivec2 pos, ivec2 sz, int block) {
+    ivec2 base = (pos / block) * block;
+    ivec2 local = pos - base;
+    local.x = block - 1 - local.x;
+    return sampleSource(base + local, sz);
+}
+
+vec3 blockMirrorY(ivec2 pos, ivec2 sz, int block) {
+    ivec2 base = (pos / block) * block;
+    ivec2 local = pos - base;
+    local.y = block - 1 - local.y;
+    return sampleSource(base + local, sz);
+}
+
+vec3 combinePixels(ivec2 pos, ivec2 sz) {
+    uvec3 cur = sampleSourceU8(pos, sz);
+    ivec2 p0 = pos + ivec2(1, 0);
+    ivec2 p1 = pos + ivec2(0, 1);
+    ivec2 p2 = pos + ivec2(1, 1);
+    uvec3 n = sampleSourceU8(p0, sz) + sampleSourceU8(p1, sz) + sampleSourceU8(p2, sz);
+    uvec3 x = cur ^ n;
+    uvec3 scaled = mul8(x, max(pc.square_size, 1));
+    return toRGB((scaled >> 1) + (cur >> 1));
+}
+
+vec3 historyXor(ivec2 pos, ivec2 sz) {
+    if (pc.historyCount <= 0) {
+        return sampleSource(pos, sz);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp(pc.historyIdx, 0, safe - 1);
+    uvec3 cur = sampleSourceU8(pos, sz);
+    uvec3 hist = sampleHistoryU8(idx, pos, sz);
+    return toRGB(mul8(cur ^ hist, max(pc.square_size, 1)));
+}
+
+vec3 temporalBlend(ivec2 pos, ivec2 sz) {
+    vec3 cur = sampleSource(pos, sz);
     if (pc.historyCount <= 0) {
         return cur;
     }
-    int safeCount = clamp(pc.historyCount, 1, 8);
-    int idx = clamp(pc.historyIdx, 0, safeCount - 1);
-    vec3 hist = texelFetch(historyTex[idx], pos, 0).rgb;
-    int band = max(pc.square_size, 1);
-    int bandRow = pos.y / band;
-    float phase = float(bandRow + pc.historyIdx * pc.history_dir) * 0.3926990817;
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp(pc.historyIdx, 0, safe - 1);
+    vec3 hist = sampleHistory(idx, pos, sz);
+    float band = max(float(pc.square_size), 1.0);
+    float phase = float(pos.y / int(band)) * 0.31 + float(pc.historyIdx * pc.history_dir) * 0.22;
     float blend = clamp(0.5 + 0.45 * sin(phase), 0.05, 0.95);
     return mix(cur, hist, blend);
 }
 
-vec3 modeScanlineWarp(ivec2 pos, ivec2 imgSize) {
+vec3 historyMedian(ivec2 pos, ivec2 sz) {
+    vec3 a = sampleSource(pos, sz);
+    if (pc.historyCount <= 0) {
+        return a;
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int i0 = clamp(pc.historyIdx, 0, safe - 1);
+    int i1 = clamp((pc.historyIdx + 1) % safe, 0, safe - 1);
+    vec3 b = sampleHistory(i0, pos, sz);
+    vec3 c = sampleHistory(i1, pos, sz);
+    return median3(a, b, c);
+}
+
+vec3 scanlineWarp(ivec2 pos, ivec2 sz) {
     int block = max(pc.square_size, 1);
     int rowBand = pos.y / block;
-    int amplitude = max(imgSize.x / 4, 1);
+    int amplitude = max(sz.x / 4, 1);
     int cycle = amplitude * 2;
-    int phase = (rowBand + pc.historyIdx * pc.history_dir) % cycle;
+    int phase = (rowBand + pc.historyIdx * pc.history_dir) % max(cycle, 1);
     int shift = phase < amplitude ? phase : (cycle - phase);
     shift -= amplitude / 2;
-    ivec2 samplePos = clamp(pos + ivec2(shift, 0), ivec2(0), imgSize - ivec2(1));
-    return texelFetch(sourceTex, samplePos, 0).rgb;
+    return sampleSource(pos + ivec2(shift, 0), sz);
+}
+
+vec3 kaleidoscope(ivec2 pos, ivec2 sz, int segments) {
+    vec2 center = vec2(sz) * 0.5;
+    vec2 d = vec2(pos) - center;
+    float angle = atan(d.y, d.x);
+    float radius = length(d);
+    float seg = max(float(segments), 1.0);
+    float slice = TAU / seg;
+    angle = mod(angle, slice);
+    if (angle > slice * 0.5) {
+        angle = slice - angle;
+    }
+    vec2 uv = center + vec2(cos(angle), sin(angle)) * radius;
+    return sampleSource(ivec2(uv), sz);
+}
+
+vec3 dynamicKaleidoscope(ivec2 pos, ivec2 sz) {
+    int segs = 4 + abs(pc.historyIdx % 6);
+    vec3 c = kaleidoscope(pos, sz, segs);
+    float t = clamp(pc.alpha, 0.0, 1.0);
+    return mix(c, hueRotate(c, float(pc.history_dir) * 0.7), t);
+}
+
+vec3 thresholdFilter(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    return vec3(step(0.5, luma(c)));
+}
+
+vec3 brightnessContrast(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    float contrast = 1.15 + 0.25 * sin(float(pc.historyIdx) * 0.7);
+    float brightness = 0.05 * float(pc.history_dir);
+    return clamp((c - 0.5) * contrast + 0.5 + brightness, 0.0, 1.0);
+}
+
+vec3 solarize(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    vec3 hi = 1.0 - c;
+    return mix(c, hi, step(0.55, c));
+}
+
+vec3 crosshatch(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    float lineA = step(0.5, fract(float(pos.x + pos.y) * 0.125));
+    float lineB = step(0.5, fract(float(pos.x - pos.y) * 0.125));
+    float m = mix(lineA, lineB, 0.5);
+    return mix(c, vec3(luma(c)), m * 0.65);
+}
+
+vec3 noiseGrain(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    float n = hash12(vec2(pos) + vec2(float(pc.historyIdx), float(pc.history_dir))) - 0.5;
+    return clamp(c + n * 0.18, 0.0, 1.0);
+}
+
+vec3 strobeBars(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    int band = max(pc.square_size, 1);
+    int row = pos.y / band;
+    float gate = mod(float(row + pc.historyIdx * pc.history_dir), 2.0);
+    return mix(c, 1.0 - c, step(1.0, gate));
+}
+
+vec3 scanlineXor(ivec2 pos, ivec2 sz) {
+    uvec3 a = sampleSourceU8(pos, sz);
+    uvec3 b = sampleSourceU8(pos + ivec2(0, max(pc.square_size, 1)), sz);
+    return toRGB(a ^ b);
+}
+
+vec3 blockShuffle(ivec2 pos, ivec2 sz) {
+    int block = max(pc.square_size, 1);
+    ivec2 base = (pos / block) * block;
+    vec2 key = vec2(base) + vec2(float(pc.historyIdx), float(pc.history_dir) * 19.0);
+    ivec2 offset = ivec2(
+        int(hash12(key + vec2(4.1, 1.7)) * float(block)),
+        int(hash12(key + vec2(2.3, 8.8)) * float(block)));
+    return sampleSource(base + offset + (pos - base), sz);
+}
+
+vec3 diagonalSlice(ivec2 pos, ivec2 sz) {
+    int block = max(pc.square_size, 1);
+    int shift = (pos.y / block) - (pos.x / block);
+    return sampleSource(pos + ivec2(shift * block, 0), sz);
+}
+
+vec3 frameBlend(ivec2 pos, ivec2 sz) {
+    if (pc.historyCount <= 0) {
+        return sampleSource(pos, sz);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp(pc.historyIdx, 0, safe - 1);
+    float a = clamp(pc.alpha, 0.0, 1.0);
+    return mix(sampleSource(pos, sz), sampleHistory(idx, pos, sz), a);
+}
+
+vec3 trailBlend(ivec2 pos, ivec2 sz) {
+    if (pc.historyCount <= 0) {
+        return sampleSource(pos, sz);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp((pc.historyIdx - 1 + safe) % safe, 0, safe - 1);
+    float fade = clamp(0.35 + 0.15 * float(pc.history_dir), 0.05, 0.95);
+    return mix(sampleSource(pos, sz), sampleHistory(idx, pos, sz), fade);
+}
+
+vec3 rowBlend(ivec2 pos, ivec2 sz) {
+    if (pc.historyCount <= 0) {
+        return sampleSource(pos, sz);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp((pos.y / max(pc.square_size, 1) + pc.historyIdx) % safe, 0, safe - 1);
+    return mix(sampleSource(pos, sz), sampleHistory(idx, pos, sz), 0.5);
+}
+
+vec3 columnBlend(ivec2 pos, ivec2 sz) {
+    if (pc.historyCount <= 0) {
+        return sampleSource(pos, sz);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp((pos.x / max(pc.square_size, 1) + pc.historyIdx) % safe, 0, safe - 1);
+    return mix(sampleSource(pos, sz), sampleHistory(idx, pos, sz), 0.5);
+}
+
+vec3 colorCycle(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    float angle = float((pos.x + pos.y + pc.historyIdx * pc.history_dir) % 360) * (PI / 180.0);
+    return hueRotate(c, angle);
+}
+
+vec3 flashInvert(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    float m = step(0.5, hash12(vec2(pos) * 0.17 + float(pc.historyIdx)));
+    return mix(c, 1.0 - c, m);
+}
+
+vec3 xorGrid(ivec2 pos, ivec2 sz) {
+    int block = max(pc.square_size, 1);
+    ivec2 origin = (pos / block) * block;
+    uvec3 a = sampleSourceU8(pos, sz);
+    uvec3 b = sampleSourceU8(origin + ivec2(pc.historyIdx, pc.history_dir), sz);
+    return toRGB((a ^ b) & uvec3(255u));
+}
+
+vec3 mirrorTrail(ivec2 pos, ivec2 sz) {
+    vec3 c = sampleSource(pos, sz);
+    vec3 mx = sampleSource(ivec2(sz.x - 1 - pos.x, pos.y), sz);
+    if (pc.historyCount <= 0) {
+        return mix(c, mx, 0.5);
+    }
+    int safe = clamp(pc.historyCount, 1, 8);
+    int idx = clamp(pc.historyIdx, 0, safe - 1);
+    vec3 h = sampleHistory(idx, pos, sz);
+    return mix(mix(c, mx, 0.5), h, 0.35);
+}
+
+vec3 modeFor(ivec2 pos, ivec2 sz) {
+    int block = max(pc.square_size, 1);
+
+    switch (pc.mode) {
+        case 0:  return blockPixelate(pos, sz, block);                          // CombinePixels / pixelation family
+        case 1:  return blockMirrorX(pos, sz, block);                           // SquareMirror / mirror family
+        case 2:  return blockMirrorY(pos, sz, block);                           // SquareMirror vertical variant
+        case 3:  return combinePixels(pos, sz);                                 // CombinePixels
+        case 4:  return historyXor(pos, sz);                                    // History XOR / ColorPositionXor
+        case 5:  return temporalBlend(pos, sz);                                 // Alpha blend family
+        case 6:  return scanlineWarp(pos, sz);                                 // Scanline / line shift family
+        case 7:  return rgbSplit(pos, sz, block);                               // RGB split / chromatic separation
+        case 8:  return sampleSource(ivec2(sz.x - 1 - pos.x, pos.y), sz);       // Horizontal mirror
+        case 9:  return sampleSource(ivec2(pos.x, sz.y - 1 - pos.y), sz);       // Vertical mirror
+        case 10: return kaleidoscope(pos, sz, 6);                               // Kaleidoscope
+        case 11: return dynamicKaleidoscope(pos, sz);                           // Kaleidoscope mirror / dynamic variant
+        case 12: return 1.0 - sampleSource(pos, sz);                            // Negate / DarkNegate
+        case 13: return posterize(sampleSource(pos, sz), 5.0);                  // Reduce colors / posterize
+        case 14: return thresholdFilter(pos, sz);                               // Threshold
+        case 15: return gammaDarken(sampleSource(pos, sz), 1.45);               // GammaDarken
+        case 16: return brightnessContrast(pos, sz);                            // Darken / contrast
+        case 17: return sepia(sampleSource(pos, sz));                           // Color shift / sepia
+        case 18: return solarize(pos, sz);                                      // Solarize / invert threshold
+        case 19: return hueRotate(sampleSource(pos, sz), float(pc.historyIdx) * 0.22); // ColorRotate
+        case 20: return sat(sampleSource(pos, sz), 1.35);                       // Saturate
+        case 21: return sat(sampleSource(pos, sz), 0.0);                        // Desaturate / grayscale
+        case 22: return boxBlur(pos, sz, 1);                                    // Blur
+        case 23: return sharpen(pos, sz);                                       // Sharpen
+        case 24: return emboss(pos, sz);                                        // Emboss
+        case 25: return sobel(pos, sz);                                         // SobelNorm
+        case 26: return edgeDetect(pos, sz);                                    // DetectEdges / Canny-style edge emphasis
+        case 27: return dilate3(pos, sz);                                       // DilateKernel
+        case 28: return erode3(pos, sz);                                        // ErodeKernel
+        case 29: return posterize(sampleSource(pos, sz), 3.0 + float(block));   // MedianBlendVariable_ColorScale
+        case 30: return wave(pos, sz);                                          // Wave / horizontal distortion
+        case 31: return ripple(pos, sz);                                        // Ripple / circular distortion
+        case 32: return twirl(pos, sz);                                         // Twirl / rotate
+        case 33: return zoomPulse(pos, sz);                                     // Zoom pulse / in-out scale
+        case 34: return crosshatch(pos, sz);                                    // Crosshatch / scanline texture
+        case 35: return noiseGrain(pos, sz);                                    // RandomPixels / grain
+        case 36: return strobeBars(pos, sz);                                    // Strobe / bar inversion
+        case 37: return scanlineXor(pos, sz);                                  // Bitwise XOR scanline variant
+        case 38: return blockShuffle(pos, sz);                                  // Block shuffle / random square family
+        case 39: return diagonalSlice(pos, sz);                                 // Diagonal lines / slice shift
+        case 40: return frameBlend(pos, sz);                                    // FrameBlend / AlphaBlendWithSource
+        case 41: return trailBlend(pos, sz);                                    // PrevFrameBlend / trails
+        case 42: return historyMedian(pos, sz);                                 // MedianBlend / history median
+        case 43: return rowBlend(pos, sz);                                      // BlendRowAlpha / row-based blend
+        case 44: return columnBlend(pos, sz);                                   // VerticalBlend / column-based blend
+        case 45: return colorCycle(pos, sz);                                    // ColorTransition / color rotation
+        case 46: return gradientRamp(luma(sampleSource(pos, sz)));              // Gradient / color map
+        case 47: return flashInvert(pos, sz);                                   // Flash / strobe invert
+        case 48: return xorGrid(pos, sz);                                       // Bitwise XOR grid / collection xor
+        case 49: return mirrorTrail(pos, sz);                                   // MirrorMedianBlend / mirror trail
+        default: return sampleSource(pos, sz);
+    }
 }
 
 void main() {
@@ -115,19 +525,6 @@ void main() {
         return;
     }
 
-    vec3 outColor = texelFetch(sourceTex, pos, 0).rgb;
-
-    if (pc.mode == 0) {
-        outColor = modeDiagPixelate(pos, sz);
-    } else if (pc.mode == 1) {
-        outColor = modeCombinePixels(pos, sz);
-    } else if (pc.mode == 2) {
-        outColor = modeHistoryXor(pos);
-    } else if (pc.mode == 3) {
-        outColor = modeTemporalBlend(pos);
-    } else if (pc.mode == 4) {
-        outColor = modeScanlineWarp(pos, sz);
-    }
-
+    vec3 outColor = modeFor(pos, sz);
     imageStore(destTex, pos, vec4(clamp(outColor, 0.0, 1.0), 1.0));
 }

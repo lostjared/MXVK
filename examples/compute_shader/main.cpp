@@ -10,6 +10,8 @@
 #include "mxwrite.hpp"
 #endif
 #include <array>
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +23,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <string_view>
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/core/cuda.hpp>
@@ -35,6 +38,58 @@
 
 static constexpr int HISTORY_SIZE = 8;
 static constexpr const char *MODE_SHADER_NAME = "acidcam_filters.spv";
+static constexpr std::array<std::string_view, 50> ACIDCAM_FILTER_MODE_NAMES = {
+    "Block Pixelate",
+    "Block Mirror X",
+    "Block Mirror Y",
+    "Combine Pixels",
+    "History XOR",
+    "Temporal Blend",
+    "Scanline Warp",
+    "RGB Split",
+    "Horizontal Mirror",
+    "Vertical Mirror",
+    "Kaleidoscope",
+    "Dynamic Kaleidoscope",
+    "Negate",
+    "Posterize",
+    "Threshold",
+    "Gamma Darken",
+    "Brightness Contrast",
+    "Sepia",
+    "Solarize",
+    "Hue Rotate",
+    "Saturate",
+    "Desaturate",
+    "Box Blur",
+    "Sharpen",
+    "Emboss",
+    "Sobel",
+    "Edge Detect",
+    "Dilate",
+    "Erode",
+    "Posterize Scale",
+    "Wave",
+    "Ripple",
+    "Twirl",
+    "Zoom Pulse",
+    "Crosshatch",
+    "Noise Grain",
+    "Strobe Bars",
+    "Scanline XOR",
+    "Block Shuffle",
+    "Diagonal Slice",
+    "Frame Blend",
+    "Trail Blend",
+    "History Median",
+    "Row Blend",
+    "Column Blend",
+    "Color Cycle",
+    "Gradient Ramp",
+    "Flash Invert",
+    "XOR Grid",
+    "Mirror Trail",
+};
 
 struct ComputePC {
     int32_t mode;
@@ -63,6 +118,7 @@ class ComputeWindow : public mxvk::VK_Window {
           encodeTune(args.encodeTune),
           encodeCodec(args.encodeCodec),
           encodeRealtime(args.encodeRealtime),
+          repeat(args.repeat),
           cameraIndex(args.camera_index) {
         recordWidth = args.width;
         recordHeight = args.height;
@@ -87,8 +143,14 @@ class ComputeWindow : public mxvk::VK_Window {
         if (usingFfCapture) {
             frameUploaded = readFfFrameToCompute();
             if (!frameUploaded && usingFile) {
-                restartFfCapture();
-                frameUploaded = readFfFrameToCompute();
+                if (repeat) {
+                    restartFfCapture();
+                    frameUploaded = readFfFrameToCompute();
+                } else {
+                    std::cout << "compute_shader: video file reached EOF, shutting down\n";
+                    exit();
+                    return;
+                }
             }
         } else
 #endif
@@ -116,22 +178,28 @@ class ComputeWindow : public mxvk::VK_Window {
                 uploadCpuFrameToCompute(frame);
                 frameUploaded = true;
             } else if (!frameUploaded && usingFile) {
-                capture.close();
-                if (capture.open(inputFilename)) {
-                    configureVideoPlaybackRate();
-                    cv::Mat restartedFrame;
-                    if (capture.readRgba(restartedFrame) && !restartedFrame.empty()) {
-                        if (!captureUploadPathLogged) {
+                if (repeat) {
+                    capture.close();
+                    if (capture.open(inputFilename)) {
+                        configureVideoPlaybackRate();
+                        cv::Mat restartedFrame;
+                        if (capture.readRgba(restartedFrame) && !restartedFrame.empty()) {
+                            if (!captureUploadPathLogged) {
 #ifdef MXVK_CUDA
-                            std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> optional CPU resize -> Vulkan staging upload\n";
+                                std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> optional CPU resize -> Vulkan staging upload\n";
 #else
-                            std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, optional CPU resize, then uploads through Vulkan staging\n";
+                                std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, optional CPU resize, then uploads through Vulkan staging\n";
 #endif
-                            captureUploadPathLogged = true;
+                                captureUploadPathLogged = true;
+                            }
+                            uploadCpuFrameToCompute(restartedFrame);
+                            frameUploaded = true;
                         }
-                        uploadCpuFrameToCompute(restartedFrame);
-                        frameUploaded = true;
                     }
+                } else {
+                    std::cout << "compute_shader: video file reached EOF, shutting down\n";
+                    exit();
+                    return;
                 }
             }
         }
@@ -172,7 +240,7 @@ class ComputeWindow : public mxvk::VK_Window {
             } else if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME &&
                        (e.key.key == SDLK_LEFT || e.key.key == SDLK_RIGHT)) {
                 const int delta = (e.key.key == SDLK_LEFT) ? -1 : 1;
-                shaderMode = (shaderMode + delta + 5) % 5;
+                shaderMode = (shaderMode + delta + 50) % 50;
                 std::cout << "Mode shader mode: " << shaderMode << "\n";
             }
         }
@@ -221,6 +289,8 @@ class ComputeWindow : public mxvk::VK_Window {
     std::string encodeTune;
     std::string encodeCodec;
     bool encodeRealtime = false;
+    bool repeat = false;
+    mxvk::Font fpsFont{};
     int cameraIndex = 0;
     int texWidth = 1920;
     int texHeight = 1080;
@@ -270,7 +340,9 @@ class ComputeWindow : public mxvk::VK_Window {
     double currentFps = 0.0;
     uint32_t fpsFrameCount = 0;
     std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
+    std::chrono::steady_clock::time_point playbackStartTime{std::chrono::steady_clock::now()};
     std::string fpsText = "FPS: --";
+    uint64_t processedVideoFrames = 0;
     bool recordingEnabled = false;
     bool recordingWarningLogged = false;
     bool processedRecordPathLogged = false;
@@ -769,6 +841,8 @@ class ComputeWindow : public mxvk::VK_Window {
             configureRecordingDefaults();
             recordingEnabled = true;
             openVideoWriter();
+            fpsFont.reset(assetRoot + "/font.ttf", 36);
+            playbackStartTime = std::chrono::steady_clock::now();
             maybeResizeWindowToSource();
 
             const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
@@ -835,6 +909,7 @@ class ComputeWindow : public mxvk::VK_Window {
     void updateFpsOverlay(bool frameUploaded) {
         if (frameUploaded) {
             ++fpsFrameCount;
+            ++processedVideoFrames;
         }
 
         const auto now = std::chrono::steady_clock::now();
@@ -846,7 +921,44 @@ class ComputeWindow : public mxvk::VK_Window {
             fpsText = std::format("FPS: {:.1f}", currentFps);
         }
 
-        printText(fpsText, 15, 15, SDL_Color{255, 255, 255, 255});
+        const auto recElapsed = now - playbackStartTime;
+        const uint64_t recTotalSeconds =
+            static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(recElapsed).count());
+        const uint64_t recHours = recTotalSeconds / 3600U;
+        const uint64_t recMinutes = (recTotalSeconds / 60U) % 60U;
+        const uint64_t recSeconds = recTotalSeconds % 60U;
+        const std::string recText = std::format("Rec: {:02}:{:02}:{:02}", recHours, recMinutes, recSeconds);
+
+        const double effectiveSourceFps = (sourceFps > 0.0) ? sourceFps : videoFps;
+        const uint64_t totalTenths = (effectiveSourceFps > 0.0)
+                                         ? static_cast<uint64_t>(std::llround((static_cast<double>(processedVideoFrames) / effectiveSourceFps) * 10.0))
+                                         : 0U;
+        const uint64_t hours = totalTenths / 36000U;
+        const uint64_t minutes = (totalTenths / 600U) % 60U;
+        const uint64_t seconds = (totalTenths / 10U) % 60U;
+        const uint64_t tenths = totalTenths % 10U;
+        const std::string timeText = std::format("Output: {:02}:{:02}:{:02}.{:01}", hours, minutes, seconds, tenths);
+        const std::string overlayText = std::format(
+            "Source FPS: {:.1f} Current FPS: {:.1f} | {} | {}",
+            sourceFps,
+            currentFps,
+            recText,
+            timeText);
+
+        printText(overlayText, 18, 18, SDL_Color{255, 240, 0, 255}, fpsFont);
+        if (!spvFiles.empty()) {
+            if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME) {
+                const int modeIndex = std::clamp(shaderMode, 0, static_cast<int>(ACIDCAM_FILTER_MODE_NAMES.size()) - 1);
+                const std::string modeText = std::format(
+                    "Mode: {} {}/{}",
+                    ACIDCAM_FILTER_MODE_NAMES[modeIndex],
+                    modeIndex + 1,
+                    ACIDCAM_FILTER_MODE_NAMES.size());
+                printText(modeText, 15, 68, SDL_Color{255, 105, 180, 255});
+            } else {
+                printText(spvFiles[currentSpvIndex], 15, 68, SDL_Color{80, 160, 255, 255});
+            }
+        }
     }
 
     [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {

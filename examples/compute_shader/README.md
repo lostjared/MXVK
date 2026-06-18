@@ -8,7 +8,7 @@ Use `--filename <file>` for video playback. If `--filename` is not provided, the
 
 - `Up` - load the previous compute shader from `index.txt`
 - `Down` - load the next compute shader from `index.txt`
-- `Left` / `Right` - change the mode of `acidcam_filters.spv`
+- `Left` / `Right` - change the 50-mode selector inside `acidcam_filters.spv`
 - `Escape` - quit
 
 ## How It Works
