@@ -12,7 +12,7 @@ PROJECT_BRIEF           = "A C++20 Vulkan rendering framework with SDL3 integrat
 OUTPUT_DIRECTORY        = docs/doxygen
 CREATE_SUBDIRS          = YES
 
-INPUT                   = README.md mxvk/include mxvk/src examples MXNetwork
+INPUT                   = README.md mxvk/include mxvk/src examples MXNetwork MXWrite
 FILE_PATTERNS           = *.md *.dox *.h *.hh *.hpp *.hxx *.inl *.c *.cc *.cpp *.cxx
 RECURSIVE               = YES
 EXCLUDE                 = build build_local .git

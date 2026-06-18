@@ -6,6 +6,18 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
+The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
+
+## Contents
+
+- [What This Project Is](#what-this-project-is)
+- [Core Dependencies](#core-dependencies)
+- [Build](#build)
+- [Command Line Arguments](#command-line-arguments)
+- [MXWrite](#mxwrite)
+- [Project Layout](#project-layout)
+- [Early Screenshots](#early-screenshots)
+
 ## What This Project Is
 
 - A static library (`mxvk`) for Vulkan-based rendering.
@@ -36,6 +48,7 @@ The root CMake configuration checks for and uses:
 - glm
 - glslc (shader compiler)
 - Optional: OpenCV (when building with `-DCV=ON`)
+- Optional: FFmpeg for MXWrite (when building with `-DWITH_MXWRITE=AUTO|ON`)
 
 ## Build
 
@@ -243,6 +256,41 @@ Current example executables:
 ### `opencv_model` (requires `-DCV=ON`)
 - Streams camera frames into a model texture.
 - Demonstrates live texture updates on 3D geometry with model rendering.
+
+## MXWrite
+
+MXWrite is the FFmpeg-based video writer library included in this repository. It is useful when you want to export RGBA frames to a video file from a C++20 application without building a separate project.
+
+### Build
+
+MXWrite is included from the root CMake build and follows the same auto-detect pattern as other optional components:
+
+```bash
+cmake -S . -B build -DWITH_MXWRITE=AUTO
+cmake --build build -j
+```
+
+Use `-DWITH_MXWRITE=ON` to require FFmpeg, or `-DWITH_MXWRITE=OFF` to skip MXWrite entirely.
+
+### Usage
+
+Consumer code includes [`MXWrite/mxwrite.hpp`](/home/jared/gpu/MXVK/MXWrite/mxwrite.hpp) and links against `mxwrite`. The public API provides `Writer` for frame-based or timestamp-based output, plus `EncodeOptions` for preset, codec, CRF, realtime, and HDR settings.
+
+```cpp
+#include "mxwrite.hpp"
+
+Writer writer;
+EncodeOptions opts;
+opts.codec = "auto";
+opts.crf = 18;
+
+if (writer.open("output.mp4", 1280, 720, 30.0f, opts)) {
+    writer.write(rgba_frame_ptr);
+    writer.close();
+}
+```
+
+When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite` target so consumers can gate MXWrite-specific code consistently.
 
 ## Project Layout
 
