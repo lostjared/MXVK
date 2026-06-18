@@ -68,6 +68,7 @@ Useful CMake options:
 - `-DVALIDATION=ON` enables Vulkan validation layers.
 - `-DDEBUG_MODE=ON` enables debug compile flags.
 - `-DWITH_CUDA=AUTO|ON|OFF` controls CUDA acceleration/interop. The default is `AUTO`, which enables CUDA when the toolkit is detected; `ON` requires CUDA; `OFF` disables it.
+- `-DWITH_MXWRITE=AUTO|ON|OFF` controls the MXWrite FFmpeg video writer build. The default is `AUTO`, which builds MXWrite when FFmpeg is detected; `ON` requires FFmpeg; `OFF` skips MXWrite.
 - `-DCV=ON` enables OpenCV-based examples and capture support.
 - `-DMIXER=ON` enables SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`).
 - `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
@@ -232,7 +233,7 @@ Current example executables:
 - Demonstrates custom post-build asset staging (font/texture/shaders) and runtime data loading.
 
 ### `compute_shader` (requires `-DCV=ON`)
-- Streams camera frames through selectable Vulkan compute shaders and displays the processed result.
+- Streams camera or video-file frames through selectable Vulkan compute shaders and displays the processed result.
 - Useful for testing OpenCV capture, GPU image processing, and shader hot selection from `data/index.txt`.
 
 ### `opencv_example` (requires `-DCV=ON`)

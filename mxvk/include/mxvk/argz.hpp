@@ -643,6 +643,7 @@ struct Arguments {
     int height = 720;          ///< Viewport height in pixels (default: 720).
     std::string path = ".";    ///< Asset search path (default: ".").
     bool fullscreen = false;   ///< Whether fullscreen mode was requested.
+    bool fast = false;         ///< Whether fast mode was requested (@c --fast).
     std::string filename;      ///< Optional input filename (@c --filename).
     std::string texture;       ///< Optional texture file path (@c --texture).
     std::string shaderPath;    ///< Optional SPV shader folder path (@c -S / @c --shader-path).
@@ -661,6 +662,7 @@ struct Arguments {
  * | -p   | --path             | Asset directory path                         |
  * | -r   | --resolution       | Resolution as WxH (e.g. 1920x1080)           |
  * | -f   | --fullscreen       | Enable fullscreen                            |
+ * |      | --fast             | Enable fast mode                             |
  * |      | --filename         | Input filename                               |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
@@ -680,6 +682,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue('R', "resolution", "Resolution WidthxHeight")
         .addOptionSingle('f', "fullscreen")
         .addOptionDouble('F', "fullscreen", "fullscreen")
+        .addOptionDouble(301, "fast", "fast")
         .addOptionDoubleValue(256, "filename", "input filename")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
@@ -693,6 +696,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     int value = 0;
     int tw = 1280, th = 720;
     bool fullscreen = false;
+    bool fast = false;
     std::string filename;
     std::string texture;
     std::string shaderPath;
@@ -745,6 +749,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             case 'F':
                 fullscreen = true;
                 break;
+            case 301:
+                fast = true;
+                break;
             case 300:
                 camera_index = atoi(arg.arg_value.c_str());
             }
@@ -765,6 +772,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.height = th;
     args.path = path;
     args.fullscreen = fullscreen;
+    args.fast = fast;
     args.filename = filename;
     args.texture = texture;
     args.shaderPath = shaderPath;

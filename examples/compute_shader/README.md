@@ -1,6 +1,8 @@
 # Compute Shader Camera Effects
 
-This example captures frames from a camera, runs them through a Vulkan compute pipeline, and displays the processed output. The shader list is read from `data/index.txt`, so the same executable can swap between several compute effects without rebuilding.
+This example captures frames from either a camera or a video file, runs them through a Vulkan compute pipeline, and displays the processed output. The shader list is read from `data/index.txt`, so the same executable can swap between several compute effects without rebuilding.
+
+Use `--filename <file>` for video playback. If `--filename` is not provided, the example falls back to `--camera <index>`.
 
 ## Controls
 

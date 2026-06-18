@@ -19,6 +19,8 @@ option(VALIDATION "Enable Vulkan validation layers" OFF)
 option(CV "Enable OpenCV video capture support (VK_Capture)" OFF)
 set(WITH_CUDA "AUTO" CACHE STRING "Enable CUDA acceleration/interop (AUTO, ON, OFF)")
 set_property(CACHE WITH_CUDA PROPERTY STRINGS AUTO ON OFF)
+set(WITH_MXWRITE "AUTO" CACHE STRING "Enable MXWrite video writer (AUTO, ON, OFF)")
+set_property(CACHE WITH_MXWRITE PROPERTY STRINGS AUTO ON OFF)
 set(WITH_MIXER "AUTO" CACHE STRING "Enable SDL3_mixer audio support (AUTO, ON, OFF)")
 set_property(CACHE WITH_MIXER PROPERTY STRINGS AUTO ON OFF)
 option(JPEG "Enable JPEG image support" OFF)
@@ -317,6 +319,9 @@ endif()
 add_subdirectory(volk)
 set(MXNETWORK_EXAMPLES OFF CACHE BOOL "MXNetwork examples ON/OFF" FORCE)
 add_subdirectory(MXNetwork)
+if(NOT WITH_MXWRITE STREQUAL "OFF")
+    add_subdirectory(MXWrite)
+endif()
 
 add_library(mxvk STATIC
     mxvk/src/mxvk.cpp

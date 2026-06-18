@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <thread>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <vector>
@@ -43,6 +44,9 @@ class ComputeWindow : public mxvk::VK_Window {
     explicit ComputeWindow(const Arguments &args)
         : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION),
           assetRoot(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path),
+          inputFilename(args.filename),
+          usingFile(!inputFilename.empty()),
+          fastMode(args.fast),
           cameraIndex(args.camera_index) {
         initComputeResources();
     }
@@ -54,6 +58,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void proc() override {
         bool frameUploaded = false;
+        if (usingFile && !fastMode) {
+            throttleVideoPlayback();
+        }
 #ifdef MXVK_CUDA
         cv::cuda::GpuMat gpuFrame;
         if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
@@ -80,6 +87,25 @@ class ComputeWindow : public mxvk::VK_Window {
                 }
                 uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
                 frameUploaded = true;
+            }
+        } else if (!frameUploaded && usingFile) {
+            capture.close();
+            if (capture.open(inputFilename)) {
+                configureVideoPlaybackRate();
+                cv::Mat restartedFrame;
+                if (capture.readRgba(restartedFrame) && !restartedFrame.empty() &&
+                    restartedFrame.cols == texWidth && restartedFrame.rows == texHeight) {
+                    if (!captureUploadPathLogged) {
+#ifdef MXVK_CUDA
+                        std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
+#else
+                        std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
+#endif
+                        captureUploadPathLogged = true;
+                    }
+                    uploadToImage(restartedFrame.ptr(), static_cast<int>(restartedFrame.step), workImg[0]);
+                    frameUploaded = true;
+                }
             }
         }
 
@@ -143,6 +169,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
     std::string assetRoot;
     mxvk::VK_Capture capture{};
+    std::string inputFilename;
+    bool usingFile = false;
+    bool fastMode = false;
     int cameraIndex = 0;
     int texWidth = 1920;
     int texHeight = 1080;
@@ -183,6 +212,9 @@ class ComputeWindow : public mxvk::VK_Window {
     int shaderMode = 0;
     float alpha = 1.0F;
     bool captureUploadPathLogged = false;
+    double videoFps = 0.0;
+    std::chrono::duration<double> videoFrameInterval{0.0};
+    std::chrono::steady_clock::time_point nextVideoFrameDeadline{std::chrono::steady_clock::now()};
     double currentFps = 0.0;
     uint32_t fpsFrameCount = 0;
     std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
@@ -225,6 +257,34 @@ class ComputeWindow : public mxvk::VK_Window {
         return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
     }
 
+    void resetVideoPlaybackClock() {
+        nextVideoFrameDeadline = std::chrono::steady_clock::now();
+    }
+
+    void configureVideoPlaybackRate() {
+        const double reportedFps = capture.get(cv::CAP_PROP_FPS);
+        videoFps = (reportedFps > 0.0) ? reportedFps : 30.0;
+        if (videoFps <= 0.0) {
+            videoFps = 30.0;
+        }
+        videoFrameInterval = std::chrono::duration<double>(1.0 / videoFps);
+        resetVideoPlaybackClock();
+        std::cout << "compute_shader: video file FPS " << videoFps
+                  << " fps, fast=" << (fastMode ? "true" : "false") << "\n";
+    }
+
+    void throttleVideoPlayback() {
+        if (!usingFile || fastMode || videoFps <= 0.0) {
+            return;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        if (nextVideoFrameDeadline > now) {
+            std::this_thread::sleep_until(nextVideoFrameDeadline);
+        }
+        nextVideoFrameDeadline += std::chrono::duration_cast<std::chrono::steady_clock::duration>(videoFrameInterval);
+    }
+
     void initComputeResources() {
         try {
             if (device == VK_NULL_HANDLE) {
@@ -235,19 +295,26 @@ class ComputeWindow : public mxvk::VK_Window {
             }
             setFont(assetRoot + "/font.ttf", 20);
 
-            if (!capture.open(cameraIndex)) {
+            if (usingFile) {
+                if (!capture.open(inputFilename)) {
+                    throw mxvk::Exception("Failed to open video file " + inputFilename);
+                }
+                configureVideoPlaybackRate();
+            } else if (!capture.open(cameraIndex)) {
                 throw mxvk::Exception("Failed to open camera " + std::to_string(cameraIndex));
             }
 
-            capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
-            capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
-            const double selectedFps = configureCameraFps();
-            std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
-                      << selectedFps << " fps\n";
+            if (!usingFile) {
+                capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
+                const double selectedFps = configureCameraFps();
+                std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
+                          << selectedFps << " fps\n";
+            }
 
             cv::Mat frame;
             if (!capture.read(frame) || frame.empty()) {
-                throw mxvk::Exception("Failed to read initial camera frame");
+                throw mxvk::Exception(usingFile ? "Failed to read initial video frame" : "Failed to read initial camera frame");
             }
 
             texWidth = frame.cols;
