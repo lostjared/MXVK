@@ -124,6 +124,14 @@ Supported options:
 	- Optional output filename for examples that export video.
 - `-c <value>`, `--crf <value>`
 	- Optional Constant Rate Factor for video export.
+- `--encode-preset <preset>`
+	- Optional MXWrite encoder preset. For software x264 use values such as `ultrafast`, `superfast`, `veryfast`, `fast`, `medium`, `slow`, or `veryslow`; for NVENC these map to NVENC preset levels.
+- `--encode-tune <tune>`
+	- Optional MXWrite encoder tune, such as `film`, `animation`, `grain`, `stillimage`, `fastdecode`, or `zerolatency`.
+- `--encode-codec <auto|software|nvenc>`
+	- Optional MXWrite encoder backend policy. `auto` prefers NVENC when available, `software` forces x264, and `nvenc` requests NVENC with fallback handled by MXWrite.
+- `--encode-realtime`
+	- Enable MXWrite low-latency/realtime encoder settings.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`

@@ -12,6 +12,10 @@
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/cudaarithm.hpp>
+#ifdef MXVK_CUDA_NPP
+#include <nppi_color_conversion.h>
+#include <nppi_data_exchange_and_initialization.h>
+#endif
 #endif
 
 namespace mxvk {
@@ -23,6 +27,32 @@ namespace mxvk {
             }
             return av_q2d(rational);
         }
+
+#if defined(MXVK_CUDA) && defined(MXVK_CUDA_NPP)
+        [[nodiscard]] NppStreamContext makeNppStreamContext(cudaStream_t stream) {
+            NppStreamContext context{};
+            context.hStream = stream;
+            cudaGetDevice(&context.nCudaDeviceId);
+
+            cudaDeviceProp properties{};
+            cudaGetDeviceProperties(&properties, context.nCudaDeviceId);
+            context.nMultiProcessorCount = properties.multiProcessorCount;
+            context.nMaxThreadsPerMultiProcessor = properties.maxThreadsPerMultiProcessor;
+            context.nMaxThreadsPerBlock = properties.maxThreadsPerBlock;
+            context.nSharedMemPerBlock = properties.sharedMemPerBlock;
+
+            cudaDeviceGetAttribute(
+                &context.nCudaDevAttrComputeCapabilityMajor,
+                cudaDevAttrComputeCapabilityMajor,
+                context.nCudaDeviceId);
+            cudaDeviceGetAttribute(
+                &context.nCudaDevAttrComputeCapabilityMinor,
+                cudaDevAttrComputeCapabilityMinor,
+                context.nCudaDeviceId);
+            cudaStreamGetFlags(stream, &context.nStreamFlags);
+            return context;
+        }
+#endif
     } // namespace
 
     VK_FF_Capture::~VK_FF_Capture() {
@@ -340,6 +370,51 @@ namespace mxvk {
                     return false;
                 }
 
+#ifdef MXVK_CUDA_NPP
+                gpuRgb.create(height, width, CV_8UC3);
+                gpuRgba.create(height, width, CV_8UC4);
+
+                const Npp8u *srcPlanes[2] = {
+                    static_cast<const Npp8u *>(gpuNv12.ptr()),
+                    static_cast<const Npp8u *>(gpuNv12.ptr(height)),
+                };
+                const NppiSize roi{width, height};
+                const NppStreamContext nppContext = makeNppStreamContext(cudaStream);
+                NppStatus nppStatus = nppiNV12ToRGB_8u_P2C3R_Ctx(
+                    srcPlanes,
+                    static_cast<int>(gpuNv12.step),
+                    static_cast<Npp8u *>(gpuRgb.ptr()),
+                    static_cast<int>(gpuRgb.step),
+                    roi,
+                    nppContext);
+                if (nppStatus != NPP_SUCCESS) {
+                    std::cout << "mxvk_ff_capture: NPP NV12 to RGB conversion failed: " << static_cast<int>(nppStatus) << "\n";
+                    return false;
+                }
+
+                const int rgbaOrder[4] = {0, 1, 2, 3};
+                nppStatus = nppiSwapChannels_8u_C3C4R_Ctx(
+                    static_cast<const Npp8u *>(gpuRgb.ptr()),
+                    static_cast<int>(gpuRgb.step),
+                    static_cast<Npp8u *>(gpuRgba.ptr()),
+                    static_cast<int>(gpuRgba.step),
+                    roi,
+                    rgbaOrder,
+                    255,
+                    nppContext);
+                if (nppStatus != NPP_SUCCESS) {
+                    std::cout << "mxvk_ff_capture: NPP RGB to RGBA conversion failed: " << static_cast<int>(nppStatus) << "\n";
+                    return false;
+                }
+
+                if (flipY) {
+                    cv::cuda::flip(gpuRgba, gpuFlippedRgba, 0, stream);
+                    rgba = gpuFlippedRgba;
+                } else {
+                    rgba = gpuRgba;
+                }
+                return true;
+#else
                 try {
                     cv::cuda::cvtColor(gpuNv12, gpuRgba, cv::COLOR_YUV2RGBA_NV12, 0, stream);
                     if (flipY) {
@@ -352,6 +427,7 @@ namespace mxvk {
                 } catch (const cv::Exception &e) {
                     std::cout << "mxvk_ff_capture: CUDA NV12 to RGBA conversion failed; falling back to host conversion: " << e.what() << "\n";
                 }
+#endif
             }
         }
 

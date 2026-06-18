@@ -639,19 +639,23 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width = 1280;          ///< Viewport width in pixels (default: 1280).
-    int height = 720;          ///< Viewport height in pixels (default: 720).
-    std::string path = ".";    ///< Asset search path (default: ".").
-    bool fullscreen = false;   ///< Whether fullscreen mode was requested.
-    bool fast = false;         ///< Whether fast mode was requested (@c --fast).
-    std::string filename;      ///< Optional input filename (@c --filename).
-    std::string output;        ///< Optional output filename (@c --output).
-    std::string crf;           ///< Optional CRF value (@c --crf).
-    std::string texture;       ///< Optional texture file path (@c --texture).
-    std::string shaderPath;    ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    int camera_index = 0;      ///< Optional camera index
-    std::string resource;      ///< Resource file
-    std::string resource_path; ///< Resource path
+    int width = 1280;            ///< Viewport width in pixels (default: 1280).
+    int height = 720;            ///< Viewport height in pixels (default: 720).
+    std::string path = ".";      ///< Asset search path (default: ".").
+    bool fullscreen = false;     ///< Whether fullscreen mode was requested.
+    bool fast = false;           ///< Whether fast mode was requested (@c --fast).
+    std::string filename;        ///< Optional input filename (@c --filename).
+    std::string output;          ///< Optional output filename (@c --output).
+    std::string crf;             ///< Optional CRF value (@c --crf).
+    std::string encodePreset;    ///< Optional encoder preset (@c --encode-preset).
+    std::string encodeTune;      ///< Optional encoder tune (@c --encode-tune).
+    std::string encodeCodec;     ///< Optional encoder codec policy (@c --encode-codec).
+    bool encodeRealtime = false; ///< Enable low-latency encoder settings (@c --encode-realtime).
+    std::string texture;         ///< Optional texture file path (@c --texture).
+    std::string shaderPath;      ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    int camera_index = 0;        ///< Optional camera index
+    std::string resource;        ///< Resource file
+    std::string resource_path;   ///< Resource path
 };
 
 /**
@@ -668,6 +672,10 @@ struct Arguments {
  * |      | --filename         | Input filename                               |
  * | -o   | --output           | Output filename                              |
  * | -c   | --crf              | Constant Rate Factor                         |
+ * |      | --encode-preset    | Encoder preset                               |
+ * |      | --encode-tune      | Encoder tune                                 |
+ * |      | --encode-codec     | Encoder codec policy                         |
+ * |      | --encode-realtime  | Enable realtime/low-latency encoding         |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  *
@@ -688,8 +696,14 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDouble(301, "fast", "fast")
         .addOptionDoubleValue(256, "filename", "input filename")
-        .addOptionDoubleValue('o', "output", "output filename")
-        .addOptionDoubleValue('c', "crf", "crf value")
+        .addOptionSingleValue('o', "output filename")
+        .addOptionDoubleValue(304, "output", "output filename")
+        .addOptionSingleValue('c', "crf value")
+        .addOptionDoubleValue(305, "crf", "crf value")
+        .addOptionDoubleValue(306, "encode-preset", "encoder preset")
+        .addOptionDoubleValue(307, "encode-tune", "encoder tune")
+        .addOptionDoubleValue(308, "encode-codec", "encoder codec policy")
+        .addOptionDouble(309, "encode-realtime", "encoder realtime mode")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
@@ -706,6 +720,10 @@ inline Arguments proc_args(int &argc, char **argv) {
     std::string filename;
     std::string output;
     std::string crf;
+    std::string encodePreset;
+    std::string encodeTune;
+    std::string encodeCodec;
+    bool encodeRealtime = false;
     std::string texture;
     std::string shaderPath;
     int camera_index = 0;
@@ -724,10 +742,24 @@ inline Arguments proc_args(int &argc, char **argv) {
                 filename = arg.arg_value;
                 break;
             case 'o':
+            case 304:
                 output = arg.arg_value;
                 break;
             case 'c':
+            case 305:
                 crf = arg.arg_value;
+                break;
+            case 306:
+                encodePreset = arg.arg_value;
+                break;
+            case 307:
+                encodeTune = arg.arg_value;
+                break;
+            case 308:
+                encodeCodec = arg.arg_value;
+                break;
+            case 309:
+                encodeRealtime = true;
                 break;
             case 257:
                 texture = arg.arg_value;
@@ -790,6 +822,10 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.filename = filename;
     args.output = output;
     args.crf = crf;
+    args.encodePreset = encodePreset;
+    args.encodeTune = encodeTune;
+    args.encodeCodec = encodeCodec;
+    args.encodeRealtime = encodeRealtime;
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.camera_index = camera_index;

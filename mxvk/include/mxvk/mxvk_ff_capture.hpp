@@ -108,6 +108,7 @@ namespace mxvk {
         bool hardwareDecode = false;
 #ifdef MXVK_CUDA
         cv::cuda::GpuMat gpuNv12{};
+        cv::cuda::GpuMat gpuRgb{};
         cv::cuda::GpuMat gpuRgba{};
         cv::cuda::GpuMat gpuFlippedRgba{};
 #endif

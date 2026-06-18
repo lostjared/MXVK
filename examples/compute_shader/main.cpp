@@ -55,6 +55,10 @@ class ComputeWindow : public mxvk::VK_Window {
           fastMode(args.fast),
           outputFilename(args.output),
           outputCrf(args.crf),
+          encodePreset(args.encodePreset),
+          encodeTune(args.encodeTune),
+          encodeCodec(args.encodeCodec),
+          encodeRealtime(args.encodeRealtime),
           cameraIndex(args.camera_index) {
         initComputeResources();
     }
@@ -89,9 +93,6 @@ class ComputeWindow : public mxvk::VK_Window {
             if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
                 if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
                     frameUploaded = uploadGpuToImage(gpuFrame, capture.cudaStream(), workImg[0]);
-                    if (frameUploaded) {
-                        recordGpuFrame(gpuFrame);
-                    }
                     if (frameUploaded && !captureUploadPathLogged) {
                         std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
                         captureUploadPathLogged = true;
@@ -109,7 +110,6 @@ class ComputeWindow : public mxvk::VK_Window {
 #endif
                         captureUploadPathLogged = true;
                     }
-                    recordFrame(frame);
                     uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
                     frameUploaded = true;
                 }
@@ -128,7 +128,6 @@ class ComputeWindow : public mxvk::VK_Window {
 #endif
                             captureUploadPathLogged = true;
                         }
-                        recordFrame(restartedFrame);
                         uploadToImage(restartedFrame.ptr(), static_cast<int>(restartedFrame.step), workImg[0]);
                         frameUploaded = true;
                     }
@@ -139,6 +138,7 @@ class ComputeWindow : public mxvk::VK_Window {
         if (frameUploaded) {
             tickAnimState();
             runComputeFrame();
+            recordProcessedFrame();
         }
         updateFpsOverlay(frameUploaded);
     }
@@ -210,6 +210,10 @@ class ComputeWindow : public mxvk::VK_Window {
     bool fastMode = false;
     std::string outputFilename;
     std::string outputCrf;
+    std::string encodePreset;
+    std::string encodeTune;
+    std::string encodeCodec;
+    bool encodeRealtime = false;
     int cameraIndex = 0;
     int texWidth = 1920;
     int texHeight = 1080;
@@ -222,6 +226,8 @@ class ComputeWindow : public mxvk::VK_Window {
 
     VkBuffer stagingBuf = VK_NULL_HANDLE;
     VkDeviceMemory stagingMem = VK_NULL_HANDLE;
+    VkBuffer readbackBuf = VK_NULL_HANDLE;
+    VkDeviceMemory readbackMem = VK_NULL_HANDLE;
 
     VkDescriptorSetLayout compDSLayout = VK_NULL_HANDLE;
     VkPipelineLayout compPipeLayout = VK_NULL_HANDLE;
@@ -260,7 +266,12 @@ class ComputeWindow : public mxvk::VK_Window {
     std::string fpsText = "FPS: --";
     bool recordingEnabled = false;
     bool recordingWarningLogged = false;
+    bool processedRecordPathLogged = false;
     std::vector<uint8_t> recordScratch{};
+#ifdef MXVK_CUDA
+    cv::cuda::Stream processedRecordStream{};
+    cv::cuda::GpuMat processedRecordGpuFrame{};
+#endif
 #if defined(MXWRITE_ENABLED)
     Writer videoWriter{};
     bool videoWriterOpen = false;
@@ -364,7 +375,6 @@ class ComputeWindow : public mxvk::VK_Window {
                         std::cout << "compute_shader: FFmpeg CUDA path active: NVDEC/CUDA decode -> CUDA NV12/RGBA conversion -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no CPU download)\n";
                         captureUploadPathLogged = true;
                     }
-                    recordGpuFrame(gpuFrame);
                     return true;
                 }
 
@@ -376,7 +386,6 @@ class ComputeWindow : public mxvk::VK_Window {
                         std::cout << "compute_shader: FFmpeg CUDA decode active, Vulkan CUDA interop unavailable; downloading RGBA for staging upload\n";
                         captureUploadPathLogged = true;
                     }
-                    recordFrame(cpuFrame);
                     uploadToImage(cpuFrame.ptr(), static_cast<int>(cpuFrame.step), workImg[0]);
                     return true;
                 }
@@ -395,7 +404,6 @@ class ComputeWindow : public mxvk::VK_Window {
             std::cout << "compute_shader: FFmpeg capture path active: decoded RGBA -> Vulkan staging upload\n";
             captureUploadPathLogged = true;
         }
-        recordFrame(ffFrameRgba.data(), frameWidth, frameHeight, ffFramePitch);
         uploadToImage(ffFrameRgba.data(), ffFramePitch, workImg[0]);
         return true;
     }
@@ -411,6 +419,18 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
 #if defined(MXWRITE_ENABLED)
+    [[nodiscard]] int parseCrf() const {
+        try {
+            size_t parsedChars = 0;
+            const int value = std::stoi(outputCrf, &parsedChars);
+            if (parsedChars == outputCrf.size() && value >= 0 && value <= 51) {
+                return value;
+            }
+        } catch (const std::exception &) {
+        }
+        throw mxvk::Exception("compute_shader: invalid CRF '" + outputCrf + "'; expected integer 0..51");
+    }
+
     void openVideoWriter() {
         if (videoWriterOpen) {
             return;
@@ -421,12 +441,29 @@ class ComputeWindow : public mxvk::VK_Window {
         if (sourceFps <= 0.0) {
             sourceFps = 30.0;
         }
-        if (!videoWriter.open(outputFilename, texWidth, texHeight, static_cast<float>(sourceFps), outputCrf.c_str())) {
+        EncodeOptions encodeOptions{};
+        encodeOptions.crf = parseCrf();
+        if (!encodePreset.empty()) {
+            encodeOptions.preset = encodePreset;
+        }
+        if (!encodeTune.empty()) {
+            encodeOptions.tune = encodeTune;
+        }
+        if (!encodeCodec.empty()) {
+            encodeOptions.codec = encodeCodec;
+        }
+        encodeOptions.realtime = encodeRealtime;
+
+        if (!videoWriter.open(outputFilename, texWidth, texHeight, static_cast<float>(sourceFps), encodeOptions)) {
             throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
         }
         videoWriterOpen = true;
         std::cout << "compute_shader: recording to " << outputFilename << " at " << sourceFps
-                  << " fps with crf " << outputCrf << "\n";
+                  << " fps with crf " << encodeOptions.crf
+                  << ", codec=" << encodeOptions.codec
+                  << ", preset=" << encodeOptions.preset
+                  << ", tune=" << (encodeOptions.tune.empty() ? "none" : encodeOptions.tune)
+                  << ", realtime=" << (encodeOptions.realtime ? "true" : "false") << "\n";
     }
 
     void recordFrame(const cv::Mat &frame) {
@@ -493,6 +530,123 @@ class ComputeWindow : public mxvk::VK_Window {
     void recordGpuFrame(cv::cuda::GpuMat &) {}
 #endif
 #endif
+
+#ifdef MXVK_CUDA
+    bool recordProcessedFrameCuda() {
+        if (!recordingEnabled || !ensureCudaInterop(outImg)) {
+            return false;
+        }
+
+        const VkCommandBuffer cmd = beginSingleTimeCommands();
+        transitionImageLayout(
+            cmd,
+            outImg.image,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT);
+        endSingleTimeCommands(cmd);
+
+        processedRecordGpuFrame.create(texHeight, texWidth, CV_8UC4);
+        cudaStream_t cudaStream = mxvk::cuda_stream_handle(processedRecordStream);
+        cudaError_t cudaResult = cudaMemcpy2DFromArrayAsync(
+            processedRecordGpuFrame.ptr(),
+            processedRecordGpuFrame.step,
+            outImg.cudaArray,
+            0,
+            0,
+            static_cast<size_t>(texWidth) * 4U,
+            static_cast<size_t>(texHeight),
+            cudaMemcpyDeviceToDevice,
+            cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << "compute_shader: CUDA processed-frame readback failed: " << cudaGetErrorString(cudaResult) << "\n";
+            return false;
+        }
+
+        cudaResult = cudaStreamSynchronize(cudaStream);
+        if (cudaResult != cudaSuccess) {
+            std::cout << "compute_shader: CUDA processed-frame readback sync failed: " << cudaGetErrorString(cudaResult) << "\n";
+            return false;
+        }
+
+        if (!processedRecordPathLogged) {
+            std::cout << "compute_shader: processed recording path active: Vulkan compute output image -> CUDA array -> RGBA GpuMat -> MXWrite"
+#if defined(MXWRITE_HAS_CUDA_COPY)
+                      << " CUDA ingestion when hardware encode is active"
+#else
+                      << " CPU fallback when MXWrite CUDA ingestion is unavailable"
+#endif
+                      << "\n";
+            processedRecordPathLogged = true;
+        }
+        recordGpuFrame(processedRecordGpuFrame);
+        return true;
+    }
+#endif
+
+    void recordProcessedFrame() {
+        if (!recordingEnabled || readbackBuf == VK_NULL_HANDLE || readbackMem == VK_NULL_HANDLE) {
+            return;
+        }
+
+#ifdef MXVK_CUDA
+        if (recordProcessedFrameCuda()) {
+            return;
+        }
+#endif
+
+        const int tightPitch = texWidth * 4;
+        const VkDeviceSize bytes = static_cast<VkDeviceSize>(tightPitch) * static_cast<VkDeviceSize>(texHeight);
+        const VkCommandBuffer cmd = beginSingleTimeCommands();
+
+        transitionImageLayout(
+            cmd,
+            outImg.image,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_READ_BIT);
+
+        VkBufferImageCopy2 region{};
+        region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1};
+
+        VkCopyImageToBufferInfo2 copyInfo{};
+        copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2;
+        copyInfo.srcImage = outImg.image;
+        copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        copyInfo.dstBuffer = readbackBuf;
+        copyInfo.regionCount = 1;
+        copyInfo.pRegions = &region;
+        vkCmdCopyImageToBuffer2(cmd, &copyInfo);
+
+        transitionImageLayout(
+            cmd,
+            outImg.image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            VK_ACCESS_2_TRANSFER_READ_BIT,
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+
+        endSingleTimeCommands(cmd);
+
+        void *mapped = nullptr;
+        VK_CHECK_RESULT(vkMapMemory(device, readbackMem, 0, bytes, 0, &mapped));
+        if (!processedRecordPathLogged) {
+            std::cout << "compute_shader: processed recording path active: Vulkan compute output image -> readback buffer -> MXWrite\n";
+            processedRecordPathLogged = true;
+        }
+        recordFrame(static_cast<const uint8_t *>(mapped), texWidth, texHeight, tightPitch);
+        vkUnmapMemory(device, readbackMem);
+    }
 
     void throttleVideoPlayback() {
         if (!usingFile || fastMode || videoFps <= 0.0) {
@@ -565,6 +719,12 @@ class ComputeWindow : public mxvk::VK_Window {
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 stagingBuf,
                 stagingMem);
+            createBuffer(
+                imgBytes,
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                readbackBuf,
+                readbackMem);
 
             {
                 const VkCommandBuffer cmd = beginSingleTimeCommands();
@@ -577,7 +737,11 @@ class ComputeWindow : public mxvk::VK_Window {
                 for (ComputeImage &img : histImg) {
                     allocCImg(img, cmd);
                 }
+#ifdef MXVK_CUDA
+                allocCImg(outImg, cmd, true);
+#else
                 allocCImg(outImg, cmd);
+#endif
                 endSingleTimeCommands(cmd);
             }
 
@@ -1951,6 +2115,14 @@ class ComputeWindow : public mxvk::VK_Window {
         if (stagingMem != VK_NULL_HANDLE) {
             vkFreeMemory(device, stagingMem, nullptr);
             stagingMem = VK_NULL_HANDLE;
+        }
+        if (readbackBuf != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, readbackBuf, nullptr);
+            readbackBuf = VK_NULL_HANDLE;
+        }
+        if (readbackMem != VK_NULL_HANDLE) {
+            vkFreeMemory(device, readbackMem, nullptr);
+            readbackMem = VK_NULL_HANDLE;
         }
     }
 };
