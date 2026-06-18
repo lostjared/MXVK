@@ -116,6 +116,7 @@ Supported options:
 	- Asset root path (defaults to `.` when omitted).
 - `-r <WxH>`, `--resolution <WxH>`
 	- Window resolution, e.g. `-r 1280x720`.
+	- For `compute_shader`, this also sets the compute canvas and recorded video size; source frames are scaled into that canvas before shader processing. When omitted for file playback, the window and compute canvas use the video frame size unless fullscreen is enabled.
 - `-f`, `--fullscreen`
 	- Launch in fullscreen mode.
 - `--filename <file>`

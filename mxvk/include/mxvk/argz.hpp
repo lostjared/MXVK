@@ -639,23 +639,24 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width = 1280;            ///< Viewport width in pixels (default: 1280).
-    int height = 720;            ///< Viewport height in pixels (default: 720).
-    std::string path = ".";      ///< Asset search path (default: ".").
-    bool fullscreen = false;     ///< Whether fullscreen mode was requested.
-    bool fast = false;           ///< Whether fast mode was requested (@c --fast).
-    std::string filename;        ///< Optional input filename (@c --filename).
-    std::string output;          ///< Optional output filename (@c --output).
-    std::string crf;             ///< Optional CRF value (@c --crf).
-    std::string encodePreset;    ///< Optional encoder preset (@c --encode-preset).
-    std::string encodeTune;      ///< Optional encoder tune (@c --encode-tune).
-    std::string encodeCodec;     ///< Optional encoder codec policy (@c --encode-codec).
-    bool encodeRealtime = false; ///< Enable low-latency encoder settings (@c --encode-realtime).
-    std::string texture;         ///< Optional texture file path (@c --texture).
-    std::string shaderPath;      ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    int camera_index = 0;        ///< Optional camera index
-    std::string resource;        ///< Resource file
-    std::string resource_path;   ///< Resource path
+    int width = 1280;                 ///< Viewport width in pixels (default: 1280).
+    int height = 720;                 ///< Viewport height in pixels (default: 720).
+    bool resolutionSpecified = false; ///< Whether -r/--resolution was provided.
+    std::string path = ".";           ///< Asset search path (default: ".").
+    bool fullscreen = false;          ///< Whether fullscreen mode was requested.
+    bool fast = false;                ///< Whether fast mode was requested (@c --fast).
+    std::string filename;             ///< Optional input filename (@c --filename).
+    std::string output;               ///< Optional output filename (@c --output).
+    std::string crf;                  ///< Optional CRF value (@c --crf).
+    std::string encodePreset;         ///< Optional encoder preset (@c --encode-preset).
+    std::string encodeTune;           ///< Optional encoder tune (@c --encode-tune).
+    std::string encodeCodec;          ///< Optional encoder codec policy (@c --encode-codec).
+    bool encodeRealtime = false;      ///< Enable low-latency encoder settings (@c --encode-realtime).
+    std::string texture;              ///< Optional texture file path (@c --texture).
+    std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    int camera_index = 0;             ///< Optional camera index
+    std::string resource;             ///< Resource file
+    std::string resource_path;        ///< Resource path
 };
 
 /**
@@ -717,6 +718,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     int tw = 1280, th = 720;
     bool fullscreen = false;
     bool fast = false;
+    bool resolutionSpecified = false;
     std::string filename;
     std::string output;
     std::string crf;
@@ -790,6 +792,7 @@ inline Arguments proc_args(int &argc, char **argv) {
                 right = arg.arg_value.substr(pos + 1);
                 tw = atoi(left.c_str());
                 th = atoi(right.c_str());
+                resolutionSpecified = true;
             } break;
             case 'f':
             case 'F':
@@ -816,6 +819,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     }
     args.width = tw;
     args.height = th;
+    args.resolutionSpecified = resolutionSpecified;
     args.path = path;
     args.fullscreen = fullscreen;
     args.fast = fast;

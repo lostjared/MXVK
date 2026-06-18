@@ -24,6 +24,8 @@
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/core/cuda.hpp>
+#include <opencv2/cudaimgproc.hpp>
+#include <opencv2/cudawarping.hpp>
 #include <unistd.h>
 #endif
 
@@ -53,6 +55,8 @@ class ComputeWindow : public mxvk::VK_Window {
           inputFilename(args.filename),
           usingFile(!inputFilename.empty()),
           fastMode(args.fast),
+          explicitResolution(args.resolutionSpecified),
+          fullscreenMode(args.fullscreen),
           outputFilename(args.output),
           outputCrf(args.crf),
           encodePreset(args.encodePreset),
@@ -60,6 +64,8 @@ class ComputeWindow : public mxvk::VK_Window {
           encodeCodec(args.encodeCodec),
           encodeRealtime(args.encodeRealtime),
           cameraIndex(args.camera_index) {
+        recordWidth = args.width;
+        recordHeight = args.height;
         initComputeResources();
     }
 
@@ -91,44 +97,39 @@ class ComputeWindow : public mxvk::VK_Window {
 #ifdef MXVK_CUDA
             cv::cuda::GpuMat gpuFrame;
             if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
-                if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
-                    frameUploaded = uploadGpuToImage(gpuFrame, capture.cudaStream(), workImg[0]);
-                    if (frameUploaded && !captureUploadPathLogged) {
-                        std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
-                        captureUploadPathLogged = true;
-                    }
+                frameUploaded = uploadGpuFrameToCompute(gpuFrame, capture.cudaStream());
+                if (frameUploaded && !captureUploadPathLogged) {
+                    std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> optional CUDA resize -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
+                    captureUploadPathLogged = true;
                 }
             }
 #endif
             if (!frameUploaded && capture.readRgba(frame) && !frame.empty()) {
-                if (frame.cols == texWidth && frame.rows == texHeight) {
-                    if (!captureUploadPathLogged) {
+                if (!captureUploadPathLogged) {
 #ifdef MXVK_CUDA
-                        std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
+                    std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> optional CPU resize -> Vulkan staging upload\n";
 #else
-                        std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
+                    std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, optional CPU resize, then uploads through Vulkan staging\n";
 #endif
-                        captureUploadPathLogged = true;
-                    }
-                    uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
-                    frameUploaded = true;
+                    captureUploadPathLogged = true;
                 }
+                uploadCpuFrameToCompute(frame);
+                frameUploaded = true;
             } else if (!frameUploaded && usingFile) {
                 capture.close();
                 if (capture.open(inputFilename)) {
                     configureVideoPlaybackRate();
                     cv::Mat restartedFrame;
-                    if (capture.readRgba(restartedFrame) && !restartedFrame.empty() &&
-                        restartedFrame.cols == texWidth && restartedFrame.rows == texHeight) {
+                    if (capture.readRgba(restartedFrame) && !restartedFrame.empty()) {
                         if (!captureUploadPathLogged) {
 #ifdef MXVK_CUDA
-                            std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
+                            std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> optional CPU resize -> Vulkan staging upload\n";
 #else
-                            std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
+                            std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, optional CPU resize, then uploads through Vulkan staging\n";
 #endif
                             captureUploadPathLogged = true;
                         }
-                        uploadToImage(restartedFrame.ptr(), static_cast<int>(restartedFrame.step), workImg[0]);
+                        uploadCpuFrameToCompute(restartedFrame);
                         frameUploaded = true;
                     }
                 }
@@ -208,6 +209,12 @@ class ComputeWindow : public mxvk::VK_Window {
     std::string inputFilename;
     bool usingFile = false;
     bool fastMode = false;
+    bool explicitResolution = false;
+    bool fullscreenMode = false;
+    int recordWidth = 1920;
+    int recordHeight = 1080;
+    int sourceWidth = 1920;
+    int sourceHeight = 1080;
     std::string outputFilename;
     std::string outputCrf;
     std::string encodePreset;
@@ -271,6 +278,7 @@ class ComputeWindow : public mxvk::VK_Window {
 #ifdef MXVK_CUDA
     cv::cuda::Stream processedRecordStream{};
     cv::cuda::GpuMat processedRecordGpuFrame{};
+    cv::cuda::GpuMat computeInputGpuFrame{};
 #endif
 #if defined(MXWRITE_ENABLED)
     Writer videoWriter{};
@@ -354,6 +362,35 @@ class ComputeWindow : public mxvk::VK_Window {
         return capture.open(inputFilename);
     }
 
+    void uploadCpuFrameToCompute(const cv::Mat &frame) {
+        if (frame.empty()) {
+            return;
+        }
+        if (frame.cols == texWidth && frame.rows == texHeight) {
+            uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
+            return;
+        }
+
+        cv::Mat resizedFrame;
+        cv::resize(frame, resizedFrame, cv::Size(texWidth, texHeight), 0.0, 0.0, cv::INTER_LINEAR);
+        uploadToImage(resizedFrame.ptr(), static_cast<int>(resizedFrame.step), workImg[0]);
+    }
+
+#ifdef MXVK_CUDA
+    bool uploadGpuFrameToCompute(const cv::cuda::GpuMat &gpuFrame, cv::cuda::Stream &stream) {
+        if (gpuFrame.empty()) {
+            return false;
+        }
+        if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
+            return uploadGpuToImage(gpuFrame, stream, workImg[0]);
+        }
+
+        cv::cuda::resize(gpuFrame, computeInputGpuFrame, cv::Size(texWidth, texHeight), 0.0, 0.0, cv::INTER_LINEAR, stream);
+        stream.waitForCompletion();
+        return uploadGpuToImage(computeInputGpuFrame, stream, workImg[0]);
+    }
+#endif
+
 #if defined(MXVK_WITH_FFMPEG_CAPTURE)
     void restartFfCapture() {
         ffCapture.close();
@@ -367,12 +404,11 @@ class ComputeWindow : public mxvk::VK_Window {
 #ifdef MXVK_CUDA
         if (ffCapture.using_hardware_decode()) {
             cv::cuda::GpuMat gpuFrame;
-            if (ffCapture.readGpuRgba(gpuFrame, ffCudaStream) && !gpuFrame.empty() &&
-                gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
-                const bool uploadedWithInterop = uploadGpuToImage(gpuFrame, ffCudaStream, workImg[0]);
+            if (ffCapture.readGpuRgba(gpuFrame, ffCudaStream) && !gpuFrame.empty()) {
+                const bool uploadedWithInterop = uploadGpuFrameToCompute(gpuFrame, ffCudaStream);
                 if (uploadedWithInterop) {
                     if (!captureUploadPathLogged) {
-                        std::cout << "compute_shader: FFmpeg CUDA path active: NVDEC/CUDA decode -> CUDA NV12/RGBA conversion -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no CPU download)\n";
+                        std::cout << "compute_shader: FFmpeg CUDA path active: NVDEC/CUDA decode -> CUDA NV12/RGBA conversion -> optional CUDA resize -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no CPU download)\n";
                         captureUploadPathLogged = true;
                     }
                     return true;
@@ -383,10 +419,10 @@ class ComputeWindow : public mxvk::VK_Window {
                 ffCudaStream.waitForCompletion();
                 if (!cpuFrame.empty()) {
                     if (!captureUploadPathLogged) {
-                        std::cout << "compute_shader: FFmpeg CUDA decode active, Vulkan CUDA interop unavailable; downloading RGBA for staging upload\n";
+                        std::cout << "compute_shader: FFmpeg CUDA decode active, Vulkan CUDA interop unavailable; downloading RGBA for optional CPU resize and staging upload\n";
                         captureUploadPathLogged = true;
                     }
-                    uploadToImage(cpuFrame.ptr(), static_cast<int>(cpuFrame.step), workImg[0]);
+                    uploadCpuFrameToCompute(cpuFrame);
                     return true;
                 }
             }
@@ -397,14 +433,15 @@ class ComputeWindow : public mxvk::VK_Window {
         if (!ffCapture.readRgba(ffFrameRgba, frameWidth, frameHeight, ffFramePitch) || ffFrameRgba.empty()) {
             return false;
         }
-        if (frameWidth != texWidth || frameHeight != texHeight) {
+        if (frameWidth <= 0 || frameHeight <= 0) {
             return false;
         }
         if (!captureUploadPathLogged) {
-            std::cout << "compute_shader: FFmpeg capture path active: decoded RGBA -> Vulkan staging upload\n";
+            std::cout << "compute_shader: FFmpeg capture path active: decoded RGBA -> optional CPU resize -> Vulkan staging upload\n";
             captureUploadPathLogged = true;
         }
-        uploadToImage(ffFrameRgba.data(), ffFramePitch, workImg[0]);
+        cv::Mat frame(frameHeight, frameWidth, CV_8UC4, ffFrameRgba.data(), static_cast<size_t>(ffFramePitch));
+        uploadCpuFrameToCompute(frame);
         return true;
     }
 #endif
@@ -415,6 +452,14 @@ class ComputeWindow : public mxvk::VK_Window {
         }
         if (outputCrf.empty()) {
             outputCrf = "24";
+        }
+    }
+
+    void maybeResizeWindowToSource() {
+        if (usingFile && !explicitResolution && !fullscreenMode && getSDLWindow() != nullptr) {
+            SDL_SetWindowSize(getSDLWindow(), texWidth, texHeight);
+            std::cout << "compute_shader: window resized to source frame size " << texWidth << "x" << texHeight
+                      << " (pass -r/--resolution to override)\n";
         }
     }
 
@@ -454,7 +499,7 @@ class ComputeWindow : public mxvk::VK_Window {
         }
         encodeOptions.realtime = encodeRealtime;
 
-        if (!videoWriter.open(outputFilename, texWidth, texHeight, static_cast<float>(sourceFps), encodeOptions)) {
+        if (!videoWriter.open(outputFilename, recordWidth, recordHeight, static_cast<float>(sourceFps), encodeOptions)) {
             throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
         }
         videoWriterOpen = true;
@@ -473,11 +518,11 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void recordFrame(const uint8_t *data, int width, int height, int pitch) {
-        if (!videoWriterOpen || data == nullptr || width != texWidth || height != texHeight) {
+        if (!videoWriterOpen || data == nullptr || width != recordWidth || height != recordHeight) {
             return;
         }
 
-        const int tightPitch = texWidth * 4;
+        const int tightPitch = recordWidth * 4;
         if (pitch == tightPitch) {
             videoWriter.write(const_cast<uint8_t *>(data));
             return;
@@ -487,11 +532,12 @@ class ComputeWindow : public mxvk::VK_Window {
             return;
         }
 
-        recordScratch.resize(static_cast<size_t>(tightPitch) * static_cast<size_t>(texHeight));
-        for (int row = 0; row < texHeight; ++row) {
+        const int recordTightPitch = recordWidth * 4;
+        recordScratch.resize(static_cast<size_t>(recordTightPitch) * static_cast<size_t>(recordHeight));
+        for (int row = 0; row < recordHeight; ++row) {
             std::memcpy(recordScratch.data() + static_cast<size_t>(row) * static_cast<size_t>(tightPitch),
                         data + static_cast<size_t>(row) * static_cast<size_t>(pitch),
-                        static_cast<size_t>(tightPitch));
+                        static_cast<size_t>(recordTightPitch));
         }
         videoWriter.write(recordScratch.data());
     }
@@ -640,11 +686,12 @@ class ComputeWindow : public mxvk::VK_Window {
 
         void *mapped = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, readbackMem, 0, bytes, 0, &mapped));
+        cv::Mat sourceFrame(texHeight, texWidth, CV_8UC4, mapped, tightPitch);
         if (!processedRecordPathLogged) {
             std::cout << "compute_shader: processed recording path active: Vulkan compute output image -> readback buffer -> MXWrite\n";
             processedRecordPathLogged = true;
         }
-        recordFrame(static_cast<const uint8_t *>(mapped), texWidth, texHeight, tightPitch);
+        recordFrame(sourceFrame);
         vkUnmapMemory(device, readbackMem);
     }
 
@@ -690,9 +737,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
 #if defined(MXVK_WITH_FFMPEG_CAPTURE)
             if (usingFfCapture) {
-                texWidth = ffCapture.width();
-                texHeight = ffCapture.height();
-                if (texWidth <= 0 || texHeight <= 0) {
+                sourceWidth = ffCapture.width();
+                sourceHeight = ffCapture.height();
+                if (sourceWidth <= 0 || sourceHeight <= 0) {
                     throw mxvk::Exception("Failed to query FFmpeg video dimensions");
                 }
             } else
@@ -703,13 +750,26 @@ class ComputeWindow : public mxvk::VK_Window {
                     throw mxvk::Exception(usingFile ? "Failed to read initial video frame" : "Failed to read initial camera frame");
                 }
 
-                texWidth = frame.cols;
-                texHeight = frame.rows;
+                sourceWidth = frame.cols;
+                sourceHeight = frame.rows;
+            }
+
+            if (explicitResolution) {
+                texWidth = recordWidth;
+                texHeight = recordHeight;
+                std::cout << "compute_shader: compute canvas set from explicit resolution " << texWidth << "x" << texHeight
+                          << "; source frames are " << sourceWidth << "x" << sourceHeight << "\n";
+            } else {
+                texWidth = sourceWidth;
+                texHeight = sourceHeight;
+                recordWidth = texWidth;
+                recordHeight = texHeight;
             }
 
             configureRecordingDefaults();
             recordingEnabled = true;
             openVideoWriter();
+            maybeResizeWindowToSource();
 
             const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
 
