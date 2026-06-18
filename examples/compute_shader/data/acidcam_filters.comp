@@ -1,0 +1,133 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, rgba8) uniform image2D destTex;
+layout(set = 0, binding = 1) uniform sampler2D sourceTex;
+layout(set = 0, binding = 2) uniform sampler2D historyTex[8];
+
+layout(push_constant) uniform PC {
+    int mode;
+    int historyCount;
+    int historyIdx;
+    int square_size;
+    int history_dir;
+} pc;
+
+const float INV_255 = 1.0 / 255.0;
+
+uvec3 toU8(vec3 c) {
+    return uvec3(clamp(c * 255.0 + 0.5, 0.0, 255.0));
+}
+
+vec3 toRGB(uvec3 c) {
+    return vec3(c) * INV_255;
+}
+
+uvec3 fetchSourceU8(ivec2 p) {
+    return toU8(texelFetch(sourceTex, p, 0).rgb);
+}
+
+uvec3 fetchHistoryU8(int idx, ivec2 p) {
+    return toU8(texelFetch(historyTex[idx], p, 0).rgb);
+}
+
+uvec3 mul8(uvec3 value, int scale) {
+    uint s = uint(max(scale, 1));
+    return (value * s) & uvec3(255u);
+}
+
+uvec3 avgHistoryU8(ivec2 p, int count) {
+    uvec3 sum = uvec3(0);
+    int safeCount = clamp(count, 0, 8);
+    for (int i = 0; i < 8; ++i) {
+        if (i >= safeCount) {
+            break;
+        }
+        sum += fetchHistoryU8(i, p);
+    }
+    if (safeCount <= 0) {
+        return uvec3(0);
+    }
+    return sum / uint(safeCount);
+}
+
+vec3 modeDiagPixelate(ivec2 pos, ivec2 imgSize) {
+    int block = max(pc.square_size, 1);
+    ivec2 blockOrigin = (pos / block) * block;
+    ivec2 samplePos = clamp(blockOrigin, ivec2(0), imgSize - ivec2(1));
+    vec3 cur = texelFetch(sourceTex, pos, 0).rgb;
+    vec3 blockColor = texelFetch(sourceTex, samplePos, 0).rgb;
+    return mix(cur, blockColor, 0.5);
+}
+
+vec3 modeCombinePixels(ivec2 pos, ivec2 imgSize) {
+    uvec3 cur = fetchSourceU8(pos);
+    ivec2 p0 = clamp(pos + ivec2(1, 0), ivec2(0), imgSize - ivec2(1));
+    ivec2 p1 = clamp(pos + ivec2(0, 1), ivec2(0), imgSize - ivec2(1));
+    ivec2 p2 = clamp(pos + ivec2(1, 1), ivec2(0), imgSize - ivec2(1));
+    uvec3 neighborSum = fetchSourceU8(p0) + fetchSourceU8(p1) + fetchSourceU8(p2);
+    uvec3 xored = cur ^ neighborSum;
+    uvec3 scaled = mul8(xored, max(pc.square_size, 1));
+    uvec3 blended = (scaled >> 1) + (cur >> 1);
+    return toRGB(blended);
+}
+
+vec3 modeHistoryXor(ivec2 pos) {
+    uvec3 cur = fetchSourceU8(pos);
+    uvec3 hist = avgHistoryU8(pos, pc.historyCount);
+    uvec3 xored = cur ^ hist;
+    uvec3 scaled = mul8(xored, max(pc.square_size, 1));
+    return toRGB(scaled);
+}
+
+vec3 modeTemporalBlend(ivec2 pos) {
+    vec3 cur = texelFetch(sourceTex, pos, 0).rgb;
+    if (pc.historyCount <= 0) {
+        return cur;
+    }
+    int safeCount = clamp(pc.historyCount, 1, 8);
+    int idx = clamp(pc.historyIdx, 0, safeCount - 1);
+    vec3 hist = texelFetch(historyTex[idx], pos, 0).rgb;
+    int band = max(pc.square_size, 1);
+    int bandRow = pos.y / band;
+    float phase = float(bandRow + pc.historyIdx * pc.history_dir) * 0.3926990817;
+    float blend = clamp(0.5 + 0.45 * sin(phase), 0.05, 0.95);
+    return mix(cur, hist, blend);
+}
+
+vec3 modeScanlineWarp(ivec2 pos, ivec2 imgSize) {
+    int block = max(pc.square_size, 1);
+    int rowBand = pos.y / block;
+    int amplitude = max(imgSize.x / 4, 1);
+    int cycle = amplitude * 2;
+    int phase = (rowBand + pc.historyIdx * pc.history_dir) % cycle;
+    int shift = phase < amplitude ? phase : (cycle - phase);
+    shift -= amplitude / 2;
+    ivec2 samplePos = clamp(pos + ivec2(shift, 0), ivec2(0), imgSize - ivec2(1));
+    return texelFetch(sourceTex, samplePos, 0).rgb;
+}
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 sz = imageSize(destTex);
+    if (pos.x >= sz.x || pos.y >= sz.y) {
+        return;
+    }
+
+    vec3 outColor = texelFetch(sourceTex, pos, 0).rgb;
+
+    if (pc.mode == 0) {
+        outColor = modeDiagPixelate(pos, sz);
+    } else if (pc.mode == 1) {
+        outColor = modeCombinePixels(pos, sz);
+    } else if (pc.mode == 2) {
+        outColor = modeHistoryXor(pos);
+    } else if (pc.mode == 3) {
+        outColor = modeTemporalBlend(pos);
+    } else if (pc.mode == 4) {
+        outColor = modeScanlineWarp(pos, sz);
+    }
+
+    imageStore(destTex, pos, vec4(clamp(outColor, 0.0, 1.0), 1.0));
+}

@@ -25,6 +25,7 @@
 #endif
 
 static constexpr int HISTORY_SIZE = 8;
+static constexpr const char *MODE_SHADER_NAME = "acidcam_filters.spv";
 
 struct ComputePC {
     int32_t mode;
@@ -114,6 +115,11 @@ class ComputeWindow : public mxvk::VK_Window {
                 currentSpvIndex = (currentSpvIndex + 1) % static_cast<int>(spvFiles.size());
                 std::cout << "Current index: " << spvFiles[currentSpvIndex] << "\n";
                 reloadPipeline();
+            } else if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME &&
+                       (e.key.key == SDLK_LEFT || e.key.key == SDLK_RIGHT)) {
+                const int delta = (e.key.key == SDLK_LEFT) ? -1 : 1;
+                shaderMode = (shaderMode + delta + 5) % 5;
+                std::cout << "Mode shader mode: " << shaderMode << "\n";
             }
         }
     }
@@ -174,6 +180,7 @@ class ComputeWindow : public mxvk::VK_Window {
     int squareDir = 1;
     int currentHistIdx = 0;
     int currentDir = 1;
+    int shaderMode = 0;
     float alpha = 1.0F;
     bool captureUploadPathLogged = false;
     double currentFps = 0.0;
@@ -675,6 +682,7 @@ class ComputeWindow : public mxvk::VK_Window {
             vkDestroyPipelineLayout(device, compPipeLayout, nullptr);
             compPipeLayout = VK_NULL_HANDLE;
         }
+        shaderMode = 0;
         buildComputePipeline();
     }
 
@@ -1190,7 +1198,7 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void dispatchOne(VkCommandBuffer cmd, VkDescriptorSet descriptorSet, int mode) {
         ComputePC pc{};
-        pc.mode = mode;
+        pc.mode = (!spvFiles.empty() && spvFiles[currentSpvIndex] == MODE_SHADER_NAME) ? shaderMode : mode;
         pc.historyCount = historyCount;
         pc.historyIdx = currentHistIdx;
         pc.square_size = currentSquare;
@@ -1274,14 +1282,9 @@ class ComputeWindow : public mxvk::VK_Window {
         const VkCommandBuffer cmd = beginSingleTimeCommands();
         int srcIdx = 0;
         int dstIdx = 1;
-        const int passes = 3 + (std::rand() % 7);
-        for (int pass = 0; pass < passes; ++pass) {
-            dispatchOne(cmd, blurDS[dstIdx], 0);
-            computeBarrier(cmd, workImg[dstIdx].image);
-            std::swap(srcIdx, dstIdx);
-        }
+        const bool isModeShader = !spvFiles.empty() && spvFiles[currentSpvIndex] == MODE_SHADER_NAME;
 
-        {
+        if (isModeShader) {
             std::array<VkImageMemoryBarrier2, 2> barriers{};
             barriers[0] = makeImageBarrier(
                 workImg[srcIdx].image,
@@ -1346,16 +1349,94 @@ class ComputeWindow : public mxvk::VK_Window {
             dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
             dependencyInfo.pImageMemoryBarriers = barriers.data();
             vkCmdPipelineBarrier2(cmd, &dependencyInfo);
-        }
 
-        if (historyCount < HISTORY_SIZE) {
-            ++historyCount;
-        }
-        historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+            if (historyCount < HISTORY_SIZE) {
+                ++historyCount;
+            }
+            historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+            dispatchOne(cmd, blendDS[srcIdx], shaderMode);
+        } else {
+            const int passes = 3 + (std::rand() % 7);
+            for (int pass = 0; pass < passes; ++pass) {
+                dispatchOne(cmd, blurDS[dstIdx], 0);
+                computeBarrier(cmd, workImg[dstIdx].image);
+                std::swap(srcIdx, dstIdx);
+            }
 
-        const bool isMetalMedian =
-            !spvFiles.empty() && spvFiles[currentSpvIndex].find("metalmedianblend") != std::string::npos;
-        dispatchOne(cmd, blendDS[srcIdx], isMetalMedian ? 2 : 1);
+            std::array<VkImageMemoryBarrier2, 2> barriers{};
+            barriers[0] = makeImageBarrier(
+                workImg[srcIdx].image,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_READ_BIT);
+
+            barriers[1] = makeImageBarrier(
+                histImg[historyIndex].image,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT);
+
+            VkDependencyInfo dependencyInfo{};
+            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dependencyInfo.pImageMemoryBarriers = barriers.data();
+            vkCmdPipelineBarrier2(cmd, &dependencyInfo);
+
+            VkImageCopy2 copy{};
+            copy.sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2;
+            copy.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            copy.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            copy.extent = {static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), 1};
+
+            VkCopyImageInfo2 copyInfo{};
+            copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
+            copyInfo.srcImage = workImg[srcIdx].image;
+            copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            copyInfo.dstImage = histImg[historyIndex].image;
+            copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            copyInfo.regionCount = 1;
+            copyInfo.pRegions = &copy;
+            vkCmdCopyImage2(cmd, &copyInfo);
+
+            barriers[0] = makeImageBarrier(
+                workImg[srcIdx].image,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_READ_BIT,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+
+            barriers[1] = makeImageBarrier(
+                histImg[historyIndex].image,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_GENERAL,
+                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT);
+
+            dependencyInfo = {};
+            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(barriers.size());
+            dependencyInfo.pImageMemoryBarriers = barriers.data();
+            vkCmdPipelineBarrier2(cmd, &dependencyInfo);
+
+            if (historyCount < HISTORY_SIZE) {
+                ++historyCount;
+            }
+            historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+
+            const bool isMetalMedian =
+                !spvFiles.empty() && spvFiles[currentSpvIndex].find("metalmedianblend") != std::string::npos;
+            dispatchOne(cmd, blendDS[srcIdx], isMetalMedian ? 2 : 1);
+        }
 
         transitionImageLayout(
             cmd,

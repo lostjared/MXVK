@@ -2,3 +2,4 @@ compute.spv
 square_block_resize_dir.spv
 xorblend.spv
 metalmedianblend.spv
+acidcam_filters.spv

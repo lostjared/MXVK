@@ -22,6 +22,8 @@ set(compute_shader_MEDIAN_SHADER ${compute_shader_SHADER_SOURCE_DIR}/metalmedian
 set(compute_shader_MEDIAN_SPV ${CMAKE_CURRENT_BINARY_DIR}/metalmedianblend.spv)
 set(compute_shader_SQUARE_SHADER ${compute_shader_SHADER_SOURCE_DIR}/square_block_resize_dir.comp)
 set(compute_shader_SQUARE_SPV ${CMAKE_CURRENT_BINARY_DIR}/square_block_resize_dir.spv)
+set(compute_shader_ACIDCAM_SHADER ${compute_shader_SHADER_SOURCE_DIR}/acidcam_filters.comp)
+set(compute_shader_ACIDCAM_SPV ${CMAKE_CURRENT_BINARY_DIR}/acidcam_filters.spv)
 
 add_custom_command(
     OUTPUT ${compute_shader_COMPUTE_SPV}
@@ -55,12 +57,21 @@ add_custom_command(
     VERBATIM
 )
 
+add_custom_command(
+    OUTPUT ${compute_shader_ACIDCAM_SPV}
+    COMMAND ${GLSLC_EXECUTABLE} -fshader-stage=compute ${compute_shader_ACIDCAM_SHADER} -o ${compute_shader_ACIDCAM_SPV}
+    DEPENDS ${compute_shader_ACIDCAM_SHADER}
+    COMMENT "Compiling compute_shader acidcam_filters.comp"
+    VERBATIM
+)
+
 add_custom_target(compute_shader_shaders
     DEPENDS
         ${compute_shader_COMPUTE_SPV}
         ${compute_shader_XORBLEND_SPV}
         ${compute_shader_MEDIAN_SPV}
         ${compute_shader_SQUARE_SPV}
+        ${compute_shader_ACIDCAM_SPV}
 )
 
 add_dependencies(compute_shader compute_shader_shaders)
@@ -88,5 +99,8 @@ add_custom_command(TARGET compute_shader POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_SQUARE_SPV}
         $<TARGET_FILE_DIR:compute_shader>/square_block_resize_dir.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${compute_shader_ACIDCAM_SPV}
+        $<TARGET_FILE_DIR:compute_shader>/acidcam_filters.spv
     COMMENT "Copying compute_shader runtime assets"
 )
