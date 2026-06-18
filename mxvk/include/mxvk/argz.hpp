@@ -645,6 +645,8 @@ struct Arguments {
     bool fullscreen = false;   ///< Whether fullscreen mode was requested.
     bool fast = false;         ///< Whether fast mode was requested (@c --fast).
     std::string filename;      ///< Optional input filename (@c --filename).
+    std::string output;        ///< Optional output filename (@c --output).
+    std::string crf;           ///< Optional CRF value (@c --crf).
     std::string texture;       ///< Optional texture file path (@c --texture).
     std::string shaderPath;    ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     int camera_index = 0;      ///< Optional camera index
@@ -664,6 +666,8 @@ struct Arguments {
  * | -f   | --fullscreen       | Enable fullscreen                            |
  * |      | --fast             | Enable fast mode                             |
  * |      | --filename         | Input filename                               |
+ * | -o   | --output           | Output filename                              |
+ * | -c   | --crf              | Constant Rate Factor                         |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  *
@@ -684,6 +688,8 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDouble(301, "fast", "fast")
         .addOptionDoubleValue(256, "filename", "input filename")
+        .addOptionDoubleValue('o', "output", "output filename")
+        .addOptionDoubleValue('c', "crf", "crf value")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
@@ -698,6 +704,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool fullscreen = false;
     bool fast = false;
     std::string filename;
+    std::string output;
+    std::string crf;
     std::string texture;
     std::string shaderPath;
     int camera_index = 0;
@@ -714,6 +722,12 @@ inline Arguments proc_args(int &argc, char **argv) {
                 break;
             case 256:
                 filename = arg.arg_value;
+                break;
+            case 'o':
+                output = arg.arg_value;
+                break;
+            case 'c':
+                crf = arg.arg_value;
                 break;
             case 257:
                 texture = arg.arg_value;
@@ -774,6 +788,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.fullscreen = fullscreen;
     args.fast = fast;
     args.filename = filename;
+    args.output = output;
+    args.crf = crf;
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.camera_index = camera_index;

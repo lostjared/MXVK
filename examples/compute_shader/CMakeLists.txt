@@ -3,6 +3,9 @@ add_executable(compute_shader
 )
 
 target_link_libraries(compute_shader PRIVATE mxvk::mxvk)
+if(TARGET mxwrite)
+    target_link_libraries(compute_shader PRIVATE mxwrite)
+endif()
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)

@@ -120,6 +120,10 @@ Supported options:
 	- Launch in fullscreen mode.
 - `--filename <file>`
 	- Optional input/model/video filename (used by specific examples).
+- `-o <file>`, `--output <file>`
+	- Optional output filename for examples that export video.
+- `-c <value>`, `--crf <value>`
+	- Optional Constant Rate Factor for video export.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`

@@ -2,7 +2,13 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+#include "mxvk/mxvk_ff_capture.hpp"
+#endif
 #include "mxvk/mxvk_opencv_compat.hpp"
+#if defined(MXWRITE_ENABLED)
+#include "mxwrite.hpp"
+#endif
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -11,9 +17,9 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <thread>
 #include <opencv2/opencv.hpp>
 #include <string>
+#include <thread>
 #include <vector>
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
@@ -47,12 +53,17 @@ class ComputeWindow : public mxvk::VK_Window {
           inputFilename(args.filename),
           usingFile(!inputFilename.empty()),
           fastMode(args.fast),
+          outputFilename(args.output),
+          outputCrf(args.crf),
           cameraIndex(args.camera_index) {
         initComputeResources();
     }
 
     ~ComputeWindow() override {
         capture.close();
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+        ffCapture.close();
+#endif
         destroyComputeResources();
     }
 
@@ -61,40 +72,35 @@ class ComputeWindow : public mxvk::VK_Window {
         if (usingFile && !fastMode) {
             throttleVideoPlayback();
         }
-#ifdef MXVK_CUDA
-        cv::cuda::GpuMat gpuFrame;
-        if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
-            if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
-                frameUploaded = uploadGpuToImage(gpuFrame, capture.cudaStream(), workImg[0]);
-                if (frameUploaded && !captureUploadPathLogged) {
-                    std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
-                    captureUploadPathLogged = true;
-                }
-            }
-        }
-#endif
 
-        cv::Mat frame;
-        if (!frameUploaded && capture.readRgba(frame) && !frame.empty()) {
-            if (frame.cols == texWidth && frame.rows == texHeight) {
-                if (!captureUploadPathLogged) {
-#ifdef MXVK_CUDA
-                    std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
-#else
-                    std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
-#endif
-                    captureUploadPathLogged = true;
-                }
-                uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
-                frameUploaded = true;
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+        if (usingFfCapture) {
+            frameUploaded = readFfFrameToCompute();
+            if (!frameUploaded && usingFile) {
+                restartFfCapture();
+                frameUploaded = readFfFrameToCompute();
             }
-        } else if (!frameUploaded && usingFile) {
-            capture.close();
-            if (capture.open(inputFilename)) {
-                configureVideoPlaybackRate();
-                cv::Mat restartedFrame;
-                if (capture.readRgba(restartedFrame) && !restartedFrame.empty() &&
-                    restartedFrame.cols == texWidth && restartedFrame.rows == texHeight) {
+        } else
+#endif
+        {
+            cv::Mat frame;
+#ifdef MXVK_CUDA
+            cv::cuda::GpuMat gpuFrame;
+            if (capture.readGpuRgba(gpuFrame) && !gpuFrame.empty()) {
+                if (gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
+                    frameUploaded = uploadGpuToImage(gpuFrame, capture.cudaStream(), workImg[0]);
+                    if (frameUploaded) {
+                        recordGpuFrame(gpuFrame);
+                    }
+                    if (frameUploaded && !captureUploadPathLogged) {
+                        std::cout << "compute_shader: CUDA interop capture path active: capture -> GpuMat -> cv::cuda::cvtColor -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no download)\n";
+                        captureUploadPathLogged = true;
+                    }
+                }
+            }
+#endif
+            if (!frameUploaded && capture.readRgba(frame) && !frame.empty()) {
+                if (frame.cols == texWidth && frame.rows == texHeight) {
                     if (!captureUploadPathLogged) {
 #ifdef MXVK_CUDA
                         std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
@@ -103,8 +109,29 @@ class ComputeWindow : public mxvk::VK_Window {
 #endif
                         captureUploadPathLogged = true;
                     }
-                    uploadToImage(restartedFrame.ptr(), static_cast<int>(restartedFrame.step), workImg[0]);
+                    recordFrame(frame);
+                    uploadToImage(frame.ptr(), static_cast<int>(frame.step), workImg[0]);
                     frameUploaded = true;
+                }
+            } else if (!frameUploaded && usingFile) {
+                capture.close();
+                if (capture.open(inputFilename)) {
+                    configureVideoPlaybackRate();
+                    cv::Mat restartedFrame;
+                    if (capture.readRgba(restartedFrame) && !restartedFrame.empty() &&
+                        restartedFrame.cols == texWidth && restartedFrame.rows == texHeight) {
+                        if (!captureUploadPathLogged) {
+#ifdef MXVK_CUDA
+                            std::cout << "compute_shader: CUDA interop unavailable; fallback path active: CUDA/CPU RGBA -> host memory -> Vulkan staging upload\n";
+#else
+                            std::cout << "compute_shader: CPU capture path active: readRgba converts to RGBA, then uploads through Vulkan staging\n";
+#endif
+                            captureUploadPathLogged = true;
+                        }
+                        recordFrame(restartedFrame);
+                        uploadToImage(restartedFrame.ptr(), static_cast<int>(restartedFrame.step), workImg[0]);
+                        frameUploaded = true;
+                    }
                 }
             }
         }
@@ -169,9 +196,20 @@ class ComputeWindow : public mxvk::VK_Window {
 
     std::string assetRoot;
     mxvk::VK_Capture capture{};
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+    mxvk::VK_FF_Capture ffCapture{};
+    bool usingFfCapture = false;
+    std::vector<uint8_t> ffFrameRgba{};
+    int ffFramePitch = 0;
+#ifdef MXVK_CUDA
+    cv::cuda::Stream ffCudaStream{};
+#endif
+#endif
     std::string inputFilename;
     bool usingFile = false;
     bool fastMode = false;
+    std::string outputFilename;
+    std::string outputCrf;
     int cameraIndex = 0;
     int texWidth = 1920;
     int texHeight = 1080;
@@ -213,12 +251,20 @@ class ComputeWindow : public mxvk::VK_Window {
     float alpha = 1.0F;
     bool captureUploadPathLogged = false;
     double videoFps = 0.0;
+    double sourceFps = 0.0;
     std::chrono::duration<double> videoFrameInterval{0.0};
     std::chrono::steady_clock::time_point nextVideoFrameDeadline{std::chrono::steady_clock::now()};
     double currentFps = 0.0;
     uint32_t fpsFrameCount = 0;
     std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
     std::string fpsText = "FPS: --";
+    bool recordingEnabled = false;
+    bool recordingWarningLogged = false;
+    std::vector<uint8_t> recordScratch{};
+#if defined(MXWRITE_ENABLED)
+    Writer videoWriter{};
+    bool videoWriterOpen = false;
+#endif
 
     std::vector<std::string> spvFiles{};
     int currentSpvIndex = 0;
@@ -262,16 +308,191 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void configureVideoPlaybackRate() {
-        const double reportedFps = capture.get(cv::CAP_PROP_FPS);
+        double reportedFps = 0.0;
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+        if (usingFfCapture) {
+            reportedFps = ffCapture.fps();
+        } else
+#endif
+        {
+            reportedFps = capture.get(cv::CAP_PROP_FPS);
+        }
         videoFps = (reportedFps > 0.0) ? reportedFps : 30.0;
+        sourceFps = videoFps;
         if (videoFps <= 0.0) {
             videoFps = 30.0;
+            sourceFps = videoFps;
         }
         videoFrameInterval = std::chrono::duration<double>(1.0 / videoFps);
         resetVideoPlaybackClock();
         std::cout << "compute_shader: video file FPS " << videoFps
                   << " fps, fast=" << (fastMode ? "true" : "false") << "\n";
     }
+
+    bool openVideoSource() {
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+        usingFfCapture = false;
+        if (ffCapture.open(inputFilename)) {
+            usingFfCapture = true;
+            std::cout << "compute_shader: FFmpeg capture path active for file input"
+                      << (ffCapture.using_hardware_decode() ? " (CUDA decode)\n" : " (software decode)\n");
+            return true;
+        }
+        std::cout << "compute_shader: FFmpeg capture failed; falling back to VK_Capture/OpenCV file input\n";
+#endif
+        return capture.open(inputFilename);
+    }
+
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+    void restartFfCapture() {
+        ffCapture.close();
+        if (ffCapture.open(inputFilename)) {
+            usingFfCapture = true;
+            configureVideoPlaybackRate();
+        }
+    }
+
+    bool readFfFrameToCompute() {
+#ifdef MXVK_CUDA
+        if (ffCapture.using_hardware_decode()) {
+            cv::cuda::GpuMat gpuFrame;
+            if (ffCapture.readGpuRgba(gpuFrame, ffCudaStream) && !gpuFrame.empty() &&
+                gpuFrame.cols == texWidth && gpuFrame.rows == texHeight) {
+                const bool uploadedWithInterop = uploadGpuToImage(gpuFrame, ffCudaStream, workImg[0]);
+                if (uploadedWithInterop) {
+                    if (!captureUploadPathLogged) {
+                        std::cout << "compute_shader: FFmpeg CUDA path active: NVDEC/CUDA decode -> CUDA NV12/RGBA conversion -> cudaMemcpy2DToArrayAsync -> Vulkan compute storage image (no CPU download)\n";
+                        captureUploadPathLogged = true;
+                    }
+                    recordGpuFrame(gpuFrame);
+                    return true;
+                }
+
+                cv::Mat cpuFrame;
+                gpuFrame.download(cpuFrame, ffCudaStream);
+                ffCudaStream.waitForCompletion();
+                if (!cpuFrame.empty()) {
+                    if (!captureUploadPathLogged) {
+                        std::cout << "compute_shader: FFmpeg CUDA decode active, Vulkan CUDA interop unavailable; downloading RGBA for staging upload\n";
+                        captureUploadPathLogged = true;
+                    }
+                    recordFrame(cpuFrame);
+                    uploadToImage(cpuFrame.ptr(), static_cast<int>(cpuFrame.step), workImg[0]);
+                    return true;
+                }
+            }
+        }
+#endif
+        int frameWidth = 0;
+        int frameHeight = 0;
+        if (!ffCapture.readRgba(ffFrameRgba, frameWidth, frameHeight, ffFramePitch) || ffFrameRgba.empty()) {
+            return false;
+        }
+        if (frameWidth != texWidth || frameHeight != texHeight) {
+            return false;
+        }
+        if (!captureUploadPathLogged) {
+            std::cout << "compute_shader: FFmpeg capture path active: decoded RGBA -> Vulkan staging upload\n";
+            captureUploadPathLogged = true;
+        }
+        recordFrame(ffFrameRgba.data(), frameWidth, frameHeight, ffFramePitch);
+        uploadToImage(ffFrameRgba.data(), ffFramePitch, workImg[0]);
+        return true;
+    }
+#endif
+
+    void configureRecordingDefaults() {
+        if (outputFilename.empty()) {
+            outputFilename = assetRoot + "/compute_shader_output.mp4";
+        }
+        if (outputCrf.empty()) {
+            outputCrf = "24";
+        }
+    }
+
+#if defined(MXWRITE_ENABLED)
+    void openVideoWriter() {
+        if (videoWriterOpen) {
+            return;
+        }
+        if (sourceFps <= 0.0) {
+            sourceFps = usingFile ? videoFps : 30.0;
+        }
+        if (sourceFps <= 0.0) {
+            sourceFps = 30.0;
+        }
+        if (!videoWriter.open(outputFilename, texWidth, texHeight, static_cast<float>(sourceFps), outputCrf.c_str())) {
+            throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
+        }
+        videoWriterOpen = true;
+        std::cout << "compute_shader: recording to " << outputFilename << " at " << sourceFps
+                  << " fps with crf " << outputCrf << "\n";
+    }
+
+    void recordFrame(const cv::Mat &frame) {
+        if (videoWriterOpen && !frame.empty()) {
+            recordFrame(frame.ptr(), frame.cols, frame.rows, static_cast<int>(frame.step));
+        }
+    }
+
+    void recordFrame(const uint8_t *data, int width, int height, int pitch) {
+        if (!videoWriterOpen || data == nullptr || width != texWidth || height != texHeight) {
+            return;
+        }
+
+        const int tightPitch = texWidth * 4;
+        if (pitch == tightPitch) {
+            videoWriter.write(const_cast<uint8_t *>(data));
+            return;
+        }
+
+        if (pitch < tightPitch) {
+            return;
+        }
+
+        recordScratch.resize(static_cast<size_t>(tightPitch) * static_cast<size_t>(texHeight));
+        for (int row = 0; row < texHeight; ++row) {
+            std::memcpy(recordScratch.data() + static_cast<size_t>(row) * static_cast<size_t>(tightPitch),
+                        data + static_cast<size_t>(row) * static_cast<size_t>(pitch),
+                        static_cast<size_t>(tightPitch));
+        }
+        videoWriter.write(recordScratch.data());
+    }
+
+#ifdef MXVK_CUDA
+    void recordGpuFrame(cv::cuda::GpuMat &gpuFrame) {
+        if (!videoWriterOpen || gpuFrame.empty()) {
+            return;
+        }
+#if defined(MXWRITE_HAS_CUDA_COPY)
+        if (videoWriter.is_hardware_encode() &&
+            videoWriter.write_cuda_rgba(gpuFrame.ptr(), static_cast<int>(gpuFrame.step))) {
+            return;
+        }
+#endif
+        cv::Mat cpuFrame;
+        gpuFrame.download(cpuFrame);
+        recordFrame(cpuFrame);
+    }
+#endif
+#else
+    void openVideoWriter() {
+        if (!recordingEnabled) {
+            return;
+        }
+        if (!recordingWarningLogged) {
+            std::cout << "compute_shader: MXWrite is unavailable; video recording disabled\n";
+            recordingWarningLogged = true;
+        }
+        recordingEnabled = false;
+    }
+
+    void recordFrame(const cv::Mat &) {}
+    void recordFrame(const uint8_t *, int, int, int) {}
+#ifdef MXVK_CUDA
+    void recordGpuFrame(cv::cuda::GpuMat &) {}
+#endif
+#endif
 
     void throttleVideoPlayback() {
         if (!usingFile || fastMode || videoFps <= 0.0) {
@@ -296,7 +517,7 @@ class ComputeWindow : public mxvk::VK_Window {
             setFont(assetRoot + "/font.ttf", 20);
 
             if (usingFile) {
-                if (!capture.open(inputFilename)) {
+                if (!openVideoSource()) {
                     throw mxvk::Exception("Failed to open video file " + inputFilename);
                 }
                 configureVideoPlaybackRate();
@@ -308,17 +529,33 @@ class ComputeWindow : public mxvk::VK_Window {
                 capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
                 capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
                 const double selectedFps = configureCameraFps();
+                sourceFps = selectedFps;
                 std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
                           << selectedFps << " fps\n";
             }
 
-            cv::Mat frame;
-            if (!capture.read(frame) || frame.empty()) {
-                throw mxvk::Exception(usingFile ? "Failed to read initial video frame" : "Failed to read initial camera frame");
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+            if (usingFfCapture) {
+                texWidth = ffCapture.width();
+                texHeight = ffCapture.height();
+                if (texWidth <= 0 || texHeight <= 0) {
+                    throw mxvk::Exception("Failed to query FFmpeg video dimensions");
+                }
+            } else
+#endif
+            {
+                cv::Mat frame;
+                if (!capture.read(frame) || frame.empty()) {
+                    throw mxvk::Exception(usingFile ? "Failed to read initial video frame" : "Failed to read initial camera frame");
+                }
+
+                texWidth = frame.cols;
+                texHeight = frame.rows;
             }
 
-            texWidth = frame.cols;
-            texHeight = frame.rows;
+            configureRecordingDefaults();
+            recordingEnabled = true;
+            openVideoWriter();
 
             const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
 
@@ -363,6 +600,9 @@ class ComputeWindow : public mxvk::VK_Window {
         } catch (...) {
             // Constructor failure bypasses ~ComputeWindow; cleanup partial Vulkan state here.
             capture.close();
+#if defined(MXVK_WITH_FFMPEG_CAPTURE)
+            ffCapture.close();
+#endif
             destroyComputeResources();
             throw;
         }
@@ -715,16 +955,16 @@ class ComputeWindow : public mxvk::VK_Window {
         (void)cudaExportable;
 #endif
         {
-        createImage(
-            static_cast<uint32_t>(texWidth),
-            static_cast<uint32_t>(texHeight),
-            VK_FORMAT_R8G8B8A8_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            img.image,
-            img.memory);
+            createImage(
+                static_cast<uint32_t>(texWidth),
+                static_cast<uint32_t>(texHeight),
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                img.image,
+                img.memory);
         }
         img.view = createImageView(img.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -910,10 +1150,22 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         const std::array<float, 16> vertices = {
-            0.0F, 0.0F, 0.0F, 0.0F,
-            1.0F, 0.0F, 1.0F, 0.0F,
-            1.0F, 1.0F, 1.0F, 1.0F,
-            0.0F, 1.0F, 0.0F, 1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            1.0F,
+            1.0F,
+            1.0F,
+            1.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            1.0F,
         };
         const std::array<uint16_t, 6> indices = {0, 1, 2, 0, 2, 3};
 

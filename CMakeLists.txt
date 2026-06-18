@@ -428,6 +428,11 @@ add_custom_target(mxvk_shaders
 if(CV)
     target_sources(mxvk PRIVATE mxvk/src/mxvk_cv.cpp)
 endif()
+if(TARGET mxwrite)
+    target_sources(mxvk PRIVATE mxvk/src/mxvk_ff_capture.cpp)
+    target_link_libraries(mxvk PUBLIC mxwrite)
+    target_compile_definitions(mxvk PUBLIC MXVK_WITH_FFMPEG_CAPTURE)
+endif()
 add_library(mxvk::mxvk ALIAS mxvk)
 target_include_directories(mxvk PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include>
