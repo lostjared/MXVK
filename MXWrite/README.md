@@ -16,6 +16,7 @@ This repository provides a C++ class (`Writer`) that uses the [FFmpeg](https://f
 
 ---
 
+@anchor overview
 ## Overview
 
 `Writer` is a C++ class that simplifies encoding and writing video frames to a container file. You can:
@@ -30,6 +31,7 @@ It can handle both:
 
 ---
 
+@anchor dependencies
 ## Dependencies
 
 ### Required Libraries
@@ -56,17 +58,20 @@ To install FFmpeg development libraries on your platform:
   ```
 
 ---
+@anchor building
 ## Building
 
- **Configure and build**:
-   ```bash
-   mkdir -p build
-   cd build
-   cmake ..
-   cmake --build .
-   ```
+Configure and build:
+
+```bash
+mkdir -p build
+cd build
+cmake ..
+cmake --build .
+```
 ---
 
+@anchor usage
 ## Usage
 
 You can include the `mxwrite.hpp` header in your own C++ files and link against the library. Below is a quick example:
@@ -94,3 +99,25 @@ int main() {
     return 0;
 }
 ```
+
+### Basic Initialization (`open`/`write`)
+@anchor basic-initialization-openwrite
+
+Use `Writer::open(...)` to configure the output file, then call `write(...)` once per RGBA frame. This mode is the simplest path when you already know the target frame rate and are generating frames in a steady loop.
+
+### Timestamp-Based Writing (`open_ts`/`write_ts`)
+@anchor timestamp-based-writing-open_tswrite_ts
+
+Use `Writer::open_ts(...)` and `write_ts(...)` when frames arrive at irregular intervals and you want the encoder to preserve capture timing. The writer records timestamps internally and maps them into the stream's time base before muxing.
+
+## Key Implementation Details
+@anchor key-implementation-details
+
+- `Writer` can accept host RGBA buffers and, when CUDA support is enabled, device buffers for direct ingestion.
+- `EncodeOptions` centralizes preset, tune, codec selection, CRF, realtime mode, and HDR metadata.
+- The header is intended to be included directly by consumer code that links against the `mxwrite` target.
+
+## License
+@anchor license
+
+MXWrite is distributed under the GNU General Public License v3.0. See the root [`LICENSE`](../LICENSE) file for the full text.
