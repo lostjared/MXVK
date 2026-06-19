@@ -119,9 +119,15 @@ class ComputeWindow : public mxvk::VK_Window {
           encodeCodec(args.encodeCodec),
           encodeRealtime(args.encodeRealtime),
           repeat(args.repeat),
-          cameraIndex(args.camera_index) {
+          cameraIndex(args.camera_index),
+          requestedShaderIndex(args.shader_index),
+          initialShaderMode(
+              args.index > 0
+                  ? std::clamp(args.index - 1, 0, static_cast<int>(ACIDCAM_FILTER_MODE_NAMES.size()) - 1)
+                  : 0) {
         recordWidth = args.width;
         recordHeight = args.height;
+        shaderMode = initialShaderMode;
         initComputeResources();
     }
 
@@ -330,7 +336,9 @@ class ComputeWindow : public mxvk::VK_Window {
     int squareDir = 1;
     int currentHistIdx = 0;
     int currentDir = 1;
+    int requestedShaderIndex = 0;
     int shaderMode = 0;
+    int initialShaderMode = 0;
     float alpha = 1.0F;
     bool captureUploadPathLogged = false;
     double videoFps = 0.0;
@@ -376,6 +384,9 @@ class ComputeWindow : public mxvk::VK_Window {
         if (spvFiles.empty()) {
             throw mxvk::Exception("index.txt contains no entries");
         }
+
+        currentSpvIndex =
+            std::clamp(requestedShaderIndex, 0, static_cast<int>(spvFiles.size()) - 1);
     }
 
     [[nodiscard]] double configureCameraFps() {
@@ -525,6 +536,11 @@ class ComputeWindow : public mxvk::VK_Window {
         if (outputCrf.empty()) {
             outputCrf = "24";
         }
+    }
+
+    [[nodiscard]] int overlayFontSizeForCanvas() const {
+        const int canvasMinDim = std::min(texWidth, texHeight);
+        return std::clamp(canvasMinDim / 30, 8, 36);
     }
 
     void maybeResizeWindowToSource() {
@@ -841,7 +857,7 @@ class ComputeWindow : public mxvk::VK_Window {
             configureRecordingDefaults();
             recordingEnabled = true;
             openVideoWriter();
-            fpsFont.reset(assetRoot + "/font.ttf", 36);
+            fpsFont.reset(assetRoot + "/font.ttf", overlayFontSizeForCanvas());
             playbackStartTime = std::chrono::steady_clock::now();
             maybeResizeWindowToSource();
 
@@ -956,7 +972,8 @@ class ComputeWindow : public mxvk::VK_Window {
                     ACIDCAM_FILTER_MODE_NAMES.size());
                 printText(modeText, 15, 68, SDL_Color{255, 105, 180, 255});
             } else {
-                printText(spvFiles[currentSpvIndex], 15, 68, SDL_Color{80, 160, 255, 255});
+                const std::string spvText = std::format("{}: {}", currentSpvIndex, spvFiles[currentSpvIndex]);
+                printText(spvText, 15, 68, SDL_Color{80, 160, 255, 255});
             }
         }
     }
@@ -1325,7 +1342,7 @@ class ComputeWindow : public mxvk::VK_Window {
             vkDestroyPipelineLayout(device, compPipeLayout, nullptr);
             compPipeLayout = VK_NULL_HANDLE;
         }
-        shaderMode = 0;
+        shaderMode = initialShaderMode;
         buildComputePipeline();
     }
 

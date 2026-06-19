@@ -701,6 +701,8 @@ struct Arguments {
     std::string texture;              ///< Optional texture file path (@c --texture).
     std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     int camera_index = 0;             ///< Optional camera index
+    int index = 0;                    ///< Optional acidcam filter mode index.
+    int shader_index = 0;             ///< Optional initial shader entry index.
     std::string resource;             ///< Resource file
     std::string resource_path;        ///< Resource path
 };
@@ -726,6 +728,8 @@ struct Arguments {
  * |      | --repeat           | Repeat video playback at EOF                 |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
+ * | -i   | --index            | Acidcam filter mode index                    |
+ * |      | --shader-index     | Initial shader entry index                   |
  *
  * @param argc Reference to argc from main().
  * @param argv argv from main().
@@ -758,6 +762,9 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
+        .addOptionSingleValue('i', "acidcam filter mode index")
+        .addOptionDoubleValue(311, "index", "acidcam filter mode index")
+        .addOptionDoubleValue(312, "shader-index", "initial shader entry index")
         .addOptionDoubleValue(300, "camera", "camera index");
 
     Argument<std::string> arg;
@@ -778,6 +785,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     std::string texture;
     std::string shaderPath;
     int camera_index = 0;
+    int index = 0;
+    int shader_index = 0;
     std::string resource;
     std::string resource_path;
     while ((value = parser.proc(arg)) != -1) {
@@ -854,6 +863,14 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 300:
             camera_index = atoi(arg.arg_value.c_str());
+            break;
+        case 'i':
+        case 311:
+            index = atoi(arg.arg_value.c_str());
+            break;
+        case 312:
+            shader_index = atoi(arg.arg_value.c_str());
+            break;
         }
     }
     if (path.empty()) {
@@ -877,6 +894,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.camera_index = camera_index;
+    args.index = index;
+    args.shader_index = shader_index;
     args.resource = resource;
     args.resource_path = resource_path;
     return args;
