@@ -389,18 +389,7 @@ class Argz {
                         }
                     }
                 } else {
-                    if constexpr (std::is_same<typename String::value_type, char>::value) {
-                        String value = "Error argument: ";
-                        value += name;
-                        value += " switch not found";
-                        throw ArgException<String>(value);
-                    }
-                    if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
-                        String value = L"Error argument: ";
-                        value += name;
-                        value += L" switch not found";
-                        throw ArgException<String>(value);
-                    }
+                    throwUnknownOption(type);
                 }
             } else if (type.length() == 1 && type[0] == '-') {
                 if constexpr (std::is_same<typename String::value_type, char>::value) {
@@ -459,20 +448,7 @@ class Argz {
                         }
                     }
                 } else {
-                    if constexpr (std::is_same<typename String::value_type, char>::value) {
-                        String value;
-                        value = "Error argument ";
-                        value += static_cast<typename String::value_type>(c);
-                        value += " switch not found.";
-                        throw ArgException<String>(value);
-                    }
-                    if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
-                        String value;
-                        value = L"Error argument ";
-                        value += static_cast<typename String::value_type>(c);
-                        value += L" switch not found.";
-                        throw ArgException<String>(value);
-                    }
+                    throwUnknownOption(type);
                 }
             } else {
                 a = Argument<String>();
@@ -592,6 +568,21 @@ class Argz {
 #endif
         } else {
             return false;
+        }
+    }
+
+    [[noreturn]] void throwUnknownOption(const String &token) const {
+        if constexpr (std::is_same<typename String::value_type, char>::value) {
+            String value = "Error argument: ";
+            value += token;
+            value += " switch not found";
+            throw ArgException<String>(value);
+        }
+        if constexpr (std::is_same<typename String::value_type, wchar_t>::value) {
+            String value = L"Error argument: ";
+            value += token;
+            value += L" switch not found";
+            throw ArgException<String>(value);
         }
     }
 
