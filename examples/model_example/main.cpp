@@ -74,7 +74,6 @@ namespace example {
 
                 yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
                 pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
-                pitchDegrees = std::clamp(pitchDegrees, -80.0f, 80.0f);
 
                 lastMouseX = x;
                 lastMouseY = y;
