@@ -159,6 +159,10 @@ To run a compiled example from the repository root, use `run.pl`:
 `run.pl` looks up the built executable under `build/examples/<example>/` and
 passes the example's asset directory with `-p` automatically.
 
+For the full core demo sweep, use `./testapps.pl`. It runs the example list
+sequentially, forwards any extra arguments to each `run.pl` invocation, and
+stops on the first failure or `Ctrl-C`.
+
 Examples:
 ```bash
 ./run.pl sprite_example -r 1920x1080 -f
