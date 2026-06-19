@@ -25,6 +25,7 @@
 #define _ARGZ_HPP_X
 
 #include <algorithm>
+#include <cstdio>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -34,6 +35,12 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 /**
  * @concept StringType
@@ -487,6 +494,29 @@ class Argz {
     template <typename T>
     void help(T &cout) {
         using char_type = typename std::decay<decltype(*std::declval<T>().rdbuf())>::type::char_type;
+        const bool use_color = supportsColor(cout);
+        auto write_ansi = [&](const char *seq) {
+            if (!use_color) {
+                return;
+            }
+            if constexpr (std::is_same_v<char_type, char>) {
+                cout << seq;
+            } else if constexpr (std::is_same_v<char_type, wchar_t>) {
+                for (const char *p = seq; *p != '\0'; ++p) {
+                    cout << static_cast<char_type>(*p);
+                }
+            }
+        };
+        auto write_padding = [&](size_t count) {
+            for (size_t i = 0; i < count; ++i) {
+                cout << static_cast<char_type>(' ');
+            }
+        };
+        struct HelpRow {
+            String token;
+            String desc;
+            bool is_short;
+        };
         std::vector<Argument<String>> v;
         std::vector<Argument<String>> v2;
         for (const auto &i : arg_info) {
@@ -497,40 +527,39 @@ class Argz {
         }
         std::ranges::sort(v);
         std::ranges::sort(v2);
-        std::vector<Argument<String>> farg;
-        farg.reserve(v.size() + v2.size());
-        std::copy(v.begin(), v.end(), std::back_inserter(farg));
-        std::copy(v2.begin(), v2.end(), std::back_inserter(farg));
-        for (auto a = farg.begin(); a != farg.end(); ++a) {
-            if (a->arg_type == ArgType::ARG_SINGLE || a->arg_type == ArgType::ARG_SINGLE_VALUE) {
-                if constexpr (std::is_same<char_type, char>::value) {
-                    String item;
-                    item += static_cast<char_type>(a->arg_letter);
-                    cout << "-" << std::setfill(' ') << std::setw(9) << std::left << item << "\t";
-                    cout << std::setfill(' ') << std::left << std::setw(10) << a->desc;
-                    cout << '\n';
-                } else if constexpr (std::is_same<char_type, wchar_t>::value) {
-                    String item;
-                    item += static_cast<char_type>(a->arg_letter);
-                    cout << L"-" << std::setfill(L' ') << std::setw(9) << std::left << item << L"\t";
-                    cout << std::setfill(L' ') << std::setw(10) << a->desc;
-                    cout << L'\n';
-                }
+        std::vector<HelpRow> rows;
+        rows.reserve(v.size() + v2.size());
+        for (const auto &a : v) {
+            String token;
+            token += static_cast<char_type>('-');
+            token += static_cast<char_type>(a.arg_letter);
+            rows.push_back(HelpRow{std::move(token), a.desc, true});
+        }
+        for (const auto &a : v2) {
+            String token;
+            token += static_cast<char_type>('-');
+            token += static_cast<char_type>('-');
+            token += a.arg_name;
+            rows.push_back(HelpRow{std::move(token), a.desc, false});
+        }
+        size_t token_width = 0;
+        for (const auto &row : rows) {
+            token_width = std::max(token_width, static_cast<size_t>(row.token.length()));
+        }
+        const size_t desc_column = token_width + 2;
+        for (const auto &row : rows) {
+            write_ansi(row.is_short ? "\x1b[1;36m" : "\x1b[1;35m");
+            cout << row.token;
+            write_ansi("\x1b[0m");
+            if (desc_column > row.token.length()) {
+                write_padding(desc_column - row.token.length());
             } else {
-                if constexpr (std::is_same<char_type, char>::value) {
-                    cout << "--";
-                    cout << std::setfill(' ') << std::left << std::setw(10) << a->arg_name;
-                    cout << "\t";
-                    cout << std::setw(10) << a->desc;
-                    cout << '\n';
-                } else if constexpr (std::is_same<char_type, wchar_t>::value) {
-                    cout << L"--";
-                    cout << std::setfill(L' ') << std::left << std::setw(10) << a->arg_name;
-                    cout << L"\t";
-                    cout << std::setw(10) << std::left << a->desc;
-                    cout << L'\n';
-                }
+                write_padding(2);
             }
+            write_ansi("\x1b[90m");
+            cout << row.desc;
+            write_ansi("\x1b[0m");
+            cout << '\n';
         }
     }
     /** @return Number of argv entries consumed so far. */
@@ -541,6 +570,31 @@ class Argz {
     std::unordered_map<int, Argument<String>> arg_info;
 
   private:
+    template <typename Stream>
+    static bool supportsColor(const Stream &stream) {
+        if constexpr (std::is_same_v<Stream, std::ostream>) {
+            if (&stream != &std::cout) {
+                return false;
+            }
+#if defined(_WIN32)
+            return _isatty(_fileno(stdout));
+#else
+            return isatty(fileno(stdout));
+#endif
+        } else if constexpr (std::is_same_v<Stream, std::wostream>) {
+            if (&stream != &std::wcout) {
+                return false;
+            }
+#if defined(_WIN32)
+            return _isatty(_fileno(stdout));
+#else
+            return isatty(fileno(stdout));
+#endif
+        } else {
+            return false;
+        }
+    }
+
     bool isSignedNumericToken(const String &s) const {
         if (s.empty()) {
             return false;
