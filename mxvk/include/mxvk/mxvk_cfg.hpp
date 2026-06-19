@@ -62,7 +62,7 @@ namespace mxvk {
          * @param key     Key name within that section.
          * @return The matching Item, or a default-constructed one if not found.
          */
-        VK_ConfigItem itemAtKey(const std::string &section, const std::string &key) const;
+        VK_ConfigItem itemAtKey(const std::string &section, const std::string &key, const std::string &default_value = "") const;
 
         /**
          * @brief Insert or update a configuration item.
@@ -74,6 +74,8 @@ namespace mxvk {
 
         /**
          * @brief Load (or reload) a configuration file from disk.
+         *
+         * If the file does not exist, an empty file is created first.
          * @param f Path to the file.
          */
         void loadFile(const std::string &f);

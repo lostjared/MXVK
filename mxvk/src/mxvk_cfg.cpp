@@ -14,7 +14,13 @@ namespace mxvk {
     void VK_Config::loadFile(const std::string &f) {
         std::ifstream in(f);
         if (!in.is_open()) {
-            throw mxvk::Exception(std::format("mxvk: Could not open configuration file: {}", f));
+            std::ofstream out(f);
+            if (!out.is_open()) {
+                throw mxvk::Exception(std::format("mxvk: Could not create configuration file: {}", f));
+            }
+
+            values.clear();
+            return;
         }
 
         values.clear();
@@ -76,17 +82,15 @@ namespace mxvk {
         out.close();
     }
 
-    VK_ConfigItem VK_Config::itemAtKey(const std::string &section, const std::string &key) const {
+    VK_ConfigItem VK_Config::itemAtKey(const std::string &section, const std::string &key, const std::string &default_value) const {
         const auto sectionIt = values.find(section);
         if (sectionIt == values.end()) {
-            throw mxvk::Exception(std::format("mxvk: Could not find section '{}' in config file.", section));
+            return {key, default_value};
         }
-
         const auto keyIt = sectionIt->second.find(key);
         if (keyIt == sectionIt->second.end()) {
             throw mxvk::Exception(std::format("mxvk: Could not find key '{}' in section '{}'.", key, section));
         }
-
         return keyIt->second;
     }
 

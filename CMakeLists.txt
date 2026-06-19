@@ -569,6 +569,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(masterpiece)
     add_subdirectory(examples/console_demo)
     mxvk_configure_mingw_target(console_demo)
+    add_subdirectory(examples/cfg_example)
+    mxvk_configure_mingw_target(cfg_example)
     add_subdirectory(examples/matrix)
     mxvk_configure_mingw_target(matrix)
     add_subdirectory(examples/binary_matrix)
@@ -687,6 +689,7 @@ if(EXAMPLES)
         Pool3D
         fractal_zoom
         console_demo
+        cfg_example
         matrix
         binary_matrix
         walk_example
