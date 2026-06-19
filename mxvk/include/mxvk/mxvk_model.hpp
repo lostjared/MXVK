@@ -85,6 +85,34 @@ namespace mxvk {
         void load(const std::string &path, float positionScale = 1.0f);
 
         /**
+         * @brief Parse model data and an optional texture manifest from disk.
+         * @param path Path to .obj, .mxmod, or .mxmod.z model.
+         * @param textureManifestPath Optional .txt/.tex or MTL-like texture manifest.
+         * @param textureBasePath Base path used to resolve relative texture paths.
+         * @param positionScale Uniform scale applied to positions.
+         */
+        void load(const std::string &path,
+                  const std::string &textureManifestPath,
+                  const std::string &textureBasePath,
+                  float positionScale = 1.0f);
+
+        /**
+         * @brief Export the loaded model as Wavefront OBJ plus MTL.
+         * @param objPath Output .obj path.
+         * @param mtlPath Optional output .mtl path. Defaults to objPath with .mtl extension.
+         */
+        void exportOBJ(const std::string &objPath, const std::string &mtlPath = "") const;
+
+        /**
+         * @brief Load a model/manifest pair and export it as Wavefront OBJ plus MTL.
+         */
+        static void exportOBJ(const std::string &modelPath,
+                              const std::string &textureManifestPath,
+                              const std::string &textureBasePath,
+                              const std::string &objPath,
+                              float positionScale = 1.0f);
+
+        /**
          * @brief Upload parsed geometry to device-local GPU buffers.
          * @param device Logical Vulkan device.
          * @param physicalDevice Physical Vulkan device.
@@ -158,6 +186,7 @@ namespace mxvk {
         void loadMXMOD(const std::string &path, float positionScale);
         void loadMXMODZ(const std::string &path, float positionScale);
         void loadMTL(const std::string &path);
+        void loadTextureManifest(const std::string &path, const std::string &textureBasePath);
     };
 
 } // namespace mxvk

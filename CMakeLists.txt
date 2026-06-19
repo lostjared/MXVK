@@ -529,6 +529,11 @@ target_compile_definitions(mxvk PUBLIC
 if(CV OR MXVK_CUDA_ENABLED)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
 endif()
+
+add_executable(mxmod2obj tools/mxmod2obj.cpp)
+target_link_libraries(mxmod2obj PRIVATE mxvk)
+mxvk_configure_mingw_target(mxmod2obj)
+
 if(EXAMPLES)
     message(STATUS "Examples ON")
     add_subdirectory(examples/hello_world)
@@ -712,6 +717,10 @@ install(TARGETS mxvk
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(TARGETS mxmod2obj
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include/mxvk

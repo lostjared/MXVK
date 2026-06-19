@@ -319,6 +319,161 @@ namespace mxvk {
             return output;
         }
 
+        [[nodiscard]] std::string resolveManifestPath(const std::string &basePath, const std::string &path) {
+            if (path.empty()) {
+                return {};
+            }
+
+            std::filesystem::path resolved(path);
+            if (resolved.is_absolute() || basePath.empty()) {
+                return resolved.lexically_normal().string();
+            }
+
+            return (std::filesystem::path(basePath) / resolved).lexically_normal().string();
+        }
+
+        [[nodiscard]] std::string parseMTLTexturePath(std::istream &stream) {
+            std::string mapPath{};
+            std::string mapToken{};
+            while (stream >> mapToken) {
+                if (!mapToken.empty() && mapToken[0] == '-') {
+                    if (mapToken == "-blendu" || mapToken == "-blendv" || mapToken == "-cc" ||
+                        mapToken == "-clamp" || mapToken == "-imfchan" || mapToken == "-type") {
+                        stream >> mapToken;
+                    } else if (mapToken == "-mm") {
+                        stream >> mapToken;
+                        stream >> mapToken;
+                    } else if (mapToken == "-o" || mapToken == "-s" || mapToken == "-t") {
+                        stream >> mapToken;
+                        stream >> mapToken;
+                        stream >> mapToken;
+                    } else if (mapToken == "-bm" || mapToken == "-boost" || mapToken == "-texres") {
+                        stream >> mapToken;
+                    }
+                    continue;
+                }
+
+                if (!mapPath.empty()) {
+                    mapPath += ' ';
+                }
+                mapPath += mapToken;
+            }
+            return mapPath;
+        }
+
+        void parseMTLStream(std::istream &file,
+                            const std::string &textureBasePath,
+                            std::vector<MXMaterial> &materials) {
+            MXMaterial *current = nullptr;
+            std::string line{};
+            while (std::getline(file, line)) {
+                stripTrailingComment(line);
+                if (line.empty()) {
+                    continue;
+                }
+
+                std::istringstream stream(line);
+                std::string tag{};
+                stream >> tag;
+
+                if (tag == "newmtl") {
+                    materials.emplace_back();
+                    current = &materials.back();
+                    std::getline(stream, current->name);
+                    trim(current->name);
+                    continue;
+                }
+
+                if (current == nullptr) {
+                    continue;
+                }
+
+                if (tag == "Ka") {
+                    stream >> current->ka[0] >> current->ka[1] >> current->ka[2];
+                } else if (tag == "Kd") {
+                    stream >> current->kd[0] >> current->kd[1] >> current->kd[2];
+                } else if (tag == "Ks") {
+                    stream >> current->ks[0] >> current->ks[1] >> current->ks[2];
+                } else if (tag == "Ns") {
+                    stream >> current->ns;
+                } else if (tag == "d") {
+                    stream >> current->d;
+                } else if (tag == "illum") {
+                    stream >> current->illum;
+                } else if (tag == "map_Kd") {
+                    const std::string mapPath = parseMTLTexturePath(stream);
+                    if (!mapPath.empty()) {
+                        current->map_kd = resolveManifestPath(textureBasePath, mapPath);
+                    }
+                }
+            }
+        }
+
+        [[nodiscard]] std::string mtlReferencePath(const std::string &objPath, const std::string &mtlPath) {
+            const std::filesystem::path objDir = std::filesystem::path(objPath).parent_path();
+            const std::filesystem::path materialPath(mtlPath);
+            if (objDir.empty()) {
+                return materialPath.filename().string();
+            }
+
+            std::error_code ec{};
+            const std::filesystem::path relative = std::filesystem::relative(materialPath, objDir, ec);
+            if (!ec && !relative.empty()) {
+                return relative.string();
+            }
+
+            return materialPath.filename().string();
+        }
+
+        [[nodiscard]] std::string materialNameForTextureIndex(uint32_t textureIndex,
+                                                              const std::vector<MXMaterial> &materials) {
+            if (textureIndex < static_cast<uint32_t>(materials.size()) && !materials[textureIndex].name.empty()) {
+                return materials[textureIndex].name;
+            }
+            return "material_" + std::to_string(textureIndex);
+        }
+
+        [[nodiscard]] std::string mtlTextureReferencePath(const std::filesystem::path &mtlPath,
+                                                          const std::string &texturePath) {
+            if (texturePath.empty()) {
+                return {};
+            }
+
+            std::filesystem::path resolvedTexturePath(texturePath);
+            if (resolvedTexturePath.is_relative()) {
+                resolvedTexturePath = std::filesystem::absolute(resolvedTexturePath);
+            }
+
+            std::filesystem::path mtlDir = mtlPath.parent_path();
+            if (mtlDir.empty()) {
+                mtlDir = std::filesystem::current_path();
+            } else if (mtlDir.is_relative()) {
+                mtlDir = std::filesystem::absolute(mtlDir);
+            }
+
+            std::error_code ec{};
+            const std::filesystem::path relative = std::filesystem::relative(resolvedTexturePath, mtlDir, ec);
+            if (!ec && !relative.empty()) {
+                return relative.string();
+            }
+
+            return resolvedTexturePath.lexically_normal().string();
+        }
+
+        void writeMTLMaterial(std::ostream &out, const MXMaterial &material) {
+            out << "newmtl " << material.name << '\n';
+            out << "Ka " << material.ka[0] << ' ' << material.ka[1] << ' ' << material.ka[2] << '\n';
+            out << "Kd " << material.kd[0] << ' ' << material.kd[1] << ' ' << material.kd[2] << '\n';
+            out << "Ks " << material.ks[0] << ' ' << material.ks[1] << ' ' << material.ks[2] << '\n';
+            out << "Ns " << material.ns << '\n';
+            out << "d " << material.d << '\n';
+            out << "illum " << material.illum << '\n';
+            if (!material.map_kd.empty()) {
+                out << "map_Kd " << material.map_kd << '\n';
+            }
+            out << '\n';
+        }
+
         [[nodiscard]] MXMODParseResult parseMXMODStream(std::istream &file,
                                                         const std::string &sourcePath,
                                                         float positionScale) {
@@ -552,6 +707,149 @@ namespace mxvk {
         }
 
         throw mxvk::Exception("MXModel::load unsupported file format: " + path);
+    }
+
+    void MXModel::load(const std::string &path,
+                       const std::string &textureManifestPath,
+                       const std::string &textureBasePath,
+                       float positionScale) {
+        load(path, positionScale);
+        if (!textureManifestPath.empty()) {
+            loadTextureManifest(textureManifestPath, textureBasePath);
+        }
+    }
+
+    void MXModel::exportOBJ(const std::string &objPath, const std::string &mtlPath) const {
+        if (objPath.empty()) {
+            throw mxvk::Exception("MXModel::exportOBJ objPath is empty");
+        }
+        if (verticesData.empty() || indicesData.empty()) {
+            throw mxvk::Exception("MXModel::exportOBJ requires loaded geometry");
+        }
+
+        const std::filesystem::path objOutputPath(objPath);
+        const std::filesystem::path mtlOutputPath = mtlPath.empty()
+                                                        ? objOutputPath.parent_path() / objOutputPath.stem().concat(".mtl")
+                                                        : std::filesystem::path(mtlPath);
+
+        if (!objOutputPath.parent_path().empty()) {
+            std::filesystem::create_directories(objOutputPath.parent_path());
+        }
+        if (!mtlOutputPath.parent_path().empty()) {
+            std::filesystem::create_directories(mtlOutputPath.parent_path());
+        }
+
+        std::ofstream objFile(objOutputPath);
+        if (!objFile.is_open()) {
+            throw mxvk::Exception("MXModel::exportOBJ failed to open OBJ file: " + objOutputPath.string());
+        }
+
+        std::ofstream mtlFile(mtlOutputPath);
+        if (!mtlFile.is_open()) {
+            throw mxvk::Exception("MXModel::exportOBJ failed to open MTL file: " + mtlOutputPath.string());
+        }
+
+        objFile << "# Exported from MXVK MXModel\n";
+        objFile << "mtllib " << mtlReferencePath(objOutputPath.string(), mtlOutputPath.string()) << "\n\n";
+
+        for (const VKVertex &vertex : verticesData) {
+            objFile << "v " << vertex.pos[0] << ' ' << vertex.pos[1] << ' ' << vertex.pos[2] << '\n';
+        }
+        objFile << '\n';
+
+        for (const VKVertex &vertex : verticesData) {
+            objFile << "vt " << vertex.texCoord[0] << ' ' << vertex.texCoord[1] << '\n';
+        }
+        objFile << '\n';
+
+        for (const VKVertex &vertex : verticesData) {
+            objFile << "vn " << vertex.normal[0] << ' ' << vertex.normal[1] << ' ' << vertex.normal[2] << '\n';
+        }
+        objFile << '\n';
+
+        std::vector<MXMaterial> outputMaterials = materialList;
+        for (size_t i = 0; i < outputMaterials.size(); ++i) {
+            if (outputMaterials[i].name.empty()) {
+                outputMaterials[i].name = "material_" + std::to_string(i);
+            }
+        }
+
+        const auto hasOutputMaterial = [&outputMaterials](const std::string &name) {
+            return std::any_of(outputMaterials.begin(), outputMaterials.end(), [&name](const MXMaterial &material) {
+                return material.name == name;
+            });
+        };
+
+        const auto ensureOutputMaterial = [&outputMaterials, &hasOutputMaterial](const std::string &name) {
+            if (hasOutputMaterial(name)) {
+                return;
+            }
+            MXMaterial material{};
+            material.name = name;
+            outputMaterials.push_back(material);
+        };
+
+        if (subMeshList.empty()) {
+            ensureOutputMaterial("material_0");
+        } else {
+            for (const SubMesh &sm : subMeshList) {
+                const std::string materialName = !sm.materialName.empty()
+                                                     ? sm.materialName
+                                                     : materialNameForTextureIndex(sm.textureIndex, outputMaterials);
+                ensureOutputMaterial(materialName);
+            }
+        }
+
+        for (const MXMaterial &material : outputMaterials) {
+            MXMaterial outputMaterial = material;
+            outputMaterial.map_kd = mtlTextureReferencePath(mtlOutputPath, outputMaterial.map_kd);
+            writeMTLMaterial(mtlFile, outputMaterial);
+        }
+
+        const auto emitFaces = [&](uint32_t firstIndex, uint32_t indexCount, const std::string &materialName) {
+            if (firstIndex > indicesData.size() || indexCount > indicesData.size() - firstIndex) {
+                throw mxvk::Exception("MXModel::exportOBJ submesh index range is out of bounds");
+            }
+            if ((indexCount % 3U) != 0U) {
+                throw mxvk::Exception("MXModel::exportOBJ only triangle index ranges can be exported");
+            }
+
+            objFile << "usemtl " << materialName << '\n';
+            for (uint32_t i = 0; i < indexCount; i += 3U) {
+                objFile << "f";
+                for (uint32_t j = 0; j < 3U; ++j) {
+                    const uint32_t vertexIndex = indicesData[firstIndex + i + j];
+                    if (vertexIndex >= static_cast<uint32_t>(verticesData.size())) {
+                        throw mxvk::Exception("MXModel::exportOBJ vertex index is out of bounds");
+                    }
+                    const uint32_t objIndex = vertexIndex + 1U;
+                    objFile << ' ' << objIndex << '/' << objIndex << '/' << objIndex;
+                }
+                objFile << '\n';
+            }
+            objFile << '\n';
+        };
+
+        if (subMeshList.empty()) {
+            emitFaces(0, static_cast<uint32_t>(indicesData.size()), "material_0");
+        } else {
+            for (const SubMesh &sm : subMeshList) {
+                const std::string materialName = !sm.materialName.empty()
+                                                     ? sm.materialName
+                                                     : materialNameForTextureIndex(sm.textureIndex, materialList);
+                emitFaces(sm.firstIndex, sm.indexCount, materialName);
+            }
+        }
+    }
+
+    void MXModel::exportOBJ(const std::string &modelPath,
+                            const std::string &textureManifestPath,
+                            const std::string &textureBasePath,
+                            const std::string &objPath,
+                            float positionScale) {
+        MXModel model{};
+        model.load(modelPath, textureManifestPath, textureBasePath, positionScale);
+        model.exportOBJ(objPath);
     }
 
     void MXModel::loadOBJ(const std::string &path, float positionScale) {
@@ -1052,71 +1350,134 @@ namespace mxvk {
             return;
         }
 
-        MXMaterial *current = nullptr;
+        parseMTLStream(file, std::filesystem::path(path).parent_path().string(), materialList);
+    }
+
+    void MXModel::loadTextureManifest(const std::string &path, const std::string &textureBasePath) {
+        std::ifstream file(path);
+        if (!file.is_open()) {
+            throw mxvk::Exception("MXModel::loadTextureManifest failed to open file: " + path);
+        }
+
+        std::vector<std::string> lines{};
         std::string line{};
         while (std::getline(file, line)) {
             stripTrailingComment(line);
             if (line.empty()) {
                 continue;
             }
+            lines.push_back(line);
+        }
 
-            std::istringstream stream(line);
+        bool isStructured = false;
+        bool isMtlLike = false;
+        for (const std::string &ln : lines) {
+            std::istringstream stream(ln);
             std::string tag{};
             stream >> tag;
-
+            if (tag == "submesh" || tag == "texture_dir" || tag == "material_lib" || tag == "model" || tag == "texture") {
+                isStructured = true;
+                break;
+            }
             if (tag == "newmtl") {
-                materialList.emplace_back();
-                current = &materialList.back();
-                std::getline(stream, current->name);
-                trim(current->name);
-                continue;
+                isMtlLike = true;
+                break;
             }
+        }
 
-            if (current == nullptr) {
-                continue;
+        materialList.clear();
+
+        std::string manifestTextureBase = textureBasePath.empty()
+                                              ? std::filesystem::path(path).parent_path().string()
+                                              : textureBasePath;
+
+        if (isMtlLike) {
+            std::istringstream stream{};
+            std::string text{};
+            for (const std::string &ln : lines) {
+                text += ln;
+                text += '\n';
             }
+            stream.str(text);
+            parseMTLStream(stream, manifestTextureBase, materialList);
+        } else if (isStructured) {
+            for (const std::string &ln : lines) {
+                std::istringstream stream(ln);
+                std::string tag{};
+                stream >> tag;
 
-            if (tag == "Ka") {
-                stream >> current->ka[0] >> current->ka[1] >> current->ka[2];
-            } else if (tag == "Kd") {
-                stream >> current->kd[0] >> current->kd[1] >> current->kd[2];
-            } else if (tag == "Ks") {
-                stream >> current->ks[0] >> current->ks[1] >> current->ks[2];
-            } else if (tag == "Ns") {
-                stream >> current->ns;
-            } else if (tag == "d") {
-                stream >> current->d;
-            } else if (tag == "illum") {
-                stream >> current->illum;
-            } else if (tag == "map_Kd") {
-                std::string mapPath{};
-                std::string mapToken{};
-                while (stream >> mapToken) {
-                    if (!mapToken.empty() && mapToken[0] == '-') {
-                        if (mapToken == "-blendu" || mapToken == "-blendv" || mapToken == "-cc" ||
-                            mapToken == "-clamp" || mapToken == "-imfchan" || mapToken == "-type") {
-                            stream >> mapToken;
-                        } else if (mapToken == "-mm") {
-                            stream >> mapToken;
-                            stream >> mapToken;
-                        } else if (mapToken == "-o" || mapToken == "-s" || mapToken == "-t") {
-                            stream >> mapToken;
-                            stream >> mapToken;
-                            stream >> mapToken;
-                        } else if (mapToken == "-bm" || mapToken == "-boost" || mapToken == "-texres") {
-                            stream >> mapToken;
-                        }
+                if (tag == "texture_dir") {
+                    std::string dir{};
+                    std::getline(stream, dir);
+                    trim(dir);
+                    if (!dir.empty()) {
+                        manifestTextureBase = resolveManifestPath(std::filesystem::path(path).parent_path().string(), dir);
+                    }
+                    continue;
+                }
+
+                if (tag == "material_lib") {
+                    std::string materialPath{};
+                    std::getline(stream, materialPath);
+                    trim(materialPath);
+                    if (!materialPath.empty()) {
+                        loadMTL(resolveManifestPath(std::filesystem::path(path).parent_path().string(), materialPath));
+                    }
+                    continue;
+                }
+
+                if (tag == "texture") {
+                    std::string image{};
+                    if (stream >> image) {
+                        MXMaterial material{};
+                        material.name = "material_" + std::to_string(materialList.size());
+                        material.map_kd = resolveManifestPath(manifestTextureBase, image);
+                        materialList.push_back(material);
+                    }
+                    continue;
+                }
+
+                if (tag == "submesh") {
+                    uint32_t subMeshIndex = 0;
+                    if (!(stream >> subMeshIndex) || subMeshIndex >= subMeshList.size()) {
                         continue;
                     }
 
-                    if (!mapPath.empty()) {
-                        mapPath += ' ';
+                    std::string materialOrTexture{};
+                    if (!(stream >> materialOrTexture)) {
+                        continue;
                     }
-                    mapPath += mapToken;
+
+                    try {
+                        size_t consumed = 0;
+                        const unsigned long value = std::stoul(materialOrTexture, &consumed, 10);
+                        if (consumed == materialOrTexture.size()) {
+                            subMeshList[subMeshIndex].textureIndex = static_cast<uint32_t>(value);
+                            subMeshList[subMeshIndex].materialName = materialNameForTextureIndex(subMeshList[subMeshIndex].textureIndex, materialList);
+                            continue;
+                        }
+                    } catch (const std::exception &) {
+                    }
+
+                    subMeshList[subMeshIndex].materialName = materialOrTexture;
                 }
-                if (!mapPath.empty()) {
-                    current->map_kd = mapPath;
-                }
+            }
+        } else {
+            for (const std::string &ln : lines) {
+                MXMaterial material{};
+                material.name = "material_" + std::to_string(materialList.size());
+                material.map_kd = resolveManifestPath(manifestTextureBase, ln);
+                materialList.push_back(material);
+            }
+        }
+
+        if (materialList.empty()) {
+            return;
+        }
+
+        for (SubMesh &sm : subMeshList) {
+            if (sm.materialName.empty()) {
+                sm.materialName = materialNameForTextureIndex(sm.textureIndex, materialList);
             }
         }
     }
