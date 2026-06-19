@@ -19,7 +19,7 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-        ModelWindow(const std::string filename, bool usingDefaultModel, const std::string &path, const std::string &resource, const std::string &resource_path, const std::string &title, int width, int height, bool fullscreen)
+        ModelWindow(const std::string filename, bool usingDefaultModel, const std::string &path, const std::string &resource, const std::string &resource_path, const std::string &fragmentShaderPath, const std::string &title, int width, int height, bool fullscreen)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path) {
             const std::string modelPath = filename;
@@ -27,7 +27,7 @@ namespace example {
             const bool useDefaultTextureBase = resource_path.empty() && (usingDefaultModel || !resource.empty());
             const std::string textureBasePath = resource_path.empty() ? (useDefaultTextureBase ? assetRoot + "/data" : "") : resource_path;
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
-            const std::string fragPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
+            const std::string fragPath = fragmentShaderPath.empty() ? (std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv") : fragmentShaderPath;
 
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, vertPath, fragPath);
@@ -95,6 +95,7 @@ namespace example {
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const auto now = std::chrono::steady_clock::now();
             const float deltaSeconds = std::chrono::duration<float>(now - lastFrameTime).count();
+            const float elapsedSeconds = std::chrono::duration<float>(now - startTime).count();
             lastFrameTime = now;
             if (autoSpinEnabled) {
                 autoSpinRadians += deltaSeconds * autoSpinSpeed;
@@ -114,6 +115,7 @@ namespace example {
             ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
             ubo.proj[1][1] *= -1.0f;
+            ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 1.0f);
 
             model.updateUBO(imageIndex, ubo);
             model.render(cmd, imageIndex, false);
@@ -132,6 +134,7 @@ namespace example {
         float mouseSensitivity = 0.35f;
         float autoSpinSpeed = 0.65f;
         float autoSpinRadians = 0.0f;
+        std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
     };
 
@@ -145,7 +148,7 @@ int main(int argc, char **argv) {
         if (args.filename.empty()) {
             filename = args.path + "/data/pyramid.obj";
         }
-        example::ModelWindow window(filename, usingDefaultModel, args.path, args.resource, args.resource_path, "MXVK Model Example", args.width, args.height, args.fullscreen);
+        example::ModelWindow window(filename, usingDefaultModel, args.path, args.resource, args.resource_path, args.fragmentPath, "MXVK Model Example", args.width, args.height, args.fullscreen);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

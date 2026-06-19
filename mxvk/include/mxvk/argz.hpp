@@ -700,6 +700,7 @@ struct Arguments {
     bool repeat = false;              ///< Repeat video playback when a file reaches EOF.
     std::string texture;              ///< Optional texture file path (@c --texture).
     std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    std::string fragmentPath;         ///< Optional fragment shader SPV path (@c --fragment).
     int camera_index = 0;             ///< Optional camera index
     int index = 0;                    ///< Optional acidcam filter mode index.
     int shader_index = 0;             ///< Optional initial shader entry index.
@@ -728,6 +729,7 @@ struct Arguments {
  * |      | --repeat           | Repeat video playback at EOF                 |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
+ * |      | --fragment         | Fragment shader SPV path                     |
  * | -i   | --index            | Acidcam filter mode index                    |
  * |      | --shader-index     | Initial shader entry index                   |
  *
@@ -762,6 +764,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
+        .addOptionDoubleValue(313, "fragment", "fragment shader SPV path")
         .addOptionSingleValue('i', "acidcam filter mode index")
         .addOptionDoubleValue(311, "index", "acidcam filter mode index")
         .addOptionDoubleValue(312, "shader-index", "initial shader entry index")
@@ -784,6 +787,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool repeat = false;
     std::string texture;
     std::string shaderPath;
+    std::string fragmentPath;
     int camera_index = 0;
     int index = 0;
     int shader_index = 0;
@@ -829,6 +833,9 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 'S':
         case 258:
             shaderPath = arg.arg_value;
+            break;
+        case 313:
+            fragmentPath = arg.arg_value;
             break;
         case 'h':
         case 'v':
@@ -893,6 +900,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.repeat = repeat;
     args.texture = texture;
     args.shaderPath = shaderPath;
+    args.fragmentPath = fragmentPath;
     args.camera_index = camera_index;
     args.index = index;
     args.shader_index = shader_index;
