@@ -29,22 +29,33 @@ my @tests = qw(
 
 my $count = 0;
 
+sub shell_quote {
+    my ($value) = @_;
+    return "''" if !defined($value) || $value eq '';
+    $value =~ s/'/'"'"'/g;
+    return "'$value'";
+}
+
 for my $test (@tests) {
     $count++;
-    my $rc = system('./run.pl', $test);
+    my @cmd = ('./run.pl', $test, @ARGV);
+    print '>> Executing: ';
+    print join(' ', map { shell_quote($_) } @cmd);
+    print "\n";
+    my $rc = system(@cmd);
 
     if ($rc == -1) {
-        die "Program '$test' failed to start: $!\n";
+        die "Error: program '$test' failed to start: $!\n";
     }
 
     if ($rc & 127) {
         my $signal = $rc & 127;
-        die "Program '$test' failed on test $count: terminated by signal $signal\n";
+        die "Error: program '$test' failed on test $count: terminated by signal $signal\n";
     }
 
     my $exit_code = $rc >> 8;
     if ($exit_code != 0) {
-        die "Program '$test' failed on test $count: exit code $exit_code\n";
+        die "Error: program '$test' failed on test $count: exit code $exit_code\n";
     }
 }
 
