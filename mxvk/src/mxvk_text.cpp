@@ -3,6 +3,7 @@
  * @brief Implementation of mx::VKText Vulkan SDL_ttf text renderer.
  */
 #include "mxvk/mxvk_text.hpp"
+#include <algorithm>
 #include <iostream>
 
 namespace mxvk {
@@ -94,15 +95,54 @@ namespace mxvk {
 
     void VK_Text::clearCache() {
         for (auto &[key, cached] : textureCache) {
-            if (cached.imageView != VK_NULL_HANDLE) {
-                vkDestroyImageView(device, cached.imageView, nullptr);
-            }
-            if (cached.image != VK_NULL_HANDLE) {
-                vkDestroyImage(device, cached.image, nullptr);
-                vkFreeMemory(device, cached.imageMemory, nullptr);
-            }
+            destroyCachedTexture(cached);
         }
         textureCache.clear();
+    }
+
+    void VK_Text::destroyCachedTexture(CachedTexture &cached) {
+        if (cached.imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, cached.imageView, nullptr);
+            cached.imageView = VK_NULL_HANDLE;
+        }
+        if (cached.image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, cached.image, nullptr);
+            cached.image = VK_NULL_HANDLE;
+        }
+        if (cached.imageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, cached.imageMemory, nullptr);
+            cached.imageMemory = VK_NULL_HANDLE;
+        }
+    }
+
+    void VK_Text::pruneCache() {
+        if (textureCache.size() <= MAX_CACHED_TEXTURES) {
+            return;
+        }
+
+        std::vector<std::pair<uint64_t, CacheKey>> entries;
+        entries.reserve(textureCache.size());
+        for (const auto &[key, cached] : textureCache) {
+            entries.emplace_back(cached.lastUsedSerial, key);
+        }
+
+        const size_t removeCount = textureCache.size() - MAX_CACHED_TEXTURES;
+        std::nth_element(
+            entries.begin(),
+            entries.begin() + static_cast<std::ptrdiff_t>(removeCount),
+            entries.end(),
+            [](const auto &lhs, const auto &rhs) {
+                return lhs.first < rhs.first;
+            });
+
+        for (size_t i = 0; i < removeCount; ++i) {
+            auto it = textureCache.find(entries[i].second);
+            if (it == textureCache.end()) {
+                continue;
+            }
+            destroyCachedTexture(it->second);
+            textureCache.erase(it);
+        }
     }
 
     void VK_Text::createDescriptorPool() {
@@ -281,6 +321,7 @@ namespace mxvk {
         if (it != textureCache.end()) {
             // Cache hit -- reuse the existing GPU texture
             auto &cached = it->second;
+            cached.lastUsedSerial = ++cacheUseSerial;
             quad.textImage = cached.image;
             quad.textImageMemory = cached.imageMemory;
             quad.textImageView = cached.imageView;
@@ -366,10 +407,15 @@ namespace mxvk {
 
                 uploadedImageView = createImageView(uploadedImage, VK_FORMAT_R8G8B8A8_UNORM);
                 uploadSucceeded = true;
-            } catch (...) {
+            } catch (const mxvk::Exception &ex) {
                 SDL_DestroySurface(rgbaSurface);
                 cleanupUploadResources();
-                throw;
+                static bool textTextureWarningLogged = false;
+                if (!textTextureWarningLogged) {
+                    std::cerr << "mxvk: dropping text texture after Vulkan allocation failure: " << ex.text() << "\n";
+                    textTextureWarningLogged = true;
+                }
+                return;
             }
 
             SDL_DestroySurface(rgbaSurface);
@@ -394,7 +440,7 @@ namespace mxvk {
 
             // Store in cache
             textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
-                                 quad.width, quad.height};
+                                 quad.width, quad.height, ++cacheUseSerial};
         }
 
         // Build the screen-space quad (position-dependent, not cached)
@@ -412,26 +458,35 @@ namespace mxvk {
         quad.indices = {0, 1, 2, 0, 2, 3};
         quad.indexCount = 6;
 
-        void *data;
-        VkDeviceSize vertexSize = quad.vertices.size() * sizeof(TextVertex);
-        createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     quad.vertexBuffer, quad.vertexBufferMemory);
+        try {
+            void *data;
+            VkDeviceSize vertexSize = quad.vertices.size() * sizeof(TextVertex);
+            createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                         quad.vertexBuffer, quad.vertexBufferMemory);
 
-        VK_CHECK_RESULT(vkMapMemory(device, quad.vertexBufferMemory, 0, vertexSize, 0, &data));
-        memcpy(data, quad.vertices.data(), vertexSize);
-        vkUnmapMemory(device, quad.vertexBufferMemory);
+            VK_CHECK_RESULT(vkMapMemory(device, quad.vertexBufferMemory, 0, vertexSize, 0, &data));
+            memcpy(data, quad.vertices.data(), vertexSize);
+            vkUnmapMemory(device, quad.vertexBufferMemory);
 
-        VkDeviceSize indexSize = quad.indices.size() * sizeof(uint16_t);
-        createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     quad.indexBuffer, quad.indexBufferMemory);
+            VkDeviceSize indexSize = quad.indices.size() * sizeof(uint16_t);
+            createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                         quad.indexBuffer, quad.indexBufferMemory);
 
-        VK_CHECK_RESULT(vkMapMemory(device, quad.indexBufferMemory, 0, indexSize, 0, &data));
-        memcpy(data, quad.indices.data(), indexSize);
-        vkUnmapMemory(device, quad.indexBufferMemory);
+            VK_CHECK_RESULT(vkMapMemory(device, quad.indexBufferMemory, 0, indexSize, 0, &data));
+            memcpy(data, quad.indices.data(), indexSize);
+            vkUnmapMemory(device, quad.indexBufferMemory);
 
-        quad.descriptorSet = createDescriptorSet(quad.textImageView);
+            quad.descriptorSet = createDescriptorSet(quad.textImageView);
+        } catch (const mxvk::Exception &ex) {
+            static bool textAllocationWarningLogged = false;
+            if (!textAllocationWarningLogged) {
+                std::cerr << "mxvk: dropping text draw after Vulkan allocation failure: " << ex.text() << "\n";
+                textAllocationWarningLogged = true;
+            }
+            return;
+        }
 
         textQuads.emplace_back(std::move(quad));
     }
@@ -483,6 +538,7 @@ namespace mxvk {
         if (descriptorPool != VK_NULL_HANDLE) {
             VK_CHECK_RESULT(vkResetDescriptorPool(device, descriptorPool, 0));
         }
+        pruneCache();
     }
 
     void VK_Text::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,

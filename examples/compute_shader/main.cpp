@@ -923,6 +923,16 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void updateFpsOverlay(bool frameUploaded) {
+        if (!active || !frameUploaded) {
+            return;
+        }
+
+        try {
+            clearTextQueue();
+        } catch (const std::exception &ex) {
+            std::cerr << "compute_shader: failed to clear stale text overlay queue: " << ex.what() << "\n";
+        }
+
         if (frameUploaded) {
             ++fpsFrameCount;
             ++processedVideoFrames;
