@@ -524,6 +524,7 @@ namespace mxvk {
             }
             sdl_initialized = true;
             SDL_SetGamepadEventsEnabled(true);
+            SDL_SetJoystickEventsEnabled(true);
             std::cout << "SDL3: video/gamepad subsystems initialized\n";
         }
 

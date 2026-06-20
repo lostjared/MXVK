@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_console.hpp"
+#include "mxvk/mxvk_controller.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
 
@@ -16,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <format>
+#include <limits>
 #include <memory>
 #include <ostream>
 #include <random>
@@ -44,7 +46,10 @@ constexpr int FIRE_COOLDOWN = 5;
 constexpr int SHOTS_PER_BURST = 5;
 constexpr int FIRE_DELAY = 3;
 constexpr int EXPLOSION_DURATION_FRAMES = 90;
-constexpr float SHIP_RADIUS = 3.0f;
+constexpr float ASTEROID_SHIP_COLLISION_SCALE = 0.97f;
+constexpr glm::vec4 PROJECTILE_COLOR{1.0f, 0.58f, 0.12f, 1.0f};
+constexpr Sint16 CONTROLLER_DEAD_ZONE = 8000;
+constexpr float CONTROLLER_AXIS_MAX = 32767.0f;
 constexpr float BOUNDARY_X_MIN = -150.0f;
 constexpr float BOUNDARY_X_MAX = 150.0f;
 constexpr float BOUNDARY_Y_MIN = -100.0f;
@@ -207,6 +212,7 @@ struct Projectile {
     glm::vec3 position{0.0f};
     glm::vec3 prev_position{0.0f};
     glm::vec3 velocity{0.0f};
+    glm::vec4 color{1.0f, 0.58f, 0.12f, 1.0f};
     float lifetime = 0.0f;
     bool active = false;
 };
@@ -220,6 +226,11 @@ struct Asteroid {
     bool active = false;
     int generation = 0;
     int model_index = 0;
+};
+
+struct ShipCollisionSample {
+    glm::vec3 local_position{0.0f};
+    float radius = 0.0f;
 };
 
 struct Particle {
@@ -406,6 +417,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         load_loading_screen_resources();
         configure_console();
+        open_controller();
     }
 
     ~Asteroids3DWindow() override {
@@ -429,6 +441,17 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void event(SDL_Event &e) override {
+        if (e.type == SDL_EVENT_GAMEPAD_ADDED ||
+            e.type == SDL_EVENT_GAMEPAD_REMOVED ||
+            e.type == SDL_EVENT_JOYSTICK_ADDED ||
+            e.type == SDL_EVENT_JOYSTICK_REMOVED) {
+            if (e.type == SDL_EVENT_GAMEPAD_ADDED || e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                controller.connectEvent(e);
+            }
+            sync_controller_connection();
+            return;
+        }
+
         const bool was_console_visible = console.isVisible();
         const bool is_console_toggle = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F3;
         console.handleEvent(e);
@@ -458,6 +481,35 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             intro_fade = 0.01f;
             log_game("Intro skipped. Starting game.");
             return;
+        }
+        if (mode == GameMode::Intro &&
+            e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN &&
+            e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+            intro_fade = 0.01f;
+            log_game("Intro skipped from controller. Starting game.");
+            return;
+        }
+        if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK || e.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
+                log_game("Exit requested from controller.");
+                exit();
+                return;
+            }
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_WEST) {
+                debug_menu = !debug_menu;
+                log_game(std::string("Debug HUD ") + (debug_menu ? "enabled from controller." : "disabled from controller."));
+                return;
+            }
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_NORTH) {
+                inverted_controls = !inverted_controls;
+                log_game(std::string("Controls set to ") + (inverted_controls ? "inverted from controller." : "arcade from controller."));
+                return;
+            }
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_EAST && mode == GameMode::Playing) {
+                restart_game();
+                log_game("Game restarted from controller.");
+                return;
+            }
         }
         if (mode == GameMode::Playing && e.type == SDL_EVENT_KEY_DOWN) {
             if (e.key.key == SDLK_F1) {
@@ -511,6 +563,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         const float dt = std::min(delta_seconds, 0.1f);
         last_delta_time = dt;
         elapsed_seconds += dt;
+
+        sync_controller_connection();
 
         const VkExtent2D extent = getSwapchainExtent();
         const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
@@ -619,6 +673,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     mxvk::VK_Sprite3D *effect_sprite = nullptr;
     mxvk::VK_Sprite *intro_sprite = nullptr;
     mxvk::VK_Console console;
+    mxvk::VK_Controller controller;
     bool console_ready = false;
     bool game_resources_loaded = false;
     int loading_step_index = 0;
@@ -684,6 +739,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                     << "Asteroids: " << active_asteroids() << '\n'
                     << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n'
                     << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n'
+                    << "Controller: " << controller_status() << '\n'
                     << "Debug HUD: " << (debug_menu ? "on" : "off") << '\n';
                 return true;
             }
@@ -740,6 +796,45 @@ class Asteroids3DWindow : public mxvk::VK_Window {
 
             return false;
         });
+    }
+
+    bool open_controller() {
+        for (int i = 0; i < mxvk::VK_Controller::joysticks(); ++i) {
+            if (controller.open(i)) {
+                log_game("Controller connected: " + controller.name());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void sync_controller_connection() {
+        if (!controller.active()) {
+            open_controller();
+        }
+    }
+
+    std::string controller_status() const {
+        return controller.active() ? ("Connected: " + controller.name()) : "Disconnected";
+    }
+
+    float controller_axis(SDL_GamepadAxis axis) const {
+        if (!controller.active()) {
+            return 0.0f;
+        }
+
+        const Sint16 raw_value = controller.getAxis(axis);
+        const float magnitude = static_cast<float>(std::abs(static_cast<int>(raw_value)));
+        if (magnitude <= static_cast<float>(CONTROLLER_DEAD_ZONE)) {
+            return 0.0f;
+        }
+
+        const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) /
+                                                (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)),
+                                            0.0f,
+                                            1.0f);
+        const float curved = normalized * normalized;
+        return raw_value < 0 ? -curved : curved;
     }
 
     void load_loading_screen_resources() {
@@ -974,6 +1069,12 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
 
+        if (controller.getButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) || controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_UP)) {
+            increase_speed(dt);
+        } else if (controller.getButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) || controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
+            decrease_speed(dt);
+        }
+
         auto ramp_axis = [dt](float &value, float target, float rise_rate, float fall_rate) {
             const float rate = (std::fabs(target) > std::fabs(value)) ? rise_rate : fall_rate;
             const float step = rate * dt;
@@ -988,6 +1089,11 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         float pitch_amount = 0.0f;
         float roll_amount = 0.0f;
         bool manual_roll_input = false;
+
+        const float left_x = controller_axis(SDL_GAMEPAD_AXIS_LEFTX);
+        if (std::fabs(left_x) > 0.001f) {
+            yaw_amount = -left_x;
+        }
 
         float keyboard_yaw_target = 0.0f;
         if (keys[SDL_SCANCODE_LEFT]) {
@@ -1033,6 +1139,23 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             manual_roll_input = true;
         }
 
+        if (controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_LEFT)) {
+            yaw_amount = 1.0f;
+        } else if (controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) {
+            yaw_amount = -1.0f;
+        }
+
+        const float right_x = controller_axis(SDL_GAMEPAD_AXIS_RIGHTX);
+        if (std::fabs(right_x) > 0.001f) {
+            roll_amount = right_x;
+            manual_roll_input = true;
+        }
+
+        const float right_y = controller_axis(SDL_GAMEPAD_AXIS_RIGHTY);
+        if (std::fabs(right_y) > 0.001f) {
+            pitch_amount = inverted_controls ? right_y : -right_y;
+        }
+
         const float smoothing = std::clamp(dt * 8.0f, 0.0f, 1.0f);
         smooth_yaw = glm::mix(smooth_yaw, yaw_amount, smoothing);
         smooth_pitch = glm::mix(smooth_pitch, pitch_amount, smoothing);
@@ -1074,7 +1197,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             }
         }
 
-        const bool firing = keys[SDL_SCANCODE_SPACE];
+        const bool firing = keys[SDL_SCANCODE_SPACE] ||
+                            controller.getButton(SDL_GAMEPAD_BUTTON_SOUTH) ||
+                            controller.getAxis(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > CONTROLLER_DEAD_ZONE;
         if (firing) {
             if (can_fire()) {
                 fire_projectile();
@@ -1141,7 +1266,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
 
     void fire_projectile() {
         const glm::vec3 forward = ship.forward();
-        const glm::vec3 muzzle = ship.position + forward * 2.5f;
+        const float muzzle_offset = 0.08f;
+        const glm::vec3 muzzle = ship.position + forward * muzzle_offset;
         for (auto &projectile : projectiles) {
             if (projectile.active) {
                 continue;
@@ -1149,6 +1275,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             projectile.position = muzzle;
             projectile.prev_position = muzzle;
             projectile.velocity = forward * PROJECTILE_SPEED;
+            projectile.color = PROJECTILE_COLOR;
             projectile.lifetime = 0.0f;
             projectile.active = true;
             log_game(std::format("Projectile fired from ({:.1f}, {:.1f}, {:.1f}).", muzzle.x, muzzle.y, muzzle.z));
@@ -1377,28 +1504,62 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             if (!asteroid.active) {
                 continue;
             }
-            const float ship_distance = ship_asteroid_swept_distance(asteroid);
-            const float collision_radius = asteroid.radius * 0.9f + SHIP_RADIUS;
-            if (ship_distance <= collision_radius) {
-                log_game(std::format("Ship collision with asteroid at distance {:.1f} radius {:.1f}.", ship_distance, collision_radius), SDL_Color{255, 130, 90, 255});
+            const float ship_distance = ship_asteroid_collision_distance(asteroid);
+            if (ship_distance <= 0.0f) {
+                log_game(std::format("Ship collision with asteroid overlap {:.2f}.", -ship_distance), SDL_Color{255, 130, 90, 255});
                 start_ship_explosion();
                 break;
             }
         }
     }
 
-    float ship_asteroid_swept_distance(const Asteroid &asteroid) const {
-        const glm::vec3 segment = ship.position - ship.prev_position;
-        const float segment_length_sq = glm::dot(segment, segment);
-        glm::vec3 closest_point = ship.position;
+    float ship_asteroid_collision_distance(const Asteroid &asteroid) const {
+        static constexpr std::array<ShipCollisionSample, 5> ship_samples = {
+            ShipCollisionSample{{0.0f, 0.0f, -1.45f}, 0.26f},
+            ShipCollisionSample{{0.0f, 0.0f, -0.45f}, 0.42f},
+            ShipCollisionSample{{0.0f, 0.0f, 0.55f}, 0.34f},
+            ShipCollisionSample{{-1.10f, 0.0f, -0.05f}, 0.24f},
+            ShipCollisionSample{{1.10f, 0.0f, -0.05f}, 0.24f},
+        };
 
-        if (segment_length_sq > 1e-6f) {
-            const glm::vec3 to_asteroid = asteroid.position - ship.prev_position;
-            const float t = std::clamp(glm::dot(to_asteroid, segment) / segment_length_sq, 0.0f, 1.0f);
-            closest_point = ship.prev_position + segment * t;
+        const float asteroid_collision_radius = asteroid.radius * ASTEROID_SHIP_COLLISION_SCALE;
+        float nearest_surface_distance = std::numeric_limits<float>::max();
+
+        for (const ShipCollisionSample &sample : ship_samples) {
+            const glm::vec3 offset = transform_ship_collision_offset(sample.local_position);
+            const glm::vec3 previous_position = ship.prev_position + offset;
+            const glm::vec3 current_position = ship.position + offset;
+            const float center_distance = swept_point_distance_to_asteroid(previous_position, current_position, asteroid.position);
+            nearest_surface_distance = std::min(nearest_surface_distance, center_distance - asteroid_collision_radius - sample.radius);
         }
 
-        return glm::length(closest_point - asteroid.position);
+        return nearest_surface_distance;
+    }
+
+    glm::vec3 transform_ship_collision_offset(const glm::vec3 &local_position) const {
+        const float ship_scale = 1.55f * ship_model.modelRenderScale();
+        const glm::mat4 model = build_model_matrix(
+            glm::vec3(0.0f),
+            ship.rotation,
+            ship_scale,
+            ship_model.modelCenterOffset());
+        return glm::vec3(model * glm::vec4(local_position, 1.0f));
+    }
+
+    float swept_point_distance_to_asteroid(const glm::vec3 &previous_position,
+                                           const glm::vec3 &current_position,
+                                           const glm::vec3 &asteroid_position) const {
+        const glm::vec3 segment = current_position - previous_position;
+        const float segment_length_sq = glm::dot(segment, segment);
+        glm::vec3 closest_point = current_position;
+
+        if (segment_length_sq > 1e-6f) {
+            const glm::vec3 to_asteroid = asteroid_position - previous_position;
+            const float t = std::clamp(glm::dot(to_asteroid, segment) / segment_length_sq, 0.0f, 1.0f);
+            closest_point = previous_position + segment * t;
+        }
+
+        return glm::length(closest_point - asteroid_position);
     }
 
     void start_ship_explosion() {
@@ -1606,7 +1767,12 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             }
             const float life_factor = 1.0f - (projectile.lifetime / PROJECTILE_LIFETIME);
             const float pulse = (0.55f + 0.22f * (1.0f - life_factor)) * (0.9f + 0.1f * std::sin(elapsed_seconds * 12.0f));
-            projectile_sprite->drawSprite(projectile.position, glm::vec2(pulse), glm::vec4(1.0f, 0.95f, 0.80f, 1.0f));
+            const glm::vec4 color = glm::vec4(
+                std::clamp(projectile.color.r * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
+                std::clamp(projectile.color.g * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
+                std::clamp(projectile.color.b * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
+                std::clamp(projectile.color.a * (0.65f + 0.35f * life_factor), 0.0f, 1.0f));
+            projectile_sprite->drawSprite(projectile.position, glm::vec2(pulse), color);
         }
     }
 
@@ -1986,7 +2152,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         printText("Nearest Object: " + std::to_string(nearest_asteroid_distance()), 25, 150, white);
         printText("Farthest Object: " + std::to_string(farthest_asteroid_distance()), 25, 175, white);
         printText("Speed: " + std::to_string(ship.current_speed) + " / " + std::to_string(ship.max_speed), 25, 200, white);
-        printText("Controller: Disconnected", 25, 225, white);
+        printText("Controller: " + controller_status(), 25, 225, white);
         printText("Press ENTER to randomize asteroids", 25, 250, white);
     }
 
