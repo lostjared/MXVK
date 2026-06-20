@@ -1138,8 +1138,21 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 if (!projectile.active) {
                     continue;
                 }
-                const float dist = glm::length(projectile.position - asteroid.position);
-                const float projectile_hit_radius = asteroid.radius * 0.75f;
+
+                const glm::vec3 segment = projectile.position - projectile.prev_position;
+                const float segment_length_sq = glm::dot(segment, segment);
+
+                glm::vec3 closest_point = projectile.prev_position;
+
+                if (segment_length_sq > 1e-6f) {
+                    const glm::vec3 to_asteroid = asteroid.position - projectile.prev_position;
+                    const float t = std::clamp(glm::dot(to_asteroid, segment) / segment_length_sq, 0.0f, 1.0f);
+                    closest_point = projectile.prev_position + segment * t;
+                }
+
+                const float dist = glm::length(closest_point - asteroid.position);
+                const float projectile_hit_radius = asteroid.radius * 0.97f;
+
                 if (dist < projectile_hit_radius) {
                     projectile.active = false;
                     log_game(std::format("Projectile hit asteroid at ({:.1f}, {:.1f}, {:.1f}).", asteroid.position.x, asteroid.position.y, asteroid.position.z));
