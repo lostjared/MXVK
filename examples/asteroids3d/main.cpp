@@ -46,6 +46,7 @@ constexpr int FIRE_COOLDOWN = 5;
 constexpr int SHOTS_PER_BURST = 5;
 constexpr int FIRE_DELAY = 3;
 constexpr int EXPLOSION_DURATION_FRAMES = 90;
+constexpr float ROUND_TIME_LIMIT_SECONDS = 150.0f;
 constexpr float SHIP_MODEL_SCALE = 1.55f;
 constexpr float ASTEROID_SHIP_COLLISION_SCALE = 1.08f;
 constexpr float ASTEROID_PROJECTILE_COLLISION_SCALE = 1.18f;
@@ -63,7 +64,9 @@ constexpr float BOUNDARY_BOUNCE_FACTOR = 1.2f;
 enum class GameMode {
     Intro,
     Loading,
-    Playing
+    Playing,
+    GameComplete,
+    GameOver
 };
 
 std::default_random_engine &rng() {
@@ -471,6 +474,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 intro_fade = 1.0f;
                 intro_last_update_ms = SDL_GetTicks();
                 log_game("Returned to intro screen.");
+            } else if (mode == GameMode::GameOver || mode == GameMode::GameComplete) {
+                exit();
             } else {
                 log_game("Exit requested from intro screen.");
                 exit();
@@ -492,7 +497,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
         if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
-            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK || e.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) {
                 log_game("Exit requested from controller.");
                 exit();
                 return;
@@ -512,6 +517,19 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 log_game("Game restarted from controller.");
                 return;
             }
+            if ((mode == GameMode::GameOver || mode == GameMode::GameComplete) &&
+                (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH || e.gbutton.button == SDL_GAMEPAD_BUTTON_START)) {
+                prepare_restart_from_game_over();
+                log_game("End screen acknowledged from controller. Returning to intro.");
+                return;
+            }
+        }
+        if ((mode == GameMode::GameOver || mode == GameMode::GameComplete) && e.type == SDL_EVENT_KEY_DOWN) {
+            if (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER) {
+                prepare_restart_from_game_over();
+                log_game("End screen acknowledged from keyboard. Returning to intro.");
+                return;
+            }
         }
         if (mode == GameMode::Playing && e.type == SDL_EVENT_KEY_DOWN) {
             if (e.key.key == SDLK_F1) {
@@ -524,15 +542,6 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 log_game(std::string("Controls set to ") + (inverted_controls ? "inverted." : "arcade."));
                 return;
             }
-            if (e.key.key == SDLK_RETURN) {
-                restart_game();
-                log_game("Game restarted from keyboard.");
-                return;
-            }
-        }
-        if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE && ship.lives <= 0) {
-            restart_game();
-            log_game("Game restarted after game over.");
         }
     }
 
@@ -583,7 +592,25 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
 
+        if (mode == GameMode::GameOver) {
+            draw_end_screen(image_index, aspect, "Game over", SDL_Color{235, 60, 60, 255});
+            console.draw();
+            return;
+        }
+
+        if (mode == GameMode::GameComplete) {
+            draw_end_screen(image_index, aspect, "Mission complete", SDL_Color{255, 220, 120, 255});
+            console.draw();
+            return;
+        }
+
         const bool console_visible = console.isVisible();
+        update_round_timer(dt);
+        if (mode == GameMode::GameOver) {
+            draw_game_over(image_index, aspect);
+            console.draw();
+            return;
+        }
         if (!console_visible) {
             handle_input(dt);
         }
@@ -593,6 +620,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         update_particles(dt);
 
         if (ship.lives <= 0 && !ship.exploding) {
+            mode = GameMode::GameOver;
+            ship.visible = false;
             if (star_sprite != nullptr) {
                 star_sprite->clearQueue();
             }
@@ -603,6 +632,27 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 effect_sprite->clearQueue();
             }
             draw_game_over(image_index, aspect);
+            console.draw();
+            return;
+        }
+
+        if (mode == GameMode::Playing && active_asteroids() == 0) {
+            mode = GameMode::GameComplete;
+            ship.visible = false;
+            log_game("All asteroids cleared. Mission complete.", SDL_Color{120, 255, 160, 255});
+        }
+
+        if (mode == GameMode::GameComplete) {
+            if (star_sprite != nullptr) {
+                star_sprite->clearQueue();
+            }
+            if (projectile_sprite != nullptr) {
+                projectile_sprite->clearQueue();
+            }
+            if (effect_sprite != nullptr) {
+                effect_sprite->clearQueue();
+            }
+            draw_end_screen(image_index, aspect, "Mission complete", SDL_Color{255, 220, 120, 255});
             console.draw();
             return;
         }
@@ -650,6 +700,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     GameMode mode = GameMode::Intro;
     float intro_fade = 1.0f;
     Uint32 intro_last_update_ms = 0;
+    bool restart_after_intro = false;
     bool debug_menu = false;
     bool inverted_controls = false;
     float keyboard_yaw = 0.0f;
@@ -678,6 +729,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     mxvk::VK_Controller controller;
     bool console_ready = false;
     bool game_resources_loaded = false;
+    int last_font_size = 0;
+    float round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
     int loading_step_index = 0;
     static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
     glm::mat4 last_ship_model_matrix{1.0f};
@@ -735,10 +788,16 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             }
 
             if (cmd == "status") {
-                out << "Mode: " << ((mode == GameMode::Intro) ? "intro" : "playing") << '\n'
+                const char *mode_name = (mode == GameMode::Intro) ? "intro" :
+                                        (mode == GameMode::Loading) ? "loading" :
+                                        (mode == GameMode::Playing) ? "playing" :
+                                        (mode == GameMode::GameComplete) ? "complete" :
+                                                                      "gameover";
+                out << "Mode: " << mode_name << '\n'
                     << "Score: " << ship.score << '\n'
                     << "Lives: " << std::max(0, ship.lives) << '\n'
                     << "Asteroids: " << active_asteroids() << '\n'
+                    << "Time left: " << format_round_time() << '\n'
                     << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n'
                     << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n'
                     << "Controller: " << controller_status() << '\n'
@@ -840,7 +899,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void load_loading_screen_resources() {
-        setFont(asset_root + "/data/font.ttf", 18);
+        set_ui_font_size(18);
 
         intro_sprite = createSprite(
             asset_root + "/data/intro.png",
@@ -864,11 +923,19 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         }
 
         if (intro_fade <= 0.0f) {
-            mode = GameMode::Loading;
             intro_fade = 1.0f;
-            loading_step_index = 0;
-            game_resources_loaded = false;
-            log_game("Intro finished. Loading game resources.");
+            if (restart_after_intro) {
+                restart_after_intro = false;
+                restart_game();
+                mode = GameMode::Playing;
+                intro_last_update_ms = SDL_GetTicks();
+                log_game("Intro finished. Restarting game.");
+            } else {
+                mode = GameMode::Loading;
+                loading_step_index = 0;
+                game_resources_loaded = false;
+                log_game("Intro finished. Loading game resources.");
+            }
             return;
         }
 
@@ -977,6 +1044,14 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void restart_game() {
+        clear_round_state();
+        spawn_initial_asteroids();
+        round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
+        restart_after_intro = false;
+        log_game("Game state reset: score=0 lives=5.");
+    }
+
+    void clear_round_state() {
         ship.position = glm::vec3(0.0f);
         ship.prev_position = ship.position;
         ship.velocity = glm::vec3(0.0f);
@@ -1001,8 +1076,13 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         for (auto &asteroid : asteroids) {
             asteroid.active = false;
         }
-        spawn_initial_asteroids();
-        log_game("Game state reset: score=0 lives=5.");
+        keyboard_yaw = 0.0f;
+        keyboard_pitch = 0.0f;
+        keyboard_roll = 0.0f;
+        smooth_yaw = 0.0f;
+        smooth_pitch = 0.0f;
+        smooth_roll = 0.0f;
+        round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
     }
 
     void spawn_initial_asteroids() {
@@ -1438,12 +1518,10 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void update_asteroids(float dt) {
-        int active_count = 0;
         for (auto &asteroid : asteroids) {
             if (!asteroid.active) {
                 continue;
             }
-            ++active_count;
             asteroid.position += asteroid.velocity * dt;
             asteroid.rotation += asteroid.rotation_speed * dt;
             bool bounced = false;
@@ -1483,11 +1561,6 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             if (asteroid.rotation.x > 360.0f) asteroid.rotation.x -= 360.0f;
             if (asteroid.rotation.y > 360.0f) asteroid.rotation.y -= 360.0f;
             if (asteroid.rotation.z > 360.0f) asteroid.rotation.z -= 360.0f;
-        }
-
-        if (active_count == 0) {
-            spawn_initial_asteroids();
-            log_game("Asteroid field reset.");
         }
 
         for (auto &asteroid : asteroids) {
@@ -1717,6 +1790,55 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         for (auto &particle : particles) {
             particle.active = false;
         }
+    }
+
+    void prepare_restart_from_game_over() {
+        clear_round_state();
+        restart_after_intro = true;
+        mode = GameMode::Intro;
+        intro_fade = 1.0f;
+        intro_last_update_ms = SDL_GetTicks();
+    }
+
+    void update_round_timer(float dt) {
+        if (mode != GameMode::Playing) {
+            return;
+        }
+
+        if (round_time_remaining <= 0.0f) {
+            mode = GameMode::GameOver;
+            return;
+        }
+
+        round_time_remaining = std::max(0.0f, round_time_remaining - dt);
+        if (round_time_remaining <= 0.0f) {
+            mode = GameMode::GameOver;
+            ship.exploding = false;
+            ship.visible = false;
+            ship.fire_cooldown = 0;
+            ship.burst_count = 0;
+            ship.continuous_fire_timer = 0;
+            ship.overheated = false;
+            ship.overheat_cooldown = 0;
+            log_game("Time expired. Game over.", SDL_Color{255, 90, 90, 255});
+        }
+    }
+
+    void set_ui_font_size(int font_size) {
+        if (font_size == last_font_size) {
+            return;
+        }
+
+        last_font_size = font_size;
+        setFont(asset_root + "/data/font.ttf", font_size);
+        clearTextQueue();
+    }
+
+    std::string format_round_time() const {
+        const int total_seconds = std::max(0, static_cast<int>(std::ceil(round_time_remaining)));
+        const int minutes = total_seconds / 60;
+        const int seconds = total_seconds % 60;
+        return std::format("{:02d}:{:02d}", minutes, seconds);
     }
 
     void draw_ship(uint32_t image_index) {
@@ -2120,17 +2242,20 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void draw_hud([[maybe_unused]] float aspect) {
+        set_ui_font_size(18);
         const SDL_Color white{255, 255, 255, 255};
         const SDL_Color red{220, 60, 60, 255};
+        const SDL_Color yellow{255, 220, 120, 255};
         const VkExtent2D extent = getSwapchainExtent();
         const int right_x = std::max(25, static_cast<int>(extent.width) - 250);
         printText("MXVK Asteroids v1.0", right_x, 25, red);
         printText("Score: " + std::to_string(ship.score), right_x, 50, white);
         printText("Lives: " + std::to_string(std::max(0, ship.lives)), right_x, 75, white);
         printText("Asteroids: " + std::to_string(active_asteroids()), right_x, 100, white);
-        printText("[F1 for Debug]", right_x, 125, white);
-        printText(inverted_controls ? "[Inverted] F2/Y" : "[Arcade] F2/Y", right_x, 150, white);
-        printText("[F3 for Console]", right_x, 175, white);
+        printText("Time Left: " + format_round_time(), right_x, 125, round_time_remaining <= 30.0f ? yellow : white);
+        printText("[F1 for Debug]", right_x, 150, white);
+        printText(inverted_controls ? "[Inverted] F2/Y" : "[Arcade] F2/Y", right_x, 175, white);
+        printText("[F3 for Console]", right_x, 200, white);
 
         if (!debug_menu) {
             return;
@@ -2159,12 +2284,54 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         return count;
     }
 
-    void draw_game_over([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect) {
-        const SDL_Color red{235, 60, 60, 255};
+    void draw_end_screen([[maybe_unused]] uint32_t image_index,
+                         [[maybe_unused]] float aspect,
+                         const std::string &title,
+                         const SDL_Color &title_color) {
+        set_ui_font_size(32);
         const SDL_Color white{255, 255, 255, 255};
-        printText("GAME OVER", 24, 20, red);
-        printText("Final Score: " + std::to_string(ship.score), 24, 52, white);
-        printText("Press SPACE to restart", 24, 84, white);
+        const SDL_Color yellow{255, 220, 120, 255};
+        const VkExtent2D extent = getSwapchainExtent();
+
+        const std::string score_text = "Final Score: " + std::to_string(ship.score);
+        const std::string prompt = "Press ENTER to start over";
+
+        int title_w = 0;
+        int title_h = 0;
+        if (getTextDimensions(title.c_str(), title_w, title_h)) {
+            printText(title.c_str(),
+                      static_cast<int>(extent.width) / 2 - title_w / 2,
+                      static_cast<int>(extent.height) / 2 - title_h,
+                      title_color);
+        } else {
+            printText(title.c_str(), 24, 20, title_color);
+        }
+
+        int score_w = 0;
+        int score_h = 0;
+        if (getTextDimensions(score_text.c_str(), score_w, score_h)) {
+            printText(score_text.c_str(),
+                      static_cast<int>(extent.width) / 2 - score_w / 2,
+                      static_cast<int>(extent.height) / 2 + 10,
+                      white);
+        } else {
+            printText(score_text.c_str(), 24, 70, white);
+        }
+
+        int prompt_w = 0;
+        int prompt_h = 0;
+        if (getTextDimensions(prompt.c_str(), prompt_w, prompt_h)) {
+            printText(prompt.c_str(),
+                      static_cast<int>(extent.width) / 2 - prompt_w / 2,
+                      static_cast<int>(extent.height) / 2 + score_h + 28,
+                      yellow);
+        } else {
+            printText(prompt.c_str(), 24, 100, yellow);
+        }
+    }
+
+    void draw_game_over([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect) {
+        draw_end_screen(image_index, aspect, "Game over", SDL_Color{235, 60, 60, 255});
     }
 
     VkCommandBuffer current_command_buffer = VK_NULL_HANDLE;
