@@ -1446,7 +1446,7 @@ namespace walk {
             vkUnmapMemory(window->getDevice(), indexMemory);
         }
 
-        void loadTexture(const std::string &textureManifestPath, const std::string &textureBasePath) {
+        void loadTexture([[maybe_unused]] const std::string &textureManifestPath, const std::string &textureBasePath) {
             SDL_Surface *surface = mxvk::LoadPNG((textureBasePath + "/ground.png").c_str());
             if (surface == nullptr) {
                 throw mxvk::Exception("walk: failed to load raw pillar texture");
@@ -1486,7 +1486,6 @@ namespace walk {
             vkDestroyBuffer(window->getDevice(), stagingBuffer, nullptr);
             vkFreeMemory(window->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
-            (void)textureManifestPath;
         }
 
         mxvk::VK_Window *window = nullptr;
@@ -1772,7 +1771,7 @@ namespace walk {
             vkUnmapMemory(window->getDevice(), indexMemory);
         }
 
-        void loadTexture(const std::string &textureManifestPath, const std::string &textureBasePath) {
+        void loadTexture([[maybe_unused]] const std::string &textureManifestPath, const std::string &textureBasePath) {
             SDL_Surface *surface = mxvk::LoadPNG((textureBasePath + "/wall_bricks.png").c_str());
             if (surface == nullptr) {
                 throw mxvk::Exception("walk: failed to load raw wall texture");
@@ -1812,7 +1811,6 @@ namespace walk {
             vkDestroyBuffer(window->getDevice(), stagingBuffer, nullptr);
             vkFreeMemory(window->getDevice(), stagingMemory, nullptr);
             SDL_DestroySurface(surface);
-            (void)textureManifestPath;
         }
 
         void createTextureSampler() {

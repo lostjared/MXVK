@@ -319,7 +319,7 @@ namespace example {
             }
         }
 
-        void updateStars(float elapsed_seconds) {
+        void updateStars([[maybe_unused]] float elapsed_seconds) {
             constexpr float max_radius = 120.0f;
             constexpr float min_radius = 20.0f;
             constexpr float dt = 1.0f / 60.0f;
@@ -334,8 +334,6 @@ namespace example {
                     star = makeStar();
                 }
             }
-
-            (void)elapsed_seconds;
         }
 
         StarParticle makeStar() const {

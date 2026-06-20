@@ -713,7 +713,7 @@ namespace demo {
             }
 
             const int pitch = static_cast<int>(rgba->pitch);
-            (void)model.updatePrimaryTexture(rgba->pixels, rgba->w, rgba->h, pitch);
+            [[maybe_unused]] const bool texture_updated = model.updatePrimaryTexture(rgba->pixels, rgba->w, rgba->h, pitch);
             SDL_DestroySurface(rgba);
         }
 
@@ -739,8 +739,8 @@ namespace demo {
                 return;
             }
             mouseCaptured = enabled;
-            (void)SDL_SetWindowMouseGrab(window.get(), enabled);
-            (void)SDL_SetWindowRelativeMouseMode(window.get(), enabled);
+            [[maybe_unused]] const bool mouse_grabbed = SDL_SetWindowMouseGrab(window.get(), enabled);
+            [[maybe_unused]] const bool relative_mouse_mode = SDL_SetWindowRelativeMouseMode(window.get(), enabled);
             if (enabled) {
                 SDL_HideCursor();
             } else {
@@ -787,7 +787,7 @@ namespace demo {
             const char *hint = "ENTER / A - Play";
             int tw = 0;
             int th = 0;
-            (void)getTextDimensions(hint, tw, th);
+            [[maybe_unused]] const bool hint_dims = getTextDimensions(hint, tw, th);
             const int x = width / 2 - tw / 2;
             const int y = height - (th * 3) + 20;
             printText(hint, x, y, SDL_Color{220, 220, 100, 255});
@@ -828,22 +828,22 @@ namespace demo {
 
                 int tw = 0;
                 int th = 0;
-                (void)getTextDimensions(ys.str(), tw, th);
+                [[maybe_unused]] const bool score_dims = getTextDimensions(ys.str(), tw, th);
                 printText(ys.str(), feltCX - tw / 2, entryY, SDL_Color{255, 255, 0, 255});
 
                 const std::string dn = playerName + "_";
-                (void)getTextDimensions(dn, tw, th);
+                [[maybe_unused]] const bool name_dims = getTextDimensions(dn, tw, th);
                 printText(dn, feltCX - tw / 2, entryY + lineH, SDL_Color{0, 255, 255, 255});
 
                 const std::string confirm = "ENTER to confirm";
                 const std::string del = "BACKSPACE to delete";
                 int cw = 0;
                 int ch = 0;
-                (void)getTextDimensions(confirm, cw, ch);
+                [[maybe_unused]] const bool confirm_dims = getTextDimensions(confirm, cw, ch);
                 printText(confirm, feltCX - cw - fs / 3, entryY + lineH * 2, SDL_Color{200, 200, 200, 255});
                 int dw = 0;
                 int dh = 0;
-                (void)getTextDimensions(del, dw, dh);
+                [[maybe_unused]] const bool delete_dims = getTextDimensions(del, dw, dh);
                 printText(del, feltCX + fs / 3, entryY + lineH * 2, SDL_Color{200, 200, 200, 255});
 
                 scoresConfirmRect = makeTextRect(confirm, feltCX - cw - fs / 3, entryY + lineH * 2, 10);
@@ -853,7 +853,7 @@ namespace demo {
                 const std::string ret = "Press ENTER to return to intro";
                 int tw = 0;
                 int th = 0;
-                (void)getTextDimensions(ret, tw, th);
+                [[maybe_unused]] const bool return_dims = getTextDimensions(ret, tw, th);
                 const int x = feltCX - tw / 2;
                 const int y = feltB - lineH;
                 printText(ret, x, y, SDL_Color{255, 255, 0, 255});
@@ -1470,7 +1470,7 @@ namespace demo {
         SDL_Rect makeTextRect(const std::string &txt, int x, int y, int pad) {
             int tw = 0;
             int th = 0;
-            (void)getTextDimensions(txt, tw, th);
+            [[maybe_unused]] const bool text_dims = getTextDimensions(txt, tw, th);
             SDL_Rect r{};
             r.x = x - pad;
             r.y = y - pad;

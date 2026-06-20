@@ -859,13 +859,12 @@ namespace {
         void parseMultiplayerSnapshot(const std::string &line) {
             std::istringstream in(line);
             char type = 0;
-            std::uint32_t sequence = 0;
+            [[maybe_unused]] std::uint32_t sequence = 0;
             std::string cells;
             int remoteGameOver = 0;
             MultiplayerSnapshot snapshot{};
 
             in >> type >> sequence >> snapshot.score >> snapshot.lines >> snapshot.level >> remoteGameOver >> cells;
-            (void)sequence;
             if (type != 'S' || cells.size() != static_cast<std::size_t>(boardWidth * boardHeight)) {
                 return;
             }
@@ -2073,11 +2072,10 @@ namespace {
             sprite->clearQueue();
         }
 
-        void drawNextPiecePreview(VkCommandBuffer cmd, uint32_t imageIndex, const VkExtent2D &extent) {
+        void drawNextPiecePreview(VkCommandBuffer cmd, [[maybe_unused]] uint32_t imageIndex, const VkExtent2D &extent) {
             if (screen != AppScreen::Game || introActive || previewBorderSprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
                 return;
             }
-            (void)imageIndex;
 
             const int panelSize = std::min({220, static_cast<int>(static_cast<float>(extent.width) * 0.28f), static_cast<int>(static_cast<float>(extent.height) * 0.34f)});
             const int panelW = panelSize;

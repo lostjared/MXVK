@@ -1123,7 +1123,6 @@ namespace example {
         }
 
         void drawGame(Uint64 now) {
-            (void)now;
             const float scaleX = static_cast<float>(layout.width) / static_cast<float>(game_base_width);
             const float scaleY = static_cast<float>(layout.height) / static_cast<float>(game_base_height);
             drawSprite(background_game, 0, 0, layout.width, layout.height);
@@ -1271,8 +1270,7 @@ namespace example {
             }
         }
 
-        void pollController(Uint64 now) {
-            (void)now;
+        void pollController([[maybe_unused]] Uint64 now) {
             if (gamepad == nullptr) {
                 return;
             }

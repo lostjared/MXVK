@@ -1170,7 +1170,7 @@ void Writer::write_hdr_rgba16(void *rgba16_buffer) {
     queue_cv.notify_one();
 }
 
-bool Writer::write_cuda_rgba(void *cuda_rgba_buffer, int src_stride, bool bottom_up) {
+bool Writer::write_cuda_rgba(void *cuda_rgba_buffer, int src_stride, [[maybe_unused]] bool bottom_up) {
     if (!cuda_rgba_buffer || src_stride <= 0) {
         return false;
     }
@@ -1259,7 +1259,6 @@ bool Writer::write_cuda_rgba(void *cuda_rgba_buffer, int src_stride, bool bottom
         }
     }
 #else
-    (void)bottom_up;
     std::cerr << "Writer: CUDA copy support disabled at build time\n";
     releaseFrame(queued_frame);
     return false;

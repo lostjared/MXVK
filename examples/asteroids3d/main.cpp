@@ -55,6 +55,7 @@ constexpr float BOUNDARY_BOUNCE_FACTOR = 1.2f;
 
 enum class GameMode {
     Intro,
+    Loading,
     Playing
 };
 
@@ -402,7 +403,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         }
 
         setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        load_resources();
+        load_loading_screen_resources();
         configure_console();
     }
 
@@ -519,6 +520,12 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
 
+        if (mode == GameMode::Loading) {
+            draw_loading(extent);
+            console.draw();
+            return;
+        }
+
         if (!console.isVisible()) {
             handle_input(dt);
         }
@@ -611,6 +618,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     mxvk::VK_Sprite *intro_sprite = nullptr;
     mxvk::VK_Console console;
     bool console_ready = false;
+    bool loading_screen_drawn = false;
+    bool game_resources_loaded = false;
     glm::mat4 last_ship_model_matrix{1.0f};
     VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
     VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
@@ -730,7 +739,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         });
     }
 
-    void load_resources() {
+    void load_loading_screen_resources() {
         setFont(asset_root + "/data/font.ttf", 18);
 
         intro_sprite = createSprite(
@@ -738,7 +747,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             asset_root + "/data/sprite.vert.spv",
             std::string(ASTEROIDS3D_SHADER_DIR) + "/intro.frag.spv");
         intro_last_update_ms = SDL_GetTicks();
+    }
 
+    void load_game_resources() {
         std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
         star_sprite = createSprite3D(star_surface.get());
         if (star_sprite == nullptr) {
@@ -796,9 +807,19 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         restart_game();
     }
 
+    void ensure_game_resources_loaded() {
+        if (game_resources_loaded) {
+            return;
+        }
+
+        load_game_resources();
+        intro_last_update_ms = SDL_GetTicks();
+        game_resources_loaded = true;
+    }
+
     void draw_intro(const VkExtent2D &extent) {
         if (intro_sprite == nullptr) {
-            mode = GameMode::Playing;
+            mode = GameMode::Loading;
             return;
         }
 
@@ -809,16 +830,28 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         }
 
         if (intro_fade <= 0.0f) {
-            mode = GameMode::Playing;
+            mode = GameMode::Loading;
             intro_fade = 1.0f;
-            log_game("Intro finished. Game is now playing.");
+            loading_screen_drawn = false;
+            log_game("Intro finished. Loading game resources.");
             return;
         }
 
         intro_sprite->setShaderParams(static_cast<float>(current_ms) / 1000.0f, 0.0f, 0.0f, intro_fade);
         intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-        if (intro_fade <= 0.1f) {
+    }
+
+    void draw_loading([[maybe_unused]] const VkExtent2D &extent) {
+        if (!loading_screen_drawn) {
             printText("Loading ...", 25, 25, {255, 255, 255, 255});
+            loading_screen_drawn = true;
+            return;
+        }
+
+        if (!game_resources_loaded) {
+            ensure_game_resources_loaded();
+            mode = GameMode::Playing;
+            log_game("Loading complete. Game is now playing.");
         }
     }
 
@@ -1868,8 +1901,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         throw mxvk::Exception("Failed to find asteroids3d memory type");
     }
 
-    void draw_hud(float aspect) {
-        (void)aspect;
+    void draw_hud([[maybe_unused]] float aspect) {
         const SDL_Color white{255, 255, 255, 255};
         const SDL_Color red{220, 60, 60, 255};
         const VkExtent2D extent = getSwapchainExtent();
@@ -1909,9 +1941,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         return count;
     }
 
-    void draw_game_over(uint32_t image_index, float aspect) {
-        (void)image_index;
-        (void)aspect;
+    void draw_game_over([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect) {
         const SDL_Color red{235, 60, 60, 255};
         const SDL_Color white{255, 255, 255, 255};
         printText("GAME OVER", 24, 20, red);

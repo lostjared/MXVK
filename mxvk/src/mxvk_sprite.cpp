@@ -1612,11 +1612,9 @@ namespace mxvk {
         shaderParams = glm::vec4(p1, p2, p3, p4);
     }
 
-    void VK_Sprite::prepareForRendering(VkCommandBuffer cmdBuffer) {
+    void VK_Sprite::prepareForRendering([[maybe_unused]] VkCommandBuffer cmdBuffer) {
 #ifdef MXVK_CUDA
         recordCudaReadyBarrier(cmdBuffer);
-#else
-        (void)cmdBuffer;
 #endif
     }
 

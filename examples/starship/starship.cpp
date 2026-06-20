@@ -721,7 +721,7 @@ namespace example {
         }
 
         void updateStarUniform(uint32_t imageIndex,
-                               const VkExtent2D &extent,
+                               [[maybe_unused]] const VkExtent2D &extent,
                                const glm::mat4 &view,
                                const glm::mat4 &proj,
                                float timeSeconds) {
@@ -735,8 +735,6 @@ namespace example {
             ubo.proj = proj;
             ubo.params = glm::vec4(timeSeconds, 0.0f, 0.0f, 0.0f);
             ubo.color = glm::vec4(1.0f);
-
-            (void)extent;
             std::memcpy(starUniformBufferMapped[imageIndex], &ubo, sizeof(ubo));
         }
 

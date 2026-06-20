@@ -1298,7 +1298,7 @@ class ComputeWindow : public mxvk::VK_Window {
         return imageView;
     }
 
-    void allocCImg(ComputeImage &img, VkCommandBuffer cmd, bool cudaExportable = false) {
+    void allocCImg(ComputeImage &img, VkCommandBuffer cmd, [[maybe_unused]] bool cudaExportable = false) {
 #ifdef MXVK_CUDA
         if (cudaExportable) {
             try {
@@ -1319,8 +1319,6 @@ class ComputeWindow : public mxvk::VK_Window {
             }
         } else
 #else
-        (void)cudaExportable;
-#endif
         {
             createImage(
                 static_cast<uint32_t>(texWidth),
