@@ -1874,7 +1874,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         const SDL_Color red{220, 60, 60, 255};
         const VkExtent2D extent = getSwapchainExtent();
         const int right_x = std::max(25, static_cast<int>(extent.width) - 250);
-        printText("MX2 Asteroids v2.0", right_x, 25, red);
+        printText("MXVK Asteroids v1.0", right_x, 25, red);
         printText("Score: " + std::to_string(ship.score), right_x, 50, white);
         printText("Lives: " + std::to_string(std::max(0, ship.lives)), right_x, 75, white);
         printText("Asteroids: " + std::to_string(active_asteroids()), right_x, 100, white);
