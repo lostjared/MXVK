@@ -604,7 +604,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     glm::mat4 projection_matrix{1.0f};
 
     mxvk::VKAbstractModel ship_model{};
-    std::array<mxvk::VKAbstractModel, 3> asteroid_models{};
+    std::array<mxvk::VKAbstractModel, MAX_ASTEROIDS> asteroid_models{};
     mxvk::VK_Sprite3D *star_sprite = nullptr;
     mxvk::VK_Sprite3D *projectile_sprite = nullptr;
     mxvk::VK_Sprite3D *effect_sprite = nullptr;
@@ -785,7 +785,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             (random_int(0, 1) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex",
         };
         for (size_t i = 0; i < asteroid_models.size(); ++i) {
-            asteroid_models[i].load(this, asteroid_paths[i], asteroid_textures[i], asset_root + "/data", 1.0f);
+            const int model_index = static_cast<int>(i % asteroid_paths.size());
+            asteroids[i].model_index = model_index;
+            asteroid_models[i].load(this, asteroid_paths[static_cast<std::size_t>(model_index)], asteroid_textures[static_cast<std::size_t>(model_index)], asset_root + "/data", 1.0f);
             asteroid_models[i].setShaders(this, model_vert, model_frag);
             asteroid_models[i].setBackfaceCulling(false);
         }
@@ -861,30 +863,35 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             spawn_asteroid(position,
                            glm::vec3(random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f)),
                            random_float(2.8f, 7.0f),
-                           0);
+                           0,
+                           random_int(0, 2));
         }
         log_game("Initial asteroid field spawned.");
     }
 
-    void spawn_asteroid(const glm::vec3 &position, const glm::vec3 &velocity, float radius, int generation) {
-        for (auto &asteroid : asteroids) {
-            if (asteroid.active) {
-                continue;
-            }
-            asteroid.position = position;
-            asteroid.velocity = velocity;
-            asteroid.radius = radius;
-            asteroid.generation = generation;
-            asteroid.rotation = glm::vec3(random_float(0.0f, 360.0f), random_float(0.0f, 360.0f), random_float(0.0f, 360.0f));
-            asteroid.rotation_speed = glm::vec3(random_float(-45.0f, 45.0f), random_float(-45.0f, 45.0f), random_float(-45.0f, 45.0f));
-            asteroid.model_index = random_int(0, 2);
-            asteroid.active = true;
-            if (generation == 0) {
-                log_game(std::format("Asteroid spawned at ({:.1f}, {:.1f}, {:.1f}) radius {:.1f}.", position.x, position.y, position.z, radius));
-            }
+    void spawn_asteroid(const glm::vec3 &position, const glm::vec3 &velocity, float radius, int generation, int preferred_model_index = -1) {
+        Asteroid *free_asteroid = find_free_asteroid(preferred_model_index);
+        if (free_asteroid == nullptr && preferred_model_index >= 0) {
+            free_asteroid = find_free_asteroid();
+        }
+
+        if (free_asteroid == nullptr) {
+            log_game("Asteroid spawn skipped: no free asteroid slots.", SDL_Color{255, 190, 90, 255});
             return;
         }
-        log_game("Asteroid spawn skipped: no free asteroid slots.", SDL_Color{255, 190, 90, 255});
+
+        const int slot_model_index = free_asteroid->model_index;
+        free_asteroid->position = position;
+        free_asteroid->velocity = velocity;
+        free_asteroid->radius = radius;
+        free_asteroid->generation = generation;
+        free_asteroid->rotation = glm::vec3(random_float(0.0f, 360.0f), random_float(0.0f, 360.0f), random_float(0.0f, 360.0f));
+        free_asteroid->rotation_speed = glm::vec3(random_float(-45.0f, 45.0f), random_float(-45.0f, 45.0f), random_float(-45.0f, 45.0f));
+        free_asteroid->model_index = slot_model_index;
+        free_asteroid->active = true;
+        if (generation == 0) {
+            log_game(std::format("Asteroid spawned at ({:.1f}, {:.1f}, {:.1f}) radius {:.1f}.", position.x, position.y, position.z, radius));
+        }
     }
 
     void handle_input(float dt) {
@@ -1177,7 +1184,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         };
 
         for (int i = 0; i < child_count; ++i) {
-            Asteroid *child = find_free_asteroid();
+            Asteroid *child = find_free_asteroid(asteroid.model_index);
             if (child == nullptr) {
                 log_game("Asteroid split skipped: asteroid pool exhausted.", SDL_Color{255, 190, 90, 255});
                 break;
@@ -1213,9 +1220,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         asteroid.active = false;
     }
 
-    Asteroid *find_free_asteroid() {
+    Asteroid *find_free_asteroid(int preferred_model_index = -1) {
         for (auto &asteroid : asteroids) {
-            if (!asteroid.active) {
+            if (!asteroid.active && (preferred_model_index < 0 || asteroid.model_index == preferred_model_index)) {
                 return &asteroid;
             }
         }
@@ -1469,19 +1476,21 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void draw_asteroids(uint32_t image_index) {
-        for (const auto &asteroid : asteroids) {
+        for (std::size_t i = 0; i < asteroids.size(); ++i) {
+            const Asteroid &asteroid = asteroids[i];
             if (!asteroid.active) {
                 continue;
             }
             mxvk::UniformBufferObject ubo{};
             const float scale = asteroid.radius;
-            ubo.model = build_model_matrix(asteroid.position, asteroid.rotation, scale * asteroid_models[asteroid.model_index].modelRenderScale(),
-                                            asteroid_models[asteroid.model_index].modelCenterOffset());
+            mxvk::VKAbstractModel &asteroid_model = asteroid_models[i];
+            ubo.model = build_model_matrix(asteroid.position, asteroid.rotation, scale * asteroid_model.modelRenderScale(),
+                                            asteroid_model.modelCenterOffset());
             ubo.view = view_matrix;
             ubo.proj = projection_matrix;
             ubo.fx = glm::vec4(camera_position, elapsed_seconds);
-            asteroid_models[asteroid.model_index].updateUBO(image_index, ubo);
-            asteroid_models[asteroid.model_index].render(current_command_buffer, image_index, false);
+            asteroid_model.updateUBO(image_index, ubo);
+            asteroid_model.render(current_command_buffer, image_index, false);
         }
     }
 
