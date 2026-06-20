@@ -320,7 +320,7 @@ class StarField {
             }
 
         const float twinkle = 0.65f + 0.35f * std::sin(elapsed_time * star.twinkle_speed + star.twinkle_phase);
-        const float fade = std::clamp(1.0f - ((distance - min_radius) / (max_radius - min_radius)), 0.2f, 1.0f);
+        const float fade = std::clamp(1.0f - ((distance - min_radius) / (max_radius - min_radius)), 0.2f, 0.7f);
         const float brightness = star.brightness * twinkle * fade;
         star.color = glm::vec4(
             std::clamp(star.base_color.r * brightness, 0.0f, 1.0f),
