@@ -87,5 +87,14 @@ add_custom_command(TARGET asteroids3d POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         $<TARGET_FILE_DIR:asteroids3d>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid.obj
+        $<TARGET_FILE_DIR:asteroids3d>/data/asteroid.obj
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid2.obj
+        $<TARGET_FILE_DIR:asteroids3d>/data/asteroid2.obj
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid3.obj
+        $<TARGET_FILE_DIR:asteroids3d>/data/asteroid3.obj
     COMMENT "Copying asteroids3d assets to runtime output directory"
 )

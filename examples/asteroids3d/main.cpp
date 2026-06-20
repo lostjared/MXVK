@@ -950,9 +950,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
 
     void load_asteroid_model_slot(std::size_t slot_index, const std::string &model_vert, const std::string &model_frag) {
         static constexpr std::array<const char *, 3> asteroid_paths = {
-            "data/asteroid.mxmod",
-            "data/asteroid2.mxmod",
-            "data/asteroid3.mxmod",
+            "data/asteroid.obj",
+            "data/asteroid2.obj",
+            "data/asteroid3.obj",
         };
 
         const std::size_t model_variant = slot_index % asteroid_paths.size();
