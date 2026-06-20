@@ -33,7 +33,7 @@ namespace {
 constexpr float PI = 3.14159265358979323846f;
 constexpr int GAME_STARS = 22000;
 constexpr int MAX_PROJECTILES = 64;
-constexpr int MAX_ASTEROIDS = 49;
+constexpr int MAX_ASTEROIDS = 64;
 constexpr int MAX_PARTICLES = 6000;
 constexpr int MAX_GENERATIONS = 1;
 constexpr int CHILDREN_PER_SPAWN = 2;
@@ -679,7 +679,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     bool console_ready = false;
     bool game_resources_loaded = false;
     int loading_step_index = 0;
-    static constexpr int loading_step_count = 57;
+    static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
     glm::mat4 last_ship_model_matrix{1.0f};
     VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
     VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
@@ -891,8 +891,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         const std::string model_vert = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.vert.spv";
         const std::string model_frag = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.frag.spv";
 
-        switch (loading_step_index) {
-        case 0: {
+        if (loading_step_index == 0) {
             std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
             star_sprite = createSprite3D(star_surface.get());
             if (star_sprite == nullptr) {
@@ -901,9 +900,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             star_sprite->setDepthTestEnabled(false);
             star_sprite->setDepthWriteEnabled(false);
             star_sprite->setAlphaDiscardThreshold(0.01f);
-            break;
-        }
-        case 1: {
+        } else if (loading_step_index == 1) {
             std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> fire_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
             projectile_sprite = createSprite3D(fire_surface.get());
             if (projectile_sprite == nullptr) {
@@ -912,9 +909,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             projectile_sprite->setDepthTestEnabled(true);
             projectile_sprite->setDepthWriteEnabled(false);
             projectile_sprite->setAlphaDiscardThreshold(0.05f);
-            break;
-        }
-        case 2: {
+        } else if (loading_step_index == 2) {
             std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
             effect_sprite = createSprite3D(explosion_surface.get());
             if (effect_sprite == nullptr) {
@@ -923,82 +918,20 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             effect_sprite->setDepthTestEnabled(true);
             effect_sprite->setDepthWriteEnabled(false);
             effect_sprite->setAlphaDiscardThreshold(0.05f);
-            break;
-        }
-        case 3: {
+        } else if (loading_step_index == 3) {
             ship_model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
-            break;
-        }
-        case 4: {
+        } else if (loading_step_index == 4) {
             ship_model.setShaders(this, model_vert, model_frag);
             ship_model.setBackfaceCulling(false);
-            break;
-        }
-        case 5: {
+        } else if (loading_step_index == 5) {
             create_flame_resources();
-            break;
-        }
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 10:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-        case 15:
-        case 16:
-        case 17:
-        case 18:
-        case 19:
-        case 20:
-        case 21:
-        case 22:
-        case 23:
-        case 24:
-        case 25:
-        case 26:
-        case 27:
-        case 28:
-        case 29:
-        case 30:
-        case 31:
-        case 32:
-        case 33:
-        case 34:
-        case 35:
-        case 36:
-        case 37:
-        case 38:
-        case 39:
-        case 40:
-        case 41:
-        case 42:
-        case 43:
-        case 44:
-        case 45:
-        case 46:
-        case 47:
-        case 48:
-        case 49:
-        case 50:
-        case 51:
-        case 52:
-        case 53:
-        case 54: {
+        } else if (loading_step_index >= 6 && loading_step_index < 6 + MAX_ASTEROIDS) {
             load_asteroid_model_slot(static_cast<std::size_t>(loading_step_index - 6), model_vert, model_frag);
-            break;
-        }
-        case 55: {
+        } else if (loading_step_index == 6 + MAX_ASTEROIDS) {
             star_field.init(GAME_STARS, 4.0f, 30.0f);
-            break;
-        }
-        case 56: {
+        } else if (loading_step_index == 7 + MAX_ASTEROIDS) {
             restart_game();
-            break;
-        }
-        default:
+        } else {
             game_resources_loaded = true;
             intro_last_update_ms = SDL_GetTicks();
             mode = GameMode::Playing;
@@ -1461,7 +1394,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         for (int i = 0; i < child_count; ++i) {
             Asteroid *child = find_free_asteroid(asteroid.model_index);
             if (child == nullptr) {
-                log_game("Asteroid split skipped: asteroid pool exhausted.", SDL_Color{255, 190, 90, 255});
+                log_game("Asteroid split skipped: no free slot for parent asteroid type.", SDL_Color{255, 190, 90, 255});
                 break;
             }
 
