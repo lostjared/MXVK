@@ -46,7 +46,9 @@ constexpr int FIRE_COOLDOWN = 5;
 constexpr int SHOTS_PER_BURST = 5;
 constexpr int FIRE_DELAY = 3;
 constexpr int EXPLOSION_DURATION_FRAMES = 90;
-constexpr float ASTEROID_SHIP_COLLISION_SCALE = 0.97f;
+constexpr float SHIP_MODEL_SCALE = 1.55f;
+constexpr float ASTEROID_SHIP_COLLISION_SCALE = 1.08f;
+constexpr float ASTEROID_PROJECTILE_COLLISION_SCALE = 1.18f;
 constexpr glm::vec4 PROJECTILE_COLOR{1.0f, 0.58f, 0.12f, 1.0f};
 constexpr Sint16 CONTROLLER_DEAD_ZONE = 8000;
 constexpr float CONTROLLER_AXIS_MAX = 32767.0f;
@@ -1411,7 +1413,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 }
 
                 const float dist = glm::length(closest_point - asteroid.position);
-                const float projectile_hit_radius = asteroid.radius * 0.97f;
+                const float projectile_hit_radius = asteroid.radius * ASTEROID_PROJECTILE_COLLISION_SCALE;
 
                 if (dist < projectile_hit_radius) {
                     projectile.active = false;
@@ -1570,35 +1572,39 @@ class Asteroids3DWindow : public mxvk::VK_Window {
 
     float ship_asteroid_collision_distance(const Asteroid &asteroid) const {
         static constexpr std::array<ShipCollisionSample, 5> ship_samples = {
-            ShipCollisionSample{{0.0f, 0.0f, -1.45f}, 0.26f},
-            ShipCollisionSample{{0.0f, 0.0f, -0.45f}, 0.42f},
-            ShipCollisionSample{{0.0f, 0.0f, 0.55f}, 0.34f},
-            ShipCollisionSample{{-1.10f, 0.0f, -0.05f}, 0.24f},
-            ShipCollisionSample{{1.10f, 0.0f, -0.05f}, 0.24f},
+            ShipCollisionSample{{0.0f, 0.0f, -0.55f}, 0.055f},
+            ShipCollisionSample{{0.0f, 0.06f, -0.16f}, 0.160f},
+            ShipCollisionSample{{0.0f, 0.08f, 0.34f}, 0.125f},
+            ShipCollisionSample{{-0.42f, 0.03f, -0.02f}, 0.085f},
+            ShipCollisionSample{{0.42f, 0.03f, -0.02f}, 0.085f},
         };
 
         const float asteroid_collision_radius = asteroid.radius * ASTEROID_SHIP_COLLISION_SCALE;
         float nearest_surface_distance = std::numeric_limits<float>::max();
 
         for (const ShipCollisionSample &sample : ship_samples) {
+            const float ship_scale = rendered_ship_scale();
             const glm::vec3 offset = transform_ship_collision_offset(sample.local_position);
             const glm::vec3 previous_position = ship.prev_position + offset;
             const glm::vec3 current_position = ship.position + offset;
             const float center_distance = swept_point_distance_to_asteroid(previous_position, current_position, asteroid.position);
-            nearest_surface_distance = std::min(nearest_surface_distance, center_distance - asteroid_collision_radius - sample.radius);
+            nearest_surface_distance = std::min(nearest_surface_distance, center_distance - asteroid_collision_radius - (sample.radius * ship_scale));
         }
 
         return nearest_surface_distance;
     }
 
     glm::vec3 transform_ship_collision_offset(const glm::vec3 &local_position) const {
-        const float ship_scale = 1.55f * ship_model.modelRenderScale();
         const glm::mat4 model = build_model_matrix(
             glm::vec3(0.0f),
             ship.rotation,
-            ship_scale,
+            rendered_ship_scale(),
             ship_model.modelCenterOffset());
         return glm::vec3(model * glm::vec4(local_position, 1.0f));
+    }
+
+    float rendered_ship_scale() const {
+        return SHIP_MODEL_SCALE * ship_model.modelRenderScale();
     }
 
     float swept_point_distance_to_asteroid(const glm::vec3 &previous_position,
@@ -1785,9 +1791,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
 
-        const float ship_scale = 1.55f;
         mxvk::UniformBufferObject ubo{};
-        ubo.model = build_model_matrix(ship.position, ship.rotation, ship_scale * ship_model.modelRenderScale(), ship_model.modelCenterOffset());
+        ubo.model = build_model_matrix(ship.position, ship.rotation, rendered_ship_scale(), ship_model.modelCenterOffset());
         last_ship_model_matrix = ubo.model;
         ubo.view = view_matrix;
         ubo.proj = projection_matrix;
