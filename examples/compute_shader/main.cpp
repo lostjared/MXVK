@@ -118,6 +118,7 @@ class ComputeWindow : public mxvk::VK_Window {
           encodeTune(args.encodeTune),
           encodeCodec(args.encodeCodec),
           encodeRealtime(args.encodeRealtime),
+          mxwriteBlockWhenFull(args.mxwriteBlockWhenFull),
           repeat(args.repeat),
           cameraIndex(args.camera_index),
           requestedShaderIndex(args.shader_index),
@@ -295,6 +296,7 @@ class ComputeWindow : public mxvk::VK_Window {
     std::string encodeTune;
     std::string encodeCodec;
     bool encodeRealtime = false;
+    bool mxwriteBlockWhenFull = false;
     bool repeat = false;
     mxvk::Font fpsFont{};
     int cameraIndex = 0;
@@ -587,6 +589,7 @@ class ComputeWindow : public mxvk::VK_Window {
         }
         encodeOptions.realtime = encodeRealtime;
 
+        videoWriter.set_block_when_full(mxwriteBlockWhenFull);
         if (!videoWriter.open(outputFilename, recordWidth, recordHeight, static_cast<float>(sourceFps), encodeOptions)) {
             throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
         }
@@ -596,7 +599,8 @@ class ComputeWindow : public mxvk::VK_Window {
                   << ", codec=" << encodeOptions.codec
                   << ", preset=" << encodeOptions.preset
                   << ", tune=" << (encodeOptions.tune.empty() ? "none" : encodeOptions.tune)
-                  << ", realtime=" << (encodeOptions.realtime ? "true" : "false") << "\n";
+                  << ", realtime=" << (encodeOptions.realtime ? "true" : "false")
+                  << ", block_when_full=" << (mxwriteBlockWhenFull ? "true" : "false") << "\n";
     }
 
     void recordFrame(const cv::Mat &frame) {

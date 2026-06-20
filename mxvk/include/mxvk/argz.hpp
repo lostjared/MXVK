@@ -697,6 +697,7 @@ struct Arguments {
     std::string encodeTune;           ///< Optional encoder tune (@c --encode-tune).
     std::string encodeCodec;          ///< Optional encoder codec policy (@c --encode-codec).
     bool encodeRealtime = false;      ///< Enable low-latency encoder settings (@c --encode-realtime).
+    bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
     bool repeat = false;              ///< Repeat video playback when a file reaches EOF.
     std::string texture;              ///< Optional texture file path (@c --texture).
     std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
@@ -726,6 +727,7 @@ struct Arguments {
  * |      | --encode-tune      | Encoder tune                                 |
  * |      | --encode-codec     | Encoder codec policy                         |
  * |      | --encode-realtime  | Enable realtime/low-latency encoding         |
+ * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
  * |      | --repeat           | Repeat video playback at EOF                 |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
@@ -758,6 +760,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(307, "encode-tune", "encoder tune")
         .addOptionDoubleValue(308, "encode-codec", "encoder codec policy")
         .addOptionDouble(309, "encode-realtime", "encoder realtime mode")
+        .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
         .addOptionDouble(310, "repeat", "repeat video playback")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
@@ -784,6 +787,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     std::string encodeTune;
     std::string encodeCodec;
     bool encodeRealtime = false;
+    bool mxwriteBlockWhenFull = false;
     bool repeat = false;
     std::string texture;
     std::string shaderPath;
@@ -823,6 +827,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 309:
             encodeRealtime = true;
+            break;
+        case 314:
+            mxwriteBlockWhenFull = true;
             break;
         case 310:
             repeat = true;
@@ -897,6 +904,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.encodeTune = encodeTune;
     args.encodeCodec = encodeCodec;
     args.encodeRealtime = encodeRealtime;
+    args.mxwriteBlockWhenFull = mxwriteBlockWhenFull;
     args.repeat = repeat;
     args.texture = texture;
     args.shaderPath = shaderPath;

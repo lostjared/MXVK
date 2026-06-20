@@ -115,7 +115,7 @@ namespace example {
             ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
             ubo.proj[1][1] *= -1.0f;
-            ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 1.0f);
+            ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 0.37f);
 
             model.updateUBO(imageIndex, ubo);
             model.render(cmd, imageIndex, false);

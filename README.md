@@ -137,6 +137,8 @@ Supported options:
 	- Optional MXWrite encoder backend policy. `auto` prefers NVENC when available, `software` forces x264, and `nvenc` requests NVENC with fallback handled by MXWrite.
 - `--encode-realtime`
 	- Enable MXWrite low-latency/realtime encoder settings.
+- `--mxwrite-block`
+	- Make MXWrite block when its internal queue is full instead of dropping frames.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`
