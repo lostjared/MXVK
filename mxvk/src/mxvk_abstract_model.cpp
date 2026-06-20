@@ -339,6 +339,9 @@ namespace mxvk {
         if (targetWindow == nullptr || targetWindow->getDevice() == VK_NULL_HANDLE) {
             return;
         }
+        if (!isLoaded()) {
+            return;
+        }
 
         logVKAbstractModelStep("resize begin");
         windowPtr = targetWindow;
@@ -1456,6 +1459,11 @@ namespace mxvk {
         const size_t textureCount = std::max<size_t>(1, textures.size());
         const size_t frameCount = windowPtr->getSwapchainImageCount();
         const size_t setCount = textureCount * frameCount;
+
+        if (descriptorPool == VK_NULL_HANDLE || descriptorSetLayout == VK_NULL_HANDLE ||
+            frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty()) {
+            return;
+        }
 
         std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout);
 

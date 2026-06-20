@@ -127,6 +127,8 @@ namespace mxvk {
         [[nodiscard]] float modelRenderScale() const { return modelRenderScaleValue; }
         /** @brief Per-axis extent (max - min) of the source mesh's bounding box. */
         [[nodiscard]] glm::vec3 modelAxisExtent() const { return modelAxisExtentValue; }
+        /** @brief True once the model has been uploaded to GPU buffers. */
+        [[nodiscard]] bool isLoaded() const { return obj.indexCount() > 0 && vertexBufferReady(); }
 
         /**
          * @brief Enable or disable backface culling for this model pipeline.
@@ -180,6 +182,8 @@ namespace mxvk {
         bool backfaceCullingEnabled = false;
 
         VK_Window *windowPtr = nullptr;
+
+        [[nodiscard]] bool vertexBufferReady() const { return obj.vertexBuffer() != VK_NULL_HANDLE && obj.indexBuffer() != VK_NULL_HANDLE; }
 
         void computeBoundsAndScale();
         void loadTextures(const std::string &textureManifestPath, const std::string &textureBasePath);
