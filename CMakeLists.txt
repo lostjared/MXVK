@@ -558,6 +558,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(glitch_cube)
     add_subdirectory(examples/asteroids)
     mxvk_configure_mingw_target(asteroids)
+    add_subdirectory(examples/asteroids3d)
+    mxvk_configure_mingw_target(asteroids3d)
     add_subdirectory(examples/pong)
     mxvk_configure_mingw_target(pong)
     add_subdirectory(examples/tetris)
@@ -688,6 +690,7 @@ if(EXAMPLES)
         tux_example
         glitch_cube
         asteroids
+        asteroids3d
         pong
         tictactoe
         puzzle
