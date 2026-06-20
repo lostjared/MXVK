@@ -256,6 +256,7 @@ struct Star {
 
 struct Ship {
     glm::vec3 position{0.0f, 0.0f, 0.0f};
+    glm::vec3 prev_position{0.0f, 0.0f, 0.0f};
     glm::vec3 velocity{0.0f};
     glm::vec3 rotation{0.0f};
     float current_speed = 1.0f;
@@ -891,6 +892,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
 
     void restart_game() {
         ship.position = glm::vec3(0.0f);
+        ship.prev_position = ship.position;
         ship.velocity = glm::vec3(0.0f);
         ship.rotation = glm::vec3(0.0f);
         ship.current_speed = 1.0f;
@@ -1161,6 +1163,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 ship.exploding = false;
                 ship.visible = true;
                 ship.position = glm::vec3(0.0f);
+                ship.prev_position = ship.position;
                 ship.velocity = glm::vec3(0.0f);
                 ship.rotation = glm::vec3(0.0f);
                 ship.current_speed = 1.0f;
@@ -1171,6 +1174,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         }
 
         const glm::vec3 forward = ship.forward();
+        ship.prev_position = ship.position;
         ship.velocity = forward * ship.current_speed;
         ship.position += ship.velocity * dt;
         ship.rotation.x = std::clamp(ship.rotation.x, -75.0f, 75.0f);
@@ -1366,14 +1370,28 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             if (!asteroid.active) {
                 continue;
             }
-            const float ship_distance = glm::length(ship.position - asteroid.position);
-            const float ship_collision_radius = asteroid.radius * 0.65f + 1.0f;
-            if (ship_distance < ship_collision_radius) {
-                log_game(std::format("Ship collision with asteroid at distance {:.1f}.", ship_distance), SDL_Color{255, 130, 90, 255});
+            const float ship_distance = ship_asteroid_swept_distance(asteroid);
+            const float collision_radius = asteroid.radius * 0.9f + SHIP_RADIUS;
+            if (ship_distance <= collision_radius) {
+                log_game(std::format("Ship collision with asteroid at distance {:.1f} radius {:.1f}.", ship_distance, collision_radius), SDL_Color{255, 130, 90, 255});
                 start_ship_explosion();
                 break;
             }
         }
+    }
+
+    float ship_asteroid_swept_distance(const Asteroid &asteroid) const {
+        const glm::vec3 segment = ship.position - ship.prev_position;
+        const float segment_length_sq = glm::dot(segment, segment);
+        glm::vec3 closest_point = ship.position;
+
+        if (segment_length_sq > 1e-6f) {
+            const glm::vec3 to_asteroid = asteroid.position - ship.prev_position;
+            const float t = std::clamp(glm::dot(to_asteroid, segment) / segment_length_sq, 0.0f, 1.0f);
+            closest_point = ship.prev_position + segment * t;
+        }
+
+        return glm::length(closest_point - asteroid.position);
     }
 
     void start_ship_explosion() {
