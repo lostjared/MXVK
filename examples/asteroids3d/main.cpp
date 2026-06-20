@@ -618,8 +618,9 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     mxvk::VK_Sprite *intro_sprite = nullptr;
     mxvk::VK_Console console;
     bool console_ready = false;
-    bool loading_screen_drawn = false;
     bool game_resources_loaded = false;
+    int loading_step_index = 0;
+    static constexpr int loading_step_count = 11;
     glm::mat4 last_ship_model_matrix{1.0f};
     VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
     VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
@@ -747,74 +748,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             asset_root + "/data/sprite.vert.spv",
             std::string(ASTEROIDS3D_SHADER_DIR) + "/intro.frag.spv");
         intro_last_update_ms = SDL_GetTicks();
-    }
-
-    void load_game_resources() {
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
-        star_sprite = createSprite3D(star_surface.get());
-        if (star_sprite == nullptr) {
-            throw mxvk::Exception("Failed to create star sprite batch");
-        }
-        star_sprite->setDepthTestEnabled(false);
-        star_sprite->setDepthWriteEnabled(false);
-        star_sprite->setAlphaDiscardThreshold(0.01f);
-
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> fire_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
-        projectile_sprite = createSprite3D(fire_surface.get());
-        if (projectile_sprite == nullptr) {
-            throw mxvk::Exception("Failed to create projectile sprite batch");
-        }
-        projectile_sprite->setDepthTestEnabled(true);
-        projectile_sprite->setDepthWriteEnabled(false);
-        projectile_sprite->setAlphaDiscardThreshold(0.05f);
-
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
-        effect_sprite = createSprite3D(explosion_surface.get());
-        if (effect_sprite == nullptr) {
-            throw mxvk::Exception("Failed to create effect sprite batch");
-        }
-        effect_sprite->setDepthTestEnabled(true);
-        effect_sprite->setDepthWriteEnabled(false);
-        effect_sprite->setAlphaDiscardThreshold(0.05f);
-
-        const std::string model_vert = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.vert.spv";
-        const std::string model_frag = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.frag.spv";
-
-        ship_model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
-        ship_model.setShaders(this, model_vert, model_frag);
-        ship_model.setBackfaceCulling(false);
-        create_flame_resources();
-
-        const std::array<std::string, 3> asteroid_paths = {
-            asset_root + "/data/asteroid.mxmod",
-            asset_root + "/data/asteroid2.mxmod",
-            asset_root + "/data/asteroid3.mxmod",
-        };
-        const std::array<std::string, 3> asteroid_textures = {
-            asset_root + "/data/rock.tex",
-            asset_root + "/data/rock2.tex",
-            (random_int(0, 1) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex",
-        };
-        for (size_t i = 0; i < asteroid_models.size(); ++i) {
-            const int model_index = static_cast<int>(i % asteroid_paths.size());
-            asteroids[i].model_index = model_index;
-            asteroid_models[i].load(this, asteroid_paths[static_cast<std::size_t>(model_index)], asteroid_textures[static_cast<std::size_t>(model_index)], asset_root + "/data", 1.0f);
-            asteroid_models[i].setShaders(this, model_vert, model_frag);
-            asteroid_models[i].setBackfaceCulling(false);
-        }
-
-        star_field.init(GAME_STARS, 4.0f, 30.0f);
-        restart_game();
-    }
-
-    void ensure_game_resources_loaded() {
-        if (game_resources_loaded) {
-            return;
-        }
-
-        load_game_resources();
-        intro_last_update_ms = SDL_GetTicks();
-        game_resources_loaded = true;
+        loading_step_index = 0;
+        game_resources_loaded = false;
     }
 
     void draw_intro(const VkExtent2D &extent) {
@@ -832,7 +767,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         if (intro_fade <= 0.0f) {
             mode = GameMode::Loading;
             intro_fade = 1.0f;
-            loading_screen_drawn = false;
+            loading_step_index = 0;
+            game_resources_loaded = false;
             log_game("Intro finished. Loading game resources.");
             return;
         }
@@ -842,14 +778,112 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     }
 
     void draw_loading([[maybe_unused]] const VkExtent2D &extent) {
-        if (!loading_screen_drawn) {
-            printText("Loading ...", 25, 25, {255, 255, 255, 255});
-            loading_screen_drawn = true;
+        if (!game_resources_loaded) {
+            const int progress_percent = std::clamp((loading_step_index * 100) / loading_step_count, 0, 100);
+            printText("Loading " + std::to_string(progress_percent) + "%", 25, 25, {255, 255, 255, 255});
+            load_next_game_resource_step();
             return;
         }
 
-        if (!game_resources_loaded) {
-            ensure_game_resources_loaded();
+        printText("Loading 100%", 25, 25, {255, 255, 255, 255});
+    }
+
+    void load_next_game_resource_step() {
+        const std::string model_vert = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.vert.spv";
+        const std::string model_frag = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.frag.spv";
+
+        switch (loading_step_index) {
+        case 0: {
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
+            star_sprite = createSprite3D(star_surface.get());
+            if (star_sprite == nullptr) {
+                throw mxvk::Exception("Failed to create star sprite batch");
+            }
+            star_sprite->setDepthTestEnabled(false);
+            star_sprite->setDepthWriteEnabled(false);
+            star_sprite->setAlphaDiscardThreshold(0.01f);
+            break;
+        }
+        case 1: {
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> fire_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
+            projectile_sprite = createSprite3D(fire_surface.get());
+            if (projectile_sprite == nullptr) {
+                throw mxvk::Exception("Failed to create projectile sprite batch");
+            }
+            projectile_sprite->setDepthTestEnabled(true);
+            projectile_sprite->setDepthWriteEnabled(false);
+            projectile_sprite->setAlphaDiscardThreshold(0.05f);
+            break;
+        }
+        case 2: {
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
+            effect_sprite = createSprite3D(explosion_surface.get());
+            if (effect_sprite == nullptr) {
+                throw mxvk::Exception("Failed to create effect sprite batch");
+            }
+            effect_sprite->setDepthTestEnabled(true);
+            effect_sprite->setDepthWriteEnabled(false);
+            effect_sprite->setAlphaDiscardThreshold(0.05f);
+            break;
+        }
+        case 3: {
+            ship_model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
+            break;
+        }
+        case 4: {
+            ship_model.setShaders(this, model_vert, model_frag);
+            ship_model.setBackfaceCulling(false);
+            break;
+        }
+        case 5: {
+            create_flame_resources();
+            break;
+        }
+        case 6: {
+            const int model_index = 0;
+            asteroids[0].model_index = model_index;
+            asteroid_models[0].load(this, asset_root + "/data/asteroid.mxmod", asset_root + "/data/rock.tex", asset_root + "/data", 1.0f);
+            asteroid_models[0].setShaders(this, model_vert, model_frag);
+            asteroid_models[0].setBackfaceCulling(false);
+            break;
+        }
+        case 7: {
+            const int model_index = 1;
+            asteroids[1].model_index = model_index;
+            asteroid_models[1].load(this, asset_root + "/data/asteroid2.mxmod", asset_root + "/data/rock2.tex", asset_root + "/data", 1.0f);
+            asteroid_models[1].setShaders(this, model_vert, model_frag);
+            asteroid_models[1].setBackfaceCulling(false);
+            break;
+        }
+        case 8: {
+            const int model_index = 2;
+            asteroids[2].model_index = model_index;
+            const std::string asteroid_texture = (random_int(0, 1) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex";
+            asteroid_models[2].load(this, asset_root + "/data/asteroid3.mxmod", asteroid_texture, asset_root + "/data", 1.0f);
+            asteroid_models[2].setShaders(this, model_vert, model_frag);
+            asteroid_models[2].setBackfaceCulling(false);
+            break;
+        }
+        case 9: {
+            star_field.init(GAME_STARS, 4.0f, 30.0f);
+            break;
+        }
+        case 10: {
+            restart_game();
+            break;
+        }
+        default:
+            game_resources_loaded = true;
+            intro_last_update_ms = SDL_GetTicks();
+            mode = GameMode::Playing;
+            log_game("Loading complete. Game is now playing.");
+            return;
+        }
+
+        ++loading_step_index;
+        if (loading_step_index >= loading_step_count) {
+            game_resources_loaded = true;
+            intro_last_update_ms = SDL_GetTicks();
             mode = GameMode::Playing;
             log_game("Loading complete. Game is now playing.");
         }
