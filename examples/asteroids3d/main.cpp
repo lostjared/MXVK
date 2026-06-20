@@ -677,7 +677,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
     bool console_ready = false;
     bool game_resources_loaded = false;
     int loading_step_index = 0;
-    static constexpr int loading_step_count = 11;
+    static constexpr int loading_step_count = 57;
     glm::mat4 last_ship_model_matrix{1.0f};
     VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
     VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
@@ -936,36 +936,63 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             create_flame_resources();
             break;
         }
-        case 6: {
-            const int model_index = 0;
-            asteroids[0].model_index = model_index;
-            asteroid_models[0].load(this, asset_root + "/data/asteroid.mxmod", asset_root + "/data/rock.tex", asset_root + "/data", 1.0f);
-            asteroid_models[0].setShaders(this, model_vert, model_frag);
-            asteroid_models[0].setBackfaceCulling(false);
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+        case 11:
+        case 12:
+        case 13:
+        case 14:
+        case 15:
+        case 16:
+        case 17:
+        case 18:
+        case 19:
+        case 20:
+        case 21:
+        case 22:
+        case 23:
+        case 24:
+        case 25:
+        case 26:
+        case 27:
+        case 28:
+        case 29:
+        case 30:
+        case 31:
+        case 32:
+        case 33:
+        case 34:
+        case 35:
+        case 36:
+        case 37:
+        case 38:
+        case 39:
+        case 40:
+        case 41:
+        case 42:
+        case 43:
+        case 44:
+        case 45:
+        case 46:
+        case 47:
+        case 48:
+        case 49:
+        case 50:
+        case 51:
+        case 52:
+        case 53:
+        case 54: {
+            load_asteroid_model_slot(static_cast<std::size_t>(loading_step_index - 6), model_vert, model_frag);
             break;
         }
-        case 7: {
-            const int model_index = 1;
-            asteroids[1].model_index = model_index;
-            asteroid_models[1].load(this, asset_root + "/data/asteroid2.mxmod", asset_root + "/data/rock2.tex", asset_root + "/data", 1.0f);
-            asteroid_models[1].setShaders(this, model_vert, model_frag);
-            asteroid_models[1].setBackfaceCulling(false);
-            break;
-        }
-        case 8: {
-            const int model_index = 2;
-            asteroids[2].model_index = model_index;
-            const std::string asteroid_texture = (random_int(0, 1) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex";
-            asteroid_models[2].load(this, asset_root + "/data/asteroid3.mxmod", asteroid_texture, asset_root + "/data", 1.0f);
-            asteroid_models[2].setShaders(this, model_vert, model_frag);
-            asteroid_models[2].setBackfaceCulling(false);
-            break;
-        }
-        case 9: {
+        case 55: {
             star_field.init(GAME_STARS, 4.0f, 30.0f);
             break;
         }
-        case 10: {
+        case 56: {
             restart_game();
             break;
         }
@@ -984,6 +1011,34 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             mode = GameMode::Playing;
             log_game("Loading complete. Game is now playing.");
         }
+    }
+
+    void load_asteroid_model_slot(std::size_t slot_index, const std::string &model_vert, const std::string &model_frag) {
+        static constexpr std::array<const char *, 3> asteroid_paths = {
+            "data/asteroid.mxmod",
+            "data/asteroid2.mxmod",
+            "data/asteroid3.mxmod",
+        };
+
+        const std::size_t model_variant = slot_index % asteroid_paths.size();
+        std::string texture_path;
+        if (model_variant == 0) {
+            texture_path = asset_root + "/data/rock.tex";
+        } else if (model_variant == 1) {
+            texture_path = asset_root + "/data/rock2.tex";
+        } else {
+            texture_path = (random_int(0, 1) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex";
+        }
+
+        asteroids[slot_index].model_index = static_cast<int>(model_variant);
+        asteroid_models[slot_index].load(
+            this,
+            asset_root + "/" + asteroid_paths[model_variant],
+            texture_path,
+            asset_root + "/data",
+            1.0f);
+        asteroid_models[slot_index].setShaders(this, model_vert, model_frag);
+        asteroid_models[slot_index].setBackfaceCulling(false);
     }
 
     void restart_game() {
@@ -1394,8 +1449,8 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         }
         split_axis = normalize_or_zero(split_axis);
         const glm::vec3 toward_camera = normalize_or_zero(camera_position - hit_position);
-        const float child_separation = std::max(asteroid.radius * 0.9f, child_radius * 4.0f);
-        const glm::vec3 depth_bias = toward_camera * (child_separation * 0.25f);
+        const float child_separation = std::max(asteroid.radius * 0.45f, child_radius * 2.0f);
+        const glm::vec3 depth_bias = toward_camera * (child_separation * 0.12f);
         std::array<glm::vec3, CHILDREN_PER_SPAWN> child_positions = {
             hit_position - split_axis * child_separation + depth_bias,
             hit_position + split_axis * child_separation + depth_bias,
