@@ -762,7 +762,7 @@ class Asteroids3DWindow : public mxvk::VK_Window {
         if (effect_sprite == nullptr) {
             throw mxvk::Exception("Failed to create effect sprite batch");
         }
-        effect_sprite->setDepthTestEnabled(false);
+        effect_sprite->setDepthTestEnabled(true);
         effect_sprite->setDepthWriteEnabled(false);
         effect_sprite->setAlphaDiscardThreshold(0.05f);
 
