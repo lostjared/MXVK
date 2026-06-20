@@ -527,10 +527,11 @@ class Asteroids3DWindow : public mxvk::VK_Window {
             return;
         }
 
-        if (!console.isVisible()) {
+        const bool console_visible = console.isVisible();
+        if (!console_visible) {
             handle_input(dt);
         }
-        update_ship(dt);
+        update_ship(console_visible ? 0.0f : dt);
         update_projectiles(dt);
         update_asteroids(dt);
         update_particles(dt);
@@ -1170,6 +1171,12 @@ class Asteroids3DWindow : public mxvk::VK_Window {
                 clear_particles();
                 log_game("Ship respawned at origin.");
             }
+            return;
+        }
+
+        if (dt <= 0.0f) {
+            ship.prev_position = ship.position;
+            ship.velocity = glm::vec3(0.0f);
             return;
         }
 
