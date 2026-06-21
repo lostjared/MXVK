@@ -9,6 +9,7 @@ my @tests = qw(
     sprite_example
     sprite3d_example
     static_example
+    dark
     matrix
     binary_matrix
     masterpiece
