@@ -344,7 +344,6 @@ if (writer.open("output.mp4", 1280, 720, 30.0f, opts)) {
 
 When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite` target so consumers can gate MXWrite-specific code consistently.
 
-@anchor project-layout
 ## Project Layout
 
 - `mxvk/`
