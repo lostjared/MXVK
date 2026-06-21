@@ -44,8 +44,7 @@ sub should_use_build_asset_path {
 if (!$program) {
     print "Usage: ./run <program_name> [extra args...]\n\n";
     print "Available programs:\n";
-
-    my %progs;
+    my %progs;   
     if (-d $build_dir) {
         opendir(my $dh, $build_dir);
         while (my $entry = readdir($dh)) {
@@ -58,6 +57,9 @@ if (!$program) {
     for my $p (sort keys %progs) {
         print "  $p\n";
     }
+
+    my $counter = scalar(keys %progs);
+    print "$counter total program(s)\n";
     exit 1;
 }
 
