@@ -171,6 +171,17 @@ namespace mxvk {
         }
     }
 
+    void VKAbstractModel::setAlphaBlending(bool enabled) {
+        if (alphaBlendingEnabled == enabled) {
+            return;
+        }
+
+        alphaBlendingEnabled = enabled;
+        if (windowPtr != nullptr) {
+            createPipelines();
+        }
+    }
+
     void VKAbstractModel::updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo) {
         if (imageIndex >= uniformBuffersMapped.size()) {
             return;
@@ -1615,7 +1626,7 @@ namespace mxvk {
             VkPipelineDepthStencilStateCreateInfo depthStencil{};
             depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
             depthStencil.depthTestEnable = VK_TRUE;
-            depthStencil.depthWriteEnable = VK_TRUE;
+            depthStencil.depthWriteEnable = alphaBlendingEnabled ? VK_FALSE : VK_TRUE;
             depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
             VkPipelineColorBlendAttachmentState blendAttachment{};
@@ -1624,7 +1635,13 @@ namespace mxvk {
                 VK_COLOR_COMPONENT_G_BIT |
                 VK_COLOR_COMPONENT_B_BIT |
                 VK_COLOR_COMPONENT_A_BIT;
-            blendAttachment.blendEnable = VK_FALSE;
+            blendAttachment.blendEnable = alphaBlendingEnabled ? VK_TRUE : VK_FALSE;
+            blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+            blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
             VkPipelineColorBlendStateCreateInfo colorBlend{};
             colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;

@@ -136,6 +136,12 @@ namespace mxvk {
          */
         void setBackfaceCulling(bool enabled);
 
+        /**
+         * @brief Enable or disable alpha blending for this model pipeline.
+         * @param enabled True to blend fragment alpha and avoid depth writes.
+         */
+        void setAlphaBlending(bool enabled);
+
       private:
         struct TextureEntry {
             VkImage image = VK_NULL_HANDLE;
@@ -180,6 +186,7 @@ namespace mxvk {
         std::string vertexShaderPath{};
         std::string fragmentShaderPath{};
         bool backfaceCullingEnabled = false;
+        bool alphaBlendingEnabled = false;
 
         VK_Window *windowPtr = nullptr;
 

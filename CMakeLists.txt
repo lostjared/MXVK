@@ -548,6 +548,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(text_example)
     add_subdirectory(examples/model_example)
     mxvk_configure_mingw_target(model_example)
+    add_subdirectory(examples/dark)
+    mxvk_configure_mingw_target(dark)
     add_subdirectory(examples/moon)
     mxvk_configure_mingw_target(moon)
     add_subdirectory(examples/starship)
@@ -688,6 +690,7 @@ if(EXAMPLES)
         sprite3d_example
         text_example
         model_example
+        dark
         planet
         tux_example
         glitch_cube
