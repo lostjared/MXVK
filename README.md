@@ -305,7 +305,7 @@ Current example executables:
 - Demonstrates live texture updates on 3D geometry with model rendering.
 
 ### `moon`
-- Variant of the 3D model viewer that renders the moon model with orbiting pyramid satellites.
+- Variant of the 3D model viewer that renders the moon model with pyramids.
 - Shares the model pipeline from `model_example` and adds a separate starfield sprite layer.
 
 @anchor mxwrite
