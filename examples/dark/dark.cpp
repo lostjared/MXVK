@@ -64,33 +64,6 @@ namespace example {
                 return;
             }
 
-            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
-                mouseDragging = true;
-                lastMouseX = static_cast<int>(e.button.x);
-                lastMouseY = static_cast<int>(e.button.y);
-                return;
-            }
-
-            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
-                mouseDragging = false;
-                return;
-            }
-
-            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseDragging) {
-                const int x = static_cast<int>(e.motion.x);
-                const int y = static_cast<int>(e.motion.y);
-                const int deltaX = x - lastMouseX;
-                const int deltaY = y - lastMouseY;
-
-                yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
-                pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
-                pitchDegrees = std::clamp(pitchDegrees, -60.0f, 70.0f);
-
-                lastMouseX = x;
-                lastMouseY = y;
-                return;
-            }
-
             if (e.type == SDL_EVENT_MOUSE_WHEEL) {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
                 cameraDistance -= delta * 0.35f;
@@ -163,14 +136,10 @@ namespace example {
         std::string assetRoot;
         mxvk::VKAbstractModel model{};
         mxvk::VK_Sprite *beamSprite = nullptr;
-        bool mouseDragging = false;
         bool autoSpinEnabled = true;
-        int lastMouseX = 0;
-        int lastMouseY = 0;
         float yawDegrees = 0.0f;
         float pitchDegrees = 0.0f;
         float cameraDistance = 5.35f;
-        float mouseSensitivity = 0.35f;
         float autoSpinRadians = 0.0f;
         float elapsedSeconds = 0.0f;
         int fallbackWidth = 1280;

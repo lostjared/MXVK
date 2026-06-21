@@ -48,29 +48,45 @@ void main() {
     vec2 aspect = vec2(max(pc.screenWidth / max(pc.screenHeight, 1.0), 1.0), 1.0);
     vec2 p = (out_uv - vec2(0.5)) * aspect;
 
-    float angle = pc.params.x;
-    float time = pc.params.y;
+    float prismRotation = pc.params.x;
     float intensity = max(pc.params.z, 0.0);
 
-    vec2 origin = vec2(0.02, -0.01);
-    vec2 dir = normalize(vec2(cos(angle), sin(angle) * 0.68));
+    vec2 origin = vec2(0.01, -0.005);
+    vec2 dir = normalize(vec2(1.0, 0.24));
     vec2 normal = vec2(-dir.y, dir.x);
-    vec2 q = p - origin;
+    float faceOffset = 0.052 + cos(prismRotation) * 0.010;
+    vec2 rotationOffset = normal * sin(prismRotation) * 0.014;
+    vec2 incomingOrigin = origin - dir * faceOffset + rotationOffset;
+    vec2 outgoingOrigin = origin + dir * faceOffset - rotationOffset;
+    vec2 outgoingQ = p - outgoingOrigin;
+    vec2 incomingQ = p - incomingOrigin;
 
-    float along = dot(q, dir);
-    float across = dot(q, normal);
-    float beamLength = smoothstep(0.0, 0.18, along) * (1.0 - smoothstep(1.48, 1.92, along));
-    float spread = 0.030 + max(along, 0.0) * 0.13;
-    float band = across / max(spread, 0.001);
-    float beamMask = smoothstep(1.0, 0.82, abs(band)) * beamLength;
+    float outgoingAlong = dot(outgoingQ, dir);
+    float outgoingAcross = dot(outgoingQ, normal);
+    float outgoingLength = smoothstep(0.0, 0.12, outgoingAlong) * (1.0 - smoothstep(1.48, 1.92, outgoingAlong));
+    float outgoingSpread = 0.030 + max(outgoingAlong, 0.0) * 0.13;
+    float outgoingBand = outgoingAcross / max(outgoingSpread, 0.001);
+    float outgoingMask = smoothstep(1.0, 0.82, abs(outgoingBand)) * outgoingLength;
 
-    float spectrum = clamp((band * 0.5) + 0.5, 0.0, 1.0);
+    float spectrum = clamp((outgoingBand * 0.5) + 0.5, 0.0, 1.0);
     vec3 color = spectralColor(spectrum);
 
     float separation = smoothstep(0.020, 0.055, abs(fract(spectrum * 6.0) - 0.5));
-    float core = smoothstep(0.18, 0.0, abs(band)) * beamLength;
-    vec3 beamColor = color * beamMask * (1.85 + separation * 0.20) + vec3(1.0) * core * 0.08;
+    float outgoingCore = smoothstep(0.18, 0.0, abs(outgoingBand)) * outgoingLength;
+    vec3 outgoingColor = color * outgoingMask * (1.85 + separation * 0.20) + vec3(1.0) * outgoingCore * 0.08;
 
-    float alpha = clamp((beamMask * 0.94 + core * 0.08) * intensity, 0.0, 0.96);
+    float incomingAlong = dot(incomingQ, dir);
+    float incomingAcross = dot(incomingQ, normal);
+    float incomingLength = smoothstep(-1.92, -1.48, incomingAlong) * (1.0 - smoothstep(-0.12, 0.0, incomingAlong));
+    float incomingSpread = 0.018 - min(incomingAlong, 0.0) * 0.003;
+    float incomingBand = incomingAcross / max(incomingSpread, 0.001);
+    float incomingMask = smoothstep(1.12, 0.70, abs(incomingBand)) * incomingLength;
+    float incomingCore = smoothstep(0.34, 0.0, abs(incomingBand)) * incomingLength;
+    float prismHotspot = smoothstep(0.095, 0.0, length(incomingQ)) * 0.34;
+
+    vec3 incomingColor = vec3(0.86, 0.92, 1.0) * incomingMask * 0.64 + vec3(1.0, 0.98, 0.88) * (incomingCore * 0.42 + prismHotspot);
+    vec3 beamColor = incomingColor + outgoingColor;
+
+    float alpha = clamp((incomingMask * 0.34 + incomingCore * 0.12 + prismHotspot * 0.32 + outgoingMask * 0.94 + outgoingCore * 0.08) * intensity, 0.0, 0.96);
     out_color = vec4(beamColor * intensity, alpha);
 }
