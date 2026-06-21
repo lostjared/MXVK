@@ -11,6 +11,17 @@ my $source_dir = "$root/examples";
 
 my $program = shift @ARGV;
 
+if (defined $program && $program eq '--all') {
+    my $testapps = "$root/testapps.pl";
+    if (!-f $testapps) {
+        die "Error: Could not find test runner at $testapps\n";
+    }
+
+    my @cmd = ($testapps, @ARGV);
+    print ">> Executing: @cmd\n";
+    exec(@cmd) or die "Failed to exec test runner: $!\n";
+}
+
 sub resolve_executable_name {
     my ($cmake_file) = @_;
     return undef if !-f $cmake_file;
@@ -42,7 +53,8 @@ sub should_use_build_asset_path {
 }
 
 if (!$program) {
-    print "Usage: ./run <program_name> [extra args...]\n\n";
+    print "Usage: ./run.pl <program_name> [extra args...]\n";
+    print "   or: ./run.pl --all [extra args...]\n\n";
     print "Available programs:\n";
     my %progs;   
     if (-d $build_dir) {
