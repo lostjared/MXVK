@@ -1414,7 +1414,7 @@ int main(int argc, char **argv) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
         return EXIT_FAILURE;
     } catch (ArgException<std::string> &e) {
-        std::cerr << std::format("Argument exception: {}\n", e.text());
+        std::cerr << std::format("mxvk: Argument Exception: {}\n", e.text());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

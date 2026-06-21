@@ -18,6 +18,7 @@ my @tests = qw(
     model_example
     starship
     planet
+    moon
     asteroids
     asteroids3d
     glitch_cube

@@ -2353,7 +2353,7 @@ int main(int argc, char **argv) {
         std::cerr << "mxvk: Exception: " << e.text() << "\n";
         return EXIT_FAILURE;
     } catch (const ArgException<std::string> &e) {
-        std::cerr << "Argument Exception: " << e.text() << "\n";
+        std::cerr << std::format("mxvk: Argument Exception: {}\n", e.text());
         return EXIT_FAILURE;
     }
 

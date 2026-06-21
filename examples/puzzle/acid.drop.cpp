@@ -1432,7 +1432,7 @@ int main(int argc, char **argv) {
         SDL_Log("mxvk: Exception: %s\n", e.text().c_str());
         return EXIT_FAILURE;
     } catch (ArgException<std::string> &e) {
-        SDL_Log("mxvk: Argument exception: %s\n", e.text().c_str());
+        std::cerr << std::format("mxvk: Argument Exception: {}\n", e.text());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
