@@ -52,17 +52,20 @@ void main() {
     float intensity = max(pc.params.z, 0.0);
 
     vec2 origin = vec2(0.01, -0.005);
-    vec2 dir = normalize(vec2(1.0, 0.24));
-    vec2 normal = vec2(-dir.y, dir.x);
+    vec2 incomingDir = normalize(vec2(1.0, -0.19));
+    vec2 outgoingDir = normalize(vec2(1.0, 0.19));
+    vec2 incomingNormal = vec2(-incomingDir.y, incomingDir.x);
+    vec2 outgoingNormal = vec2(-outgoingDir.y, outgoingDir.x);
     float faceOffset = 0.052 + cos(prismRotation) * 0.010;
-    vec2 rotationOffset = normal * sin(prismRotation) * 0.014;
-    vec2 incomingOrigin = origin - dir * faceOffset + rotationOffset;
-    vec2 outgoingOrigin = origin + dir * faceOffset - rotationOffset;
+    vec2 incomingRotationOffset = incomingNormal * sin(prismRotation) * 0.014;
+    vec2 outgoingRotationOffset = outgoingNormal * sin(prismRotation) * 0.014;
+    vec2 incomingOrigin = origin - incomingDir * faceOffset + incomingRotationOffset;
+    vec2 outgoingOrigin = origin + outgoingDir * faceOffset - outgoingRotationOffset;
     vec2 outgoingQ = p - outgoingOrigin;
     vec2 incomingQ = p - incomingOrigin;
 
-    float outgoingAlong = dot(outgoingQ, dir);
-    float outgoingAcross = dot(outgoingQ, normal);
+    float outgoingAlong = dot(outgoingQ, outgoingDir);
+    float outgoingAcross = dot(outgoingQ, outgoingNormal);
     float outgoingLength = smoothstep(0.0, 0.12, outgoingAlong) * (1.0 - smoothstep(1.48, 1.92, outgoingAlong));
     float outgoingSpread = 0.030 + max(outgoingAlong, 0.0) * 0.13;
     float outgoingBand = outgoingAcross / max(outgoingSpread, 0.001);
@@ -75,8 +78,8 @@ void main() {
     float outgoingCore = smoothstep(0.18, 0.0, abs(outgoingBand)) * outgoingLength;
     vec3 outgoingColor = color * outgoingMask * (1.85 + separation * 0.20) + vec3(1.0) * outgoingCore * 0.08;
 
-    float incomingAlong = dot(incomingQ, dir);
-    float incomingAcross = dot(incomingQ, normal);
+    float incomingAlong = dot(incomingQ, incomingDir);
+    float incomingAcross = dot(incomingQ, incomingNormal);
     float incomingLength = smoothstep(-1.92, -1.48, incomingAlong) * (1.0 - smoothstep(-0.12, 0.0, incomingAlong));
     float incomingSpread = 0.018 - min(incomingAlong, 0.0) * 0.003;
     float incomingBand = incomingAcross / max(incomingSpread, 0.001);
