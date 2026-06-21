@@ -18,7 +18,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Project Layout](#project-layout)
 - [Early Screenshots](#early-screenshots)
 
-@anchor what-this-project-is
+
 ## What This Project Is
 
 - A static library (`mxvk`) for Vulkan-based rendering.
@@ -36,7 +36,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 
 View on YouTube: https://youtu.be/Y3PyGg3qBUA
 
-@anchor core-dependencies
+
 ## Core Dependencies
 
 The root CMake configuration checks for and uses:
@@ -52,7 +52,7 @@ The root CMake configuration checks for and uses:
 - Optional: OpenCV (when building with `-DCV=ON`)
 - Optional: FFmpeg for MXWrite (when building with `-DWITH_MXWRITE=AUTO|ON`)
 
-@anchor build
+
 ## Build
 
 From repository root:
@@ -107,7 +107,7 @@ cmake -S . -B build -DMIXER=ON -DJPEG=ON
 cmake -S . -B build -DEXAMPLES=OFF
 ```
 
-@anchor command-line-arguments
+
 ## Command Line Arguments
 
 Most examples use the shared parser in `mxvk/argz.hpp` via `proc_args(...)`.
@@ -308,7 +308,7 @@ Current example executables:
 - Variant of the 3D model viewer that renders the moon model with pyramids.
 - Shares the model pipeline from `model_example` and adds a separate starfield sprite layer.
 
-@anchor mxwrite
+
 ## MXWrite
 
 MXWrite is the FFmpeg-based video writer library included in this repository. It is useful when you want to export RGBA frames to a video file from a C++20 application without building a separate project.
@@ -359,7 +359,7 @@ When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite
 
 - The example CMake files copy required runtime assets into each example's output directory after build.
 
-@anchor early-screenshots
+
 ## Early Screenshots
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/b7d0af91-993a-44ab-8045-126459df13a1" />
