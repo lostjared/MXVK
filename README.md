@@ -188,6 +188,10 @@ Examples:
 
 Current example executables:
 
+### `cfg_example`
+- Small MXVK configuration API smoke test.
+- Reads and increments a value in `test.dat` to verify config persistence.
+
 ### `hello_world`
 - Demonstrates a minimal custom Vulkan pipeline in an `mxvk::VK_Window` subclass.
 - Shows how to handle swapchain recreation hooks and render loop integration.
@@ -207,6 +211,14 @@ Current example executables:
 - Matrix-style digital rain demo built with `SDL_ttf` glyph rendering and a sprite-backed framebuffer.
 - Uses the bundled `data/keifont.ttf` runtime asset and `Space` to randomize the streams.
 
+### `binary_matrix`
+- 3D binary-rain variant of the matrix demo with an orbital camera.
+- Uses `0` and `1` glyphs rendered into 3D sprites, plus the same bundled font and background assets as `matrix`.
+
+### `dark`
+- Dark Crystal Pyramid viewer with a custom beam effect, animated text, and a textured 3D model.
+- Useful as a compact reference for model loading plus layered sprite/text rendering.
+
 ### `model_example`
 - Demonstrates `VKAbstractModel` loading and rendering of 3D assets.
 - Uses uniform buffers and camera/projection transforms.
@@ -217,6 +229,10 @@ Current example executables:
 
 ### `tux_example`
 - Renders a 3D model with a textured animated background and on-screen text.
+
+### `sprite3d_example`
+- 3D sprite scene with a starfield and a flying saucer.
+- Demonstrates `createSprite3D(...)`, alpha-discard sprites, and mouse-driven camera orbiting.
 
 ### `starship`
 - 3D ship viewer with textured Phong shading, a moving starfield, and a small exhaust effect.
@@ -234,6 +250,10 @@ Current example executables:
 ### `asteroids`
 - Full game example with game state management, controller/keyboard input, particles, and HUD.
 - Good reference for a complete gameplay loop on top of MXVK.
+
+### `asteroids3d`
+- 3D Asteroids-style action game with ship, asteroids, projectiles, and particle effects.
+- Includes console commands, camera-following gameplay, and an arcade/inverted control toggle.
 
 ### `pong`
 - 3D-styled Pong demo with paddle/ball gameplay implemented on top of MXVK rendering hooks.
@@ -253,12 +273,16 @@ Current example executables:
 - Demonstrates multi-model scene composition, per-object transforms, and interactive cue/ball simulation flow.
 
 ### `puzzle`
-- Puzzle game example ported to MXVK/SDL3.
-- Demonstrates menu/game/scores state flow, sprite-based gameplay grid, and text UI.
+- Acid Drop, a falling-block puzzle with menus, high scores, options, credits, and name entry.
+- Demonstrates a full state machine built on sprite rendering and text UI.
+
+### `masterpiece` (`MasterPiece` executable)
+- MXVK port of the original `MasterPiece.SDL` block puzzle game.
+- Includes an intro flow, menus, high scores, credits, and a falling-block match game.
 
 ### `tetris`
-- 3D Tetris game in MXVK
-- Puzzle game
+- MXVK 3D Tetris with a title screen, high-score flow, credits, and optional network multiplayer.
+- Uses a 3D camera around the board plus keyboard, mouse, and gamepad input.
 
 ### `fractal_zoom`
 - Fullscreen fractal renderer with its own shader pipeline.
@@ -279,6 +303,10 @@ Current example executables:
 ### `opencv_model` (requires `-DCV=ON`)
 - Streams camera frames into a model texture.
 - Demonstrates live texture updates on 3D geometry with model rendering.
+
+### `moon`
+- Variant of the 3D model viewer that renders the moon model with orbiting pyramid satellites.
+- Shares the model pipeline from `model_example` and adds a separate starfield sprite layer.
 
 @anchor mxwrite
 ## MXWrite
