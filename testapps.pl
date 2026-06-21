@@ -18,6 +18,7 @@ my @tests = qw(
     starship
     planet
     asteroids
+    asteroids3d
     glitch_cube
     tictactoe
     pong
