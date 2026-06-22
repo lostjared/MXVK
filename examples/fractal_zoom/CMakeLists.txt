@@ -1,8 +1,3 @@
-find_package(Boost CONFIG QUIET)
-if(NOT Boost_FOUND)
-    find_package(Boost REQUIRED)
-endif()
-
 add_executable(fractal_zoom
     ${CMAKE_SOURCE_DIR}/examples/fractal_zoom/fractal.cpp
 )

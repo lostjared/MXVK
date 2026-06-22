@@ -3,6 +3,8 @@ use strict;
 use warnings;
 use POSIX qw(:sys_wait_h);
 
+my $missing_executable_exit_code = 3;
+
 my @tests = qw(
     hello_world
     text_example
@@ -32,6 +34,7 @@ my @tests = qw(
 );
 
 my $count = 0;
+my $skipped = 0;
 my $interrupted = 0;
 my $child_pid;
 
@@ -50,7 +53,7 @@ local $SIG{INT} = sub {
 for my $test (@tests) {
     last if $interrupted;
 
-    $count++;
+    my $test_number = $count + 1;
     my @cmd = ('./run.pl', $test, @ARGV);
     print '>> Executing: ';
     print join(' ', map { shell_quote($_) } @cmd);
@@ -96,19 +99,27 @@ for my $test (@tests) {
         die "Error: program '$test' failed to start: $!\n";
     }
 
+    my $exit_code = $rc >> 8;
+    if ($exit_code == $missing_executable_exit_code) {
+        $skipped++;
+        print ">> Skipping: $test was not built\n";
+        next;
+    }
+
     if ($rc & 127) {
         my $signal = $rc & 127;
         if ($signal == 2) {
             $interrupted = 1;
             last;
         }
-        die "Error: program '$test' failed on test $count: terminated by signal $signal\n";
+        die "Error: program '$test' failed on test $test_number: terminated by signal $signal\n";
     }
 
-    my $exit_code = $rc >> 8;
     if ($exit_code != 0) {
-        die "Error: program '$test' failed on test $count: exit code $exit_code\n";
+        die "Error: program '$test' failed on test $test_number: exit code $exit_code\n";
     }
+
+    $count++;
 }
 
 if ($interrupted) {
@@ -116,4 +127,8 @@ if ($interrupted) {
     exit 130;
 }
 
-print "$count tests ran and they were all successful.\n";
+if ($skipped) {
+    print "$count tests ran successfully, $skipped test(s) were skipped.\n";
+} else {
+    print "$count tests ran and they were all successful.\n";
+}

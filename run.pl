@@ -8,6 +8,7 @@ my $root = dirname(abs_path($0));
 my $parent = dirname($root);
 my $build_dir = "$root/build/examples";
 my $source_dir = "$root/examples";
+my $missing_executable_exit_code = 3;
 
 my $program = shift @ARGV;
 
@@ -103,9 +104,10 @@ if (-x $exe_path) {
     }
 
     my @cmd = ("./$resolved_exe_name", "-p", $runtime_path, @ARGV);
-    
+
     print ">> Executing: @cmd\n";
     exec(@cmd) or die "Failed to exec $resolved_exe_name: $!\n";
 } else {
-    die "Error: Could not find executable for '$program_name' at $exe_path\n";
+    warn "Skipping '$program_name': could not find executable at $exe_path\n";
+    exit $missing_executable_exit_code;
 }

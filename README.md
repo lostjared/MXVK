@@ -89,6 +89,7 @@ Useful CMake options:
 - `-DCV=ON` enables OpenCV-based examples and capture support.
 - `-DMIXER=ON` enables SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`).
 - `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
+- `-DFRACTAL_ZOOM=ON` enables the `fractal_zoom` example and its Boost dependency.
 - `-DEXAMPLES=OFF` builds/install only the `mxvk` library and skips all examples.
 
 Example:
@@ -103,6 +104,9 @@ Additional configure examples:
 ```bash
 # Build library + examples with audio and JPEG support
 cmake -S . -B build -DMIXER=ON -DJPEG=ON
+
+# Build the fractal_zoom example and its Boost dependency
+cmake -S . -B build -DFRACTAL_ZOOM=ON
 
 # Library-only build (faster CI/package build)
 cmake -S . -B build -DEXAMPLES=OFF
