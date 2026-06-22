@@ -293,6 +293,15 @@ namespace mxvk {
          */
         virtual void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index);
 
+      protected:
+        /**
+         * @brief Render one standalone sprite using the window's shared sprite pipeline.
+         *
+         * This is intended for derived classes that want to draw a sprite before or after
+         * their own scene content without registering it in the window-managed sprite list.
+         */
+        void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd);
+
       private:
         static constexpr uint32_t invalid_queue_index = std::numeric_limits<uint32_t>::max();
         static constexpr uint32_t max_frames_in_flight = 2;

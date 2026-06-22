@@ -50,6 +50,7 @@ foreach(_asset
     ${CMAKE_CURRENT_SOURCE_DIR}/data/saturn.tex
     ${CMAKE_CURRENT_SOURCE_DIR}/data/surface.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ring.png
+    ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf
     ${PLANET_VERTEX_SHADER}
     ${PLANET_FRAGMENT_SHADER}
 )
@@ -63,5 +64,8 @@ add_custom_command(TARGET planet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         $<TARGET_FILE_DIR:planet>/data
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf
+        $<TARGET_FILE_DIR:planet>/data/keifont.ttf
     COMMENT "Copying planet example assets to runtime output directory"
 )

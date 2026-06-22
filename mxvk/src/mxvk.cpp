@@ -555,6 +555,22 @@ namespace mxvk {
 
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
+    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) {
+        if (device == VK_NULL_HANDLE || swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
+            return;
+        }
+
+        if (sprite_pipeline == VK_NULL_HANDLE) {
+            createSpritePipeline();
+        }
+
+        sprite.prepareForRendering(cmd);
+        if (sprite_pipeline != VK_NULL_HANDLE) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+        }
+        sprite.renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+    }
+
     bool VK_Window::ensureRenderResources() {
         const auto sync_ready = [this]() {
             return std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
