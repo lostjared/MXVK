@@ -14,6 +14,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
 - [Command Line Arguments](#command-line-arguments)
+- [Examples](#examples)
 - [MXWrite](#mxwrite)
 - [Project Layout](#project-layout)
 - [Early Screenshots](#early-screenshots)
@@ -186,127 +187,53 @@ Examples:
 
 ## Examples
 
-Current example executables:
+The examples are grouped below by what they demonstrate. Many of them share the same `run.pl` invocation pattern and accept the common arguments documented above.
 
-### `cfg_example`
-- Small MXVK configuration API smoke test.
-- Reads and increments a value in `test.dat` to verify config persistence.
+### Starter samples
 
-### `hello_world`
-- Demonstrates a minimal custom Vulkan pipeline in an `mxvk::VK_Window` subclass.
-- Shows how to handle swapchain recreation hooks and render loop integration.
+- `cfg_example` - small configuration API smoke test that reads and updates `test.dat`.
+- `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle.
+- `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader.
+- `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader.
+- `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`.
 
-### `static_example`
-- Similar to `hello_world`, but focused on a static shader-driven fullscreen render path.
-- Useful for understanding custom rendering hooks and command recording.
+### Shader and effect demos
 
-### `sprite_example`
-- Demonstrates sprite loading from PNG and full-window sprite rendering.
-- Includes text drawing and custom sprite shader usage.
+- `matrix` - Matrix-style digital rain rendered from `SDL_ttf` glyphs and a sprite-backed framebuffer.
+- `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene.
+- `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output.
+- `console_demo` - in-window console layered over a moving shader background.
+- `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls.
 
-### `text_example`
-- Minimal example for text rendering with `setFont(...)` and `printText(...)`.
+### 3D viewers
 
-### `matrix`
-- Matrix-style digital rain demo built with `SDL_ttf` glyph rendering and a sprite-backed framebuffer.
-- Uses the bundled `data/keifont.ttf` runtime asset and `Space` to randomize the streams.
+- `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets.
+- `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging.
+- `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays.
+- `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting.
+- `starship` - ship viewer with Phong shading, a moving starfield, and exhaust effects.
+- `dark` - Dark Crystal Pyramid viewer with a custom beam effect and layered model/sprite/text rendering.
+- `moon` - moon model viewer with pyramids and a separate starfield layer.
 
-### `binary_matrix`
-- 3D binary-rain variant of the matrix demo with an orbital camera.
-- Uses `0` and `1` glyphs rendered into 3D sprites, plus the same bundled font and background assets as `matrix`.
+### Games and interactive scenes
 
-### `dark`
-- Dark Crystal Pyramid viewer with a custom beam effect, animated text, and a textured 3D model.
-- Useful as a compact reference for model loading plus layered sprite/text rendering.
+- `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield.
+- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands.
+- `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates.
+- `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent.
+- `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat.
+- `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic.
+- `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry.
+- `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets.
+- `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer.
 
-### `model_example`
-- Demonstrates `VKAbstractModel` loading and rendering of 3D assets.
-- Uses uniform buffers and camera/projection transforms.
+### Camera and video workflows
 
-### `planet`
-- Planetary ring and satellite rendering demo built on `VKAbstractModel`.
-- Shows textured 3D model rendering with lighting, shader-driven materials, and runtime asset staging.
+- `compute_shader` - OpenCV capture or video-file playback through selectable Vulkan compute shaders. Requires `-DCV=ON`.
+- `opencv_example` - displays camera or video frames on a sprite in real time. Requires `-DCV=ON`.
+- `opencv_model` - maps a live camera feed onto a textured 3D model. Requires `-DCV=ON`.
 
-### `tux_example`
-- Renders a 3D model with a textured animated background and on-screen text.
-
-### `sprite3d_example`
-- 3D sprite scene with a starfield and a flying saucer.
-- Demonstrates `createSprite3D(...)`, alpha-discard sprites, and mouse-driven camera orbiting.
-
-### `starship`
-- 3D ship viewer with textured Phong shading, a moving starfield, and a small exhaust effect.
-- Shows how to layer model rendering with sprite-based background effects.
-
-### `glitch_cube`
-- MXVK Vulkan port of the legacy `gl_glitch_cube` demo from MX2.
-- Uses `VKAbstractModel` with GLSL 450 shaders (`model.vert/.frag`) and runtime-compiled SPIR-V.
-- Controls:
-	- Drag left mouse to orbit the cube.
-	- Mouse wheel zooms the camera in and out.
-	- `Space` toggles rotation axis behavior.
-	- `PageUp`/`PageDown` scales the cube larger/smaller at runtime.
-
-### `asteroids`
-- Full game example with game state management, controller/keyboard input, particles, and HUD.
-- Good reference for a complete gameplay loop on top of MXVK.
-
-### `asteroids3d`
-- 3D Asteroids-style action game with ship, asteroids, projectiles, and particle effects.
-- Includes console commands, camera-following gameplay, and an arcade/inverted control toggle.
-
-### `pong`
-- 3D-styled Pong demo with paddle/ball gameplay implemented on top of MXVK rendering hooks.
-- Demonstrates runtime asset copying, model-based scene elements, and real-time game-state updates.
-
-### `tictactoe`
-- Mouse-driven tic-tac-toe example with a simple computer opponent.
-- Shows sprite-based board rendering, text UI, click-to-play interaction, and quick restart flow with `R` or after a finished game.
-- Uses the shared font asset plus a background image staged into the example output directory.
-
-### `walk`
-- First-person maze and exploration sample with procedural level generation.
-- Demonstrates collision handling, projectile combat, collectibles, and a debug console in an FPS-style loop.
-
-### `pool_demo` (`Pool3D` executable)
-- 3D pool/billiards demo built directly on MXVK dynamic rendering.
-- Demonstrates multi-model scene composition, per-object transforms, and interactive cue/ball simulation flow.
-
-### `puzzle`
-- Acid Drop, a falling-block puzzle with menus, high scores, options, credits, and name entry.
-- Demonstrates a full state machine built on sprite rendering and text UI.
-
-### `masterpiece` (`MasterPiece` executable)
-- MXVK port of the original `MasterPiece.SDL` block puzzle game.
-- Includes an intro flow, menus, high scores, credits, and a falling-block match game.
-
-### `tetris`
-- MXVK 3D Tetris with a title screen, high-score flow, credits, and optional network multiplayer.
-- Uses a 3D camera around the board plus keyboard, mouse, and gamepad input.
-
-### `fractal_zoom`
-- Fullscreen fractal renderer with its own shader pipeline.
-- Demonstrates per-example shader compilation and runtime shader-path wiring.
-
-### `console_demo`
-- Immediate-mode style in-app console and command handling demo.
-- Demonstrates custom post-build asset staging (font/texture/shaders) and runtime data loading.
-
-### `compute_shader` (requires `-DCV=ON`)
-- Streams camera or video-file frames through selectable Vulkan compute shaders and displays the processed result.
-- Useful for testing OpenCV capture, GPU image processing, and shader hot selection from `data/index.txt`.
-
-### `opencv_example` (requires `-DCV=ON`)
-- Displays camera or video-file frames on a sprite in real time.
-- Uses `--camera` and/or `--filename` to select source.
-
-### `opencv_model` (requires `-DCV=ON`)
-- Streams camera frames into a model texture.
-- Demonstrates live texture updates on 3D geometry with model rendering.
-
-### `moon`
-- Variant of the 3D model viewer that renders the moon model with pyramids.
-- Shares the model pipeline from `model_example` and adds a separate starfield sprite layer.
+If you want a quick tour of the core demos, `./run.pl --all` executes the default example sweep used by `testapps.pl`.
 
 
 ## MXWrite
