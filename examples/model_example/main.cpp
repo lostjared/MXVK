@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstring>
 #include <format>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -389,6 +390,7 @@ namespace example {
 
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, vertPath, fragPath);
+            model.setBackfaceCulling(!binaryTextureMode);
             if (binaryTextureMode) {
                 binaryMatrixTexture = std::make_unique<MatrixTexture>(assetRoot);
             }
@@ -415,6 +417,30 @@ namespace example {
                 return;
             }
 
+            if (binaryTextureMode && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
+                if (e.key.repeat) {
+                    return;
+                }
+                skyboxMode = !skyboxMode;
+                if (skyboxMode) {
+                    resetSkyboxCamera();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
+                const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
+                if (e.key.key == SDLK_W) {
+                    skyboxLookUpKey = pressed;
+                } else if (e.key.key == SDLK_S) {
+                    skyboxLookDownKey = pressed;
+                } else if (e.key.key == SDLK_A) {
+                    skyboxLookLeftKey = pressed;
+                } else if (e.key.key == SDLK_D) {
+                    skyboxLookRightKey = pressed;
+                }
+            }
+
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
                 mouseDragging = true;
                 lastMouseX = static_cast<int>(e.button.x);
@@ -433,15 +459,22 @@ namespace example {
                 const int deltaX = x - lastMouseX;
                 const int deltaY = y - lastMouseY;
 
-                yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
-                pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
+                if (skyboxMode) {
+                    skyboxYawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
+                    skyboxPitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
+                    skyboxPitchDegrees = std::clamp(skyboxPitchDegrees, -85.0f, 85.0f);
+                } else {
+                    yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
+                    pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
+                    pitchDegrees = std::clamp(pitchDegrees, -80.0f, 80.0f);
+                }
 
                 lastMouseX = x;
                 lastMouseY = y;
                 return;
             }
 
-            if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+            if (e.type == SDL_EVENT_MOUSE_WHEEL && !skyboxMode) {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
                 cameraDistance -= delta * 0.45f;
                 cameraDistance = std::clamp(cameraDistance, 1.8f, 12.0f);
@@ -462,6 +495,10 @@ namespace example {
                 autoSpinRadians += deltaSeconds * autoSpinSpeed;
             }
 
+            if (skyboxMode) {
+                updateSkyboxCamera(deltaSeconds);
+            }
+
             const VkExtent2D extent = getSwapchainExtent();
 
             const float aspect = (extent.height > 0U)
@@ -469,12 +506,21 @@ namespace example {
                                      : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
-            ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
-            ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees) + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
-            ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
-            ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
-            ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-            ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
+            if (skyboxMode) {
+                const glm::vec3 front = skyboxForwardVector();
+                const glm::vec3 target = skyboxCameraPosition + front;
+                ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(model.modelRenderScale() * skyboxScaleMultiplier));
+                ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
+                ubo.view = glm::lookAt(skyboxCameraPosition, target, glm::vec3(0.0f, 1.0f, 0.0f));
+                ubo.proj = glm::perspective(glm::radians(70.0f), aspect, 0.02f, 100.0f);
+            } else {
+                ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
+                ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees) + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
+                ubo.model = glm::scale(ubo.model, glm::vec3(model.modelRenderScale()));
+                ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
+                ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, cameraDistance), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                ubo.proj = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 100.0f);
+            }
             ubo.proj[1][1] *= -1.0f;
             ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 0.37f);
 
@@ -496,17 +542,63 @@ namespace example {
         bool binaryTextureMode = false;
         std::unique_ptr<MatrixTexture> binaryMatrixTexture{};
         bool mouseDragging = false;
+        bool skyboxMode = false;
+        bool skyboxLookUpKey = false;
+        bool skyboxLookDownKey = false;
+        bool skyboxLookLeftKey = false;
+        bool skyboxLookRightKey = false;
         bool autoSpinEnabled = true;
         int lastMouseX = 0;
         int lastMouseY = 0;
         float yawDegrees = 0.0f;
         float pitchDegrees = 12.0f;
         float cameraDistance = 4.2f;
+        glm::vec3 skyboxCameraPosition{0.0f, 0.0f, 0.0f};
+        float skyboxYawDegrees = 180.0f;
+        float skyboxPitchDegrees = 0.0f;
+        float skyboxScaleMultiplier = 1.6f;
         float mouseSensitivity = 0.35f;
         float autoSpinSpeed = 0.65f;
         float autoSpinRadians = 0.0f;
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
+
+        void resetSkyboxCamera() {
+            skyboxCameraPosition = glm::vec3(0.0f);
+            skyboxYawDegrees = 180.0f;
+            skyboxPitchDegrees = 0.0f;
+        }
+
+        [[nodiscard]] glm::vec3 skyboxForwardVector() const {
+            const float yawRadians = glm::radians(skyboxYawDegrees);
+            const float pitchRadians = glm::radians(skyboxPitchDegrees);
+            return glm::normalize(glm::vec3{
+                std::sin(yawRadians) * std::cos(pitchRadians),
+                std::sin(pitchRadians),
+                -std::cos(yawRadians) * std::cos(pitchRadians)});
+        }
+
+        [[nodiscard]] glm::vec3 skyboxRightVector() const {
+            const glm::vec3 forward = skyboxForwardVector();
+            return glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+        }
+
+        void updateSkyboxCamera(float deltaSeconds) {
+            const float lookSpeed = 85.0f;
+            if (skyboxLookLeftKey) {
+                skyboxYawDegrees -= lookSpeed * deltaSeconds;
+            }
+            if (skyboxLookRightKey) {
+                skyboxYawDegrees += lookSpeed * deltaSeconds;
+            }
+            if (skyboxLookUpKey) {
+                skyboxPitchDegrees += lookSpeed * deltaSeconds;
+            }
+            if (skyboxLookDownKey) {
+                skyboxPitchDegrees -= lookSpeed * deltaSeconds;
+            }
+            skyboxPitchDegrees = std::clamp(skyboxPitchDegrees, -85.0f, 85.0f);
+        }
     };
 
 } // namespace example
