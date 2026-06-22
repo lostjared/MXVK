@@ -27,9 +27,9 @@ vec3 prismPoint(vec3 p, float angle) {
 }
 
 vec3 ribbonSide(vec3 dir) {
-    vec3 side = cross(dir, vec3(0.0, 0.0, -1.0));
+    vec3 side = vec3(0.0, 1.0, 0.0) - dir * dot(vec3(0.0, 1.0, 0.0), dir);
     if (dot(side, side) < 0.0001) {
-        side = vec3(0.0, 1.0, 0.0);
+        side = vec3(1.0, 0.0, 0.0) - dir * dot(vec3(1.0, 0.0, 0.0), dir);
     }
     return normalize(side);
 }

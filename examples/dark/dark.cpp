@@ -58,13 +58,6 @@ namespace example {
                 return;
             }
 
-            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE) {
-                if (!e.key.repeat) {
-                    beamTracksPrism = !beamTracksPrism;
-                }
-                return;
-            }
-
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
                 mouseDragging = true;
                 lastMouseX = static_cast<int>(e.button.x);
@@ -154,7 +147,7 @@ namespace example {
             beamUbo.model = glm::mat4(1.0f);
             beamUbo.view = ubo.view;
             beamUbo.proj = ubo.proj;
-            beamUbo.fx = glm::vec4(elapsedSeconds, autoSpinRadians, beamTracksPrism ? 1.0f : 0.0f, 1.0f);
+            beamUbo.fx = glm::vec4(elapsedSeconds, autoSpinRadians, 1.0f, 1.0f);
 
             beamModel.updateUBO(imageIndex, beamUbo);
             beamModel.render(cmd, imageIndex, false);
@@ -169,7 +162,6 @@ namespace example {
         mxvk::VKAbstractModel model{};
         bool mouseDragging = false;
         bool autoSpinEnabled = true;
-        bool beamTracksPrism = true;
         int lastMouseX = 0;
         int lastMouseY = 0;
         float yawDegrees = 0.0f;
