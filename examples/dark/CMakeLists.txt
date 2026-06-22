@@ -60,8 +60,6 @@ target_compile_definitions(dark PRIVATE
 
 foreach(_asset
     ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj
-    ${CMAKE_CURRENT_SOURCE_DIR}/data/crystal.txt
-    ${CMAKE_CURRENT_SOURCE_DIR}/data/crystal.png
     ${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf
 )
     if(NOT EXISTS ${_asset})
@@ -74,12 +72,6 @@ add_custom_command(TARGET dark POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj
         $<TARGET_FILE_DIR:dark>/data/pyramid.obj
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/data/crystal.txt
-        $<TARGET_FILE_DIR:dark>/data/crystal.txt
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/data/crystal.png
-        $<TARGET_FILE_DIR:dark>/data/crystal.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf
         $<TARGET_FILE_DIR:dark>/data/font.ttf

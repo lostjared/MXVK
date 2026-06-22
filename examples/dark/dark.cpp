@@ -27,8 +27,6 @@ namespace example {
             fallbackHeight = height;
 
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/pyramid.obj") : filename;
-            const std::string textureManifestPath = assetRoot + "/data/crystal.txt";
-            const std::string textureBasePath = assetRoot + "/data";
             const std::string vertPath = std::string(DARK_SHADER_DIR) + "/dark.vert.spv";
             const std::string fragPath = std::string(DARK_SHADER_DIR) + "/dark.frag.spv";
             const std::string beamVertPath = std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv";
@@ -36,7 +34,7 @@ namespace example {
 
             setFont(assetRoot + "/data/font.ttf", 48);
 
-            model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
+            model.load(this, modelPath, "", "", 1.0f);
             model.setAlphaBlending(true);
             model.setShaders(this, vertPath, fragPath);
 
