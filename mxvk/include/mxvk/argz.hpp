@@ -699,6 +699,7 @@ struct Arguments {
     bool encodeRealtime = false;      ///< Enable low-latency encoder settings (@c --encode-realtime).
     bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
     bool repeat = false;              ///< Repeat video playback when a file reaches EOF.
+    bool binary = false;               ///< Use binary glyphs only (@c --binary).
     std::string texture;              ///< Optional texture file path (@c --texture).
     std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     std::string fragmentPath;         ///< Optional fragment shader SPV path (@c --fragment).
@@ -729,6 +730,7 @@ struct Arguments {
  * |      | --encode-realtime  | Enable realtime/low-latency encoding         |
  * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
  * |      | --repeat           | Repeat video playback at EOF                 |
+ * |      | --binary           | Use binary glyphs only                        |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  * |      | --fragment         | Fragment shader SPV path                     |
@@ -762,6 +764,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(309, "encode-realtime", "encoder realtime mode")
         .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
         .addOptionDouble(310, "repeat", "repeat video playback")
+        .addOptionDouble(315, "binary", "use binary glyphs only")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
@@ -789,6 +792,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool encodeRealtime = false;
     bool mxwriteBlockWhenFull = false;
     bool repeat = false;
+    bool binary = false;
     std::string texture;
     std::string shaderPath;
     std::string fragmentPath;
@@ -833,6 +837,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 310:
             repeat = true;
+            break;
+        case 315:
+            binary = true;
             break;
         case 257:
             texture = arg.arg_value;
@@ -906,6 +913,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.encodeRealtime = encodeRealtime;
     args.mxwriteBlockWhenFull = mxwriteBlockWhenFull;
     args.repeat = repeat;
+    args.binary = binary;
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.fragmentPath = fragmentPath;

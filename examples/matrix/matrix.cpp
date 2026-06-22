@@ -40,7 +40,7 @@ namespace {
     using FontPtr = std::unique_ptr<TTF_Font, TtfDeleter>;
 
     struct Glyph {
-        std::string symbol;
+        Uint32 codepoint;
         std::vector<SurfacePtr> levels;
     };
 
@@ -55,15 +55,30 @@ namespace {
     SDL_Color matrixColor(int level) {
         constexpr int maxLevel = 7;
         const float t = std::clamp(static_cast<float>(level) / static_cast<float>(maxLevel), 0.0f, 1.0f);
-        const Uint8 r = static_cast<Uint8>(std::lerp(0.0f, 180.0f, std::pow(t, 2.8f)));
-        const Uint8 g = static_cast<Uint8>(std::lerp(36.0f, 255.0f, std::pow(t, 0.72f)));
-        const Uint8 b = static_cast<Uint8>(std::lerp(8.0f, 205.0f, std::pow(t, 3.2f)));
-        const Uint8 a = static_cast<Uint8>(std::lerp(120.0f, 255.0f, t));
+        const Uint8 r = static_cast<Uint8>(std::lerp(0.0f, 48.0f, std::pow(t, 2.9f)));
+        const Uint8 g = static_cast<Uint8>(std::lerp(42.0f, 205.0f, std::pow(t, 0.82f)));
+        const Uint8 b = static_cast<Uint8>(std::lerp(0.0f, 24.0f, std::pow(t, 3.1f)));
+        const Uint8 a = static_cast<Uint8>(std::lerp(95.0f, 235.0f, t));
         return SDL_Color{r, g, b, a};
     }
 
     SDL_Color headColor() {
-        return SDL_Color{230, 255, 235, 255};
+        return SDL_Color{208, 255, 200, 255};
+    }
+
+    std::vector<Uint32> fullSymbolSet() {
+        return {
+            0xFF66, 0xFF67, 0xFF68, 0xFF69, 0xFF6A, 0xFF6B, 0xFF6C, 0xFF6D,
+            0xFF6E, 0xFF6F, 0xFF71, 0xFF72, 0xFF73, 0xFF74, 0xFF75, 0xFF76,
+            0xFF77, 0xFF78, 0xFF79, 0xFF7A, 0xFF7B, 0xFF7C, 0xFF7D, 0xFF7E,
+            0xFF7F, 0xFF80, 0xFF81, 0xFF82, 0xFF83, 0xFF84, 0xFF85, 0xFF86,
+            0xFF87, 0xFF88, 0xFF89, 0xFF8A, 0xFF8B, 0xFF8C, 0xFF8D, 0xFF8E,
+            0xFF8F, 0xFF90, 0xFF91, 0xFF92, 0xFF93, 0xFF94, 0xFF95, 0xFF96,
+            0xFF97, 0xFF98, 0xFF99, 0xFF9A, 0xFF9B, 0xFF9C, 0xFF9D};
+    }
+
+    std::vector<Uint32> binarySymbolSet() {
+        return {U'0', U'1'};
     }
 } // namespace
 
@@ -74,17 +89,20 @@ namespace example {
                      const std::string &title,
                      const int width,
                      const int height,
-                     const bool fullscreen)
+                     const bool fullscreen,
+                     const bool binary)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(matrix_ASSET_DIR) : path),
+              binaryGlyphMode(binary),
               rng(std::random_device{}()) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             if (!TTF_Init()) {
                 throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
             }
-            font.reset(TTF_OpenFont((assetRoot + "/data/keifont.ttf").c_str(), fontSize));
+            const std::string fontPath = assetRoot + "/data/keifont.ttf";
+            font.reset(TTF_OpenFont(fontPath.c_str(), fontSize));
             if (!font) {
-                throw mxvk::Exception("Failed to load matrix font: " + std::string(SDL_GetError()));
+                throw mxvk::Exception("Failed to load matrix font: " + fontPath + ": " + std::string(SDL_GetError()));
             }
             TTF_SetFontHinting(font.get(), TTF_HINTING_LIGHT);
             loadGlyphs();
@@ -129,33 +147,17 @@ namespace example {
 
       private:
         void loadGlyphs() {
-            static const std::vector<std::string> symbols = {
-                "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-                "A", "B", "C", "D", "E", "F", "G", "H", "K", "M",
-                "N", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
-                "@", "#", "$", "%", "&", "*", "+", "-", ":", ";",
-                "\xEF\xBD\xA6", "\xEF\xBD\xA7", "\xEF\xBD\xA8", "\xEF\xBD\xA9",
-                "\xEF\xBD\xAA", "\xEF\xBD\xAB", "\xEF\xBD\xAC", "\xEF\xBD\xAD",
-                "\xEF\xBD\xAE", "\xEF\xBD\xAF", "\xEF\xBD\xB1", "\xEF\xBD\xB2",
-                "\xEF\xBD\xB3", "\xEF\xBD\xB4", "\xEF\xBD\xB5", "\xEF\xBD\xB6",
-                "\xEF\xBD\xB7", "\xEF\xBD\xB8", "\xEF\xBD\xB9", "\xEF\xBD\xBA",
-                "\xEF\xBD\xBB", "\xEF\xBD\xBC", "\xEF\xBD\xBD", "\xEF\xBD\xBE",
-                "\xEF\xBD\xBF", "\xEF\xBE\x80", "\xEF\xBE\x81", "\xEF\xBE\x82",
-                "\xEF\xBE\x83", "\xEF\xBE\x84", "\xEF\xBE\x85", "\xEF\xBE\x86",
-                "\xEF\xBE\x87", "\xEF\xBE\x88", "\xEF\xBE\x89", "\xEF\xBE\x8A",
-                "\xEF\xBE\x8B", "\xEF\xBE\x8C", "\xEF\xBE\x8D", "\xEF\xBE\x8E",
-                "\xEF\xBE\x8F", "\xEF\xBE\x90", "\xEF\xBE\x91", "\xEF\xBE\x92",
-                "\xEF\xBE\x93", "\xEF\xBE\x94", "\xEF\xBE\x95", "\xEF\xBE\x96",
-                "\xEF\xBE\x97", "\xEF\xBE\x98", "\xEF\xBE\x99", "\xEF\xBE\x9A",
-                "\xEF\xBE\x9B", "\xEF\xBE\x9C", "\xEF\xBE\x9D"};
+            const std::vector<Uint32> symbols = binaryGlyphMode ? binarySymbolSet() : fullSymbolSet();
+            int maxGlyphW = 0;
+            int maxGlyphH = 0;
 
             glyphs.reserve(symbols.size());
-            for (const std::string &symbol : symbols) {
+            for (const Uint32 codepoint : symbols) {
                 Glyph glyph;
-                glyph.symbol = symbol;
+                glyph.codepoint = codepoint;
                 glyph.levels.reserve(glyphLevels + 1);
                 for (int level = 0; level <= glyphLevels; ++level) {
-                    SDL_Surface *rendered = TTF_RenderText_Blended(font.get(), symbol.c_str(), 0, matrixColor(level));
+                    SDL_Surface *rendered = TTF_RenderGlyph_Blended(font.get(), codepoint, matrixColor(level));
                     if (rendered == nullptr) {
                         continue;
                     }
@@ -163,15 +165,19 @@ namespace example {
                     SDL_DestroySurface(rendered);
                     if (converted != nullptr) {
                         SDL_SetSurfaceBlendMode(converted.get(), SDL_BLENDMODE_BLEND);
+                        maxGlyphW = std::max(maxGlyphW, converted->w);
+                        maxGlyphH = std::max(maxGlyphH, converted->h);
                         glyph.levels.emplace_back(std::move(converted));
                     }
                 }
-                SDL_Surface *renderedHead = TTF_RenderText_Blended(font.get(), symbol.c_str(), 0, headColor());
+                SDL_Surface *renderedHead = TTF_RenderGlyph_Blended(font.get(), codepoint, headColor());
                 if (renderedHead != nullptr) {
                     SurfacePtr converted(SDL_ConvertSurface(renderedHead, SDL_PIXELFORMAT_RGBA32));
                     SDL_DestroySurface(renderedHead);
                     if (converted != nullptr) {
                         SDL_SetSurfaceBlendMode(converted.get(), SDL_BLENDMODE_BLEND);
+                        maxGlyphW = std::max(maxGlyphW, converted->w);
+                        maxGlyphH = std::max(maxGlyphH, converted->h);
                         glyph.levels.emplace_back(std::move(converted));
                     }
                 }
@@ -184,11 +190,8 @@ namespace example {
                 throw mxvk::Exception("Matrix demo could not render any glyphs from keifont.ttf");
             }
 
-            int textW = 0;
-            int textH = 0;
-            TTF_GetStringSize(font.get(), "\xEF\xBE\x8F", 0, &textW, &textH);
-            cellW = std::max(14, textW + 2);
-            cellH = std::max(22, textH - 1);
+            cellW = std::max(16, maxGlyphW + 3);
+            cellH = std::max(24, maxGlyphH + 2);
         }
 
         void rebuildForExtent() {
@@ -270,9 +273,9 @@ namespace example {
                 Uint8 *row = pixels + y * canvas->pitch;
                 for (int x = 0; x < canvas->w; ++x) {
                     Uint8 *p = row + x * 4;
-                    p[0] = static_cast<Uint8>(static_cast<float>(p[0]) * fade * 0.80f);
+                    p[0] = static_cast<Uint8>(static_cast<float>(p[0]) * fade * 0.72f);
                     p[1] = static_cast<Uint8>(static_cast<float>(p[1]) * fade);
-                    p[2] = static_cast<Uint8>(static_cast<float>(p[2]) * fade * 0.68f);
+                    p[2] = static_cast<Uint8>(static_cast<float>(p[2]) * fade * 0.55f);
                     p[3] = 255;
                 }
             }
@@ -281,7 +284,7 @@ namespace example {
 
         void drawStream(int column, const Stream &stream) {
             const int headRow = static_cast<int>(std::floor(stream.head));
-            const int x = column * cellW + ((column % 5 == 0) ? -1 : 0);
+            const int x = column * cellW;
             for (int tail = stream.length; tail >= 0; --tail) {
                 const int row = headRow - tail;
                 if (row < -1 || row >= rows) {
@@ -304,26 +307,48 @@ namespace example {
                     continue;
                 }
 
-                SDL_Rect dst{x + (cellW - glyph.levels[level]->w) / 2, row * cellH, glyph.levels[level]->w, glyph.levels[level]->h};
-                SDL_BlitSurface(glyph.levels[level].get(), nullptr, canvas.get(), &dst);
+                const SDL_Rect clearRect{x, row * cellH, cellW, cellH};
+                SDL_FillSurfaceRect(canvas.get(), &clearRect, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
+                SDL_Surface *surface = glyph.levels[level].get();
+                Uint8 previousAlpha = 255;
+                SDL_GetSurfaceAlphaMod(surface, &previousAlpha);
+
+                const int glyphX = x + (cellW - glyph.levels[level]->w) / 2;
+                const int glyphY = row * cellH;
+                const int glowAlpha = (tail == 0) ? 110 : (tail <= 2 ? 72 : 34);
+
+                SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>(glowAlpha));
+                SDL_Rect glowDst{glyphX - 1, glyphY, glyph.levels[level]->w, glyph.levels[level]->h};
+                SDL_BlitSurface(surface, nullptr, canvas.get(), &glowDst);
+                glowDst.x = glyphX + 1;
+                glowDst.y = glyphY;
+                SDL_BlitSurface(surface, nullptr, canvas.get(), &glowDst);
+                glowDst.x = glyphX;
+                glowDst.y = glyphY + 1;
+                SDL_BlitSurface(surface, nullptr, canvas.get(), &glowDst);
+
+                SDL_SetSurfaceAlphaMod(surface, previousAlpha);
+                SDL_Rect dst{glyphX, glyphY, glyph.levels[level]->w, glyph.levels[level]->h};
+                SDL_BlitSurface(surface, nullptr, canvas.get(), &dst);
             }
         }
 
-        static constexpr int fontSize = 24;
+        static constexpr int fontSize = 28;
         static constexpr int glyphLevels = 7;
 
         std::string assetRoot;
         FontPtr font;
         SurfacePtr canvas;
         mxvk::VK_Sprite *rainSprite = nullptr;
+        bool binaryGlyphMode = false;
         std::vector<Glyph> glyphs;
         std::vector<Stream> streams;
         std::mt19937 rng;
         Clock::time_point lastFrame{Clock::now()};
         int columns = 0;
         int rows = 0;
-        int cellW = 18;
-        int cellH = 24;
+        int cellW = 20;
+        int cellH = 28;
         int frameCounter = 0;
     };
 } // namespace example
@@ -331,7 +356,8 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::MatrixWindow window(args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen);
+        example::MatrixWindow window(
+            args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen, args.binary);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
