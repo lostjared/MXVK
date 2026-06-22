@@ -4489,7 +4489,6 @@ namespace walk {
         bool showFps = true;
         float mouseSensitivity = 0.15f;
 
-        float deltaTime = 0.0f;
         float jumpVelocity = 0.0f;
         float gravity = 0.015f;
         float collectibleClusterResolveTimer = 0.0f;
