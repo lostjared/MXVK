@@ -67,12 +67,13 @@ add_custom_target(model_example_shaders
 add_dependencies(model_example model_example_shaders)
 target_compile_definitions(model_example PRIVATE
     MODEL_EXAMPLE_SHADER_DIR="${MODEL_EXAMPLE_SHADER_OUTPUT_DIR}"
-    MODEL_EXAMPLE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    MODEL_EXAMPLE_ASSET_DIR="${CMAKE_CURRENT_BINARY_DIR}"
 )
 
 set(MODEL_EXAMPLE_MODEL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj)
 set(MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/texture_manifest.txt)
 set(MODEL_EXAMPLE_TEXTURE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/sandstone_brick.png)
+set(MODEL_EXAMPLE_MATRIX_FONT_SOURCE ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf)
 set(MODEL_EXAMPLE_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
 set(MODEL_EXAMPLE_LOSTCRYSTAL_RUNTIME_SPV ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/lostcrystal.frag.spv)
 set(MODEL_EXAMPLE_LOSTCRYSTAL_SOURCE_DATA_SPV ${CMAKE_CURRENT_SOURCE_DIR}/data/lostcrystal.frag.spv)
@@ -118,6 +119,7 @@ foreach(_asset
     ${MODEL_EXAMPLE_MODEL_SOURCE}
     ${MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE}
     ${MODEL_EXAMPLE_TEXTURE_SOURCE}
+    ${MODEL_EXAMPLE_MATRIX_FONT_SOURCE}
 )
     if(NOT EXISTS ${_asset})
         message(FATAL_ERROR "model_example missing required asset: ${_asset}")
@@ -135,5 +137,8 @@ add_custom_command(TARGET model_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${MODEL_EXAMPLE_TEXTURE_SOURCE}
         ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/sandstone_brick.png
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${MODEL_EXAMPLE_MATRIX_FONT_SOURCE}
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/keifont.ttf
     COMMENT "Copying model example assets to runtime output directory"
 )
