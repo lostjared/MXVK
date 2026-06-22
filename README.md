@@ -187,51 +187,51 @@ Examples:
 
 ## Examples
 
-The examples are grouped below by what they demonstrate. Many of them share the same `run.pl` invocation pattern and accept the common arguments documented above.
+The examples are grouped below by what they demonstrate. Most accept the shared arguments documented above, and the per-example `README.md` files carry the full control maps for the larger demos.
 
-### Starter samples
+### Starter Samples
 
-- `cfg_example` - small configuration API smoke test that reads and updates `test.dat`.
-- `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle.
-- `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader.
-- `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader.
-- `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`.
+- `cfg_example` - config persistence smoke test. **Inputs:** none. **Controls:** none; it runs once, prints the incremented counter, and exits. See [examples/cfg_example/README.md](/var/home/jared/gpu/MXVK/examples/cfg_example/README.md).
+- `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
+- `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 
-### Shader and effect demos
+### Shader And Effect Demos
 
-- `matrix` - Matrix-style digital rain rendered from `SDL_ttf` glyphs and a sprite-backed framebuffer.
-- `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene.
-- `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output.
-- `console_demo` - in-window console layered over a moving shader background.
-- `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls.
+- `matrix` - Matrix-style digital rain rendered from `SDL_ttf` glyphs and a sprite-backed framebuffer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the streams, `Escape` quits.
+- `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the rain, arrow keys orbit the camera, `Page Up` / `Page Down` zoom, `Escape` quits. See [examples/binary_matrix/README.md](/var/home/jared/gpu/MXVK/examples/binary_matrix/README.md).
+- `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel zoom, drag pan, `W` / `A` / `S` / `D` or arrow keys pan, `Z` / `X` continuous zoom, `1` / `2` / `3` presets, `+` / `=` and `-` iteration count, `[` / `]` palette, `R` reset, `Escape` quit.
+- `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
+- `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
 
-### 3D viewers
+### 3D Viewers
 
-- `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets.
-- `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging.
-- `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays.
-- `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting.
-- `starship` - ship viewer with Phong shading, a moving starfield, and exhaust effects.
-- `dark` - Dark Crystal Pyramid viewer with a custom beam effect and layered model/sprite/text rendering.
-- `moon` - moon model viewer with pyramids and a separate starfield layer.
+- `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, and `--resource_path`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Escape` quits.
+- `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging. **Inputs:** common `-p`, `-r`, `-f`, `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
+- `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits. See [examples/sprite3d_example/README.md](/var/home/jared/gpu/MXVK/examples/sprite3d_example/README.md).
+- `starship` - ship viewer with Phong shading, a moving starfield, and exhaust effects. **Inputs:** common `-p`, `-r`, `-f`, plus the example asset set. **Controls:** mouse drag rotates the ship, `Escape` quits.
+- `dark` - Dark Crystal Pyramid viewer with a custom beam effect and layered model/sprite/text rendering. **Inputs:** common `-p`, `-r`, `-f`, optional `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits. See [examples/dark/README.md](/var/home/jared/gpu/MXVK/examples/dark/README.md).
+- `moon` - moon model viewer with pyramids and a separate starfield layer. **Inputs:** common `-p`, `-r`, `-f`, optional `--filename` and `--fragment`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles auto-spin, `Escape` quits. See [examples/moon/README.md](/var/home/jared/gpu/MXVK/examples/moon/README.md).
 
-### Games and interactive scenes
+### Games And Interactive Scenes
 
-- `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield.
-- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands.
-- `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates.
-- `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent.
-- `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat.
-- `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic.
-- `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry.
-- `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets.
-- `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer.
+- `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
+- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits. See [examples/asteroids3d/README.md](/var/home/jared/gpu/MXVK/examples/asteroids3d/README.md).
+- `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
+- `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.
+- `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `W` / `A` / `S` / `D` move, mouse or right stick look, `Left Shift` sprint, `Left Ctrl` crouch, `Space` jump, left click or right shoulder fire, `F` toggles the FPS overlay, `Escape` releases the mouse or quits.
+- `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Enter`, `Space`, `Escape`, and `Back`; in-game controls include arrow keys, `Space` to charge a shot, `Enter` to confirm cue-ball placement, mouse drag for aiming, right mouse drag to rotate the camera, and wheel or pinch to zoom.
+- `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Up` / `Down` navigate menus, `Left` / `Right` move blocks, `Space` rotates, `P` pauses, `Escape` backs out or quits, and text entry uses `Backspace` / `Enter`.
+- `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menu navigation uses `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `A` or `Up` rotate forward, `S` rotate backward, `P` pause, `Escape` return to menu, with typed input for high-score entry.
+- `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `Up` rotate, `Z` hard drop, `R` restart, `Escape` menu, camera controls use `W` / `A` / `S` / `D`, `Q` / `E`, `Page Up` / `Page Down`, and multiplayer uses `H` to host and `J` / `Enter` to join. See [examples/tetris/README.md](/var/home/jared/gpu/MXVK/examples/tetris/README.md).
 
-### Camera and video workflows
+### Camera And Video Workflows
 
-- `compute_shader` - OpenCV capture or video-file playback through selectable Vulkan compute shaders. Requires `-DCV=ON`.
-- `opencv_example` - displays camera or video frames on a sprite in real time. Requires `-DCV=ON`.
-- `opencv_model` - maps a live camera feed onto a textured 3D model. Requires `-DCV=ON`.
+- `compute_shader` - OpenCV capture or video-file playback through selectable Vulkan compute shaders. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--filename`, `--output`, `--crf`, `--shader-path`, and compute-related options. **Controls:** `Up` / `Down` switch shaders, `Left` / `Right` change the `acidcam_filters` selector, `Escape` quits.
+- `opencv_example` - displays camera or video frames on a sprite in real time. **Inputs:** requires `-DCV=ON`; accepts `--camera` and `--filename`. **Controls:** `Escape` quits.
+- `opencv_model` - maps a live camera feed onto a textured 3D model. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--filename`, and standard example arguments. **Controls:** left mouse drag orbits, mouse wheel zooms, arrow keys rotate the model, `Escape` quits.
 
 If you want a quick tour of the core demos, `./run.pl --all` executes the default example sweep used by `testapps.pl`.
 
