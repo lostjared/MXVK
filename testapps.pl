@@ -14,12 +14,12 @@ my @tests = qw(
     dark
     matrix
     binary_matrix
+    planet
     masterpiece
     console_demo
     fractal_zoom
     model_example
-    starship
-    planet
+    starship 
     moon
     asteroids
     asteroids3d
