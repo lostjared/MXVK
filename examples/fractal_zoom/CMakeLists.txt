@@ -1,8 +1,20 @@
+find_package(Boost CONFIG QUIET)
+if(NOT Boost_FOUND)
+    find_package(Boost REQUIRED)
+endif()
+
 add_executable(fractal_zoom
     ${CMAKE_SOURCE_DIR}/examples/fractal_zoom/fractal.cpp
 )
 
 target_link_libraries(fractal_zoom PRIVATE mxvk::mxvk)
+if(TARGET Boost::headers)
+    target_link_libraries(fractal_zoom PRIVATE Boost::headers)
+elseif(TARGET Boost::boost)
+    target_link_libraries(fractal_zoom PRIVATE Boost::boost)
+else()
+    target_include_directories(fractal_zoom PRIVATE ${Boost_INCLUDE_DIRS})
+endif()
 
 set(fractal_zoom_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(fractal_zoom_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)

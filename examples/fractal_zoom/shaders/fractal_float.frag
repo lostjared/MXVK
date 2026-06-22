@@ -2,18 +2,28 @@
 
 layout(location = 0) out vec4 outColor;
 
+layout(std430, binding = 0) buffer ReferenceOrbit {
+    vec4 orbit_samples[];
+};
+
 layout(push_constant) uniform PushConstants {
     float centerX;
     float centerY;
-    float zoom;
+    float inverseZoom;
     float time;
     float resolutionX;
     float resolutionY;
     int maxIterations;
     int palette;
-    int aaSamples;
+    int orbitLength;
     int reserved;
-} pc;
+}
+pc;
+
+const float DIRECT_RENDER_MAX_ZOOM = 4096.0;
+const float PERTURBATION_BREAKDOWN_LIMIT2 = 0.0625;
+const int MAX_ADAPTIVE_REFERENCES = 32;
+const int REFERENCE_ORBIT_STRIDE = 4097;
 
 vec3 hsv2rgb(vec3 c) {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
@@ -32,6 +42,17 @@ vec3 paletteColor(float smoothIter, float t, int palette) {
     }
     float hue = fract(smoothIter * 0.022 + t * 1.08);
     return hsv2rgb(vec3(hue, 0.9, 1.0));
+}
+
+vec3 escapedColor(int iter, float mag2, int maxIterations, float time, int palette) {
+    float smoothIter = float(iter) + 1.0 - log2(log2(max(mag2, 1.000001)));
+    vec3 color = paletteColor(smoothIter, time, palette);
+    float edge = clamp(1.0 - float(iter) / float(max(maxIterations, 1)), 0.0, 1.0);
+    return color * (0.5 + 0.5 * edge);
+}
+
+vec2 complexMul(vec2 a, vec2 b) {
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
 bool isInteriorPoint(vec2 c) {
@@ -53,47 +74,86 @@ bool isInteriorPoint(vec2 c) {
     return false;
 }
 
-vec3 mandelbrotColor(vec2 c, int maxIterations, float time, int palette) {
+vec3 directMandelbrotColor(vec2 c, int maxIterations, float time, int palette) {
     if (isInteriorPoint(c)) {
         return vec3(0.0);
     }
 
     vec2 z = vec2(0.0);
-    float zx2 = 0.0;
-    float zy2 = 0.0;
-
     int iter = 0;
-    for (int i = 0; i < maxIterations; ++i) {
-        if (zx2 + zy2 > 4.0) {
-            break;
+    for (; iter < maxIterations; ++iter) {
+        float mag2 = dot(z, z);
+        if (mag2 > 4.0) {
+            return escapedColor(iter, mag2, maxIterations, time, palette);
         }
-        float zx = z.x;
-        float zy = z.y;
-        float next_x = zx2 - zy2 + c.x;
-        float next_y = 2.0 * zx * zy + c.y;
-        z = vec2(next_x, next_y);
-        zx2 = next_x * next_x;
-        zy2 = next_y * next_y;
+        z = complexMul(z, z) + c;
+    }
+
+    return vec3(0.0);
+}
+
+vec3 perturbationMandelbrotColor(vec2 delta_c, vec2 c, int referenceBase, int orbitLength, int maxIterations, float time, int palette, bool allowDirectFallback) {
+    vec2 dz = vec2(0.0);
+    int iter = 0;
+    int count = min(maxIterations, orbitLength - 1);
+
+    for (int i = 0; i < count; ++i) {
+        vec2 ref_Z = orbit_samples[referenceBase + i].xy;
+        dz = 2.0 * complexMul(ref_Z, dz) + complexMul(dz, dz) + delta_c;
+
+        vec2 true_z = orbit_samples[referenceBase + i + 1].xy + dz;
         ++iter;
+
+        float true_mag2 = dot(true_z, true_z);
+        if (true_mag2 > 4.0) {
+            return escapedColor(iter, true_mag2, maxIterations, time, palette);
+        }
+
+        float dz_mag2 = dot(dz, dz);
+        float ref_mag2 = dot(ref_Z, ref_Z);
+        if (dz_mag2 > PERTURBATION_BREAKDOWN_LIMIT2 || (ref_mag2 > 0.0 && dz_mag2 > ref_mag2 * 0.25)) {
+            return allowDirectFallback ? directMandelbrotColor(c, maxIterations, time, palette) : vec3(0.0);
+        }
     }
 
-    if (iter >= maxIterations) {
-        return vec3(0.0);
-    }
-
-    float mag2 = max(zx2 + zy2, 1.000001);
-    float smoothIter = float(iter) + 1.0 - log2(log2(mag2));
-    vec3 color = paletteColor(smoothIter, time, palette);
-
-    float edge = clamp(1.0 - float(iter) / float(max(maxIterations, 1)), 0.0, 1.0);
-    color *= 0.5 + 0.5 * edge;
-    return color;
+    return vec3(0.0);
 }
 
 void main() {
     vec2 resolution = vec2(max(pc.resolutionX, 1.0), max(pc.resolutionY, 1.0));
     vec2 uv = (gl_FragCoord.xy - 0.5 * resolution) / min(resolution.x, resolution.y);
-    vec2 c = uv / max(pc.zoom, 1.0e-18) + vec2(pc.centerX, pc.centerY);
-    vec3 color = mandelbrotColor(c, pc.maxIterations, pc.time, pc.palette);
+    float inverse_zoom = max(pc.inverseZoom, 0.0);
+    vec2 c = uv * inverse_zoom + vec2(pc.centerX, pc.centerY);
+
+    bool allow_direct = inverse_zoom > 1.0 / DIRECT_RENDER_MAX_ZOOM;
+    int reference_count = min(int(orbit_samples[0].x + 0.5), MAX_ADAPTIVE_REFERENCES);
+    int reference_base = -1;
+    int reference_orbit_length = 0;
+    vec2 reference_uv = vec2(0.0);
+
+    for (int i = 0; i < MAX_ADAPTIVE_REFERENCES; ++i) {
+        if (i >= reference_count) {
+            break;
+        }
+
+        int metadata_base = 1 + i * 2;
+        vec4 bounds = orbit_samples[metadata_base];
+        if (uv.x >= bounds.x && uv.x <= bounds.z && uv.y >= bounds.y && uv.y <= bounds.w) {
+            vec4 metadata = orbit_samples[metadata_base + 1];
+            reference_uv = metadata.xy;
+            reference_base = int(metadata.z + 0.5);
+            reference_orbit_length = int(metadata.w + 0.5);
+            break;
+        }
+    }
+
+    vec3 color = vec3(0.0);
+    if (allow_direct || reference_base < 0 || reference_orbit_length <= 1) {
+        color = directMandelbrotColor(c, pc.maxIterations, pc.time, pc.palette);
+    } else {
+        vec2 delta_c = (uv - reference_uv) * inverse_zoom;
+        color = perturbationMandelbrotColor(delta_c, c, reference_base, reference_orbit_length, pc.maxIterations, pc.time, pc.palette, allow_direct);
+    }
+
     outColor = vec4(color, 1.0);
 }

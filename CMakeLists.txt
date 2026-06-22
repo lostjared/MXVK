@@ -25,6 +25,7 @@ set(WITH_MIXER "AUTO" CACHE STRING "Enable SDL3_mixer audio support (AUTO, ON, O
 set_property(CACHE WITH_MIXER PROPERTY STRINGS AUTO ON OFF)
 option(JPEG "Enable JPEG image support" OFF)
 option(EXAMPLES "Enable/Disable Examples" ON)
+option(FRACTAL_ZOOM "Build the Boost.Multiprecision fractal_zoom example" OFF)
 
 if(MINGW AND CMAKE_CROSSCOMPILING)
 set(MXVK_MINGW_TRIPLET "")
@@ -574,8 +575,10 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(puzzle)
     add_subdirectory(examples/pool_demo)
     mxvk_configure_mingw_target(Pool3D)
-    add_subdirectory(examples/fractal_zoom)
-    mxvk_configure_mingw_target(fractal_zoom)
+    if(FRACTAL_ZOOM)
+        add_subdirectory(examples/fractal_zoom)
+        mxvk_configure_mingw_target(fractal_zoom)
+    endif()
     add_subdirectory(examples/masterpiece)
     mxvk_configure_mingw_target(masterpiece)
     add_subdirectory(examples/console_demo)
@@ -700,13 +703,15 @@ if(EXAMPLES)
         tictactoe
         puzzle
         Pool3D
-        fractal_zoom
         console_demo
         cfg_example
         matrix
         binary_matrix
         walk_example
     )
+    if(FRACTAL_ZOOM)
+        list(APPEND mxvk_example_targets fractal_zoom)
+    endif()
     if(CV)
         list(APPEND mxvk_example_targets compute_shader opencv_example opencv_model)
     endif()
