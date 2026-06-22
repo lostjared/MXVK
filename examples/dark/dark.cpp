@@ -27,25 +27,28 @@ namespace example {
             fallbackHeight = height;
 
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/pyramid.obj") : filename;
+            const std::string beamModelPath = assetRoot + "/data/beam.obj";
             const std::string vertPath = std::string(DARK_SHADER_DIR) + "/dark.vert.spv";
             const std::string fragPath = std::string(DARK_SHADER_DIR) + "/dark.frag.spv";
-            const std::string beamVertPath = std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv";
+            const std::string beamVertPath = std::string(DARK_SHADER_DIR) + "/beam3d.vert.spv";
             const std::string beamFragPath = std::string(DARK_SHADER_DIR) + "/beam.frag.spv";
 
             setFont(assetRoot + "/data/font.ttf", 48);
 
+            beamModel.load(this, beamModelPath, "", "", 1.0f);
+            beamModel.setAlphaBlending(true);
+            beamModel.setShaders(this, beamVertPath, beamFragPath);
+
             model.load(this, modelPath, "", "", 1.0f);
             model.setAlphaBlending(true);
             model.setShaders(this, vertPath, fragPath);
-
-            beamSprite = createSprite(1, 1, beamVertPath, beamFragPath);
-            beamSprite->setEffectsEnabled(true);
         }
 
         ~DarkWindow() override {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+            beamModel.cleanup(this);
             model.cleanup(this);
         }
 
@@ -57,8 +60,35 @@ namespace example {
 
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE) {
                 if (!e.key.repeat) {
-                    autoSpinEnabled = !autoSpinEnabled;
+                    beamTracksPrism = !beamTracksPrism;
                 }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                mouseDragging = true;
+                lastMouseX = static_cast<int>(e.button.x);
+                lastMouseY = static_cast<int>(e.button.y);
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
+                mouseDragging = false;
+                return;
+            }
+
+            if (e.type == SDL_EVENT_MOUSE_MOTION && mouseDragging) {
+                const int x = static_cast<int>(e.motion.x);
+                const int y = static_cast<int>(e.motion.y);
+                const int deltaX = x - lastMouseX;
+                const int deltaY = y - lastMouseY;
+
+                yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
+                pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
+                pitchDegrees = std::clamp(pitchDegrees, -55.0f, 55.0f);
+
+                lastMouseX = x;
+                lastMouseY = y;
                 return;
             }
 
@@ -66,24 +96,18 @@ namespace example {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
                 cameraDistance -= delta * 0.35f;
                 cameraDistance = std::clamp(cameraDistance, 2.0f, 10.0f);
+                return;
             }
         }
 
         void onSwapchainRecreated() override {
+            beamModel.resize(this);
             model.resize(this);
         }
 
         void proc() override {
-            if (beamSprite == nullptr) {
-                return;
-            }
-
             const VkExtent2D extent = getSwapchainExtent();
             const int width = extent.width > 0U ? static_cast<int>(extent.width) : fallbackWidth;
-            const int height = extent.height > 0U ? static_cast<int>(extent.height) : fallbackHeight;
-
-            beamSprite->setShaderParams(autoSpinRadians, elapsedSeconds, 1.0f, 0.0f);
-            beamSprite->drawSpriteRect(0, 0, width, height);
 
             constexpr const char *titleText = "the Lunatic iS in my heaD";
             int textWidth = 0;
@@ -126,18 +150,32 @@ namespace example {
             ubo.proj[1][1] *= -1.0f;
             ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 0.42f);
 
+            mxvk::UniformBufferObject beamUbo{};
+            beamUbo.model = glm::mat4(1.0f);
+            beamUbo.view = ubo.view;
+            beamUbo.proj = ubo.proj;
+            beamUbo.fx = glm::vec4(elapsedSeconds, autoSpinRadians, beamTracksPrism ? 1.0f : 0.0f, 1.0f);
+
+            beamModel.updateUBO(imageIndex, beamUbo);
+            beamModel.render(cmd, imageIndex, false);
+
             model.updateUBO(imageIndex, ubo);
             model.render(cmd, imageIndex, false);
         }
 
       private:
         std::string assetRoot;
+        mxvk::VKAbstractModel beamModel{};
         mxvk::VKAbstractModel model{};
-        mxvk::VK_Sprite *beamSprite = nullptr;
+        bool mouseDragging = false;
         bool autoSpinEnabled = true;
+        bool beamTracksPrism = true;
+        int lastMouseX = 0;
+        int lastMouseY = 0;
         float yawDegrees = 0.0f;
         float pitchDegrees = 0.0f;
         float cameraDistance = 5.35f;
+        float mouseSensitivity = 0.35f;
         float autoSpinRadians = 0.0f;
         float elapsedSeconds = 0.0f;
         int fallbackWidth = 1280;
