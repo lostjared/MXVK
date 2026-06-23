@@ -16,3 +16,4 @@ The scene also layers a matrix-style green rain backdrop behind the planet using
 The example loads `saturn.mxmod.z` and its texture manifest, then feeds a continuously rotating model matrix into the standard MXVK model pipeline. In parallel, it builds a glyph atlas from the bundled bold `Noto Sans CJK JP` font, animates the rain into an off-screen surface, and uploads that surface into a sprite that is rendered before the planet. The camera is placed slightly above the equator so the ring is visible from the start.
 
 The rain font size can be changed with `--font-size <px>`, and the font file itself can be overridden with `--font-path <file>`. The bundled default is the bold face.
+The rain tint can also be changed with `--color <spec>` using either `#RRGGBB` or `R,G,B`.

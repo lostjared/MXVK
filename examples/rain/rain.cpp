@@ -1,8 +1,10 @@
 #include "rain.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstring>
+#include <optional>
 #include <mutex>
 #include <utility>
 
@@ -32,6 +34,82 @@ namespace matrix {
             if (ttf_refcount == 0) {
                 TTF_Quit();
             }
+        }
+
+        std::string trim_copy(const std::string &value) {
+            const auto begin = value.find_first_not_of(" \t\r\n");
+            if (begin == std::string::npos) {
+                return {};
+            }
+            const auto end = value.find_last_not_of(" \t\r\n");
+            return value.substr(begin, end - begin + 1);
+        }
+
+        std::optional<Uint8> parse_u8_component(const std::string &value, int base) {
+            int parsed = 0;
+            const std::string trimmed = trim_copy(value);
+            const char *begin = trimmed.data();
+            const char *end = trimmed.data() + trimmed.size();
+            const std::from_chars_result result = std::from_chars(begin, end, parsed, base);
+            if (result.ec != std::errc{} || result.ptr != end || parsed < 0 || parsed > 255) {
+                return std::nullopt;
+            }
+            return static_cast<Uint8>(parsed);
+        }
+
+        std::optional<SDL_Color> parse_color_spec(const std::string &spec) {
+            const std::string value = trim_copy(spec);
+            if (value.empty()) {
+                return std::nullopt;
+            }
+
+            if (value.front() == '#') {
+                if (value.size() != 7) {
+                    return std::nullopt;
+                }
+                const auto r = parse_u8_component(value.substr(1, 2), 16);
+                const auto g = parse_u8_component(value.substr(3, 2), 16);
+                const auto b = parse_u8_component(value.substr(5, 2), 16);
+                if (!r || !g || !b) {
+                    return std::nullopt;
+                }
+                return SDL_Color{*r, *g, *b, 255};
+            }
+
+            const std::size_t first = value.find(',');
+            if (first == std::string::npos) {
+                return std::nullopt;
+            }
+            const std::size_t second = value.find(',', first + 1);
+            if (second == std::string::npos || value.find(',', second + 1) != std::string::npos) {
+                return std::nullopt;
+            }
+
+            const auto r = parse_u8_component(value.substr(0, first), 10);
+            const auto g = parse_u8_component(value.substr(first + 1, second - first - 1), 10);
+            const auto b = parse_u8_component(value.substr(second + 1), 10);
+            if (!r || !g || !b) {
+                return std::nullopt;
+            }
+            return SDL_Color{*r, *g, *b, 255};
+        }
+
+        std::function<SDL_Color(int)> make_tinted_level_color(SDL_Color base_color) {
+            return [base_color](int level) {
+                constexpr int max_level = 7;
+                const float t = std::clamp(static_cast<float>(level) / static_cast<float>(max_level), 0.0f, 1.0f);
+                const Uint8 r = static_cast<Uint8>(std::lerp(0.0f, static_cast<float>(base_color.r), std::pow(t, 1.0f)));
+                const Uint8 g = static_cast<Uint8>(std::lerp(0.0f, static_cast<float>(base_color.g), std::pow(t, 1.0f)));
+                const Uint8 b = static_cast<Uint8>(std::lerp(0.0f, static_cast<float>(base_color.b), std::pow(t, 1.0f)));
+                const Uint8 a = static_cast<Uint8>(std::lerp(95.0f, 235.0f, t));
+                return SDL_Color{r, g, b, a};
+            };
+        }
+
+        std::function<SDL_Color()> make_tinted_head_color(SDL_Color base_color) {
+            return [base_color]() {
+                return SDL_Color{base_color.r, base_color.g, base_color.b, 255};
+            };
         }
     } // namespace
 
@@ -78,7 +156,7 @@ namespace matrix {
 
     RainConfig make_matrix_rain_config(const std::string &asset_root, bool binary_glyph_mode) {
         RainConfig config;
-    config.font_path = asset_root + "/data/NotoSansCJK-Bold.ttc";
+        config.font_path = asset_root + "/data/NotoSansCJK-Bold.ttc";
         config.symbols = binary_glyph_mode ? Rain::binary_symbol_set() : Rain::full_symbol_set();
         config.level_color = &Rain::matrix_color;
         config.head_color = &Rain::head_color;
@@ -106,6 +184,14 @@ namespace matrix {
         }
         if (!config.head_color) {
             config.head_color = &Rain::head_color;
+        }
+        if (!config.color.empty()) {
+            const std::optional<SDL_Color> parsed_color = parse_color_spec(config.color);
+            if (!parsed_color) {
+                throw mxvk::Exception("Invalid matrix rain color: " + config.color + " (expected #RRGGBB or R,G,B)");
+            }
+            config.level_color = make_tinted_level_color(*parsed_color);
+            config.head_color = make_tinted_head_color(*parsed_color);
         }
         if (mode == SurfaceMode::explicit_default && config.surface_width <= 0 && config.surface_height <= 0) {
             config.surface_width = default_surface_width;

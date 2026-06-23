@@ -11,6 +11,7 @@ Matrix Rain recreates the classic falling-glyph effect using SDL_ttf and MXVK sp
 - `--binary` - limit the glyph set to `0` and `1`
 - `--font-size <px>` - set the glyph raster size in pixels
 - `--font-path <file>` - override the bundled bold font file used for glyphs
+- `--color <spec>` - tint the rain using `#RRGGBB` or `R,G,B`
 
 ## How It Works
 

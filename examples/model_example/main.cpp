@@ -39,7 +39,8 @@ namespace example {
                     bool fullscreen,
                     bool binaryTextureMode,
                     int fontSize,
-                    const std::string &fontPath)
+                    const std::string &fontPath,
+                    const std::string &color)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path),
               binaryTextureMode(binaryTextureMode) {
@@ -61,6 +62,7 @@ namespace example {
                 if (!fontPath.empty()) {
                     rainConfig.font_path = fontPath;
                 }
+                rainConfig.color = color;
                 binaryMatrixTexture = std::make_unique<matrix::Rain>(std::move(rainConfig));
             }
         }
@@ -311,7 +313,8 @@ int main(int argc, char **argv) {
             args.fullscreen,
             args.binary,
             args.font_size,
-            args.font_path);
+            args.font_path,
+            args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

@@ -25,7 +25,11 @@ namespace example {
 
     class MatrixRainBackdrop {
       public:
-        MatrixRainBackdrop(PlanetWindow &window, const std::string &assetRoot, int fontSize, const std::string &fontPath);
+        MatrixRainBackdrop(PlanetWindow &window,
+                           const std::string &assetRoot,
+                           int fontSize,
+                           const std::string &fontPath,
+                           const std::string &color);
         ~MatrixRainBackdrop();
 
         void onSwapchainAboutToRecreate();
@@ -46,7 +50,8 @@ namespace example {
                      int height,
                      bool fullscreen,
                      int font_size,
-                     const std::string &font_path)
+                     const std::string &font_path,
+                     const std::string &color)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(PLANET_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/saturn.mxmod.z") : filename;
@@ -59,7 +64,7 @@ namespace example {
             model.setBackfaceCulling(false);
             model.setShaders(this, vertPath, fragPath);
 
-            backdrop = std::make_unique<MatrixRainBackdrop>(*this, assetRoot, font_size, font_path);
+            backdrop = std::make_unique<MatrixRainBackdrop>(*this, assetRoot, font_size, font_path, color);
         }
 
         ~PlanetWindow() override {
@@ -167,13 +172,18 @@ namespace example {
         float mouseSensitivity = 0.35f;
     };
 
-    MatrixRainBackdrop::MatrixRainBackdrop(PlanetWindow &window, const std::string &assetRootPath, int fontSize, const std::string &fontPath)
+    MatrixRainBackdrop::MatrixRainBackdrop(PlanetWindow &window,
+                                           const std::string &assetRootPath,
+                                           int fontSize,
+                                           const std::string &fontPath,
+                                           const std::string &color)
         : rain([&]() {
               matrix::RainConfig config = matrix::make_matrix_rain_config(assetRootPath, false);
               config.font_size = std::max(1, fontSize);
               if (!fontPath.empty()) {
                   config.font_path = fontPath;
               }
+              config.color = color;
               return std::make_unique<matrix::Rain>(window, std::move(config));
           }()) {
         lastFrame = Clock::now();
@@ -216,7 +226,7 @@ int main(int argc, char **argv) {
         const Arguments args = proc_args(argc, argv);
         example::PlanetWindow window(
             args.filename, args.path, "MXVK Planet Example", args.width, args.height, args.fullscreen, args.font_size,
-            args.font_path);
+            args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

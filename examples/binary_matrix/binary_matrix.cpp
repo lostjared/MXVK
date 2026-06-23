@@ -6,6 +6,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -13,6 +14,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -64,6 +66,64 @@ namespace {
         return SDL_Color{r, g, b, a};
     }
 
+    std::string trim_copy(const std::string &value) {
+        const auto begin = value.find_first_not_of(" \t\r\n");
+        if (begin == std::string::npos) {
+            return {};
+        }
+        const auto end = value.find_last_not_of(" \t\r\n");
+        return value.substr(begin, end - begin + 1);
+    }
+
+    std::optional<Uint8> parse_u8_component(const std::string &value, int base) {
+        int parsed = 0;
+        const std::string trimmed = trim_copy(value);
+        const char *begin = trimmed.data();
+        const char *end = trimmed.data() + trimmed.size();
+        const std::from_chars_result result = std::from_chars(begin, end, parsed, base);
+        if (result.ec != std::errc{} || result.ptr != end || parsed < 0 || parsed > 255) {
+            return std::nullopt;
+        }
+        return static_cast<Uint8>(parsed);
+    }
+
+    std::optional<SDL_Color> parse_color_spec(const std::string &spec) {
+        const std::string value = trim_copy(spec);
+        if (value.empty()) {
+            return std::nullopt;
+        }
+
+        if (value.front() == '#') {
+            if (value.size() != 7) {
+                return std::nullopt;
+            }
+            const auto r = parse_u8_component(value.substr(1, 2), 16);
+            const auto g = parse_u8_component(value.substr(3, 2), 16);
+            const auto b = parse_u8_component(value.substr(5, 2), 16);
+            if (!r || !g || !b) {
+                return std::nullopt;
+            }
+            return SDL_Color{*r, *g, *b, 255};
+        }
+
+        const std::size_t first = value.find(',');
+        if (first == std::string::npos) {
+            return std::nullopt;
+        }
+        const std::size_t second = value.find(',', first + 1);
+        if (second == std::string::npos || value.find(',', second + 1) != std::string::npos) {
+            return std::nullopt;
+        }
+
+        const auto r = parse_u8_component(value.substr(0, first), 10);
+        const auto g = parse_u8_component(value.substr(first + 1, second - first - 1), 10);
+        const auto b = parse_u8_component(value.substr(second + 1), 10);
+        if (!r || !g || !b) {
+            return std::nullopt;
+        }
+        return SDL_Color{*r, *g, *b, 255};
+    }
+
     SurfacePtr renderGlyph(TTF_Font *font, const std::string &glyph, const SDL_Color &color) {
         SDL_Surface *rendered = TTF_RenderText_Blended(font, glyph.c_str(), 0, color);
         if (rendered == nullptr) {
@@ -86,12 +146,21 @@ namespace example {
                            const std::string &title,
                            const int width,
                            const int height,
-                           const bool fullscreen)
+                           const bool fullscreen,
+                           const std::string &color)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               assetRoot(path.empty() ? std::string(binary_matrix_ASSET_DIR) : path),
               rng(std::random_device{}()) {
             if (assetRoot == ".") {
                 assetRoot = binary_matrix_ASSET_DIR;
+            }
+
+            if (!color.empty()) {
+                const std::optional<SDL_Color> parsedColor = parse_color_spec(color);
+                if (!parsedColor) {
+                    throw mxvk::Exception("Invalid binary_matrix color: " + color + " (expected #RRGGBB or R,G,B)");
+                }
+                digitColor = *parsedColor;
             }
 
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -210,8 +279,8 @@ namespace example {
 
       private:
         void loadDigits() {
-            SurfacePtr zero_surface = renderGlyph(font.get(), "0", SDL_Color{255, 255, 255, 255});
-            SurfacePtr one_surface = renderGlyph(font.get(), "1", SDL_Color{255, 255, 255, 255});
+            SurfacePtr zero_surface = renderGlyph(font.get(), "0", digitColor);
+            SurfacePtr one_surface = renderGlyph(font.get(), "1", digitColor);
 
             if (zero_surface == nullptr || one_surface == nullptr) {
                 throw mxvk::Exception("Failed to render binary matrix glyphs");
@@ -444,13 +513,15 @@ namespace example {
         Clock::time_point lastCameraInput{Clock::now()};
         static constexpr float cameraOrbitSpeed = 140.0f;
         static constexpr float cameraZoomSpeed = 2.2f;
+        SDL_Color digitColor{255, 255, 255, 255};
     };
 } // namespace example
 
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::BinaryMatrixWindow window(args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen);
+        example::BinaryMatrixWindow window(
+            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

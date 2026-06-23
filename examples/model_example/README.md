@@ -12,6 +12,7 @@ This is a basic 3D model viewer for MXVK. By default it loads `data/pyramid.obj`
 - `--binary` - replace the model's primary texture with animated Matrix-style green rain. This also disables backface culling so the inside of the mesh can be viewed.
 - `--font-size <px>` - adjust the rain glyph raster size when `--binary` is enabled.
 - `--font-path <file>` - override the rain font file when `--binary` is enabled.
+- `--color <spec>` - tint the rain when `--binary` is enabled using `#RRGGBB` or `R,G,B`.
 
 ## Controls
 

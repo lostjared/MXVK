@@ -16,7 +16,8 @@
 namespace matrix {
     struct RainConfig {
         std::string font_path;
-        int font_size = 28;
+        std::string color;
+        int font_size = 22;
         std::vector<Uint32> symbols{};
         int glyph_levels = 7;
         int min_cell_width = 16;
