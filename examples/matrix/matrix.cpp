@@ -27,7 +27,7 @@ namespace example {
                      const std::string &font_path,
                      const std::string &color)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
-                  rain(std::make_unique<matrix::Rain>(
+              rain(std::make_unique<matrix::Rain>(
                   *this, [path, binary, font_size, font_path, color]() {
                       matrix::RainConfig config = matrix::make_matrix_rain_config(path.empty() ? std::string(matrix_ASSET_DIR) : path, binary);
                       config.font_size = std::max(1, font_size);

@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <format>
-#include <cmath>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -51,7 +51,7 @@ namespace example {
             const std::string textureBasePath = resource_path.empty() ? (useDefaultTextureBase ? assetRoot + "/data" : "") : resource_path;
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = fragmentShaderPath.empty() ? (std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv") : fragmentShaderPath;
-            if(!texture_path.empty())
+            if (!texture_path.empty())
                 background = createSprite(texture_path, "", "");
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, vertPath, fragPath);
@@ -185,8 +185,8 @@ namespace example {
                 const glm::vec3 target = skyboxCameraPosition + front;
                 ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(model.modelRenderScale() * skyboxScaleMultiplier));
                 ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
-	        ubo.view = glm::lookAt(skyboxCameraPosition, target, skyboxUpVector());
-	    	ubo.proj = glm::perspective(glm::radians(70.0f), aspect, 0.02f, 100.0f);
+                ubo.view = glm::lookAt(skyboxCameraPosition, target, skyboxUpVector());
+                ubo.proj = glm::perspective(glm::radians(70.0f), aspect, 0.02f, 100.0f);
             } else {
                 ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
                 ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees) + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -268,7 +268,7 @@ namespace example {
             skyboxPitchDegrees = 0.0f;
         }
 
-	[[nodiscard]] glm::vec3 skyboxUpVector() const {
+        [[nodiscard]] glm::vec3 skyboxUpVector() const {
             const float yawRadians = glm::radians(skyboxYawDegrees);
             const float upPitchRadians = glm::radians(skyboxPitchDegrees + 90.0f);
             return glm::normalize(glm::vec3{

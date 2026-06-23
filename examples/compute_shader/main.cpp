@@ -9,8 +9,8 @@
 #if defined(MXWRITE_ENABLED)
 #include "mxwrite.hpp"
 #endif
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -21,9 +21,9 @@
 #include <iterator>
 #include <opencv2/opencv.hpp>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
-#include <string_view>
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/core/cuda.hpp>

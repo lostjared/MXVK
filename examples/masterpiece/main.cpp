@@ -397,7 +397,7 @@ namespace example {
         mxvk::Font title_font{};
         mxvk::Font ui_font{};
         mxvk::VK_Sprite *background_intro = nullptr;
-	mxvk::VK_Sprite *mxvk_logo = nullptr;
+        mxvk::VK_Sprite *mxvk_logo = nullptr;
         mxvk::VK_Sprite *background_menu = nullptr;
         mxvk::VK_Sprite *background_game = nullptr;
         mxvk::VK_Sprite *cursor = nullptr;
@@ -501,7 +501,7 @@ namespace example {
             background_intro = loadEffectSprite("intro.png");
             background_menu = loadEffectSprite("start.png");
             background_game = createSprite(puzzleDataPath("gamebg.png"));
-	    mxvk_logo = createSprite(puzzleDataPath("mxvk_logo.png"));
+            mxvk_logo = createSprite(puzzleDataPath("mxvk_logo.png"));
             cursor = loadPngSprite("cursor.png");
 
             for (std::size_t i = 0; i < block_files.size(); ++i) {
@@ -1320,7 +1320,6 @@ namespace example {
             }
             gamepadId = 0;
         }
-
     };
 
 } // namespace example

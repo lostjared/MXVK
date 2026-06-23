@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <format>
 #include <filesystem>
+#include <format>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
@@ -2444,10 +2444,10 @@ namespace walk {
             const std::string particleFragPath = std::string(WALK_SHADER_DIR) + "/particle.frag.spv";
             const std::string groundTexManifest = assetRoot + "/data/ground.tex";
 
-            modelVertSpv  = vertPath;
+            modelVertSpv = vertPath;
             pillarVertSpv = pillarVertPath;
-            wallFragSpv   = wallFragPath;
-            floorFragSpv  = floorFragPath;
+            wallFragSpv = wallFragPath;
+            floorFragSpv = floorFragPath;
             pillarFragSpv = pillarFragPath;
             objectFragSpv = objectFragPath;
             bulletFragSpv = bulletFragPath;
@@ -2457,18 +2457,18 @@ namespace walk {
 
             logEnv("loading wall renderer assets");
             rawWallRenderer.load(this,
-                                  groundTexManifest,
-                                  assetRoot + "/data",
-                                  loadSpv(pillarVertPath),
-                                  loadSpv(wallFragPath));
+                                 groundTexManifest,
+                                 assetRoot + "/data",
+                                 loadSpv(pillarVertPath),
+                                 loadSpv(wallFragPath));
             logEnv("wall renderer ready");
 
             logEnv("loading pillar renderer assets");
             rawPillarRenderer.load(this,
-                                    groundTexManifest,
-                                    assetRoot + "/data",
-                                    loadSpv(pillarVertPath),
-                                    loadSpv(pillarFragPath));
+                                   groundTexManifest,
+                                   assetRoot + "/data",
+                                   loadSpv(pillarVertPath),
+                                   loadSpv(pillarFragPath));
             logEnv("pillar renderer ready");
 
             loadModel(saturnModel, assetRoot + "/data/saturn.mxmod.z",
@@ -2669,12 +2669,12 @@ namespace walk {
             }
 
             rawWallRenderer.render(cmd,
-                                    imageIndex,
-                                    world.walls(),
-                                    world.wallThickness(),
-                                    view,
-                                    proj,
-                                    glm::vec4(0.58f, 0.58f, 0.65f, t));
+                                   imageIndex,
+                                   world.walls(),
+                                   world.wallThickness(),
+                                   view,
+                                   proj,
+                                   glm::vec4(0.58f, 0.58f, 0.65f, t));
 
             rawPillarRenderer.render(cmd, imageIndex, world.pillars(), view, proj, glm::vec4(0.0f, 0.0f, 0.0f, t));
 
@@ -3074,7 +3074,7 @@ namespace walk {
         }
 
         void logEnv(const std::string &message) {
-            print(std::format("[walk] {}", message), {255 ,100,255,255});
+            print(std::format("[walk] {}", message), {255, 100, 255, 255});
         }
 
         /// @brief Resolve a shader SPV name to a full path.
@@ -3608,10 +3608,7 @@ namespace walk {
             constexpr float blasterScale = 0.45f;
             constexpr glm::vec3 localMuzzle(0.95f, 0.09f, 0.0f);
             const glm::vec3 desiredMuzzle = blasterMuzzleTipPosition();
-            const glm::vec3 origin = desiredMuzzle
-                                     - (forward * (localMuzzle.x * blasterScale))
-                                     - (up * (localMuzzle.y * blasterScale))
-                                     - (right * (localMuzzle.z * blasterScale));
+            const glm::vec3 origin = desiredMuzzle - (forward * (localMuzzle.x * blasterScale)) - (up * (localMuzzle.y * blasterScale)) - (right * (localMuzzle.z * blasterScale));
 
             glm::mat4 world(1.0f);
             world[0] = glm::vec4(forward * blasterScale, 0.0f);
@@ -3777,9 +3774,7 @@ namespace walk {
                 ExplosionParticle p{};
                 p.position = muzzle + (forward * 0.01f);
 
-                glm::vec3 dir = forward
-                                + (right * lateralJitter(rng))
-                                + (up * verticalJitter(rng));
+                glm::vec3 dir = forward + (right * lateralJitter(rng)) + (up * verticalJitter(rng));
                 if (glm::length(dir) <= 1e-5f) {
                     dir = forward;
                 } else {
@@ -4467,13 +4462,13 @@ namespace walk {
         size_t maxPointVertices = 200000;
         std::string pointParticleVertSpv{};
         std::string pointParticleFragSpv{};
-    std::string modelVertSpv{};
-    std::string pillarVertSpv{};
-    std::string wallFragSpv{};
-    std::string floorFragSpv{};
-    std::string pillarFragSpv{};
-    std::string objectFragSpv{};
-    std::string bulletFragSpv{};
+        std::string modelVertSpv{};
+        std::string pillarVertSpv{};
+        std::string wallFragSpv{};
+        std::string floorFragSpv{};
+        std::string pillarFragSpv{};
+        std::string objectFragSpv{};
+        std::string bulletFragSpv{};
 
         std::vector<Projectile> bullets{};
         std::vector<ExplosionParticle> explosionParticles{};

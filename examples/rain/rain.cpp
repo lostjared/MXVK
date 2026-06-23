@@ -4,8 +4,8 @@
 #include <charconv>
 #include <cmath>
 #include <cstring>
-#include <optional>
 #include <mutex>
+#include <optional>
 #include <utility>
 
 namespace matrix {
@@ -502,7 +502,7 @@ namespace matrix {
             const int glow_alpha = (tail == 0)
                                        ? config.head_glow_alpha
                                        : (tail <= config.near_head_tail_threshold ? config.near_head_glow_alpha
-                                                                                   : config.trail_glow_alpha);
+                                                                                  : config.trail_glow_alpha);
 
             SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>(glow_alpha));
             SDL_Rect glow_dst{glyph_x - 1, glyph_y, glyph.levels[level]->w, glyph.levels[level]->h};

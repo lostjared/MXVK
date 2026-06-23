@@ -557,9 +557,9 @@ namespace demo {
                 backgroundSprite->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
                 backgroundSprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
                 backgroundSprite->renderSprites(cmd,
-                                                 backgroundSprite->getPipelineLayout(),
-                                                 extent.width,
-                                                 extent.height);
+                                                backgroundSprite->getPipelineLayout(),
+                                                extent.width,
+                                                extent.height);
                 backgroundSprite->clearQueue();
             }
 
@@ -1290,10 +1290,10 @@ namespace demo {
                 if (glm::length(ball.pos - pocket) < POCKET_R) {
                     const int idx = static_cast<int>(&ball - &balls[0]);
                     sinkAnims.push_back(SinkAnim{pocket,
-                                                  BALL_COLORS[static_cast<std::size_t>(idx)],
-                                                  ball.spinAngle,
-                                                  0.0f,
-                                                  idx});
+                                                 BALL_COLORS[static_cast<std::size_t>(idx)],
+                                                 ball.spinAngle,
+                                                 0.0f,
+                                                 idx});
                     ball.pocketed = true;
                     ball.vel = glm::vec2{0.0f};
                     return;

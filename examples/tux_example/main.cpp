@@ -72,7 +72,7 @@ namespace example {
                     flake.z = (flake.z >= 0.0f) ? modelDepthClearance : -modelDepthClearance;
                 }
                 flake.rotation += (flake.rotationSpeed + std::sin(windTime + flake.rotationAngle) *
-                                                        flake.rotationSpeedIntensity * 0.5f) *
+                                                             flake.rotationSpeedIntensity * 0.5f) *
                                   deltaSeconds;
                 if (flake.rotation > twoPi) {
                     flake.rotation -= twoPi;
