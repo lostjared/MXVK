@@ -18,6 +18,9 @@ add_custom_command(TARGET matrix POST_BUILD
         ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
         $<TARGET_FILE_DIR:matrix>/data/NotoSansCJK-Regular.ttc
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/LICENSE.noto-fonts-cjk.txt
+        $<TARGET_FILE_DIR:matrix>/data/LICENSE.noto-fonts-cjk.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/keifont.ttf
         $<TARGET_FILE_DIR:matrix>/data/keifont.ttf
     COMMENT "Copying matrix assets to runtime output directory"
