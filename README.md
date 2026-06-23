@@ -129,7 +129,10 @@ Supported options:
 - `-f`, `--fullscreen`
 	- Launch in fullscreen mode.
 - `--filename <file>`
-	- Optional input/model/video filename (used by specific examples).
+	- Optional input/model/video filename used by examples that support external assets.
+	- For `model_example`, this overrides the default `data/pyramid.obj` mesh. You can point it at a custom `.obj`, `.mxmod`, or `.mxmod.z` file.
+	- When you provide a custom model, the loader no longer assumes the built-in pyramid asset set. If the model references external textures, use `--resource <file>` for a texture manifest and `--resource_path <dir>` for the texture directory.
+	- `run.pl` already passes the example asset root with `-p`, so `--filename` can usually be a relative path inside the repo or a full absolute path.
 - `-o <file>`, `--output <file>`
 	- Optional output filename for examples that export video.
 - `-c <value>`, `--crf <value>`
@@ -211,7 +214,7 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 
 ### 3D Viewers
 
-- `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, and `--resource_path`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Escape` quits.
+- `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. By default it loads `data/pyramid.obj` from the example asset directory. `--filename` overrides the model file, `--resource` can point at a texture manifest, `--resource_path` can override the texture lookup directory, and `--binary` replaces the model's texture with animated Matrix-style green rain while also enabling the skybox toggle. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, `--resource_path`, and `--binary`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Enter` toggles skybox mode when `--binary` is enabled, `W/A/S/D` look around inside the skybox view, `Escape` quits.
 - `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging. **Inputs:** common `-p`, `-r`, `-f`, `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
 - `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
