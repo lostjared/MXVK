@@ -1,7 +1,7 @@
 add_executable(planet
     ${CMAKE_SOURCE_DIR}/examples/planet/planet.cpp
 )
-target_link_libraries(planet PRIVATE mxvk::mxvk)
+target_link_libraries(planet PRIVATE mxvk::mxvk rain)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
@@ -42,7 +42,7 @@ add_custom_target(planet_shaders
 add_dependencies(planet planet_shaders)
 target_compile_definitions(planet PRIVATE
     PLANET_SHADER_DIR="${PLANET_SHADER_OUTPUT_DIR}"
-    PLANET_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    PLANET_ASSET_DIR="$<TARGET_FILE_DIR:planet>"
 )
 
 foreach(_asset
@@ -50,6 +50,8 @@ foreach(_asset
     ${CMAKE_CURRENT_SOURCE_DIR}/data/saturn.tex
     ${CMAKE_CURRENT_SOURCE_DIR}/data/surface.png
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ring.png
+    ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc
+    ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
     ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf
     ${PLANET_VERTEX_SHADER}
     ${PLANET_FRAGMENT_SHADER}
@@ -64,6 +66,12 @@ add_custom_command(TARGET planet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         $<TARGET_FILE_DIR:planet>/data
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc
+        $<TARGET_FILE_DIR:planet>/data/NotoSansCJK-Bold.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
+        $<TARGET_FILE_DIR:planet>/data/NotoSansCJK-Regular.ttc
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf
         $<TARGET_FILE_DIR:planet>/data/keifont.ttf

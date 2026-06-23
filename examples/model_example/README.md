@@ -10,6 +10,8 @@ This is a basic 3D model viewer for MXVK. By default it loads `data/pyramid.obj`
 - `--resource <file>` - optional texture manifest for custom models. Use this when the model needs a manifest that is separate from the mesh file itself.
 - `--resource_path <dir>` - optional base directory for texture lookup. This is useful when your manifest uses relative texture paths.
 - `--binary` - replace the model's primary texture with animated Matrix-style green rain. This also disables backface culling so the inside of the mesh can be viewed.
+- `--font-size <px>` - adjust the rain glyph raster size when `--binary` is enabled.
+- `--font-path <file>` - override the rain font file when `--binary` is enabled.
 
 ## Controls
 
@@ -26,4 +28,4 @@ The model is loaded through `VKAbstractModel` along with its texture manifest an
 
 When `--filename` is omitted, `model_example` uses the bundled `data/pyramid.obj`. When `--filename` is provided, the argument replaces that default mesh and lets you point the viewer at your own OBJ or MXMOD asset. If the model has external textures, pair it with `--resource` and `--resource_path` so the loader can find the manifest and the image files.
 
-When `--binary` is enabled, the example renders Matrix-style rain into an off-screen SDL surface and uploads it into the model's primary texture every frame. The geometry does not change, but the surface texture is replaced live, and backface culling is disabled so the model can be viewed from the inside. Pressing `Enter` switches between the normal orbit view and an inside-the-mesh skybox view that reuses the same `--filename` model, and `W/A/S/D` adjust the viewing direction in that skybox mode.
+When `--binary` is enabled, the example renders Matrix-style rain into an off-screen SDL surface and uploads it into the model's primary texture every frame. The bundled default font is the bold `Noto Sans CJK JP` face; `--font-path <file>` can point the rain at another font. The geometry does not change, but the surface texture is replaced live, and backface culling is disabled so the model can be viewed from the inside. Pressing `Enter` switches between the normal orbit view and an inside-the-mesh skybox view that reuses the same `--filename` model, and `W/A/S/D` adjust the viewing direction in that skybox mode.

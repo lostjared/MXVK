@@ -1,7 +1,7 @@
 add_executable(model_example
     ${CMAKE_SOURCE_DIR}/examples/model_example/main.cpp
 )
-target_link_libraries(model_example PRIVATE mxvk::mxvk)
+target_link_libraries(model_example PRIVATE mxvk::mxvk rain)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
@@ -73,7 +73,9 @@ target_compile_definitions(model_example PRIVATE
 set(MODEL_EXAMPLE_MODEL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj)
 set(MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/texture_manifest.txt)
 set(MODEL_EXAMPLE_TEXTURE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/sandstone_brick.png)
-set(MODEL_EXAMPLE_MATRIX_FONT_SOURCE ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf)
+set(MODEL_EXAMPLE_NOTO_FONT_SOURCE ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc)
+set(MODEL_EXAMPLE_NOTO_FONT_FALLBACK_SOURCE ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc)
+set(MODEL_EXAMPLE_LEGACY_FONT_SOURCE ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf)
 set(MODEL_EXAMPLE_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
 set(MODEL_EXAMPLE_LOSTCRYSTAL_RUNTIME_SPV ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/lostcrystal.frag.spv)
 set(MODEL_EXAMPLE_LOSTCRYSTAL_SOURCE_DATA_SPV ${CMAKE_CURRENT_SOURCE_DIR}/data/lostcrystal.frag.spv)
@@ -119,7 +121,9 @@ foreach(_asset
     ${MODEL_EXAMPLE_MODEL_SOURCE}
     ${MODEL_EXAMPLE_TEXTURE_MANIFEST_SOURCE}
     ${MODEL_EXAMPLE_TEXTURE_SOURCE}
-    ${MODEL_EXAMPLE_MATRIX_FONT_SOURCE}
+    ${MODEL_EXAMPLE_NOTO_FONT_SOURCE}
+    ${MODEL_EXAMPLE_NOTO_FONT_FALLBACK_SOURCE}
+    ${MODEL_EXAMPLE_LEGACY_FONT_SOURCE}
 )
     if(NOT EXISTS ${_asset})
         message(FATAL_ERROR "model_example missing required asset: ${_asset}")
@@ -138,7 +142,13 @@ add_custom_command(TARGET model_example POST_BUILD
         ${MODEL_EXAMPLE_TEXTURE_SOURCE}
         ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/sandstone_brick.png
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${MODEL_EXAMPLE_MATRIX_FONT_SOURCE}
+        ${MODEL_EXAMPLE_NOTO_FONT_SOURCE}
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/NotoSansCJK-Bold.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${MODEL_EXAMPLE_NOTO_FONT_FALLBACK_SOURCE}
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/NotoSansCJK-Regular.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${MODEL_EXAMPLE_LEGACY_FONT_SOURCE}
         ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/keifont.ttf
     COMMENT "Copying model example assets to runtime output directory"
 )

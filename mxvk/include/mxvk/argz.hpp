@@ -700,6 +700,8 @@ struct Arguments {
     bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
     bool repeat = false;              ///< Repeat video playback when a file reaches EOF.
     bool binary = false;               ///< Use binary glyphs only (@c --binary).
+    int font_size = 28;               ///< Matrix rain font size in pixels (@c --font-size).
+    std::string font_path;            ///< Optional font file path (@c --font-path).
     std::string texture;              ///< Optional texture file path (@c --texture).
     std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
     std::string fragmentPath;         ///< Optional fragment shader SPV path (@c --fragment).
@@ -731,6 +733,8 @@ struct Arguments {
  * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
  * |      | --repeat           | Repeat video playback at EOF                 |
  * |      | --binary           | Use binary glyphs only                        |
+ * | -z   | --font-size        | Matrix rain font size                         |
+ * | -j   | --font-path        | Matrix rain font file path                    |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  * |      | --fragment         | Fragment shader SPV path                     |
@@ -765,6 +769,10 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
         .addOptionDouble(310, "repeat", "repeat video playback")
         .addOptionDouble(315, "binary", "use binary glyphs only")
+        .addOptionSingleValue('z', "matrix rain font size")
+        .addOptionDoubleValue(316, "font-size", "matrix rain font size")
+        .addOptionSingleValue('j', "matrix rain font file path")
+        .addOptionDoubleValue(317, "font-path", "matrix rain font file path")
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
@@ -793,6 +801,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool mxwriteBlockWhenFull = false;
     bool repeat = false;
     bool binary = false;
+    int font_size = 28;
+    std::string font_path;
     std::string texture;
     std::string shaderPath;
     std::string fragmentPath;
@@ -840,6 +850,14 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 315:
             binary = true;
+            break;
+        case 'z':
+        case 316:
+            font_size = atoi(arg.arg_value.c_str());
+            break;
+        case 'j':
+        case 317:
+            font_path = arg.arg_value;
             break;
         case 257:
             texture = arg.arg_value;
@@ -914,6 +932,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.mxwriteBlockWhenFull = mxwriteBlockWhenFull;
     args.repeat = repeat;
     args.binary = binary;
+    args.font_size = font_size;
+    args.font_path = font_path;
     args.texture = texture;
     args.shaderPath = shaderPath;
     args.fragmentPath = fragmentPath;
