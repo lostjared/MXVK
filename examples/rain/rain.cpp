@@ -226,6 +226,7 @@ namespace matrix {
     Rain::~Rain() {
         glyphs.clear();
         font.reset();
+        background.reset();
         canvas.reset();
         if (ttf_acquired) {
             release_ttf();
@@ -476,7 +477,6 @@ namespace matrix {
             if (row < -1 || row >= rows) {
                 continue;
             }
-
             const float age = static_cast<float>(tail) / static_cast<float>(std::max(1, stream.length));
             int level = config.glyph_levels - static_cast<int>(std::round(age * static_cast<float>(config.glyph_levels + 1)));
             if (tail == 0) {
@@ -485,14 +485,12 @@ namespace matrix {
                 level = config.glyph_levels;
             }
             level = std::clamp(level, 0, config.glyph_levels + 1);
-
             const int glyph_index = (stream.glyphOffset + row * 17 + column * 11 + stream.shimmer + frame_counter / 3 + tail * 5) %
                                     static_cast<int>(glyphs.size());
             const Glyph &glyph = glyphs[glyph_index < 0 ? glyph_index + static_cast<int>(glyphs.size()) : glyph_index];
             if (glyph.levels.empty()) {
                 continue;
             }
-
             const SDL_Rect clear_rect{x, row * cell_h, cell_w, cell_h};
             SDL_FillSurfaceRect(canvas.get(), &clear_rect, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
             SDL_Surface *surface = glyph.levels[level].get();

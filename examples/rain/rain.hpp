@@ -133,6 +133,7 @@ namespace matrix {
         RainConfig config;
         FontPtr font;
         SurfacePtr canvas;
+        SurfacePtr background;
         mxvk::VK_Sprite *rain_sprite = nullptr;
         std::vector<Glyph> glyphs;
         std::vector<Stream> streams;

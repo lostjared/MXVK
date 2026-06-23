@@ -33,6 +33,7 @@ namespace example {
                     const std::string &resource,
                     const std::string &resource_path,
                     const std::string &fragmentShaderPath,
+                    const std::string &texture_path,
                     const std::string &title,
                     int width,
                     int height,
@@ -50,7 +51,8 @@ namespace example {
             const std::string textureBasePath = resource_path.empty() ? (useDefaultTextureBase ? assetRoot + "/data" : "") : resource_path;
             const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string fragPath = fragmentShaderPath.empty() ? (std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv") : fragmentShaderPath;
-
+            if(!texture_path.empty())
+                background = createSprite(texture_path, "", "");
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, vertPath, fragPath);
             model.setBackfaceCulling(!binaryTextureMode);
@@ -196,6 +198,12 @@ namespace example {
             ubo.proj[1][1] *= -1.0f;
             ubo.fx = glm::vec4(elapsedSeconds, 0.0f, 0.0f, 0.37f);
 
+            if (background) {
+                background->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
+                renderStandaloneSprite(*background, cmd);
+                background->clearQueue();
+            }
+
             model.updateUBO(imageIndex, ubo);
             if (binaryTextureMode && binaryMatrixTexture != nullptr) {
                 binaryMatrixTexture->update(deltaSeconds);
@@ -212,6 +220,7 @@ namespace example {
       private:
         std::string assetRoot;
         mxvk::VKAbstractModel model{};
+        mxvk::VK_Sprite *background = nullptr;
         bool binaryTextureMode = false;
         std::unique_ptr<matrix::Rain> binaryMatrixTexture{};
         bool mouseDragging = false;
@@ -319,6 +328,7 @@ int main(int argc, char **argv) {
             args.resource,
             args.resource_path,
             args.fragmentPath,
+            args.texture,
             "MXVK Model Example",
             args.width,
             args.height,
