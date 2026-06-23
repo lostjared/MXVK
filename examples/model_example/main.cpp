@@ -88,11 +88,12 @@ namespace example {
                 return;
             }
 
-            if (binaryTextureMode && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
+            if (e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
                 if (e.key.repeat) {
                     return;
                 }
                 skyboxMode = !skyboxMode;
+                model.setBackfaceCulling(!(binaryTextureMode || skyboxMode));
                 if (skyboxMode) {
                     resetSkyboxCamera();
                 }
@@ -133,7 +134,7 @@ namespace example {
                 if (skyboxMode) {
                     skyboxYawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
                     skyboxPitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
-                    skyboxPitchDegrees = std::clamp(skyboxPitchDegrees, -85.0f, 85.0f);
+                    skyboxPitchDegrees = std::fmod(skyboxPitchDegrees, 360.0f);
                 } else {
                     yawDegrees += static_cast<float>(deltaX) * mouseSensitivity;
                     pitchDegrees += static_cast<float>(deltaY) * mouseSensitivity;
@@ -182,8 +183,8 @@ namespace example {
                 const glm::vec3 target = skyboxCameraPosition + front;
                 ubo.model = glm::scale(glm::mat4(1.0f), glm::vec3(model.modelRenderScale() * skyboxScaleMultiplier));
                 ubo.model = glm::translate(ubo.model, model.modelCenterOffset());
-                ubo.view = glm::lookAt(skyboxCameraPosition, target, glm::vec3(0.0f, 1.0f, 0.0f));
-                ubo.proj = glm::perspective(glm::radians(70.0f), aspect, 0.02f, 100.0f);
+	        ubo.view = glm::lookAt(skyboxCameraPosition, target, skyboxUpVector());
+	    	ubo.proj = glm::perspective(glm::radians(70.0f), aspect, 0.02f, 100.0f);
             } else {
                 ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
                 ubo.model = glm::rotate(ubo.model, glm::radians(yawDegrees) + autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -258,6 +259,15 @@ namespace example {
             skyboxPitchDegrees = 0.0f;
         }
 
+	[[nodiscard]] glm::vec3 skyboxUpVector() const {
+            const float yawRadians = glm::radians(skyboxYawDegrees);
+            const float upPitchRadians = glm::radians(skyboxPitchDegrees + 90.0f);
+            return glm::normalize(glm::vec3{
+                std::sin(yawRadians) * std::cos(upPitchRadians),
+                std::sin(upPitchRadians),
+                -std::cos(yawRadians) * std::cos(upPitchRadians)});
+        }
+
         [[nodiscard]] glm::vec3 skyboxForwardVector() const {
             const float yawRadians = glm::radians(skyboxYawDegrees);
             const float pitchRadians = glm::radians(skyboxPitchDegrees);
@@ -268,8 +278,7 @@ namespace example {
         }
 
         [[nodiscard]] glm::vec3 skyboxRightVector() const {
-            const glm::vec3 forward = skyboxForwardVector();
-            return glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+            return glm::normalize(glm::cross(skyboxForwardVector(), skyboxUpVector()));
         }
 
         void updateSkyboxCamera(float deltaSeconds) {
@@ -286,7 +295,10 @@ namespace example {
             if (skyboxLookDownKey) {
                 skyboxPitchDegrees -= lookSpeed * deltaSeconds;
             }
-            skyboxPitchDegrees = std::clamp(skyboxPitchDegrees, -85.0f, 85.0f);
+            skyboxPitchDegrees = std::fmod(skyboxPitchDegrees, 360.0f);
+            if (skyboxPitchDegrees < 0.0f) {
+                skyboxPitchDegrees += 360.0f;
+            }
         }
     };
 
