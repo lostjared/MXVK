@@ -112,6 +112,10 @@ namespace example {
                     skyboxLookLeftKey = pressed;
                 } else if (e.key.key == SDLK_D) {
                     skyboxLookRightKey = pressed;
+                } else if (e.key.key == SDLK_UP) {
+                    zoomInKey = pressed;
+                } else if (e.key.key == SDLK_DOWN) {
+                    zoomOutKey = pressed;
                 }
             }
 
@@ -148,10 +152,20 @@ namespace example {
                 return;
             }
 
-            if (e.type == SDL_EVENT_MOUSE_WHEEL && !skyboxMode) {
+            if (e.type == SDL_EVENT_MOUSE_WHEEL) {
                 const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
-                cameraDistance -= delta * 0.45f;
-                cameraDistance = std::clamp(cameraDistance, 1.8f, 12.0f);
+                if (skyboxMode) {
+                    const float zoomSpeed = 0.45f;
+                    skyboxCameraPosition += skyboxForwardVector() * (delta * zoomSpeed);
+
+                    const float maxSkyboxDistance = 12.0f;
+                    const float skyboxDistance = glm::length(skyboxCameraPosition);
+                    if (skyboxDistance > maxSkyboxDistance) {
+                        skyboxCameraPosition = glm::normalize(skyboxCameraPosition) * maxSkyboxDistance;
+                    }
+                } else {
+                    adjustZoomTarget(delta);
+                }
                 return;
             }
         }
@@ -171,6 +185,8 @@ namespace example {
 
             if (skyboxMode) {
                 updateSkyboxCamera(deltaSeconds);
+            } else {
+                updateZoom(deltaSeconds);
             }
 
             const VkExtent2D extent = getSwapchainExtent();
@@ -235,6 +251,7 @@ namespace example {
         float yawDegrees = 0.0f;
         float pitchDegrees = 12.0f;
         float cameraDistance = 4.2f;
+        float targetCameraDistance = 4.2f;
         glm::vec3 skyboxCameraPosition{0.0f, 0.0f, 0.0f};
         float skyboxYawDegrees = 180.0f;
         float skyboxPitchDegrees = 0.0f;
@@ -245,6 +262,31 @@ namespace example {
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point lastFrameTime = std::chrono::steady_clock::now();
         std::vector<Uint8> flippedMatrixTexture;
+        bool zoomInKey = false;
+        bool zoomOutKey = false;
+
+        void adjustZoomTarget(float wheelDelta) {
+            if (wheelDelta == 0.0f) {
+                return;
+            }
+
+            constexpr float zoomStep = 1.12f;
+            targetCameraDistance *= std::pow(zoomStep, -wheelDelta);
+            targetCameraDistance = std::clamp(targetCameraDistance, 1.8f, 12.0f);
+        }
+
+        void updateZoom(float deltaSeconds) {
+            const float keyDelta = (zoomInKey ? 1.0f : 0.0f) - (zoomOutKey ? 1.0f : 0.0f);
+            if (keyDelta != 0.0f) {
+                constexpr float keyZoomStep = 1.09f;
+                targetCameraDistance *= std::pow(keyZoomStep, -keyDelta * deltaSeconds * 60.0f);
+                targetCameraDistance = std::clamp(targetCameraDistance, 1.8f, 12.0f);
+            }
+
+            constexpr float zoomResponsiveness = 14.0f;
+            const float smoothing = 1.0f - std::exp(-zoomResponsiveness * deltaSeconds);
+            cameraDistance += (targetCameraDistance - cameraDistance) * smoothing;
+        }
 
         [[nodiscard]] const void *flippedMatrixTexturePixels(int width, int height, int pitch) {
             const auto *pixels = static_cast<const Uint8 *>(binaryMatrixTexture != nullptr ? binaryMatrixTexture->pixels() : nullptr);
@@ -307,6 +349,12 @@ namespace example {
             skyboxPitchDegrees = std::fmod(skyboxPitchDegrees, 360.0f);
             if (skyboxPitchDegrees < 0.0f) {
                 skyboxPitchDegrees += 360.0f;
+            }
+
+            const float keyZoomDelta = (zoomInKey ? 1.0f : 0.0f) - (zoomOutKey ? 1.0f : 0.0f);
+            if (keyZoomDelta != 0.0f) {
+                constexpr float zoomSpeed = 2.25f;
+                skyboxCameraPosition += skyboxForwardVector() * (keyZoomDelta * zoomSpeed * deltaSeconds);
             }
         }
     };

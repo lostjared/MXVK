@@ -19,16 +19,17 @@ This is a basic 3D model viewer for MXVK. By default it loads `data/pyramid.obj`
 - `Escape` - quit
 - `Left mouse drag` - rotate the model
 - `Space` - toggle the model's automatic spin
-- `Mouse wheel` - zoom in or out
+- `Mouse wheel` - smoothly zoom in or out
+- `Up/Down arrow keys` - zoom in or out
 - `Enter` - toggle skybox mode
 - `W/A/S/D` - look around inside the skybox view
 
 ## How It Works
 
-The model is loaded through `VKAbstractModel` along with its texture manifest and texture directory. Each frame updates a model/view/projection UBO, then draws the mesh with the example's model shaders. Mouse drag adjusts the model orientation, the wheel changes camera distance, and the automatic Y-axis spin can be toggled with `Space`.
+The model is loaded through `VKAbstractModel` along with its texture manifest and texture directory. Each frame updates a model/view/projection UBO, then draws the mesh with the example's model shaders. Mouse drag adjusts the model orientation, the wheel eases camera distance toward a zoom target, and the automatic Y-axis spin can be toggled with `Space`.
 
 When `--filename` is omitted, `model_example` uses the bundled `data/pyramid.obj`. When `--filename` is provided, the argument replaces that default mesh and lets you point the viewer at your own OBJ or MXMOD asset. If the model has external textures, pair it with `--resource` and `--resource_path` so the loader can find the manifest and the image files.
 
 When `--binary` is enabled, the example renders Matrix-style rain into an off-screen SDL surface and uploads it into the model's primary texture every frame. The bundled default font is the bold `Noto Sans CJK JP` face; `--font-path <file>` can point the rain at another font. The geometry does not change, but the surface texture is replaced live, and backface culling is disabled so the model can be viewed from the inside.
 
-Pressing `Enter` switches between the normal orbit view and an inside-the-mesh skybox view that reuses the same `--filename` model. This works whether or not `--binary` is enabled. When binary mode is off, the mesh keeps its normal texture; when it is on, the rain texture remains active in both views. `W/A/S/D` adjust the viewing direction in skybox mode.
+Pressing `Enter` switches between the normal orbit view and an inside-the-mesh skybox view that reuses the same `--filename` model. This works whether or not `--binary` is enabled. When binary mode is off, the mesh keeps its normal texture; when it is on, the rain texture remains active in both views. `W/A/S/D` adjust the viewing direction in skybox mode, and the mouse wheel and `Up/Down` keys also zoom there.
