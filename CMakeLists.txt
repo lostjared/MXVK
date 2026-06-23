@@ -552,6 +552,7 @@ mxvk_configure_mingw_target(mxmod2obj)
 
 if(EXAMPLES)
     message(STATUS "Examples ON")
+    add_subdirectory(examples/skeleton)
     add_subdirectory(examples/hello_world)
     mxvk_configure_mingw_target(hello_world)
     add_subdirectory(examples/static_example)
