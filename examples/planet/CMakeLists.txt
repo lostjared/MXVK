@@ -52,6 +52,7 @@ foreach(_asset
     ${CMAKE_CURRENT_SOURCE_DIR}/data/ring.png
     ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc
     ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
+    ${CMAKE_CURRENT_SOURCE_DIR}/data/binary.ttf
     ${PLANET_VERTEX_SHADER}
     ${PLANET_FRAGMENT_SHADER}
 )
@@ -71,5 +72,8 @@ add_custom_command(TARGET planet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
         $<TARGET_FILE_DIR:planet>/data/NotoSansCJK-Regular.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/binary.ttf
+        $<TARGET_FILE_DIR:planet>/data/binary.ttf
     COMMENT "Copying planet example assets to runtime output directory"
 )
