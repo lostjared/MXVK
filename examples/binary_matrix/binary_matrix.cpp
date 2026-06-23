@@ -100,7 +100,7 @@ namespace example {
                 throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
             }
 
-            font.reset(TTF_OpenFont((assetRoot + "/data/keifont.ttf").c_str(), fontSize));
+            font.reset(TTF_OpenFont((assetRoot + "/data/NotoSansCJK-Bold.ttc").c_str(), fontSize));
             if (!font) {
                 throw mxvk::Exception("Failed to load binary matrix font: " + std::string(SDL_GetError()));
             }

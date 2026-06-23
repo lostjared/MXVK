@@ -36,8 +36,14 @@ target_compile_definitions(binary_matrix PRIVATE
 add_custom_command(TARGET binary_matrix POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:binary_matrix>/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/examples/matrix/data/keifont.ttf
-        $<TARGET_FILE_DIR:binary_matrix>/data/keifont.ttf
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc
+        $<TARGET_FILE_DIR:binary_matrix>/data/NotoSansCJK-Bold.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
+        $<TARGET_FILE_DIR:binary_matrix>/data/NotoSansCJK-Regular.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/LICENSE.noto-fonts-cjk.txt
+        $<TARGET_FILE_DIR:binary_matrix>/data/LICENSE.noto-fonts-cjk.txt
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/matrix/data/bg.png
         $<TARGET_FILE_DIR:binary_matrix>/data/bg.png

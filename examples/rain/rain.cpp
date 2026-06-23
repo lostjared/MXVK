@@ -275,7 +275,7 @@ namespace matrix {
         }
 
         if (glyphs.empty()) {
-            throw mxvk::Exception("Matrix demo could not render any glyphs from keifont.ttf");
+            throw mxvk::Exception("Matrix demo could not render any glyphs from the bundled font");
         }
 
         cell_w = std::max(config.min_cell_width, max_glyph_w + config.cell_padding_width);
