@@ -65,6 +65,20 @@ namespace mxvk {
                   float scale = 1.0f);
 
         /**
+         * @brief Consume pre-parsed mesh data and build Vulkan state.
+         * @param window Active MXVK window.
+         * @param model Pre-parsed CPU-side model data.
+         * @param textureManifestPath Optional texture manifest path (.tex or .mtl-like text).
+         * @param textureBasePath Optional base path for texture files in the manifest.
+         * @param scale Uniform mesh scale. Kept for API compatibility.
+         */
+        void load(VK_Window *window,
+                  MXModel &&model,
+                  const std::string &textureManifestPath,
+                  const std::string &textureBasePath,
+                  [[maybe_unused]] float scale = 1.0f);
+
+        /**
          * @brief Configure custom shader paths and rebuild pipelines.
          * @param window Active MXVK window.
          * @param vertSpv Vertex shader SPIR-V path.

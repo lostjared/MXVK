@@ -74,6 +74,8 @@ namespace matrix {
         void update(float dt);
         void sync_texture();
         void render();
+        void set_opacity(float opacity);
+        void reset();
         void update_and_render(mxvk::VK_Window &window);
         void on_swapchain_recreated(mxvk::VK_Window &window);
 
@@ -144,6 +146,7 @@ namespace matrix {
         int cell_w = 20;
         int cell_h = 28;
         int frame_counter = 0;
+        float opacity = 1.0f;
         bool ttf_acquired = false;
     };
 } // namespace matrix

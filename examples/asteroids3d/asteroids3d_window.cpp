@@ -1,6 +1,7 @@
 #include "asteroids3d_types.hpp"
 #include "asteroids3d_window.hpp"
 #include "ship.hpp"
+#include "rain.hpp"
 #include "starfield.hpp"
 
 #include "mxvk/argz.hpp"
@@ -14,6 +15,8 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <exception>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -21,10 +24,14 @@
 #include <cstring>
 #include <format>
 #include <limits>
+#include <mutex>
 #include <memory>
 #include <ostream>
+#include <optional>
 #include <string>
 #include <vector>
+#include <thread>
+#include <thread>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -51,6 +58,9 @@ namespace space {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+            if (loading_thread.joinable()) {
+                loading_thread.join();
+            }
             cleanup_flame_resources();
             ship_model.cleanup(this);
             for (auto &model : asteroid_models) {
@@ -65,6 +75,7 @@ namespace space {
             if (effect_sprite != nullptr) {
                 effect_sprite->cleanup();
             }
+            intro_rain.reset();
         }
 
         void event(SDL_Event &e) override {
@@ -92,10 +103,8 @@ namespace space {
 
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 if (mode == GameMode::Playing) {
-                    mode = GameMode::Intro;
-                    intro_fade = 1.0f;
-                    intro_last_update_ms = SDL_GetTicks();
-                    log_game("Returned to intro screen.");
+                    log_game("Exit requested while playing.");
+                    exit();
                 } else if (mode == GameMode::GameOver || mode == GameMode::GameComplete) {
                     exit();
                 } else {
@@ -168,6 +177,16 @@ namespace space {
         }
 
         void onSwapchainRecreated() override {
+            if (intro_sprite != nullptr) {
+                intro_sprite->rebuildPipeline();
+            }
+            if (intro_rain != nullptr) {
+                intro_rain->resize(*this);
+            }
+            if (!game_resources_loaded.load(std::memory_order_relaxed)) {
+                cleanup_flame_swapchain_resources();
+                return;
+            }
             ship_model.resize(this);
             for (auto &model : asteroid_models) {
                 model.resize(this);
@@ -180,9 +199,6 @@ namespace space {
             }
             if (effect_sprite != nullptr) {
                 effect_sprite->resize(this);
-            }
-            if (intro_sprite != nullptr) {
-                intro_sprite->rebuildPipeline();
             }
             cleanup_flame_swapchain_resources();
             create_flame_swapchain_resources();
@@ -322,6 +338,9 @@ namespace space {
         GameMode mode = GameMode::Intro;
         float intro_fade = 1.0f;
         Uint32 intro_last_update_ms = 0;
+        float loading_rain_opacity = 1.0f;
+        bool loading_black_frame_pending = false;
+        bool loading_black_frame_shown = false;
         bool restart_after_intro = false;
         bool debug_menu = false;
         bool inverted_controls = false;
@@ -347,19 +366,29 @@ namespace space {
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
+        std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console;
         mxvk::VK_Controller controller;
         bool console_ready = false;
-        bool game_resources_loaded = false;
+        std::atomic<bool> game_resources_loaded{false};
+        std::atomic<bool> loading_failed{false};
+        std::atomic<bool> model_preload_done{false};
+        std::atomic<bool> model_preload_failed{false};
         int last_font_size = 0;
         float round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
-        int loading_step_index = 0;
+        std::atomic<int> loading_step_index{0};
         static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
         glm::mat4 last_ship_model_matrix{1.0f};
         VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
         VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
         VkPipeline flame_pipeline = VK_NULL_HANDLE;
         VkPipelineLayout flame_pipeline_layout = VK_NULL_HANDLE;
+        std::thread loading_thread{};
+        std::string loading_error{};
+        std::mutex prepared_model_mutex{};
+        std::optional<mxvk::MXModel> prepared_ship_model{};
+        std::array<std::optional<mxvk::MXModel>, MAX_ASTEROIDS> prepared_asteroid_models{};
+        std::array<std::string, MAX_ASTEROIDS> prepared_asteroid_texture_paths{};
         uint32_t flame_vertex_count = 0;
 
         void log_game(const std::string &message, SDL_Color color = SDL_Color{180, 220, 255, 255}) {
@@ -435,9 +464,7 @@ namespace space {
                 }
 
                 if (cmd == "intro") {
-                    mode = GameMode::Intro;
-                    intro_fade = 1.0f;
-                    intro_last_update_ms = SDL_GetTicks();
+                    reset_intro_screen();
                     log_game("Returned to intro screen from console.");
                     out << "Intro screen active.";
                     return true;
@@ -526,9 +553,72 @@ namespace space {
                 asset_root + "/data/intro.png",
                 asset_root + "/data/sprite.vert.spv",
                 std::string(ASTEROIDS3D_SHADER_DIR) + "/intro.frag.spv");
-            intro_last_update_ms = SDL_GetTicks();
-            loading_step_index = 0;
-            game_resources_loaded = false;
+            matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
+            intro_rain_config.color = "#ff0000";
+            intro_rain = std::make_unique<matrix::Rain>(*this, std::move(intro_rain_config));
+            reset_intro_screen();
+            loading_step_index.store(0, std::memory_order_relaxed);
+            game_resources_loaded.store(false, std::memory_order_relaxed);
+            loading_failed.store(false, std::memory_order_relaxed);
+        }
+
+        void start_loading_async() {
+            if (loading_thread.joinable()) {
+                loading_thread.join();
+            }
+            loading_thread = std::thread([this]() {
+                try {
+                    preload_models();
+                } catch (const std::exception &e) {
+                    loading_error = e.what();
+                    model_preload_failed.store(true, std::memory_order_release);
+                } catch (...) {
+                    loading_error = "unknown loading error";
+                    model_preload_failed.store(true, std::memory_order_release);
+                }
+            });
+        }
+
+        void preload_models() {
+            std::optional<mxvk::MXModel> ship_model_cpu;
+            ship_model_cpu.emplace();
+            ship_model_cpu->load(asset_root + "/data/starship.obj", 1.0f);
+
+            std::array<std::optional<mxvk::MXModel>, MAX_ASTEROIDS> asteroid_models_cpu{};
+            std::array<std::string, MAX_ASTEROIDS> asteroid_texture_paths{};
+
+            std::mt19937 rng(std::random_device{}());
+            std::uniform_int_distribution<int> rock_variant_dist(0, 2);
+            for (std::size_t slot_index = 0; slot_index < MAX_ASTEROIDS; ++slot_index) {
+                static constexpr std::array<const char *, 3> asteroid_paths = {
+                    "data/asteroid.obj",
+                    "data/asteroid2.obj",
+                    "data/asteroid3.obj",
+                };
+
+                const std::size_t model_variant = slot_index % asteroid_paths.size();
+                std::string texture_path;
+                if (model_variant == 0) {
+                    texture_path = asset_root + "/data/rock.tex";
+                } else if (model_variant == 1) {
+                    texture_path = asset_root + "/data/rock2.tex";
+                } else {
+                    texture_path = (rock_variant_dist(rng) == 0) ? asset_root + "/data/rock.tex" : asset_root + "/data/rock2.tex";
+                }
+
+                asteroid_models_cpu[slot_index].emplace();
+                asteroid_models_cpu[slot_index]->load(asset_root + "/" + asteroid_paths[model_variant], 1.0f);
+                asteroid_texture_paths[slot_index] = texture_path;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(prepared_model_mutex);
+                prepared_ship_model = std::move(ship_model_cpu);
+                prepared_asteroid_models = std::move(asteroid_models_cpu);
+                prepared_asteroid_texture_paths = std::move(asteroid_texture_paths);
+            }
+
+            model_preload_done.store(true, std::memory_order_release);
         }
 
         void draw_intro(const VkExtent2D &extent) {
@@ -544,7 +634,7 @@ namespace space {
             }
 
             if (intro_fade <= 0.0f) {
-                intro_fade = 1.0f;
+                intro_fade = 0.0f;
                 if (restart_after_intro) {
                     restart_after_intro = false;
                     restart_game();
@@ -553,33 +643,120 @@ namespace space {
                     log_game("Intro finished. Restarting game.");
                 } else {
                     mode = GameMode::Loading;
-                    loading_step_index = 0;
-                    game_resources_loaded = false;
+                    loading_step_index.store(0, std::memory_order_relaxed);
+                    game_resources_loaded.store(false, std::memory_order_relaxed);
+                    loading_failed.store(false, std::memory_order_relaxed);
+                    model_preload_done.store(false, std::memory_order_relaxed);
+                    model_preload_failed.store(false, std::memory_order_relaxed);
+                    loading_black_frame_pending = false;
+                    loading_black_frame_shown = false;
+                    start_loading_async();
                     log_game("Intro finished. Loading game resources.");
+                    draw_loading(extent);
                 }
                 return;
             }
 
             intro_sprite->setShaderParams(static_cast<float>(current_ms) / 1000.0f, 0.0f, 0.0f, intro_fade);
             intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            if (intro_rain != nullptr) {
+                intro_rain->update_and_render(*this);
+            }
         }
 
         void draw_loading([[maybe_unused]] const VkExtent2D &extent) {
-            if (!game_resources_loaded) {
-                const int progress_percent = std::clamp((loading_step_index * 100) / loading_step_count, 0, 100);
-                printText("Loading " + std::to_string(progress_percent) + "%", 25, 25, {255, 255, 255, 255});
+            if (loading_failed.load(std::memory_order_relaxed) || model_preload_failed.load(std::memory_order_relaxed)) {
+                if (intro_rain != nullptr) {
+                    intro_rain->set_opacity(0.0f);
+                }
+                if (loading_thread.joinable()) {
+                    loading_thread.join();
+                }
+                printText("Loading failed", 25, 25, {255, 100, 100, 255});
+                return;
+            }
+
+            if (!game_resources_loaded.load(std::memory_order_relaxed)) {
+                const int loading_progress_percent = std::clamp((loading_step_index.load(std::memory_order_relaxed) * 100) / loading_step_count, 0, 100);
+                if (intro_rain != nullptr) {
+                    const float target_rain_opacity = 1.0f - (static_cast<float>(loading_progress_percent) / 100.0f);
+                    loading_rain_opacity = std::lerp(loading_rain_opacity, target_rain_opacity, 0.25f);
+                    intro_rain->set_opacity(loading_rain_opacity);
+                    intro_rain->update_and_render(*this);
+                }
+                printText("Loading " + std::to_string(loading_progress_percent) + "%", 25, 25, {255, 255, 255, 255});
                 load_next_game_resource_step();
                 return;
             }
 
-            printText("Loading 100%", 25, 25, {255, 255, 255, 255});
+            if (loading_black_frame_pending) {
+                if (!loading_black_frame_shown) {
+                    loading_black_frame_shown = true;
+                    if (intro_rain != nullptr) {
+                        intro_rain->set_opacity(0.0f);
+                    }
+                    return;
+                }
+
+                loading_black_frame_pending = false;
+                loading_black_frame_shown = false;
+            }
+
+            if (intro_rain != nullptr) {
+                intro_rain->set_opacity(0.0f);
+            }
+            if (loading_thread.joinable()) {
+                loading_thread.join();
+            }
+            intro_last_update_ms = SDL_GetTicks();
+            mode = GameMode::Playing;
+            log_game("Loading complete. Game is now playing.");
+        }
+
+        bool consume_prepared_ship_model(const std::string &model_vert, const std::string &model_frag) {
+            std::optional<mxvk::MXModel> model_cpu;
+            {
+                std::lock_guard<std::mutex> lock(prepared_model_mutex);
+                if (!prepared_ship_model.has_value()) {
+                    return false;
+                }
+                model_cpu = std::move(prepared_ship_model);
+                prepared_ship_model.reset();
+            }
+
+            ship_model.load(this, std::move(*model_cpu), "", asset_root + "/data", 1.0f);
+            ship_model.setShaders(this, model_vert, model_frag);
+            ship_model.setBackfaceCulling(false);
+            return true;
+        }
+
+        bool consume_prepared_asteroid_model(std::size_t slot_index, const std::string &model_vert, const std::string &model_frag) {
+            std::optional<mxvk::MXModel> model_cpu;
+            std::string texture_path;
+            {
+                std::lock_guard<std::mutex> lock(prepared_model_mutex);
+                if (slot_index >= prepared_asteroid_models.size() || !prepared_asteroid_models[slot_index].has_value()) {
+                    return false;
+                }
+                model_cpu = std::move(prepared_asteroid_models[slot_index]);
+                prepared_asteroid_models[slot_index].reset();
+                texture_path = prepared_asteroid_texture_paths[slot_index];
+                prepared_asteroid_texture_paths[slot_index].clear();
+            }
+
+            asteroids[slot_index].model_index = static_cast<int>(slot_index % 3U);
+            asteroid_models[slot_index].load(this, std::move(*model_cpu), texture_path, asset_root + "/data", 1.0f);
+            asteroid_models[slot_index].setShaders(this, model_vert, model_frag);
+            asteroid_models[slot_index].setBackfaceCulling(false);
+            return true;
         }
 
         void load_next_game_resource_step() {
             const std::string model_vert = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.vert.spv";
             const std::string model_frag = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.frag.spv";
 
-            if (loading_step_index == 0) {
+            const int current_step = loading_step_index.load(std::memory_order_relaxed);
+            if (current_step == 0) {
                 std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
                 star_sprite = createSprite3D(star_surface.get());
                 if (star_sprite == nullptr) {
@@ -588,7 +765,7 @@ namespace space {
                 star_sprite->setDepthTestEnabled(false);
                 star_sprite->setDepthWriteEnabled(false);
                 star_sprite->setAlphaDiscardThreshold(0.01f);
-            } else if (loading_step_index == 1) {
+            } else if (current_step == 1) {
                 std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> fire_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
                 projectile_sprite = createSprite3D(fire_surface.get());
                 if (projectile_sprite == nullptr) {
@@ -597,7 +774,7 @@ namespace space {
                 projectile_sprite->setDepthTestEnabled(true);
                 projectile_sprite->setDepthWriteEnabled(false);
                 projectile_sprite->setAlphaDiscardThreshold(0.05f);
-            } else if (loading_step_index == 2) {
+            } else if (current_step == 2) {
                 std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
                 effect_sprite = createSprite3D(explosion_surface.get());
                 if (effect_sprite == nullptr) {
@@ -606,33 +783,47 @@ namespace space {
                 effect_sprite->setDepthTestEnabled(true);
                 effect_sprite->setDepthWriteEnabled(false);
                 effect_sprite->setAlphaDiscardThreshold(0.05f);
-            } else if (loading_step_index == 3) {
-                ship_model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
-            } else if (loading_step_index == 4) {
-                ship_model.setShaders(this, model_vert, model_frag);
-                ship_model.setBackfaceCulling(false);
-            } else if (loading_step_index == 5) {
+            } else if (current_step == 3) {
+                if (!consume_prepared_ship_model(model_vert, model_frag)) {
+                    return;
+                }
+            } else if (current_step == 4) {
+                if (!ship_model.isLoaded()) {
+                    return;
+                }
+            } else if (current_step == 5) {
                 create_flame_resources();
-            } else if (loading_step_index >= 6 && loading_step_index < 6 + MAX_ASTEROIDS) {
-                load_asteroid_model_slot(static_cast<std::size_t>(loading_step_index - 6), model_vert, model_frag);
-            } else if (loading_step_index == 6 + MAX_ASTEROIDS) {
+            } else if (current_step >= 6 && current_step < 6 + MAX_ASTEROIDS) {
+                if (!consume_prepared_asteroid_model(static_cast<std::size_t>(current_step - 6), model_vert, model_frag)) {
+                    return;
+                }
+            } else if (current_step == 6 + MAX_ASTEROIDS) {
                 star_field.init(GAME_STARS, 4.0f, 30.0f);
-            } else if (loading_step_index == 7 + MAX_ASTEROIDS) {
+            } else if (current_step == 7 + MAX_ASTEROIDS) {
                 restart_game();
             } else {
-                game_resources_loaded = true;
+                game_resources_loaded.store(true, std::memory_order_release);
                 intro_last_update_ms = SDL_GetTicks();
-                mode = GameMode::Playing;
-                log_game("Loading complete. Game is now playing.");
+                loading_rain_opacity = 0.0f;
+                loading_black_frame_pending = true;
+                loading_black_frame_shown = false;
+                if (intro_rain != nullptr) {
+                    intro_rain->set_opacity(0.0f);
+                }
                 return;
             }
 
-            ++loading_step_index;
-            if (loading_step_index >= loading_step_count) {
-                game_resources_loaded = true;
+            loading_step_index.store(current_step + 1, std::memory_order_release);
+            if (loading_step_index.load(std::memory_order_relaxed) >= loading_step_count) {
+                game_resources_loaded.store(true, std::memory_order_release);
                 intro_last_update_ms = SDL_GetTicks();
-                mode = GameMode::Playing;
-                log_game("Loading complete. Game is now playing.");
+                loading_rain_opacity = 0.0f;
+                loading_black_frame_pending = true;
+                loading_black_frame_shown = false;
+                if (intro_rain != nullptr) {
+                    intro_rain->set_opacity(0.0f);
+                }
+                return;
             }
         }
 
@@ -1419,9 +1610,18 @@ namespace space {
         void prepare_restart_from_game_over() {
             clear_round_state();
             restart_after_intro = true;
+            reset_intro_screen();
+        }
+
+        void reset_intro_screen() {
             mode = GameMode::Intro;
             intro_fade = 1.0f;
             intro_last_update_ms = SDL_GetTicks();
+            loading_rain_opacity = 1.0f;
+            if (intro_rain != nullptr) {
+                intro_rain->set_opacity(1.0f);
+                intro_rain->reset();
+            }
         }
 
         void update_round_timer(float dt) {

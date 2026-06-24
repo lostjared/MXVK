@@ -4,7 +4,7 @@ add_executable(asteroids3d
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/ship.cpp
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/starfield.cpp
 )
-target_link_libraries(asteroids3d PRIVATE mxvk::mxvk)
+target_link_libraries(asteroids3d PRIVATE rain)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
@@ -90,6 +90,12 @@ add_custom_command(TARGET asteroids3d POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
         $<TARGET_FILE_DIR:asteroids3d>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Bold.ttc
+        $<TARGET_FILE_DIR:asteroids3d>/data/NotoSansCJK-Bold.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
+        $<TARGET_FILE_DIR:asteroids3d>/data/NotoSansCJK-Regular.ttc
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid.obj
         $<TARGET_FILE_DIR:asteroids3d>/data/asteroid.obj

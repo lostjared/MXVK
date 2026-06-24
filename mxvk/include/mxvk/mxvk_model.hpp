@@ -74,8 +74,8 @@ namespace mxvk {
 
         MXModel(const MXModel &) = delete;
         MXModel &operator=(const MXModel &) = delete;
-        MXModel(MXModel &&) = delete;
-        MXModel &operator=(MXModel &&) = delete;
+        MXModel(MXModel &&other) noexcept;
+        MXModel &operator=(MXModel &&other) noexcept;
 
         /**
          * @brief Parse model data from disk into CPU-side arrays.

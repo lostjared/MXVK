@@ -15,9 +15,49 @@
 
 namespace mxvk {
 
+    MXModel::MXModel(MXModel &&other) noexcept
+        : verticesData(std::move(other.verticesData)),
+          indicesData(std::move(other.indicesData)),
+          subMeshList(std::move(other.subMeshList)),
+          materialList(std::move(other.materialList)),
+          mtlLibraryPath(std::move(other.mtlLibraryPath)),
+          vertexBufferHandle(other.vertexBufferHandle),
+          vertexBufferMemory(other.vertexBufferMemory),
+          indexBufferHandle(other.indexBufferHandle),
+          indexBufferMemory(other.indexBufferMemory) {
+        other.vertexBufferHandle = VK_NULL_HANDLE;
+        other.vertexBufferMemory = VK_NULL_HANDLE;
+        other.indexBufferHandle = VK_NULL_HANDLE;
+        other.indexBufferMemory = VK_NULL_HANDLE;
+    }
+
+    MXModel &MXModel::operator=(MXModel &&other) noexcept {
+        if (this == &other) {
+            return *this;
+        }
+
+        verticesData = std::move(other.verticesData);
+        indicesData = std::move(other.indicesData);
+        subMeshList = std::move(other.subMeshList);
+        materialList = std::move(other.materialList);
+        mtlLibraryPath = std::move(other.mtlLibraryPath);
+        vertexBufferHandle = other.vertexBufferHandle;
+        vertexBufferMemory = other.vertexBufferMemory;
+        indexBufferHandle = other.indexBufferHandle;
+        indexBufferMemory = other.indexBufferMemory;
+
+        other.vertexBufferHandle = VK_NULL_HANDLE;
+        other.vertexBufferMemory = VK_NULL_HANDLE;
+        other.indexBufferHandle = VK_NULL_HANDLE;
+        other.indexBufferMemory = VK_NULL_HANDLE;
+        return *this;
+    }
+
     namespace {
-        void logMXModelStep(const std::string &message) {
-            std::cout << "mxvk_model: " << message << '\n';
+        void logMXModelStep(const std::string &message, bool important = false) {
+            if (important) {
+                std::cout << "mxvk_model: " << message << '\n';
+            }
         }
 
         struct Vec2 {
@@ -680,29 +720,32 @@ namespace mxvk {
             throw mxvk::Exception("MXModel::load path is empty");
         }
 
-        logMXModelStep("load begin: " + path);
+        logMXModelStep("load begin: " + path, true);
 
         if (path.ends_with(".obj")) {
             loadOBJ(path, positionScale);
             logMXModelStep("load complete (.obj): vertices=" + std::to_string(verticesData.size()) +
-                           ", indices=" + std::to_string(indicesData.size()) +
-                           ", submeshes=" + std::to_string(subMeshList.size()));
+                               ", indices=" + std::to_string(indicesData.size()) +
+                               ", submeshes=" + std::to_string(subMeshList.size()),
+                           true);
             return;
         }
 
         if (path.ends_with(".mxmod")) {
             loadMXMOD(path, positionScale);
             logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(verticesData.size()) +
-                           ", indices=" + std::to_string(indicesData.size()) +
-                           ", submeshes=" + std::to_string(subMeshList.size()));
+                               ", indices=" + std::to_string(indicesData.size()) +
+                               ", submeshes=" + std::to_string(subMeshList.size()),
+                           true);
             return;
         }
 
         if (path.ends_with(".mxmod.z")) {
             loadMXMODZ(path, positionScale);
             logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(verticesData.size()) +
-                           ", indices=" + std::to_string(indicesData.size()) +
-                           ", submeshes=" + std::to_string(subMeshList.size()));
+                               ", indices=" + std::to_string(indicesData.size()) +
+                               ", submeshes=" + std::to_string(subMeshList.size()),
+                           true);
             return;
         }
 
@@ -1113,7 +1156,7 @@ namespace mxvk {
             throw mxvk::Exception("MXModel::upload requires loaded geometry");
         }
 
-        logMXModelStep("upload begin");
+        logMXModelStep("upload begin", true);
 
         cleanup(device);
 
@@ -1162,7 +1205,7 @@ namespace mxvk {
         vkDestroyBuffer(device, stagingIndexBuffer, nullptr);
         vkFreeMemory(device, stagingIndexMemory, nullptr);
 
-        logMXModelStep("upload complete");
+        logMXModelStep("upload complete", true);
     }
 
     void MXModel::cleanup(VkDevice device) {
@@ -1173,33 +1216,29 @@ namespace mxvk {
         const bool hadBuffers = vertexBufferHandle != VK_NULL_HANDLE || indexBufferHandle != VK_NULL_HANDLE ||
                                 vertexBufferMemory != VK_NULL_HANDLE || indexBufferMemory != VK_NULL_HANDLE;
         if (hadBuffers) {
-            logMXModelStep("teardown begin");
+            logMXModelStep("teardown begin", true);
         }
 
         if (vertexBufferHandle != VK_NULL_HANDLE) {
-            logMXModelStep("destroying vertex buffer");
             vkDestroyBuffer(device, vertexBufferHandle, nullptr);
             vertexBufferHandle = VK_NULL_HANDLE;
         }
         if (vertexBufferMemory != VK_NULL_HANDLE) {
-            logMXModelStep("freeing vertex buffer memory");
             vkFreeMemory(device, vertexBufferMemory, nullptr);
             vertexBufferMemory = VK_NULL_HANDLE;
         }
 
         if (indexBufferHandle != VK_NULL_HANDLE) {
-            logMXModelStep("destroying index buffer");
             vkDestroyBuffer(device, indexBufferHandle, nullptr);
             indexBufferHandle = VK_NULL_HANDLE;
         }
         if (indexBufferMemory != VK_NULL_HANDLE) {
-            logMXModelStep("freeing index buffer memory");
             vkFreeMemory(device, indexBufferMemory, nullptr);
             indexBufferMemory = VK_NULL_HANDLE;
         }
 
         if (hadBuffers) {
-            logMXModelStep("teardown complete");
+            logMXModelStep("teardown complete", true);
         }
     }
 

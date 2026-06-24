@@ -19,8 +19,10 @@
 namespace mxvk {
 
     namespace {
-        void logVKAbstractModelStep(const std::string &message) {
-            std::cout << "mxvk_abstract_model: " << message << '\n';
+        void logVKAbstractModelStep(const std::string &message, bool important = false) {
+            if (important) {
+                std::cout << "mxvk_abstract_model: " << message << '\n';
+            }
         }
 
         [[nodiscard]] std::vector<char> readBinaryFile(const std::string &path) {
@@ -115,7 +117,7 @@ namespace mxvk {
             throw mxvk::Exception("VKAbstractModel::load modelPath is empty");
         }
 
-        logVKAbstractModelStep("creation begin: " + modelPath);
+        logVKAbstractModelStep("creation begin: " + modelPath, true);
 
         windowPtr = targetWindow;
         if (!windowPtr->ensureRenderResources()) {
@@ -125,7 +127,7 @@ namespace mxvk {
         obj.load(modelPath, scale);
         obj.upload(windowPtr->getDevice(), windowPtr->getPhysicalDevice(), windowPtr->getCommandPool(), windowPtr->getGraphicsQueue());
         computeBoundsAndScale();
-        logVKAbstractModelStep("mesh upload complete");
+        logVKAbstractModelStep("mesh upload complete", true);
 
         textures.clear();
         if (!textureManifestPath.empty()) {
@@ -135,9 +137,9 @@ namespace mxvk {
         }
         if (textures.empty()) {
             createFallbackTexture();
-            logVKAbstractModelStep("using fallback texture");
+            logVKAbstractModelStep("using fallback texture", true);
         }
-        logVKAbstractModelStep("textures ready: " + std::to_string(textures.size()));
+        logVKAbstractModelStep("textures ready: " + std::to_string(textures.size()), true);
 
         createTextureSampler();
         createDescriptorSetLayout();
@@ -145,7 +147,50 @@ namespace mxvk {
         createDescriptorPool();
         createDescriptorSets();
         createPipelines();
-        logVKAbstractModelStep("creation complete");
+        logVKAbstractModelStep("creation complete", true);
+    }
+
+    void VKAbstractModel::load(VK_Window *targetWindow,
+                               MXModel &&model,
+                               const std::string &textureManifestPath,
+                               const std::string &textureBasePath,
+                               [[maybe_unused]] float scale) {
+        if (targetWindow == nullptr) {
+            throw mxvk::Exception("VKAbstractModel::load requires a valid window");
+        }
+
+        windowPtr = targetWindow;
+        if (!windowPtr->ensureRenderResources()) {
+            throw mxvk::Exception("VKAbstractModel::load failed because render resources are not ready");
+        }
+
+        obj = std::move(model);
+        obj.upload(windowPtr->getDevice(), windowPtr->getPhysicalDevice(), windowPtr->getCommandPool(), windowPtr->getGraphicsQueue());
+        computeBoundsAndScale();
+        logVKAbstractModelStep("mesh upload complete (prepared)", true);
+
+        textures.clear();
+        if (!textureManifestPath.empty()) {
+            loadTextures(textureManifestPath, textureBasePath);
+        } else if (!obj.mtlLibPath().empty()) {
+            loadTexturesFromMTL(textureBasePath.empty() ? std::filesystem::path(obj.mtlLibPath()).parent_path().string() : textureBasePath);
+        } else {
+            createFallbackTexture();
+            logVKAbstractModelStep("using fallback texture", true);
+        }
+        if (textures.empty()) {
+            createFallbackTexture();
+            logVKAbstractModelStep("using fallback texture", true);
+        }
+        logVKAbstractModelStep("textures ready: " + std::to_string(textures.size()), true);
+
+        createTextureSampler();
+        createDescriptorSetLayout();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
+        createPipelines();
+        logVKAbstractModelStep("creation complete", true);
     }
 
     void VKAbstractModel::setShaders(VK_Window *targetWindow, const std::string &vertSpv, const std::string &fragSpv) {
@@ -156,7 +201,7 @@ namespace mxvk {
         windowPtr = targetWindow;
         vertexShaderPath = vertSpv;
         fragmentShaderPath = fragSpv;
-        logVKAbstractModelStep("setShaders: vert=" + vertSpv + ", frag=" + fragSpv);
+        logVKAbstractModelStep("setShaders", true);
         createPipelines();
     }
 
@@ -354,7 +399,7 @@ namespace mxvk {
             return;
         }
 
-        logVKAbstractModelStep("resize begin");
+        logVKAbstractModelStep("resize begin", true);
         windowPtr = targetWindow;
         destroyPipelines();
         destroyDescriptors();
@@ -364,7 +409,7 @@ namespace mxvk {
         createDescriptorPool();
         createDescriptorSets();
         createPipelines();
-        logVKAbstractModelStep("resize complete");
+        logVKAbstractModelStep("resize complete", true);
     }
 
     void VKAbstractModel::cleanup(VK_Window *targetWindow) {
@@ -372,14 +417,14 @@ namespace mxvk {
             return;
         }
 
-        logVKAbstractModelStep("teardown begin");
+            logVKAbstractModelStep("teardown begin", true);
         windowPtr = targetWindow;
         destroyPipelines();
         destroyDescriptors();
         destroyTextures();
         obj.cleanup(windowPtr->getDevice());
         windowPtr = nullptr;
-        logVKAbstractModelStep("teardown complete");
+            logVKAbstractModelStep("teardown complete", true);
     }
 
     void VKAbstractModel::computeBoundsAndScale() {

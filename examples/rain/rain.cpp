@@ -284,6 +284,17 @@ namespace matrix {
         rain_sprite->drawSpriteRect(0, 0, canvas->w, canvas->h);
     }
 
+    void Rain::set_opacity(float value) {
+        opacity = std::clamp(value, 0.0f, 1.0f);
+    }
+
+    void Rain::reset() {
+        clear_canvas();
+        randomize_streams();
+        opacity = 1.0f;
+        last_frame = std::chrono::steady_clock::now();
+    }
+
     void Rain::update_and_render(mxvk::VK_Window &window) {
         const auto now = std::chrono::steady_clock::now();
         float dt = std::chrono::duration<float>(now - last_frame).count();
@@ -452,6 +463,7 @@ namespace matrix {
 
     void Rain::fade_canvas(float dt) {
         const float fade = std::pow(config.fade_base, dt * config.fade_exponent);
+        const float opacity_scale = opacity;
         if (!SDL_LockSurface(canvas.get())) {
             return;
         }
@@ -463,7 +475,7 @@ namespace matrix {
                 p[0] = static_cast<Uint8>(static_cast<float>(p[0]) * fade * config.fade_red_scale);
                 p[1] = static_cast<Uint8>(static_cast<float>(p[1]) * fade * config.fade_green_scale);
                 p[2] = static_cast<Uint8>(static_cast<float>(p[2]) * fade * config.fade_blue_scale);
-                p[3] = 255;
+                p[3] = static_cast<Uint8>(static_cast<float>(p[3]) * fade * opacity_scale);
             }
         }
         SDL_UnlockSurface(canvas.get());
@@ -492,19 +504,22 @@ namespace matrix {
                 continue;
             }
             const SDL_Rect clear_rect{x, row * cell_h, cell_w, cell_h};
-            SDL_FillSurfaceRect(canvas.get(), &clear_rect, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
+            SDL_FillSurfaceRect(canvas.get(), &clear_rect, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 0));
             SDL_Surface *surface = glyph.levels[level].get();
             Uint8 previous_alpha = 255;
             SDL_GetSurfaceAlphaMod(surface, &previous_alpha);
+            const Uint8 opacity_alpha = static_cast<Uint8>(std::lround(std::clamp(opacity, 0.0f, 1.0f) * 255.0f));
 
             const int glyph_x = x + (cell_w - glyph.levels[level]->w) / 2;
             const int glyph_y = row * cell_h;
-            const int glow_alpha = (tail == 0)
-                                       ? config.head_glow_alpha
-                                       : (tail <= config.near_head_tail_threshold ? config.near_head_glow_alpha
-                                                                                  : config.trail_glow_alpha);
+            const int glow_alpha = static_cast<int>(
+                std::lround(((tail == 0)
+                                 ? config.head_glow_alpha
+                                 : (tail <= config.near_head_tail_threshold ? config.near_head_glow_alpha
+                                                                            : config.trail_glow_alpha)) *
+                            opacity));
 
-            SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>(glow_alpha));
+            SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>((glow_alpha * opacity_alpha) / 255));
             SDL_Rect glow_dst{glyph_x - 1, glyph_y, glyph.levels[level]->w, glyph.levels[level]->h};
             SDL_BlitSurface(surface, nullptr, canvas.get(), &glow_dst);
             glow_dst.x = glyph_x + 1;
@@ -514,15 +529,16 @@ namespace matrix {
             glow_dst.y = glyph_y + 1;
             SDL_BlitSurface(surface, nullptr, canvas.get(), &glow_dst);
 
-            SDL_SetSurfaceAlphaMod(surface, previous_alpha);
+            SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>((static_cast<int>(previous_alpha) * opacity_alpha) / 255));
             SDL_Rect dst{glyph_x, glyph_y, glyph.levels[level]->w, glyph.levels[level]->h};
             SDL_BlitSurface(surface, nullptr, canvas.get(), &dst);
+            SDL_SetSurfaceAlphaMod(surface, previous_alpha);
         }
     }
 
     void Rain::clear_canvas() {
         if (canvas != nullptr) {
-            SDL_FillSurfaceRect(canvas.get(), nullptr, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 255));
+            SDL_FillSurfaceRect(canvas.get(), nullptr, SDL_MapSurfaceRGBA(canvas.get(), 0, 0, 0, 0));
         }
     }
 } // namespace matrix
