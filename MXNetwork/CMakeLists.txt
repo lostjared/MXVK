@@ -63,7 +63,7 @@ endif()
 
 set(CMAKE_REQUIRED_FLAGS "-std=c++20")
 message(STATUS "")
-message(STATUS "=== Checking System Headers ===")
+message(STATUS "=== MXNetwork: Checking System Headers ===")
 check_include_file_cxx(iostream HAVE_IOSTREAM)
 check_include_file_cxx(string HAVE_STRING)
 check_include_file_cxx(vector HAVE_VECTOR)
@@ -153,7 +153,7 @@ endif()
 endif()
 message(STATUS "All required C standard headers found.")
 message(STATUS "")
-message(STATUS "=== Checking C++20 Compatibility ===")
+message(STATUS "=== MXNetwork: Checking C++20 Compatibility ===")
 check_cxx_source_compiles("
 #include <version>
 #if __cplusplus < 202002L
