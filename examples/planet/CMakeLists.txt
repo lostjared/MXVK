@@ -1,7 +1,7 @@
 add_executable(planet
     ${CMAKE_SOURCE_DIR}/examples/planet/planet.cpp
 )
-target_link_libraries(planet PRIVATE mxvk::mxvk rain)
+target_link_libraries(planet PRIVATE rain)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)

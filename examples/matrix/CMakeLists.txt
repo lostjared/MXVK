@@ -2,7 +2,6 @@ add_executable(matrix
     ${CMAKE_SOURCE_DIR}/examples/matrix/matrix.cpp
 )
 
-target_link_libraries(matrix PRIVATE mxvk::mxvk)
 target_link_libraries(matrix PRIVATE rain)
 
 target_compile_definitions(matrix PRIVATE

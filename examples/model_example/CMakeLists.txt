@@ -1,7 +1,7 @@
 add_executable(model_example
     ${CMAKE_SOURCE_DIR}/examples/model_example/main.cpp
 )
-target_link_libraries(model_example PRIVATE mxvk::mxvk rain)
+target_link_libraries(model_example PRIVATE rain)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
