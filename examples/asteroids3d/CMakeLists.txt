@@ -1,5 +1,8 @@
 add_executable(asteroids3d
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/main.cpp
+    ${CMAKE_SOURCE_DIR}/examples/asteroids3d/asteroids3d_window.cpp
+    ${CMAKE_SOURCE_DIR}/examples/asteroids3d/ship.cpp
+    ${CMAKE_SOURCE_DIR}/examples/asteroids3d/starfield.cpp
 )
 target_link_libraries(asteroids3d PRIVATE mxvk::mxvk)
 
