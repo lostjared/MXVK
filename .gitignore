@@ -5,7 +5,6 @@
 *.slo
 *.lo
 *.o
-*.obj
 !examples/defender/data/asteroid.obj
 
 # Precompiled Headers
