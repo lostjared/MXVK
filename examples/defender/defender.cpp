@@ -29,6 +29,7 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 namespace defender {
 
@@ -159,13 +160,17 @@ namespace defender {
 
             if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
                 const bool pressed = e.type == SDL_EVENT_KEY_DOWN;
-                if (e.key.key == SDLK_LEFT || e.key.key == SDLK_A) {
+                if (e.key.key == SDLK_A) {
+                    roll_left_pressed = pressed;
+                } else if (e.key.key == SDLK_S) {
+                    roll_right_pressed = pressed;
+                } else if (e.key.key == SDLK_LEFT) {
                     left_pressed = pressed;
                 } else if (e.key.key == SDLK_RIGHT || e.key.key == SDLK_D) {
                     right_pressed = pressed;
                 } else if (e.key.key == SDLK_UP || e.key.key == SDLK_W) {
                     up_pressed = pressed;
-                } else if (e.key.key == SDLK_DOWN || e.key.key == SDLK_S) {
+                } else if (e.key.key == SDLK_DOWN) {
                     down_pressed = pressed;
                 } else if (e.key.key == SDLK_SPACE && pressed && !e.key.repeat) {
                     fire_pressed = true;
@@ -207,6 +212,7 @@ namespace defender {
             const float dt = std::min(delta_seconds, 0.1f);
             elapsed_seconds += dt;
 
+            update_barrel_roll(dt);
             if (ship_respawning) {
                 update_respawn(dt);
             } else if (mode == GameMode::Playing && !game_over) {
@@ -274,11 +280,7 @@ namespace defender {
             projectile_sprite->clearQueue();
 
             mxvk::UniformBufferObject ubo{};
-            ubo.model = space::build_model_matrix(
-                ship.position,
-                ship.rotation,
-                SHIP_MODEL_SCALE * ship_model.modelRenderScale(),
-                ship_model.modelCenterOffset());
+            ubo.model = build_ship_model_matrix();
             last_ship_model_matrix = ubo.model;
             ubo.view = view;
             ubo.proj = projection;
@@ -325,6 +327,12 @@ namespace defender {
         bool up_pressed = false;
         bool down_pressed = false;
         bool fire_pressed = false;
+        bool roll_left_pressed = false;
+        bool roll_right_pressed = false;
+        float barrel_roll_direction = 1.0f;
+        float barrel_roll_progress = 0.0f;
+        float barrel_roll_angle = 0.0f;
+        static constexpr float BARREL_ROLL_DURATION = 0.65f;
 
         space::Ship ship{};
         std::array<space::Projectile, MAX_PROJECTILES> projectiles{};
@@ -394,6 +402,52 @@ namespace defender {
                     ship.fire_cooldown = FIRE_COOLDOWN;
                 }
             }
+        }
+
+        void update_barrel_roll(float dt) {
+            const bool ship_visible_mode = mode == GameMode::IntroFadeIn || mode == GameMode::Countdown || mode == GameMode::Playing;
+            if (!ship_visible_mode || game_over || ship_respawning) {
+                barrel_roll_progress = 0.0f;
+                barrel_roll_angle = 0.0f;
+                return;
+            }
+
+            float roll_input = 0.0f;
+            if (roll_left_pressed && !roll_right_pressed) {
+                roll_input = -1.0f;
+            } else if (roll_right_pressed && !roll_left_pressed) {
+                roll_input = 1.0f;
+            }
+            if (roll_input != 0.0f) {
+                barrel_roll_direction = roll_input;
+            }
+
+            if (roll_input == 0.0f && barrel_roll_progress <= 0.0f) {
+                barrel_roll_angle = 0.0f;
+                return;
+            }
+
+            const float roll_speed = 360.0f / BARREL_ROLL_DURATION;
+            barrel_roll_progress += roll_speed * dt;
+            if (barrel_roll_progress >= 360.0f) {
+                barrel_roll_progress = (roll_input != 0.0f) ? std::fmod(barrel_roll_progress, 360.0f) : 0.0f;
+            }
+            barrel_roll_angle = barrel_roll_direction * barrel_roll_progress;
+        }
+
+        glm::mat4 build_ship_model_matrix() {
+            const glm::quat yaw = glm::angleAxis(glm::radians(ship.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            const glm::quat pitch = glm::angleAxis(glm::radians(ship.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            const glm::quat bank = glm::angleAxis(glm::radians(ship.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+            const glm::quat barrel_roll = glm::angleAxis(glm::radians(barrel_roll_angle), glm::vec3(0.0f, 0.0f, 1.0f));
+            const glm::quat orientation = yaw * pitch * bank * barrel_roll;
+
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, ship.position);
+            model *= glm::mat4_cast(orientation);
+            model = glm::scale(model, glm::vec3(SHIP_MODEL_SCALE * ship_model.modelRenderScale()));
+            model = glm::translate(model, ship_model.modelCenterOffset());
+            return model;
         }
 
         void reset_intro_screen() {
@@ -528,11 +582,7 @@ namespace defender {
 
             if (ship.visible && !ship_respawning) {
                 mxvk::UniformBufferObject ubo{};
-                ubo.model = space::build_model_matrix(
-                    ship.position,
-                    ship.rotation,
-                    SHIP_MODEL_SCALE * ship_model.modelRenderScale(),
-                    ship_model.modelCenterOffset());
+                ubo.model = build_ship_model_matrix();
                 ubo.view = view;
                 ubo.proj = projection;
                 ship_model.updateUBO(image_index, ubo);
@@ -1104,6 +1154,9 @@ namespace defender {
             ship.velocity = glm::vec3(0.0f);
             ship.current_speed = 0.0f;
             ship_forward_direction = 1.0f;
+            barrel_roll_direction = 1.0f;
+            barrel_roll_progress = 0.0f;
+            barrel_roll_angle = 0.0f;
             ship.rotation = glm::vec3(0.0f, -90.0f, 0.0f);
         }
 
@@ -1125,6 +1178,8 @@ namespace defender {
             right_pressed = false;
             up_pressed = false;
             down_pressed = false;
+            roll_left_pressed = false;
+            roll_right_pressed = false;
             fire_pressed = false;
             clear_projectiles();
             clear_particles();
