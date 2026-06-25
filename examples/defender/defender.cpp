@@ -376,6 +376,11 @@ namespace defender {
                 exit();
                 return;
             }
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F4 && !e.key.repeat) {
+                show_fps_counter = !show_fps_counter;
+                log_game(std::string("FPS counter ") + (show_fps_counter ? "enabled." : "disabled."));
+                return;
+            }
             if (mode == GameMode::Intro && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
                 intro_fade = 0.01f;
                 log_game("Intro skipped from keyboard.");
@@ -448,6 +453,7 @@ namespace defender {
             last_frame_time = now;
             const float dt = std::min(delta_seconds, 0.1f);
             elapsed_seconds += dt;
+            update_fps_counter(delta_seconds);
 
             const bool console_visible = console.isVisible();
             if (!console_visible) {
@@ -589,6 +595,10 @@ namespace defender {
         bool fire_pressed = false;
         bool roll_left_pressed = false;
         bool roll_right_pressed = false;
+        bool show_fps_counter = false;
+        float fps_accumulator = 0.0f;
+        int fps_frame_count = 0;
+        std::string fps_text = "FPS: --";
         float barrel_roll_direction = 1.0f;
         float barrel_roll_progress = 0.0f;
         float barrel_roll_angle = 0.0f;
@@ -2327,12 +2337,34 @@ namespace defender {
             }
         }
 
+        void update_fps_counter(float delta_seconds) {
+            fps_accumulator += delta_seconds;
+            ++fps_frame_count;
+            if (fps_accumulator < 0.25f) {
+                return;
+            }
+
+            const float fps = static_cast<float>(fps_frame_count) / fps_accumulator;
+            fps_text = std::format("FPS: {:.1f}", fps);
+            fps_accumulator = 0.0f;
+            fps_frame_count = 0;
+        }
+
         void draw_hud(const VkExtent2D &extent) {
             const SDL_Color white{255, 255, 255, 255};
             const SDL_Color yellow{255, 230, 80, 255};
             const SDL_Color red{255, 70, 60, 255};
             printText("Score: " + std::to_string(score), 24, 22, white);
             printText("Lives: " + std::to_string(lives), 24, 52, lives <= 1 ? red : white);
+            if (show_fps_counter) {
+                int fps_w = 0;
+                int fps_h = 0;
+                if (!getTextDimensions(fps_text, fps_w, fps_h)) {
+                    fps_w = 120;
+                }
+                const int fps_x = std::max(24, static_cast<int>(extent.width) - fps_w - 24);
+                printText(fps_text, fps_x, 22, white);
+            }
 
             if (!game_over) {
                 return;
