@@ -1,5 +1,12 @@
 add_executable(defender
     ${CMAKE_SOURCE_DIR}/examples/defender/defender.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_assets.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_combat.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_console.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_enemies.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_flame.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_intro.cpp
+    ${CMAKE_SOURCE_DIR}/examples/defender/defender_window.cpp
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/ship.cpp
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/starfield.cpp
 )
