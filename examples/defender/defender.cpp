@@ -245,6 +245,7 @@ namespace defender {
                 update_asteroids(dt);
                 update_projectiles(dt);
                 check_projectile_ufo_hits();
+                check_projectile_asteroid_hits();
                 check_ship_ufo_collisions();
                 check_ship_asteroid_collisions();
             }
@@ -784,6 +785,61 @@ namespace defender {
                     asteroid.respawn_timer = space::random_float(0.4f, 2.6f);
                 }
             }
+
+            resolve_asteroid_collisions();
+        }
+
+        void resolve_asteroid_collisions() {
+            constexpr float restitution = 0.92f;
+
+            for (std::size_t i = 0; i < asteroids.size(); ++i) {
+                Asteroid &first = asteroids[i];
+                if (!first.active) {
+                    continue;
+                }
+
+                for (std::size_t j = i + 1; j < asteroids.size(); ++j) {
+                    Asteroid &second = asteroids[j];
+                    if (!second.active) {
+                        continue;
+                    }
+
+                    const glm::vec2 delta{second.position.x - first.position.x, second.position.y - first.position.y};
+                    const float min_distance = first.collision_radius + second.collision_radius;
+                    const float distance_squared = glm::dot(delta, delta);
+                    if (distance_squared >= min_distance * min_distance) {
+                        continue;
+                    }
+
+                    const float distance = std::sqrt(std::max(distance_squared, 0.0001f));
+                    const glm::vec2 normal = distance > 0.0001f ? delta / distance : glm::vec2{1.0f, 0.0f};
+                    const float first_mass = first.collision_radius * first.collision_radius;
+                    const float second_mass = second.collision_radius * second.collision_radius;
+                    const float first_inverse_mass = 1.0f / first_mass;
+                    const float second_inverse_mass = 1.0f / second_mass;
+                    const float inverse_mass_sum = first_inverse_mass + second_inverse_mass;
+                    const float overlap = min_distance - distance;
+
+                    const glm::vec2 separation = normal * (overlap / inverse_mass_sum);
+                    first.position.x -= separation.x * first_inverse_mass;
+                    first.position.y -= separation.y * first_inverse_mass;
+                    second.position.x += separation.x * second_inverse_mass;
+                    second.position.y += separation.y * second_inverse_mass;
+
+                    const glm::vec2 relative_velocity{second.velocity.x - first.velocity.x, second.velocity.y - first.velocity.y};
+                    const float velocity_along_normal = glm::dot(relative_velocity, normal);
+                    if (velocity_along_normal >= 0.0f) {
+                        continue;
+                    }
+
+                    const float impulse_magnitude = -(1.0f + restitution) * velocity_along_normal / inverse_mass_sum;
+                    const glm::vec2 impulse = impulse_magnitude * normal;
+                    first.velocity.x -= impulse.x * first_inverse_mass;
+                    first.velocity.y -= impulse.y * first_inverse_mass;
+                    second.velocity.x += impulse.x * second_inverse_mass;
+                    second.velocity.y += impulse.y * second_inverse_mass;
+                }
+            }
         }
 
         void draw_ufos() {
@@ -1212,6 +1268,40 @@ namespace defender {
                     ufo.respawn_timer = space::random_float(1.2f, 2.8f);
                     projectile.active = false;
                     score += 5;
+                    break;
+                }
+            }
+        }
+
+        void check_projectile_asteroid_hits() {
+            constexpr float beam_collision_length = 7.4f;
+
+            for (auto &projectile : projectiles) {
+                if (!projectile.active) {
+                    continue;
+                }
+
+                const float direction = projectile.velocity.x >= 0.0f ? 1.0f : -1.0f;
+                const float x0 = projectile.prev_position.x;
+                const float x1 = projectile.position.x + direction * beam_collision_length;
+                const float min_x = std::min(x0, x1);
+                const float max_x = std::max(x0, x1);
+
+                for (auto &asteroid : asteroids) {
+                    if (!asteroid.active) {
+                        continue;
+                    }
+
+                    const float closest_x = std::clamp(asteroid.position.x, min_x, max_x);
+                    const glm::vec2 delta{asteroid.position.x - closest_x, asteroid.position.y - projectile.position.y};
+                    if (glm::dot(delta, delta) > asteroid.collision_radius * asteroid.collision_radius) {
+                        continue;
+                    }
+
+                    spawn_ufo_explosion(asteroid.position);
+                    asteroid.active = false;
+                    asteroid.respawn_timer = space::random_float(1.0f, 2.5f);
+                    projectile.active = false;
                     break;
                 }
             }
