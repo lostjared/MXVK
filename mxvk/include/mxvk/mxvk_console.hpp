@@ -11,6 +11,7 @@
 #include <deque>
 #include <functional>
 #include <iosfwd>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -114,6 +115,7 @@ namespace mxvk {
         [[nodiscard]] bool isPointInScrollbar(int x, int y) const noexcept;
         [[nodiscard]] bool isPointInScrollbarThumb(int x, int y) const noexcept;
         void updateScrollFromThumbY(int thumbY);
+        [[nodiscard]] std::size_t effectiveVisibleLineCount() const noexcept;
         [[nodiscard]] std::size_t maxScrollOffset() const noexcept;
         [[nodiscard]] static std::vector<std::string> tokenize(const std::string &line);
         [[nodiscard]] bool handleDefaultCommand(const std::vector<std::string> &args, std::ostream &output);
@@ -163,7 +165,7 @@ namespace mxvk {
         int history_index = -1;
         std::size_t max_lines = 1200;
         std::size_t max_total_chars = 128 * 1024;
-        std::size_t max_visible_lines = 18;
+        std::size_t max_visible_lines = std::numeric_limits<std::size_t>::max();
         SDL_Color text_color{220, 235, 255, 255};
         SDL_Color prompt_color{120, 220, 160, 255};
         SDL_Color info_color{170, 170, 210, 255};

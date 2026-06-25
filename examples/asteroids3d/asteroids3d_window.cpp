@@ -684,6 +684,7 @@ namespace space {
                     intro_rain->set_opacity(loading_rain_opacity);
                     intro_rain->update_and_render(*this);
                 }
+                set_ui_font_size(40);
                 printText("Loading " + std::to_string(loading_progress_percent) + "%", 25, 25, {255, 255, 255, 255});
                 load_next_game_resource_step();
                 return;

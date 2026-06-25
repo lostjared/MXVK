@@ -167,14 +167,19 @@ namespace mxvk {
         wrapped_cache_dirty = true;
     }
 
+    std::size_t VK_Console::effectiveVisibleLineCount() const noexcept {
+        return std::max<std::size_t>(1, std::min(max_visible_lines, last_visible_line_count));
+    }
+
     std::size_t VK_Console::maxScrollOffset() const noexcept {
         const int width = usableTextWidth();
         ensureWrappedCache(width);
         const std::size_t total_rows = wrapped_cache_line_count;
-        if (total_rows <= last_visible_line_count) {
+        const std::size_t visible_rows = effectiveVisibleLineCount();
+        if (total_rows <= visible_rows) {
             return 0;
         }
-        return total_rows - last_visible_line_count;
+        return total_rows - visible_rows;
     }
 
     int VK_Console::measureTextWidth(const std::string &text) const {
@@ -552,7 +557,7 @@ namespace mxvk {
 
         ensureWrappedCache(usableTextWidth());
         const std::size_t total_lines = wrapped_cache_line_count;
-        const std::size_t visible_lines = std::max<std::size_t>(1, std::min(max_visible_lines, last_visible_line_count));
+        const std::size_t visible_lines = effectiveVisibleLineCount();
 
         if (total_lines <= visible_lines) {
             scrollbar_thumb_h = scrollbar_h;
@@ -638,7 +643,7 @@ namespace mxvk {
             }
 
             if (isPointInScrollbar(mx, my)) {
-                const std::size_t page = std::max<std::size_t>(1, last_visible_line_count - 1);
+                const std::size_t page = std::max<std::size_t>(1, effectiveVisibleLineCount() - 1);
                 if (my < scrollbar_thumb_y) {
                     scrollUp(page);
                 } else if (my >= (scrollbar_thumb_y + scrollbar_thumb_h)) {
@@ -700,10 +705,10 @@ namespace mxvk {
                 historyDown();
                 return;
             case SDLK_PAGEUP:
-                scrollUp(std::max<std::size_t>(1, last_visible_line_count - 1));
+                scrollUp(std::max<std::size_t>(1, effectiveVisibleLineCount() - 1));
                 return;
             case SDLK_PAGEDOWN:
-                scrollDown(std::max<std::size_t>(1, last_visible_line_count - 1));
+                scrollDown(std::max<std::size_t>(1, effectiveVisibleLineCount() - 1));
                 return;
             case SDLK_ESCAPE:
                 hide();
@@ -809,7 +814,7 @@ namespace mxvk {
         scroll_offset = std::min(scroll_offset, max_offset);
         updateScrollbarGeometry();
 
-        const std::size_t visible_lines = std::min(std::min(max_visible_lines, last_visible_line_count), wrapped_cache.size());
+        const std::size_t visible_lines = std::min(effectiveVisibleLineCount(), wrapped_cache.size());
         const std::size_t start = (wrapped_cache.size() > visible_lines) ? (wrapped_cache.size() - visible_lines - scroll_offset) : 0;
         const std::size_t end = std::min(wrapped_cache.size(), start + visible_lines);
         for (std::size_t i = start; i < end; ++i) {
