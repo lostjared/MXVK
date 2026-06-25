@@ -52,6 +52,17 @@ namespace defender {
             float respawn_timer = 0.0f;
             bool active = true;
         };
+
+        struct Asteroid {
+            glm::vec3 position{0.0f};
+            glm::vec3 velocity{0.0f};
+            glm::vec3 rotation{0.0f};
+            glm::vec3 angular_velocity{0.0f};
+            float scale = 1.0f;
+            float collision_radius = 1.2f;
+            float respawn_timer = 0.0f;
+            bool active = false;
+        };
     } // namespace
 
     class DefenderWindow : public mxvk::VK_Window {
@@ -67,6 +78,10 @@ namespace defender {
             const std::string model_frag = std::string(DEFENDER_SHADER_DIR) + "/model.frag.spv";
             ship_model.load(this, asset_root + "/data/starship.obj", asset_root + "/data/starship.mtl", asset_root + "/data", 1.0f);
             ship_model.setShaders(this, model_vert, model_frag);
+            for (auto &asteroid_model : asteroid_models) {
+                asteroid_model.load(this, asset_root + "/data/asteroid.obj", asset_root + "/data/asteroid.mtl", asset_root + "/data", 1.0f);
+                asteroid_model.setShaders(this, model_vert, model_frag);
+            }
 
             intro_sprite = createSprite(
                 asset_root + "/data/intro.png",
@@ -113,6 +128,7 @@ namespace defender {
             effect_sprite->setAlphaDiscardThreshold(0.05f);
 
             init_ufos();
+            init_asteroids();
             create_flame_resources();
 
             ship.position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -129,6 +145,9 @@ namespace defender {
             }
             cleanup_flame_resources();
             ship_model.cleanup(this);
+            for (auto &asteroid_model : asteroid_models) {
+                asteroid_model.cleanup(this);
+            }
             if (star_sprite != nullptr) {
                 star_sprite->cleanup();
             }
@@ -191,6 +210,9 @@ namespace defender {
                 intro_rain->resize(*this);
             }
             ship_model.resize(this);
+            for (auto &asteroid_model : asteroid_models) {
+                asteroid_model.resize(this);
+            }
             star_field.resize(this);
             if (projectile_sprite != nullptr) {
                 projectile_sprite->resize(this);
@@ -220,9 +242,11 @@ namespace defender {
             } else if (mode == GameMode::Playing && !game_over) {
                 update_ship(dt);
                 update_ufos(dt);
+                update_asteroids(dt);
                 update_projectiles(dt);
                 check_projectile_ufo_hits();
                 check_ship_ufo_collisions();
+                check_ship_asteroid_collisions();
             }
             update_particles(dt);
 
@@ -276,6 +300,8 @@ namespace defender {
                 sprite->clearQueue();
             }
 
+            draw_asteroids(cmd, image_index, view, projection);
+
             projectile_sprite->updateCamera(image_index, view, projection);
             draw_projectiles();
             projectile_sprite->render(cmd, image_index);
@@ -324,6 +350,7 @@ namespace defender {
         bool game_over = false;
         bool ship_respawning = false;
         bool ufos_enabled = false;
+        bool asteroids_enabled = false;
         bool left_pressed = false;
         bool right_pressed = false;
         bool up_pressed = false;
@@ -342,9 +369,11 @@ namespace defender {
         space::Ship ship{};
         std::array<space::Projectile, MAX_PROJECTILES> projectiles{};
         std::array<Ufo, MAX_UFOS> ufos{};
+        std::array<Asteroid, MAX_ASTEROIDS> asteroids{};
         std::array<space::Particle, space::MAX_PARTICLES> particles{};
         space::StarField star_field{};
         mxvk::VKAbstractModel ship_model{};
+        std::array<mxvk::VKAbstractModel, MAX_ASTEROIDS> asteroid_models{};
         mxvk::VK_Sprite3D *star_sprite = nullptr;
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
         std::array<mxvk::VK_Sprite3D *, UFO_ANIMATION_FRAMES> ufo_sprites{};
@@ -452,6 +481,19 @@ namespace defender {
             model *= glm::mat4_cast(orientation);
             model = glm::scale(model, glm::vec3(SHIP_MODEL_SCALE * ship_model.modelRenderScale()));
             model = glm::translate(model, ship_model.modelCenterOffset());
+            return model;
+        }
+
+        glm::mat4 build_asteroid_model_matrix(const Asteroid &asteroid, const mxvk::VKAbstractModel &model_resource) const {
+            const glm::quat yaw = glm::angleAxis(glm::radians(asteroid.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            const glm::quat pitch = glm::angleAxis(glm::radians(asteroid.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            const glm::quat roll = glm::angleAxis(glm::radians(asteroid.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, asteroid.position);
+            model *= glm::mat4_cast(yaw * pitch * roll);
+            model = glm::scale(model, glm::vec3(asteroid.scale * model_resource.modelRenderScale()));
+            model = glm::translate(model, model_resource.modelCenterOffset());
             return model;
         }
 
@@ -633,6 +675,13 @@ namespace defender {
             }
         }
 
+        void init_asteroids() {
+            for (auto &asteroid : asteroids) {
+                asteroid.active = false;
+                asteroid.respawn_timer = space::random_float(0.6f, 4.5f);
+            }
+        }
+
         void respawn_ufo(Ufo &ufo, bool initial_spawn = false) {
             const float side = space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f;
             const float distance = initial_spawn ? space::random_float(-52.0f, 52.0f) : side * space::random_float(34.0f, 56.0f);
@@ -683,6 +732,60 @@ namespace defender {
             }
         }
 
+        void respawn_asteroid(Asteroid &asteroid, bool initial_spawn = false) {
+            const float side = space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f;
+            const float distance = initial_spawn ? space::random_float(-58.0f, 58.0f) : side * space::random_float(36.0f, 68.0f);
+            asteroid.scale = space::random_float(0.72f, 2.15f);
+            asteroid.collision_radius = asteroid.scale * 1.25f;
+            asteroid.position = glm::vec3(camera_center_x + distance, space::random_float(WORLD_BOTTOM + 1.0f, WORLD_TOP - 1.0f), space::random_float(-1.7f, 1.3f));
+            asteroid.velocity = glm::vec3(-side * space::random_float(1.8f, 5.6f), space::random_float(-0.55f, 0.55f), 0.0f);
+            asteroid.rotation = glm::vec3(
+                space::random_float(0.0f, 360.0f),
+                space::random_float(0.0f, 360.0f),
+                space::random_float(0.0f, 360.0f));
+            asteroid.angular_velocity = glm::vec3(
+                space::random_float(-74.0f, 74.0f),
+                space::random_float(-105.0f, 105.0f),
+                space::random_float(-62.0f, 62.0f));
+            asteroid.respawn_timer = 0.0f;
+            asteroid.active = true;
+        }
+
+        void update_asteroids(float dt) {
+            if (!asteroids_enabled) {
+                if (std::abs(camera_center_x) < 12.0f && std::abs(ship.position.x) < 12.0f) {
+                    return;
+                }
+                asteroids_enabled = true;
+            }
+
+            for (auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    asteroid.respawn_timer -= dt;
+                    if (asteroid.respawn_timer <= 0.0f) {
+                        respawn_asteroid(asteroid);
+                    }
+                    continue;
+                }
+
+                asteroid.position += asteroid.velocity * dt;
+                asteroid.rotation += asteroid.angular_velocity * dt;
+                asteroid.rotation.x = std::fmod(asteroid.rotation.x, 360.0f);
+                asteroid.rotation.y = std::fmod(asteroid.rotation.y, 360.0f);
+                asteroid.rotation.z = std::fmod(asteroid.rotation.z, 360.0f);
+
+                if (asteroid.position.y < WORLD_BOTTOM + asteroid.collision_radius || asteroid.position.y > WORLD_TOP - asteroid.collision_radius) {
+                    asteroid.velocity.y = -asteroid.velocity.y;
+                    asteroid.position.y = std::clamp(asteroid.position.y, WORLD_BOTTOM + asteroid.collision_radius, WORLD_TOP - asteroid.collision_radius);
+                }
+
+                if (std::abs(asteroid.position.x - camera_center_x) > 78.0f) {
+                    asteroid.active = false;
+                    asteroid.respawn_timer = space::random_float(0.4f, 2.6f);
+                }
+            }
+        }
+
         void draw_ufos() {
             for (const auto &ufo : ufos) {
                 if (!ufo.active) {
@@ -691,6 +794,22 @@ namespace defender {
                 const float pulse = 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f;
                 const int frame = static_cast<int>(std::floor(elapsed_seconds * 12.0f + ufo.phase * 1.7f)) % UFO_ANIMATION_FRAMES;
                 ufo_sprites[static_cast<std::size_t>(frame)]->drawSprite(ufo.position, glm::vec2(ufo.base_size * pulse, ufo.base_size * 0.58f * pulse), ufo.tint, 0.0f);
+            }
+        }
+
+        void draw_asteroids(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &projection) {
+            for (std::size_t i = 0; i < asteroids.size(); ++i) {
+                const Asteroid &asteroid = asteroids[i];
+                if (!asteroid.active) {
+                    continue;
+                }
+
+                mxvk::UniformBufferObject ubo{};
+                ubo.model = build_asteroid_model_matrix(asteroid, asteroid_models[i]);
+                ubo.view = view;
+                ubo.proj = projection;
+                asteroid_models[i].updateUBO(image_index, ubo);
+                asteroid_models[i].render(cmd, image_index, false);
             }
         }
 
@@ -1124,6 +1243,31 @@ namespace defender {
             }
         }
 
+        void check_ship_asteroid_collisions() {
+            constexpr float ship_half_width = 1.75f;
+            constexpr float ship_half_height = 0.85f;
+
+            for (auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    continue;
+                }
+
+                const float closest_x = std::clamp(asteroid.position.x, ship.position.x - ship_half_width, ship.position.x + ship_half_width);
+                const float closest_y = std::clamp(asteroid.position.y, ship.position.y - ship_half_height, ship.position.y + ship_half_height);
+                const glm::vec2 delta{asteroid.position.x - closest_x, asteroid.position.y - closest_y};
+                if (glm::dot(delta, delta) > asteroid.collision_radius * asteroid.collision_radius) {
+                    continue;
+                }
+
+                spawn_ufo_explosion(asteroid.position);
+                spawn_ufo_explosion(ship.position);
+                asteroid.active = false;
+                asteroid.respawn_timer = space::random_float(1.0f, 2.5f);
+                lose_life();
+                break;
+            }
+        }
+
         void lose_life() {
             --lives;
             clear_projectiles();
@@ -1174,6 +1318,11 @@ namespace defender {
             for (auto &ufo : ufos) {
                 ufo.active = false;
                 ufo.respawn_timer = space::random_float(0.4f, 4.0f);
+            }
+            asteroids_enabled = false;
+            for (auto &asteroid : asteroids) {
+                asteroid.active = false;
+                asteroid.respawn_timer = space::random_float(0.7f, 4.8f);
             }
         }
 

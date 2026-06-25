@@ -114,6 +114,9 @@ set(DEFENDER_UFO_FRAME_ASSETS
 set(DEFENDER_REQUIRED_ASSETS
     ${DEFENDER_DATA_DIR}/starship.obj
     ${DEFENDER_DATA_DIR}/starship.mtl
+    ${DEFENDER_LOCAL_DATA_DIR}/asteroid.obj
+    ${DEFENDER_LOCAL_DATA_DIR}/asteroid.mtl
+    ${DEFENDER_LOCAL_DATA_DIR}/rock.png
     ${DEFENDER_LOCAL_DATA_DIR}/intro.png
     ${DEFENDER_DATA_DIR}/star.png
     ${DEFENDER_DATA_DIR}/particle_projectile.png
@@ -135,7 +138,7 @@ set(DEFENDER_REQUIRED_ASSETS
 
 foreach(_asset ${DEFENDER_REQUIRED_ASSETS})
     if(NOT EXISTS ${_asset})
-        message(FATAL_ERROR "defender missing required asteroids3d asset: ${_asset}")
+        message(FATAL_ERROR "defender missing required asset: ${_asset}")
     endif()
 endforeach()
 
@@ -144,5 +147,5 @@ add_custom_command(TARGET defender POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${DEFENDER_REQUIRED_ASSETS}
         $<TARGET_FILE_DIR:defender>/data
-    COMMENT "Copying defender assets from asteroids3d"
+    COMMENT "Copying defender assets"
 )
