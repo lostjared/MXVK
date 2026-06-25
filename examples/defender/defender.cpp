@@ -60,7 +60,8 @@ namespace defender {
             : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION),
               asset_root((path.empty() || path == ".") ? std::string(DEFENDER_ASSET_DIR) : path) {
             setClearColor(0.0f, 0.0f, 0.01f, 1.0f);
-            setFont(asset_root + "/data/font.ttf", 24);
+            setFont(asset_root + "/data/font.ttf", HUD_FONT_SIZE);
+            countdown_font.reset(asset_root + "/data/font.ttf", COUNTDOWN_FONT_SIZE);
 
             const std::string model_vert = std::string(DEFENDER_SHADER_DIR) + "/model.vert.spv";
             const std::string model_frag = std::string(DEFENDER_SHADER_DIR) + "/model.frag.spv";
@@ -333,6 +334,9 @@ namespace defender {
         float barrel_roll_progress = 0.0f;
         float barrel_roll_angle = 0.0f;
         static constexpr float BARREL_ROLL_DURATION = 0.65f;
+        static constexpr int HUD_FONT_SIZE = 24;
+        static constexpr int COUNTDOWN_FONT_SIZE = HUD_FONT_SIZE * 2;
+        mxvk::Font countdown_font{};
 
         space::Ship ship{};
         std::array<space::Projectile, MAX_PROJECTILES> projectiles{};
@@ -593,29 +597,31 @@ namespace defender {
                 const std::string number = std::format("{}", countdown_number);
                 int text_w = 0;
                 int text_h = 0;
-                if (!getTextDimensions(number, text_w, text_h)) {
-                    text_w = 32;
-                    text_h = 32;
+                if (!getTextDimensions(number, text_w, text_h, countdown_font)) {
+                    text_w = 64;
+                    text_h = 64;
                 }
                 const bool show_number = ((countdown_timer / 167U) % 2U) == 0U;
                 if (show_number) {
                     printText(number,
                               static_cast<int>(extent.width) / 2 - text_w / 2,
                               static_cast<int>(extent.height) / 2 - text_h / 2,
-                              {255, 255, 255, 255});
+                              {255, 255, 255, 255},
+                              countdown_font);
                 }
             } else {
                 const std::string launch = "MISSION START!";
                 int text_w = 0;
                 int text_h = 0;
-                if (!getTextDimensions(launch, text_w, text_h)) {
-                    text_w = 220;
-                    text_h = 24;
+                if (!getTextDimensions(launch, text_w, text_h, countdown_font)) {
+                    text_w = 440;
+                    text_h = 48;
                 }
                 printText(launch,
                           static_cast<int>(extent.width) / 2 - text_w / 2,
                           static_cast<int>(extent.height) / 2 - text_h / 2,
-                          {0, 255, 255, 255});
+                          {0, 255, 255, 255},
+                          countdown_font);
             }
         }
 
