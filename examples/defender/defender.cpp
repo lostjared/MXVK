@@ -35,6 +35,7 @@ namespace defender {
     namespace {
         enum class GameMode {
             Intro,
+            IntroFadeIn,
             Countdown,
             Playing
         };
@@ -69,6 +70,13 @@ namespace defender {
                 asset_root + "/data/intro.png",
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(DEFENDER_SHADER_DIR) + "/intro.frag.spv");
+            fade_overlay_sprite = createSprite(
+                1,
+                1,
+                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+                std::string(DEFENDER_SHADER_DIR) + "/fade_overlay.frag.spv");
+            const uint32_t black_pixel = 0xFF000000u;
+            fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
             intro_rain_config.color = "#ff0000";
             intro_rain = std::make_unique<matrix::Rain>(*this, std::move(intro_rain_config));
@@ -169,6 +177,9 @@ namespace defender {
             if (intro_sprite != nullptr) {
                 intro_sprite->rebuildPipeline();
             }
+            if (fade_overlay_sprite != nullptr) {
+                fade_overlay_sprite->rebuildPipeline();
+            }
             if (intro_rain != nullptr) {
                 intro_rain->resize(*this);
             }
@@ -215,7 +226,7 @@ namespace defender {
                 return;
             }
 
-            if (mode == GameMode::Countdown) {
+            if (mode == GameMode::IntroFadeIn || mode == GameMode::Countdown) {
                 update_camera_scroll(aspect);
                 const glm::vec3 camera_target{camera_center_x, CAMERA_HEIGHT, 0.0f};
                 const glm::vec3 ideal_camera{camera_center_x, CAMERA_HEIGHT, CAMERA_DISTANCE};
@@ -226,6 +237,9 @@ namespace defender {
                 projection[1][1] *= -1.0f;
 
                 draw_countdown(cmd, image_index, extent, view, projection);
+                if (mode == GameMode::IntroFadeIn) {
+                    draw_intro_fade_in(extent);
+                }
                 return;
             }
 
@@ -289,6 +303,8 @@ namespace defender {
         GameMode mode = GameMode::Intro;
         float intro_fade = 1.0f;
         Uint32 intro_last_update_ms = 0;
+        Uint32 intro_fade_in_start_ms = 0;
+        static constexpr Uint32 INTRO_FADE_IN_DURATION_MS = 500;
         Uint32 countdown_timer = 0;
         Uint32 countdown_duration = 1000;
         Uint32 countdown_start_ms = 0;
@@ -321,6 +337,7 @@ namespace defender {
         std::array<mxvk::VK_Sprite3D *, UFO_ANIMATION_FRAMES> ufo_sprites{};
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
+        mxvk::VK_Sprite *fade_overlay_sprite = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         glm::vec3 camera_position{0.0f, CAMERA_HEIGHT, CAMERA_DISTANCE};
         glm::mat4 last_ship_model_matrix{1.0f};
@@ -383,6 +400,7 @@ namespace defender {
             mode = GameMode::Intro;
             intro_fade = 1.0f;
             intro_last_update_ms = SDL_GetTicks();
+            intro_fade_in_start_ms = 0;
             if (intro_rain != nullptr) {
                 intro_rain->set_opacity(1.0f);
                 intro_rain->reset();
@@ -398,6 +416,12 @@ namespace defender {
             launch_timer = 0;
             launch_duration = 1000;
             launch_start_ms = 0;
+        }
+
+        void start_intro_fade_in() {
+            start_launch_countdown();
+            mode = GameMode::IntroFadeIn;
+            intro_fade_in_start_ms = SDL_GetTicks();
         }
 
         void draw_intro(const VkExtent2D &extent) {
@@ -417,16 +441,43 @@ namespace defender {
                 if (intro_rain != nullptr) {
                     intro_rain->set_opacity(0.0f);
                 }
-                start_launch_countdown();
+                start_intro_fade_in();
                 return;
             }
 
             intro_sprite->setShaderParams(static_cast<float>(current_ms) / 1000.0f, 0.0f, 0.0f, intro_fade);
             intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
             if (intro_rain != nullptr) {
+                intro_rain->set_opacity(intro_fade);
                 intro_rain->update_and_render(*this);
             }
             printText("Press Enter", 24, static_cast<int>(extent.height) - 52, {255, 230, 80, 255});
+        }
+
+        void draw_intro_fade_in(const VkExtent2D &extent) {
+            const Uint32 elapsed_ms = SDL_GetTicks() - intro_fade_in_start_ms;
+            const float progress = std::clamp(static_cast<float>(elapsed_ms) / static_cast<float>(INTRO_FADE_IN_DURATION_MS), 0.0f, 1.0f);
+            const float alpha = 1.0f - progress;
+            if (alpha <= 0.0f) {
+                mode = GameMode::Countdown;
+                return;
+            }
+
+            draw_fade_overlay(extent, alpha);
+        }
+
+        void draw_fade_overlay(const VkExtent2D &extent, float alpha) {
+            if (fade_overlay_sprite == nullptr) {
+                return;
+            }
+
+            alpha = std::clamp(alpha, 0.0f, 1.0f);
+            if (alpha <= 0.0f) {
+                return;
+            }
+
+            fade_overlay_sprite->setShaderParams(0.0f, 0.0f, 0.0f, alpha);
+            fade_overlay_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
         }
 
         void update_camera_scroll(float aspect) {
