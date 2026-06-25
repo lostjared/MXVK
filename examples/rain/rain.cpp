@@ -277,11 +277,18 @@ namespace matrix {
     }
 
     void Rain::render() {
+        if (canvas == nullptr) {
+            return;
+        }
+        render(canvas->w, canvas->h);
+    }
+
+    void Rain::render(int width, int height) {
         sync_texture();
         if (rain_sprite == nullptr || canvas == nullptr) {
             return;
         }
-        rain_sprite->drawSpriteRect(0, 0, canvas->w, canvas->h);
+        rain_sprite->drawSpriteRect(0, 0, width, height);
     }
 
     void Rain::set_opacity(float value) {
@@ -302,6 +309,15 @@ namespace matrix {
         resize(window);
         update(dt);
         render();
+    }
+
+    void Rain::update_and_render(mxvk::VK_Window &window, int render_width, int render_height) {
+        const auto now = std::chrono::steady_clock::now();
+        float dt = std::chrono::duration<float>(now - last_frame).count();
+        last_frame = now;
+        resize(window);
+        update(dt);
+        render(render_width, render_height);
     }
 
     void Rain::on_swapchain_recreated(mxvk::VK_Window &window) {

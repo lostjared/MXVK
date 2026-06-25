@@ -100,8 +100,9 @@ namespace defender {
             const uint32_t black_pixel = 0xFF000000u;
             fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
-            intro_rain_config.font_size += 8;
             intro_rain_config.color = "#ff0000";
+            intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
+            intro_rain_config.surface_height = INTRO_RAIN_TEXTURE_HEIGHT;
             intro_rain = std::make_unique<matrix::Rain>(*this, std::move(intro_rain_config));
             reset_intro_screen();
 
@@ -385,6 +386,8 @@ namespace defender {
         Uint32 intro_last_update_ms = 0;
         Uint32 intro_fade_in_start_ms = 0;
         static constexpr Uint32 INTRO_FADE_IN_DURATION_MS = 500;
+        static constexpr int INTRO_RAIN_TEXTURE_WIDTH = 1280;
+        static constexpr int INTRO_RAIN_TEXTURE_HEIGHT = 720;
         Uint32 countdown_timer = 0;
         Uint32 countdown_duration = 1000;
         Uint32 countdown_start_ms = 0;
@@ -961,7 +964,7 @@ namespace defender {
             intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
             if (intro_rain != nullptr) {
                 intro_rain->set_opacity(intro_fade);
-                intro_rain->update_and_render(*this);
+                intro_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
             }
             printText("Press Enter", 24, static_cast<int>(extent.height) - 52, {255, 230, 80, 255});
         }

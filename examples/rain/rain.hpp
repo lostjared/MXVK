@@ -74,9 +74,11 @@ namespace matrix {
         void update(float dt);
         void sync_texture();
         void render();
+        void render(int width, int height);
         void set_opacity(float opacity);
         void reset();
         void update_and_render(mxvk::VK_Window &window);
+        void update_and_render(mxvk::VK_Window &window, int render_width, int render_height);
         void on_swapchain_recreated(mxvk::VK_Window &window);
 
         static SDL_Color matrix_color(int level);
