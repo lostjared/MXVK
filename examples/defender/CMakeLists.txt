@@ -110,6 +110,14 @@ set(DEFENDER_UFO_FRAME_ASSETS
     ${DEFENDER_LOCAL_DATA_DIR}/ufo_lights_05.png
     ${DEFENDER_LOCAL_DATA_DIR}/ufo_lights_06.png
     ${DEFENDER_LOCAL_DATA_DIR}/ufo_lights_07.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox1.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox2.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox3.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox4.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox5.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox6.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox7.png
+    ${DEFENDER_LOCAL_DATA_DIR}/ufox8.png
 )
 set(DEFENDER_REQUIRED_ASSETS
     ${DEFENDER_DATA_DIR}/starship.obj

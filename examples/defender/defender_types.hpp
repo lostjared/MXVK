@@ -12,6 +12,7 @@ namespace defender {
     constexpr int MAX_UFOS = 6;
     constexpr int MAX_ASTEROIDS = 5;
     constexpr int UFO_ANIMATION_FRAMES = 8;
+    constexpr int UFO_SPRITE_SET_COUNT = 2;
     constexpr float SHIP_MODEL_SCALE = 1.65f;
     constexpr float PROJECTILE_SPEED = 118.0f;
     constexpr float PROJECTILE_LIFETIME = 0.72f;

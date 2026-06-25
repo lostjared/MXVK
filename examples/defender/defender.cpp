@@ -21,6 +21,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -46,6 +47,11 @@ namespace defender {
             Playing
         };
 
+        enum class UfoSpriteSet : std::size_t {
+            Classic = 0,
+            Ufox = 1
+        };
+
         struct Ufo {
             glm::vec3 position{0.0f};
             glm::vec3 velocity{0.0f};
@@ -55,6 +61,7 @@ namespace defender {
             float bob_speed = 1.0f;
             float spin_speed = 1.0f;
             float respawn_timer = 0.0f;
+            UfoSpriteSet sprite_set = UfoSpriteSet::Classic;
             bool active = true;
         };
 
@@ -68,6 +75,157 @@ namespace defender {
             float respawn_timer = 0.0f;
             bool active = false;
         };
+
+        struct SpriteAlphaBounds {
+            float min_x = -0.5f;
+            float max_x = 0.5f;
+            float min_y = -0.5f;
+            float max_y = 0.5f;
+        };
+
+        [[nodiscard]] SpriteAlphaBounds calculate_alpha_bounds(SDL_Surface *surface, std::uint8_t threshold = 5) {
+            if (surface == nullptr || surface->w <= 0 || surface->h <= 0) {
+                return {};
+            }
+
+            const SDL_PixelFormatDetails *format_details = SDL_GetPixelFormatDetails(surface->format);
+            if (format_details == nullptr || !SDL_LockSurface(surface)) {
+                return {};
+            }
+
+            int min_x = surface->w;
+            int min_y = surface->h;
+            int max_x = -1;
+            int max_y = -1;
+            const auto *bytes = static_cast<const std::uint8_t *>(surface->pixels);
+
+            for (int y = 0; y < surface->h; ++y) {
+                const auto *row = reinterpret_cast<const std::uint32_t *>(bytes + static_cast<std::size_t>(y) * static_cast<std::size_t>(surface->pitch));
+                for (int x = 0; x < surface->w; ++x) {
+                    std::uint8_t r = 0;
+                    std::uint8_t g = 0;
+                    std::uint8_t b = 0;
+                    std::uint8_t a = 0;
+                    SDL_GetRGBA(row[x], format_details, nullptr, &r, &g, &b, &a);
+                    if (a <= threshold) {
+                        continue;
+                    }
+                    min_x = std::min(min_x, x);
+                    min_y = std::min(min_y, y);
+                    max_x = std::max(max_x, x);
+                    max_y = std::max(max_y, y);
+                }
+            }
+
+            SDL_UnlockSurface(surface);
+
+            if (max_x < min_x || max_y < min_y) {
+                return {};
+            }
+
+            const float width = static_cast<float>(surface->w);
+            const float height = static_cast<float>(surface->h);
+            return {
+                static_cast<float>(min_x) / width - 0.5f,
+                static_cast<float>(max_x + 1) / width - 0.5f,
+                0.5f - static_cast<float>(max_y + 1) / height,
+                0.5f - static_cast<float>(min_y) / height,
+            };
+        }
+
+        [[nodiscard]] SDL_Surface *load_light_background_png(const std::string &path) {
+            SDL_Surface *loaded_surface = mxvk::LoadPNG(path.c_str());
+            if (loaded_surface == nullptr) {
+                throw mxvk::Exception("Failed to load PNG: " + path);
+            }
+
+            SDL_Surface *surface = SDL_ConvertSurface(loaded_surface, SDL_PIXELFORMAT_RGBA32);
+            SDL_DestroySurface(loaded_surface);
+            if (surface == nullptr) {
+                throw mxvk::Exception("Failed to convert PNG to RGBA: " + path);
+            }
+
+            const SDL_PixelFormatDetails *format_details = SDL_GetPixelFormatDetails(surface->format);
+            if (format_details == nullptr) {
+                SDL_DestroySurface(surface);
+                throw mxvk::Exception("Failed to query pixel format details for: " + path);
+            }
+
+            if (!SDL_LockSurface(surface)) {
+                SDL_DestroySurface(surface);
+                throw mxvk::Exception("Failed to lock PNG surface: " + path);
+            }
+
+            auto *pixels = static_cast<std::uint32_t *>(surface->pixels);
+            const int width = surface->w;
+            const int height = surface->h;
+            const int pixel_count = width * height;
+            std::vector<std::uint8_t> background(static_cast<std::size_t>(pixel_count), 0);
+            std::vector<int> stack;
+            stack.reserve(static_cast<std::size_t>(width + height) * 2);
+
+            const auto is_light_checker_pixel = [&](const int index) {
+                std::uint8_t r = 0;
+                std::uint8_t g = 0;
+                std::uint8_t b = 0;
+                std::uint8_t a = 0;
+                SDL_GetRGBA(pixels[index], format_details, nullptr, &r, &g, &b, &a);
+                const int min_channel = std::min({static_cast<int>(r), static_cast<int>(g), static_cast<int>(b)});
+                const int max_channel = std::max({static_cast<int>(r), static_cast<int>(g), static_cast<int>(b)});
+                return a != 0 && min_channel >= 220 && (max_channel - min_channel) <= 18;
+            };
+
+            const auto push_background = [&](const int index) {
+                if (index < 0 || index >= pixel_count || background[static_cast<std::size_t>(index)] != 0 || !is_light_checker_pixel(index)) {
+                    return;
+                }
+                background[static_cast<std::size_t>(index)] = 1;
+                stack.push_back(index);
+            };
+
+            for (int x = 0; x < width; ++x) {
+                push_background(x);
+                push_background((height - 1) * width + x);
+            }
+            for (int y = 0; y < height; ++y) {
+                push_background(y * width);
+                push_background(y * width + width - 1);
+            }
+
+            while (!stack.empty()) {
+                const int index = stack.back();
+                stack.pop_back();
+                const int x = index % width;
+                const int y = index / width;
+                if (x > 0) {
+                    push_background(index - 1);
+                }
+                if (x + 1 < width) {
+                    push_background(index + 1);
+                }
+                if (y > 0) {
+                    push_background(index - width);
+                }
+                if (y + 1 < height) {
+                    push_background(index + width);
+                }
+            }
+
+            for (int i = 0; i < pixel_count; ++i) {
+                if (background[static_cast<std::size_t>(i)] == 0) {
+                    continue;
+                }
+                std::uint8_t r = 0;
+                std::uint8_t g = 0;
+                std::uint8_t b = 0;
+                std::uint8_t a = 0;
+                SDL_GetRGBA(pixels[i], format_details, nullptr, &r, &g, &b, &a);
+                pixels[i] = SDL_MapRGBA(format_details, nullptr, r, g, b, 0);
+            }
+
+            SDL_UnlockSurface(surface);
+            return surface;
+        }
     } // namespace
 
     class DefenderWindow : public mxvk::VK_Window {
@@ -121,10 +279,19 @@ namespace defender {
             for (int i = 0; i < UFO_ANIMATION_FRAMES; ++i) {
                 const std::string frame_path = asset_root + std::format("/data/ufo_lights_{:02d}.png", i);
                 std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> saucer_surface(space::load_color_keyed_png(frame_path, 8, 24), SDL_DestroySurface);
-                ufo_sprites[static_cast<std::size_t>(i)] = createSprite3D(saucer_surface.get());
-                ufo_sprites[static_cast<std::size_t>(i)]->setDepthTestEnabled(true);
-                ufo_sprites[static_cast<std::size_t>(i)]->setDepthWriteEnabled(false);
-                ufo_sprites[static_cast<std::size_t>(i)]->setAlphaDiscardThreshold(0.02f);
+                ufo_sprite_bounds[static_cast<std::size_t>(UfoSpriteSet::Classic)][static_cast<std::size_t>(i)] = calculate_alpha_bounds(saucer_surface.get());
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Classic)][static_cast<std::size_t>(i)] = createSprite3D(saucer_surface.get());
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Classic)][static_cast<std::size_t>(i)]->setDepthTestEnabled(true);
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Classic)][static_cast<std::size_t>(i)]->setDepthWriteEnabled(false);
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Classic)][static_cast<std::size_t>(i)]->setAlphaDiscardThreshold(0.02f);
+
+                const std::string ufox_frame_path = asset_root + std::format("/data/ufox{}.png", i + 1);
+                std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> ufox_surface(load_light_background_png(ufox_frame_path), SDL_DestroySurface);
+                ufo_sprite_bounds[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)] = calculate_alpha_bounds(ufox_surface.get());
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)] = createSprite3D(ufox_surface.get());
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setDepthTestEnabled(true);
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setDepthWriteEnabled(false);
+                ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setAlphaDiscardThreshold(0.02f);
             }
 
             std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(space::load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
@@ -177,9 +344,11 @@ namespace defender {
             if (projectile_sprite != nullptr) {
                 projectile_sprite->cleanup();
             }
-            for (mxvk::VK_Sprite3D *sprite : ufo_sprites) {
-                if (sprite != nullptr) {
-                    sprite->cleanup();
+            for (auto &sprite_set : ufo_sprite_sets) {
+                for (mxvk::VK_Sprite3D *sprite : sprite_set) {
+                    if (sprite != nullptr) {
+                        sprite->cleanup();
+                    }
                 }
             }
             if (effect_sprite != nullptr) {
@@ -256,9 +425,11 @@ namespace defender {
             if (projectile_sprite != nullptr) {
                 projectile_sprite->resize(this);
             }
-            for (mxvk::VK_Sprite3D *sprite : ufo_sprites) {
-                if (sprite != nullptr) {
-                    sprite->resize(this);
+            for (auto &sprite_set : ufo_sprite_sets) {
+                for (mxvk::VK_Sprite3D *sprite : sprite_set) {
+                    if (sprite != nullptr) {
+                        sprite->resize(this);
+                    }
                 }
             }
             if (effect_sprite != nullptr) {
@@ -287,6 +458,7 @@ namespace defender {
                     update_ship(dt);
                     update_ufos(dt);
                     update_asteroids(dt);
+                    resolve_enemy_overlaps();
                     update_projectiles(dt);
                     check_projectile_ufo_hits();
                     check_projectile_asteroid_hits();
@@ -339,13 +511,17 @@ namespace defender {
             star_sprite->render(cmd, image_index);
             star_sprite->clearQueue();
 
-            for (mxvk::VK_Sprite3D *sprite : ufo_sprites) {
-                sprite->updateCamera(image_index, view, projection);
+            for (auto &sprite_set : ufo_sprite_sets) {
+                for (mxvk::VK_Sprite3D *sprite : sprite_set) {
+                    sprite->updateCamera(image_index, view, projection);
+                }
             }
             draw_ufos();
-            for (mxvk::VK_Sprite3D *sprite : ufo_sprites) {
-                sprite->render(cmd, image_index);
-                sprite->clearQueue();
+            for (auto &sprite_set : ufo_sprite_sets) {
+                for (mxvk::VK_Sprite3D *sprite : sprite_set) {
+                    sprite->render(cmd, image_index);
+                    sprite->clearQueue();
+                }
             }
 
             draw_asteroids(cmd, image_index, view, projection);
@@ -388,6 +564,8 @@ namespace defender {
         static constexpr Uint32 INTRO_FADE_IN_DURATION_MS = 500;
         static constexpr int INTRO_RAIN_TEXTURE_WIDTH = 1280;
         static constexpr int INTRO_RAIN_TEXTURE_HEIGHT = 720;
+        static constexpr int ENEMY_SPAWN_ATTEMPTS = 16;
+        static constexpr float ENEMY_SEPARATION_PADDING = 0.12f;
         Uint32 countdown_timer = 0;
         Uint32 countdown_duration = 1000;
         Uint32 countdown_start_ms = 0;
@@ -429,7 +607,8 @@ namespace defender {
         std::array<mxvk::VKAbstractModel, MAX_ASTEROIDS> asteroid_models{};
         mxvk::VK_Sprite3D *star_sprite = nullptr;
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
-        std::array<mxvk::VK_Sprite3D *, UFO_ANIMATION_FRAMES> ufo_sprites{};
+        std::array<std::array<mxvk::VK_Sprite3D *, UFO_ANIMATION_FRAMES>, UFO_SPRITE_SET_COUNT> ufo_sprite_sets{};
+        std::array<std::array<SpriteAlphaBounds, UFO_ANIMATION_FRAMES>, UFO_SPRITE_SET_COUNT> ufo_sprite_bounds{};
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
         mxvk::VK_Sprite *fade_overlay_sprite = nullptr;
@@ -1102,8 +1281,6 @@ namespace defender {
 
         void respawn_ufo(Ufo &ufo, bool initial_spawn = false) {
             const float side = space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f;
-            const float distance = initial_spawn ? space::random_float(-52.0f, 52.0f) : side * space::random_float(34.0f, 56.0f);
-            ufo.position = glm::vec3(camera_center_x + distance, space::random_float(WORLD_BOTTOM + 1.2f, WORLD_TOP - 1.0f), space::random_float(-1.2f, 1.2f));
             ufo.velocity = glm::vec3(-side * space::random_float(3.5f, 8.5f), space::random_float(-0.8f, 0.8f), 0.0f);
             ufo.tint = glm::vec4(
                 space::random_float(0.82f, 1.0f),
@@ -1114,6 +1291,19 @@ namespace defender {
             ufo.phase = space::random_float(0.0f, 2.0f * space::PI);
             ufo.bob_speed = space::random_float(1.1f, 2.8f);
             ufo.spin_speed = space::random_float(2.8f, 6.2f) * (space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f);
+            ufo.sprite_set = space::random_float(0.0f, 1.0f) < 0.5f ? UfoSpriteSet::Classic : UfoSpriteSet::Ufox;
+            const float collision_radius = ufo_collision_radius(ufo);
+            for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
+                const float distance = initial_spawn ? space::random_float(-52.0f, 52.0f) : side * space::random_float(34.0f, 56.0f);
+                const glm::vec3 candidate{camera_center_x + distance, space::random_float(WORLD_BOTTOM + collision_radius, WORLD_TOP - collision_radius), space::random_float(-1.2f, 1.2f)};
+                if (enemy_spawn_is_clear(candidate, collision_radius, &ufo, nullptr)) {
+                    ufo.position = candidate;
+                    break;
+                }
+                if (attempt == ENEMY_SPAWN_ATTEMPTS - 1) {
+                    ufo.position = candidate;
+                }
+            }
             ufo.respawn_timer = 0.0f;
             ufo.active = true;
         }
@@ -1152,10 +1342,8 @@ namespace defender {
 
         void respawn_asteroid(Asteroid &asteroid, bool initial_spawn = false) {
             const float side = space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f;
-            const float distance = initial_spawn ? space::random_float(-58.0f, 58.0f) : side * space::random_float(36.0f, 68.0f);
             asteroid.scale = space::random_float(0.72f, 2.15f);
             asteroid.collision_radius = asteroid.scale * 1.25f;
-            asteroid.position = glm::vec3(camera_center_x + distance, space::random_float(WORLD_BOTTOM + 1.0f, WORLD_TOP - 1.0f), space::random_float(-1.7f, 1.3f));
             asteroid.velocity = glm::vec3(-side * space::random_float(1.8f, 5.6f), space::random_float(-0.55f, 0.55f), 0.0f);
             asteroid.rotation = glm::vec3(
                 space::random_float(0.0f, 360.0f),
@@ -1165,6 +1353,17 @@ namespace defender {
                 space::random_float(-74.0f, 74.0f),
                 space::random_float(-105.0f, 105.0f),
                 space::random_float(-62.0f, 62.0f));
+            for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
+                const float distance = initial_spawn ? space::random_float(-58.0f, 58.0f) : side * space::random_float(36.0f, 68.0f);
+                const glm::vec3 candidate{camera_center_x + distance, space::random_float(WORLD_BOTTOM + asteroid.collision_radius, WORLD_TOP - asteroid.collision_radius), space::random_float(-1.7f, 1.3f)};
+                if (enemy_spawn_is_clear(candidate, asteroid.collision_radius, nullptr, &asteroid)) {
+                    asteroid.position = candidate;
+                    break;
+                }
+                if (attempt == ENEMY_SPAWN_ATTEMPTS - 1) {
+                    asteroid.position = candidate;
+                }
+            }
             asteroid.respawn_timer = 0.0f;
             asteroid.active = true;
         }
@@ -1202,61 +1401,156 @@ namespace defender {
                     asteroid.respawn_timer = space::random_float(0.4f, 2.6f);
                 }
             }
-
-            resolve_asteroid_collisions();
         }
 
-        void resolve_asteroid_collisions() {
-            constexpr float restitution = 0.92f;
+        [[nodiscard]] float ufo_collision_radius(const Ufo &ufo) const {
+            return ufo.base_size * 0.58f + ENEMY_SEPARATION_PADDING;
+        }
 
-            for (std::size_t i = 0; i < asteroids.size(); ++i) {
-                Asteroid &first = asteroids[i];
-                if (!first.active) {
+        [[nodiscard]] bool enemy_spawn_is_clear(const glm::vec3 &position, float radius, const Ufo *ignored_ufo, const Asteroid *ignored_asteroid) const {
+            for (const Ufo &ufo : ufos) {
+                if (!ufo.active || &ufo == ignored_ufo) {
                     continue;
                 }
-
-                for (std::size_t j = i + 1; j < asteroids.size(); ++j) {
-                    Asteroid &second = asteroids[j];
-                    if (!second.active) {
-                        continue;
-                    }
-
-                    const glm::vec2 delta{second.position.x - first.position.x, second.position.y - first.position.y};
-                    const float min_distance = first.collision_radius + second.collision_radius;
-                    const float distance_squared = glm::dot(delta, delta);
-                    if (distance_squared >= min_distance * min_distance) {
-                        continue;
-                    }
-
-                    const float distance = std::sqrt(std::max(distance_squared, 0.0001f));
-                    const glm::vec2 normal = distance > 0.0001f ? delta / distance : glm::vec2{1.0f, 0.0f};
-                    const float first_mass = first.collision_radius * first.collision_radius;
-                    const float second_mass = second.collision_radius * second.collision_radius;
-                    const float first_inverse_mass = 1.0f / first_mass;
-                    const float second_inverse_mass = 1.0f / second_mass;
-                    const float inverse_mass_sum = first_inverse_mass + second_inverse_mass;
-                    const float overlap = min_distance - distance;
-
-                    const glm::vec2 separation = normal * (overlap / inverse_mass_sum);
-                    first.position.x -= separation.x * first_inverse_mass;
-                    first.position.y -= separation.y * first_inverse_mass;
-                    second.position.x += separation.x * second_inverse_mass;
-                    second.position.y += separation.y * second_inverse_mass;
-
-                    const glm::vec2 relative_velocity{second.velocity.x - first.velocity.x, second.velocity.y - first.velocity.y};
-                    const float velocity_along_normal = glm::dot(relative_velocity, normal);
-                    if (velocity_along_normal >= 0.0f) {
-                        continue;
-                    }
-
-                    const float impulse_magnitude = -(1.0f + restitution) * velocity_along_normal / inverse_mass_sum;
-                    const glm::vec2 impulse = impulse_magnitude * normal;
-                    first.velocity.x -= impulse.x * first_inverse_mass;
-                    first.velocity.y -= impulse.y * first_inverse_mass;
-                    second.velocity.x += impulse.x * second_inverse_mass;
-                    second.velocity.y += impulse.y * second_inverse_mass;
+                const glm::vec2 delta{ufo.position.x - position.x, ufo.position.y - position.y};
+                const float min_distance = ufo_collision_radius(ufo) + radius;
+                if (glm::dot(delta, delta) < min_distance * min_distance) {
+                    return false;
                 }
             }
+
+            for (const Asteroid &asteroid : asteroids) {
+                if (!asteroid.active || &asteroid == ignored_asteroid) {
+                    continue;
+                }
+                const glm::vec2 delta{asteroid.position.x - position.x, asteroid.position.y - position.y};
+                const float min_distance = asteroid.collision_radius + radius;
+                if (glm::dot(delta, delta) < min_distance * min_distance) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        void clamp_enemy_to_world_y(glm::vec3 &position, glm::vec3 &velocity, float radius) {
+            if (position.y < WORLD_BOTTOM + radius || position.y > WORLD_TOP - radius) {
+                velocity.y = -velocity.y;
+                position.y = std::clamp(position.y, WORLD_BOTTOM + radius, WORLD_TOP - radius);
+            }
+        }
+
+        void separate_enemies(glm::vec3 &first_position,
+                              glm::vec3 &first_velocity,
+                              float first_radius,
+                              glm::vec3 &second_position,
+                              glm::vec3 &second_velocity,
+                              float second_radius,
+                              float restitution) {
+            const glm::vec2 delta{second_position.x - first_position.x, second_position.y - first_position.y};
+            const float min_distance = first_radius + second_radius;
+            const float distance_squared = glm::dot(delta, delta);
+            if (distance_squared >= min_distance * min_distance) {
+                return;
+            }
+
+            const float distance = std::sqrt(std::max(distance_squared, 0.0001f));
+            const glm::vec2 normal = distance > 0.0001f ? delta / distance : glm::vec2{1.0f, 0.0f};
+            const float first_mass = first_radius * first_radius;
+            const float second_mass = second_radius * second_radius;
+            const float first_inverse_mass = 1.0f / first_mass;
+            const float second_inverse_mass = 1.0f / second_mass;
+            const float inverse_mass_sum = first_inverse_mass + second_inverse_mass;
+            const float overlap = min_distance - distance;
+
+            const glm::vec2 separation = normal * (overlap / inverse_mass_sum);
+            first_position.x -= separation.x * first_inverse_mass;
+            first_position.y -= separation.y * first_inverse_mass;
+            second_position.x += separation.x * second_inverse_mass;
+            second_position.y += separation.y * second_inverse_mass;
+
+            const glm::vec2 relative_velocity{second_velocity.x - first_velocity.x, second_velocity.y - first_velocity.y};
+            const float velocity_along_normal = glm::dot(relative_velocity, normal);
+            if (velocity_along_normal >= 0.0f) {
+                return;
+            }
+
+            const float impulse_magnitude = -(1.0f + restitution) * velocity_along_normal / inverse_mass_sum;
+            const glm::vec2 impulse = impulse_magnitude * normal;
+            first_velocity.x -= impulse.x * first_inverse_mass;
+            first_velocity.y -= impulse.y * first_inverse_mass;
+            second_velocity.x += impulse.x * second_inverse_mass;
+            second_velocity.y += impulse.y * second_inverse_mass;
+        }
+
+        void resolve_enemy_overlaps() {
+            constexpr float asteroid_restitution = 0.92f;
+            constexpr float mixed_restitution = 0.72f;
+            constexpr int separation_iterations = 4;
+
+            for (int iteration = 0; iteration < separation_iterations; ++iteration) {
+                for (std::size_t i = 0; i < ufos.size(); ++i) {
+                    Ufo &first = ufos[i];
+                    if (!first.active) {
+                        continue;
+                    }
+
+                    for (std::size_t j = i + 1; j < ufos.size(); ++j) {
+                        Ufo &second = ufos[j];
+                        if (!second.active) {
+                            continue;
+                        }
+                        separate_enemies(first.position, first.velocity, ufo_collision_radius(first), second.position, second.velocity, ufo_collision_radius(second), mixed_restitution);
+                    }
+                }
+
+                for (std::size_t i = 0; i < asteroids.size(); ++i) {
+                    Asteroid &first = asteroids[i];
+                    if (!first.active) {
+                        continue;
+                    }
+
+                    for (std::size_t j = i + 1; j < asteroids.size(); ++j) {
+                        Asteroid &second = asteroids[j];
+                        if (!second.active) {
+                            continue;
+                        }
+
+                        separate_enemies(first.position, first.velocity, first.collision_radius, second.position, second.velocity, second.collision_radius, asteroid_restitution);
+                    }
+                }
+
+                for (Ufo &ufo : ufos) {
+                    if (!ufo.active) {
+                        continue;
+                    }
+                    for (Asteroid &asteroid : asteroids) {
+                        if (!asteroid.active) {
+                            continue;
+                        }
+                        separate_enemies(ufo.position, ufo.velocity, ufo_collision_radius(ufo), asteroid.position, asteroid.velocity, asteroid.collision_radius, mixed_restitution);
+                    }
+                }
+
+                for (Ufo &ufo : ufos) {
+                    if (ufo.active) {
+                        clamp_enemy_to_world_y(ufo.position, ufo.velocity, ufo_collision_radius(ufo));
+                    }
+                }
+                for (Asteroid &asteroid : asteroids) {
+                    if (asteroid.active) {
+                        clamp_enemy_to_world_y(asteroid.position, asteroid.velocity, asteroid.collision_radius);
+                    }
+                }
+            }
+        }
+
+        [[nodiscard]] int current_ufo_frame(const Ufo &ufo) const {
+            return static_cast<int>(std::floor(elapsed_seconds * 12.0f + ufo.phase * 1.7f)) % UFO_ANIMATION_FRAMES;
+        }
+
+        [[nodiscard]] float current_ufo_pulse(const Ufo &ufo) const {
+            return 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f;
         }
 
         void draw_ufos() {
@@ -1264,9 +1558,9 @@ namespace defender {
                 if (!ufo.active) {
                     continue;
                 }
-                const float pulse = 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f;
-                const int frame = static_cast<int>(std::floor(elapsed_seconds * 12.0f + ufo.phase * 1.7f)) % UFO_ANIMATION_FRAMES;
-                ufo_sprites[static_cast<std::size_t>(frame)]->drawSprite(ufo.position, glm::vec2(ufo.base_size * pulse, ufo.base_size * 0.58f * pulse), ufo.tint, 0.0f);
+                const float pulse = current_ufo_pulse(ufo);
+                const int frame = current_ufo_frame(ufo);
+                ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(ufo.position, glm::vec2(ufo.base_size * pulse, ufo.base_size * 0.58f * pulse), ufo.tint, 0.0f);
             }
         }
 
@@ -1746,11 +2040,26 @@ namespace defender {
                     continue;
                 }
 
-                const float ufo_half_width = ufo.base_size * 0.58f;
-                const float ufo_half_height = ufo.base_size * 0.34f;
-                const bool overlaps_x = std::abs(ufo.position.x - ship.position.x) <= ship_half_width + ufo_half_width;
-                const bool overlaps_y = std::abs(ufo.position.y - ship.position.y) <= ship_half_height + ufo_half_height;
-                if (!overlaps_x || !overlaps_y) {
+                const int frame = current_ufo_frame(ufo);
+                const SpriteAlphaBounds &bounds = ufo_sprite_bounds[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)];
+                const float pulse = current_ufo_pulse(ufo);
+                const glm::vec2 draw_size{ufo.base_size * pulse, ufo.base_size * 0.58f * pulse};
+                const glm::vec2 body_center{
+                    ufo.position.x + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
+                    ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
+                };
+                const glm::vec2 body_radius{
+                    std::max(0.001f, (bounds.max_x - bounds.min_x) * 0.5f * draw_size.x),
+                    std::max(0.001f, (bounds.max_y - bounds.min_y) * 0.5f * draw_size.y),
+                };
+
+                const float closest_x = std::clamp(body_center.x, ship.position.x - ship_half_width, ship.position.x + ship_half_width);
+                const float closest_y = std::clamp(body_center.y, ship.position.y - ship_half_height, ship.position.y + ship_half_height);
+                const glm::vec2 normalized_delta{
+                    (closest_x - body_center.x) / body_radius.x,
+                    (closest_y - body_center.y) / body_radius.y,
+                };
+                if (glm::dot(normalized_delta, normalized_delta) > 1.0f) {
                     continue;
                 }
 
