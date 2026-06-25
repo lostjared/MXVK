@@ -118,6 +118,12 @@ set(DEFENDER_REQUIRED_ASSETS
     ${DEFENDER_LOCAL_DATA_DIR}/asteroid.mtl
     ${DEFENDER_LOCAL_DATA_DIR}/rock.png
     ${DEFENDER_LOCAL_DATA_DIR}/intro.png
+    ${DEFENDER_LOCAL_DATA_DIR}/background.ogg
+    ${DEFENDER_LOCAL_DATA_DIR}/crash.wav
+    ${DEFENDER_LOCAL_DATA_DIR}/shoot.wav
+    ${DEFENDER_LOCAL_DATA_DIR}/takeoff.wav
+    ${DEFENDER_LOCAL_DATA_DIR}/asteroid.wav
+    ${DEFENDER_LOCAL_DATA_DIR}/ufo.wav
     ${DEFENDER_DATA_DIR}/star.png
     ${DEFENDER_DATA_DIR}/particle_projectile.png
     ${DEFENDER_DATA_DIR}/particle_explosion.png

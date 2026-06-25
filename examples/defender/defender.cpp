@@ -8,7 +8,11 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
+#include "mxvk/mxvk_console.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+#include "mxvk/mxvk_sound.hpp"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -22,6 +26,7 @@
 #include <format>
 #include <iostream>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -137,12 +142,29 @@ namespace defender {
             ship.min_speed = 0.0f;
             ship.max_speed = 28.0f;
             ship.rotation = glm::vec3(0.0f, -90.0f, 0.0f);
+
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            background_music = std::make_unique<mxvk::VK_Mixer>();
+            background_music_track = background_music->loadMusic(asset_root + "/data/background.ogg");
+            crash_sound = background_music->loadWav(asset_root + "/data/crash.wav");
+            shoot_sound = background_music->loadWav(asset_root + "/data/shoot.wav");
+            takeoff_sound = background_music->loadWav(asset_root + "/data/takeoff.wav");
+            asteroid_explosion_sound = background_music->loadWav(asset_root + "/data/asteroid.wav");
+            ufo_explosion_sound = background_music->loadWav(asset_root + "/data/ufo.wav");
+            ensure_background_music_playing();
+#endif
+            configure_console();
         }
 
         ~DefenderWindow() override {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (background_music) {
+                background_music->stopMusic();
+            }
+#endif
             cleanup_flame_resources();
             ship_model.cleanup(this);
             for (auto &asteroid_model : asteroid_models) {
@@ -166,16 +188,32 @@ namespace defender {
         }
 
         void event(SDL_Event &e) override {
+            const bool was_console_visible = console.isVisible();
+            const bool is_console_toggle = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F3;
+            console.handleEvent(e);
+            if (is_console_toggle) {
+                clear_input_state();
+                log_game(console.isVisible() ? "Console opened." : "Console closed.");
+                return;
+            }
+            if (was_console_visible) {
+                clear_input_state();
+                return;
+            }
+
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
+                log_game("Exit requested.");
                 exit();
                 return;
             }
             if (mode == GameMode::Intro && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
                 intro_fade = 0.01f;
+                log_game("Intro skipped from keyboard.");
                 return;
             }
             if (game_over && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
                 restart_game();
+                log_game("Game restarted from keyboard.");
                 return;
             }
 
@@ -230,24 +268,30 @@ namespace defender {
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            ensure_background_music_playing();
+#endif
             const auto now = std::chrono::steady_clock::now();
             const float delta_seconds = std::chrono::duration<float>(now - last_frame_time).count();
             last_frame_time = now;
             const float dt = std::min(delta_seconds, 0.1f);
             elapsed_seconds += dt;
 
-            update_barrel_roll(dt);
-            if (ship_respawning) {
-                update_respawn(dt);
-            } else if (mode == GameMode::Playing && !game_over) {
-                update_ship(dt);
-                update_ufos(dt);
-                update_asteroids(dt);
-                update_projectiles(dt);
-                check_projectile_ufo_hits();
-                check_projectile_asteroid_hits();
-                check_ship_ufo_collisions();
-                check_ship_asteroid_collisions();
+            const bool console_visible = console.isVisible();
+            if (!console_visible) {
+                update_barrel_roll(dt);
+                if (ship_respawning) {
+                    update_respawn(dt);
+                } else if (mode == GameMode::Playing && !game_over) {
+                    update_ship(dt);
+                    update_ufos(dt);
+                    update_asteroids(dt);
+                    update_projectiles(dt);
+                    check_projectile_ufo_hits();
+                    check_projectile_asteroid_hits();
+                    check_ship_ufo_collisions();
+                    check_ship_asteroid_collisions();
+                }
             }
             update_particles(dt);
 
@@ -256,6 +300,7 @@ namespace defender {
 
             if (mode == GameMode::Intro) {
                 draw_intro(extent);
+                console.draw();
                 return;
             }
 
@@ -273,6 +318,7 @@ namespace defender {
                 if (mode == GameMode::IntroFadeIn) {
                     draw_intro_fade_in(extent);
                 }
+                console.draw();
                 return;
             }
 
@@ -324,7 +370,10 @@ namespace defender {
             effect_sprite->render(cmd, image_index);
             effect_sprite->clearQueue();
 
-            draw_hud(extent);
+            if (!console_visible) {
+                draw_hud(extent);
+            }
+            console.draw();
         }
 
       private:
@@ -382,6 +431,17 @@ namespace defender {
         mxvk::VK_Sprite *intro_sprite = nullptr;
         mxvk::VK_Sprite *fade_overlay_sprite = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
+        mxvk::VK_Console console{};
+        bool console_ready = false;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::unique_ptr<mxvk::VK_Mixer> background_music{};
+        int background_music_track = -1;
+        int crash_sound = -1;
+        int shoot_sound = -1;
+        int takeoff_sound = -1;
+        int asteroid_explosion_sound = -1;
+        int ufo_explosion_sound = -1;
+#endif
         glm::vec3 camera_position{0.0f, CAMERA_HEIGHT, CAMERA_DISTANCE};
         glm::mat4 last_ship_model_matrix{1.0f};
         VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
@@ -389,6 +449,355 @@ namespace defender {
         VkPipeline flame_pipeline = VK_NULL_HANDLE;
         VkPipelineLayout flame_pipeline_layout = VK_NULL_HANDLE;
         uint32_t flame_vertex_count = 0;
+
+        void configure_console() {
+            console.attach(*this, asset_root + "/data/font.ttf", HUD_FONT_SIZE);
+            console.setSpriteYOriginTopLeft(true);
+            console.setPrompt("defender> ");
+            console_ready = true;
+            console.printLine("Press F3 to open/close the console.");
+            console.printLine("Type 'help' for Defender commands.");
+            log_game("Console attached.");
+            log_game("Defender initialized.");
+            console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
+                return handle_console_command(args, out);
+            });
+        }
+
+        bool handle_console_command(const std::vector<std::string> &args, std::ostream &out) {
+            if (args.empty()) {
+                return true;
+            }
+
+            const std::string &cmd = args.front();
+            if (cmd == "help") {
+                out << "Defender commands:\n"
+                    << "  clear                  Clear console output\n"
+                    << "  echo <text>            Print text to the console\n"
+                    << "  status                 Print current game state\n"
+                    << "  restart                Restart the game and countdown\n"
+                    << "  intro                  Return to the intro screen\n"
+                    << "  play                   Start playing immediately\n"
+                    << "  gameover               Force game over\n"
+                    << "  lives <count>          Set remaining lives\n"
+                    << "  score <points>         Set score\n"
+                    << "  killship               Destroy the ship once\n"
+                    << "  clear_enemies          Remove active UFOs and asteroids\n"
+                    << "  spawn_ufo              Spawn one UFO near the camera\n"
+                    << "  spawn_asteroid [scale] Spawn one asteroid near the camera\n"
+                    << "  about                  Print program banner\n"
+                    << "  quit / exit            Close the window\n";
+                return true;
+            }
+
+            if (cmd == "echo") {
+                for (std::size_t i = 1; i < args.size(); ++i) {
+                    if (i > 1) {
+                        out << ' ';
+                    }
+                    out << args[i];
+                }
+                return true;
+            }
+
+            if (cmd == "status") {
+                out << "Mode: " << mode_name() << '\n'
+                    << "Score: " << score << '\n'
+                    << "Lives: " << lives << '\n'
+                    << "Game over: " << (game_over ? "yes" : "no") << '\n'
+                    << "Ship respawning: " << (ship_respawning ? "yes" : "no") << '\n'
+                    << "Ship position: " << format_vec3(ship.position) << '\n'
+                    << "Active UFOs: " << active_ufo_count() << '\n'
+                    << "Active asteroids: " << active_asteroid_count() << '\n'
+                    << "Projectiles: " << active_projectile_count() << '\n';
+                return true;
+            }
+
+            if (cmd == "restart") {
+                restart_game();
+                log_game("Game restarted from console.");
+                out << "Game restarted.";
+                return true;
+            }
+
+            if (cmd == "intro") {
+                clear_projectiles();
+                clear_particles();
+                clear_input_state();
+                game_over = false;
+                ship_respawning = false;
+                reset_ship_to_origin();
+                reset_intro_screen();
+                log_game("Returned to intro screen from console.");
+                out << "Intro screen active.";
+                return true;
+            }
+
+            if (cmd == "play") {
+                clear_input_state();
+                game_over = false;
+                ship_respawning = false;
+                mode = GameMode::Playing;
+                ship.visible = true;
+                log_game("Play mode activated from console.");
+                out << "Playing.";
+                return true;
+            }
+
+            if (cmd == "gameover") {
+                game_over = true;
+                mode = GameMode::Playing;
+                ship_respawning = false;
+                ship.visible = false;
+                ship.velocity = glm::vec3(0.0f);
+                ship.current_speed = 0.0f;
+                clear_projectiles();
+                log_game("Game over forced from console.", SDL_Color{255, 120, 80, 255});
+                out << "Game over forced.";
+                return true;
+            }
+
+            if (cmd == "lives") {
+                int value = 0;
+                if (!parse_int_arg(args, 1, "lives", value, out)) {
+                    return true;
+                }
+                lives = std::clamp(value, 0, 99);
+                if (lives > 0) {
+                    game_over = false;
+                    ship.visible = true;
+                }
+                log_game(std::format("Lives set to {} from console.", lives));
+                out << "Lives set to " << lives << '.';
+                return true;
+            }
+
+            if (cmd == "score") {
+                int value = 0;
+                if (!parse_int_arg(args, 1, "score", value, out)) {
+                    return true;
+                }
+                score = std::max(0, value);
+                log_game(std::format("Score set to {} from console.", score));
+                out << "Score set to " << score << '.';
+                return true;
+            }
+
+            if (cmd == "killship") {
+                if (game_over) {
+                    out << "Ship is already destroyed.";
+                    return true;
+                }
+                spawn_ufo_explosion(ship.position);
+                lose_life();
+                log_game("Ship destroyed from console.", SDL_Color{255, 120, 80, 255});
+                out << "Ship destroyed.";
+                return true;
+            }
+
+            if (cmd == "clear_enemies") {
+                const int cleared_ufos = active_ufo_count();
+                const int cleared_asteroids = active_asteroid_count();
+                for (auto &ufo : ufos) {
+                    ufo.active = false;
+                    ufo.respawn_timer = space::random_float(0.8f, 3.0f);
+                }
+                for (auto &asteroid : asteroids) {
+                    asteroid.active = false;
+                    asteroid.respawn_timer = space::random_float(0.8f, 3.0f);
+                }
+                log_game(std::format("Cleared {} UFO(s) and {} asteroid(s) from console.", cleared_ufos, cleared_asteroids));
+                out << "Enemies cleared.";
+                return true;
+            }
+
+            if (cmd == "spawn_ufo") {
+                Ufo *ufo = find_inactive_ufo();
+                if (ufo == nullptr) {
+                    out << "No free UFO slots.";
+                    return true;
+                }
+                respawn_ufo(*ufo);
+                log_game(std::format("UFO spawned from console at {}.", format_vec3(ufo->position)));
+                out << "UFO spawned.";
+                return true;
+            }
+
+            if (cmd == "spawn_asteroid") {
+                float scale = space::random_float(0.72f, 2.15f);
+                if (args.size() > 1 && !parse_float_arg(args, 1, "scale", scale, out)) {
+                    return true;
+                }
+                Asteroid *asteroid = find_inactive_asteroid();
+                if (asteroid == nullptr) {
+                    out << "No free asteroid slots.";
+                    return true;
+                }
+                respawn_asteroid(*asteroid);
+                asteroid->scale = std::clamp(scale, 0.25f, 4.0f);
+                asteroid->collision_radius = asteroid->scale * 1.25f;
+                log_game(std::format("Asteroid spawned from console at {} scale {:.2f}.", format_vec3(asteroid->position), asteroid->scale));
+                out << "Asteroid spawned.";
+                return true;
+            }
+
+            if (cmd == "about") {
+                out << "defender: MXVK side-scrolling starfield shooter.\n";
+                return true;
+            }
+
+            if (cmd == "quit" || cmd == "exit") {
+                log_game("Exit requested from console.");
+                out << "Closing window...";
+                exit();
+                return true;
+            }
+
+            return false;
+        }
+
+        void log_game(const std::string &message, SDL_Color color = SDL_Color{180, 220, 255, 255}) {
+            if (!console_ready) {
+                return;
+            }
+            console.printLine("[game] " + message, color);
+        }
+
+        [[nodiscard]] const char *mode_name() const {
+            switch (mode) {
+            case GameMode::Intro:
+                return "intro";
+            case GameMode::IntroFadeIn:
+                return "intro_fade_in";
+            case GameMode::Countdown:
+                return "countdown";
+            case GameMode::Playing:
+                return "playing";
+            }
+            return "unknown";
+        }
+
+        [[nodiscard]] static std::string format_vec3(const glm::vec3 &value) {
+            return std::format("({:.1f}, {:.1f}, {:.1f})", value.x, value.y, value.z);
+        }
+
+        bool parse_int_arg(const std::vector<std::string> &args, std::size_t index, const char *name, int &value, std::ostream &out) const {
+            if (args.size() <= index) {
+                out << "Missing " << name << " value.";
+                return false;
+            }
+            try {
+                std::size_t parsed = 0;
+                const int parsed_value = std::stoi(args[index], &parsed);
+                if (parsed != args[index].size()) {
+                    out << "Invalid " << name << " value: " << args[index];
+                    return false;
+                }
+                value = parsed_value;
+                return true;
+            } catch (...) {
+                out << "Invalid " << name << " value: " << args[index];
+                return false;
+            }
+        }
+
+        bool parse_float_arg(const std::vector<std::string> &args, std::size_t index, const char *name, float &value, std::ostream &out) const {
+            if (args.size() <= index) {
+                out << "Missing " << name << " value.";
+                return false;
+            }
+            try {
+                std::size_t parsed = 0;
+                const float parsed_value = std::stof(args[index], &parsed);
+                if (parsed != args[index].size()) {
+                    out << "Invalid " << name << " value: " << args[index];
+                    return false;
+                }
+                value = parsed_value;
+                return true;
+            } catch (...) {
+                out << "Invalid " << name << " value: " << args[index];
+                return false;
+            }
+        }
+
+        [[nodiscard]] int active_ufo_count() const {
+            int count = 0;
+            for (const auto &ufo : ufos) {
+                if (ufo.active) {
+                    ++count;
+                }
+            }
+            return count;
+        }
+
+        [[nodiscard]] int active_asteroid_count() const {
+            int count = 0;
+            for (const auto &asteroid : asteroids) {
+                if (asteroid.active) {
+                    ++count;
+                }
+            }
+            return count;
+        }
+
+        [[nodiscard]] int active_projectile_count() const {
+            int count = 0;
+            for (const auto &projectile : projectiles) {
+                if (projectile.active) {
+                    ++count;
+                }
+            }
+            return count;
+        }
+
+        Ufo *find_inactive_ufo() {
+            for (auto &ufo : ufos) {
+                if (!ufo.active) {
+                    return &ufo;
+                }
+            }
+            return nullptr;
+        }
+
+        Asteroid *find_inactive_asteroid() {
+            for (auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    return &asteroid;
+                }
+            }
+            return nullptr;
+        }
+
+        void clear_input_state() {
+            left_pressed = false;
+            right_pressed = false;
+            up_pressed = false;
+            down_pressed = false;
+            fire_pressed = false;
+            roll_left_pressed = false;
+            roll_right_pressed = false;
+        }
+
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        void ensure_background_music_playing() {
+            if (!background_music || background_music_track < 0) {
+                return;
+            }
+            if (!background_music->isMusicPlaying(background_music_track)) {
+                if (background_music->playMusic(background_music_track, -1) != 0) {
+                    throw mxvk::Exception("Could not start Defender background music");
+                }
+            }
+        }
+
+        void play_sound(int sound_id) {
+            if (!background_music || sound_id < 0) {
+                return;
+            }
+            background_music->playWav(sound_id);
+        }
+#endif
 
         void update_ship(float dt) {
             ship.prev_position = ship.position;
@@ -524,6 +933,7 @@ namespace defender {
             start_launch_countdown();
             mode = GameMode::IntroFadeIn;
             intro_fade_in_start_ms = SDL_GetTicks();
+            log_game("Intro faded out. Launch countdown started.");
         }
 
         void draw_intro(const VkExtent2D &extent) {
@@ -616,6 +1026,10 @@ namespace defender {
                 mode = GameMode::Playing;
                 ufos_enabled = false;
                 fire_pressed = false;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                play_sound(takeoff_sound);
+#endif
+                log_game("Mission started.");
             }
         }
 
@@ -1219,6 +1633,10 @@ namespace defender {
                 projectile.color = PROJECTILE_COLOR;
                 projectile.lifetime = 0.0f;
                 projectile.active = true;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                play_sound(shoot_sound);
+#endif
+                log_game(std::format("Laser fired from {}.", format_vec3(muzzle)));
                 return;
             }
         }
@@ -1264,10 +1682,14 @@ namespace defender {
                     }
 
                     spawn_ufo_explosion(ufo.position);
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                    play_sound(ufo_explosion_sound);
+#endif
                     ufo.active = false;
                     ufo.respawn_timer = space::random_float(1.2f, 2.8f);
                     projectile.active = false;
                     score += 5;
+                    log_game(std::format("UFO destroyed. Score={}.", score));
                     break;
                 }
             }
@@ -1298,10 +1720,15 @@ namespace defender {
                         continue;
                     }
 
-                    spawn_ufo_explosion(asteroid.position);
+                    spawn_ufo_explosion(asteroid.position, asteroid.scale);
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                    play_sound(asteroid_explosion_sound);
+#endif
                     asteroid.active = false;
                     asteroid.respawn_timer = space::random_float(1.0f, 2.5f);
                     projectile.active = false;
+                    score += 10;
+                    log_game(std::format("Asteroid destroyed. Score={}.", score));
                     break;
                 }
             }
@@ -1326,8 +1753,12 @@ namespace defender {
 
                 spawn_ufo_explosion(ufo.position);
                 spawn_ufo_explosion(ship.position);
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                play_sound(ufo_explosion_sound);
+#endif
                 ufo.active = false;
                 ufo.respawn_timer = space::random_float(1.5f, 3.0f);
+                log_game("Ship collided with UFO.", SDL_Color{255, 150, 90, 255});
                 lose_life();
                 break;
             }
@@ -1349,24 +1780,33 @@ namespace defender {
                     continue;
                 }
 
-                spawn_ufo_explosion(asteroid.position);
+                spawn_ufo_explosion(asteroid.position, asteroid.scale);
                 spawn_ufo_explosion(ship.position);
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                play_sound(asteroid_explosion_sound);
+#endif
                 asteroid.active = false;
                 asteroid.respawn_timer = space::random_float(1.0f, 2.5f);
+                log_game("Ship collided with asteroid.", SDL_Color{255, 150, 90, 255});
                 lose_life();
                 break;
             }
         }
 
         void lose_life() {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            play_sound(crash_sound);
+#endif
             --lives;
             clear_projectiles();
             ship.visible = false;
+            log_game(std::format("Ship destroyed. Lives remaining: {}.", std::max(0, lives)), SDL_Color{255, 120, 80, 255});
             if (lives <= 0) {
                 lives = 0;
                 game_over = true;
                 ship.velocity = glm::vec3(0.0f);
                 ship.current_speed = 0.0f;
+                log_game(std::format("Game over. Final score: {}.", score), SDL_Color{255, 90, 90, 255});
                 return;
             }
 
@@ -1385,6 +1825,7 @@ namespace defender {
             reset_ship_to_origin();
             ship_respawning = false;
             start_launch_countdown();
+            log_game("Ship respawned at origin.");
         }
 
         void reset_ship_to_origin() {
@@ -1433,6 +1874,7 @@ namespace defender {
             clear_particles();
             reset_ship_to_origin();
             start_launch_countdown();
+            log_game("Game state reset: score=0 lives=5.");
         }
 
         void clear_projectiles() {
@@ -1471,7 +1913,7 @@ namespace defender {
             }
         }
 
-        void spawn_ufo_explosion(const glm::vec3 &position) {
+        void spawn_ufo_explosion(const glm::vec3 &position, float explosion_scale = 1.0f) {
             struct ExplosionWave {
                 float min_speed;
                 float max_speed;
@@ -1489,8 +1931,14 @@ namespace defender {
                 ExplosionWave{5.0f, 16.0f, 0.12f, 0.26f, 1.20f, 2.10f, {0.75f, 0.90f, 1.0f}},
             };
 
+            const float visual_scale = std::clamp(explosion_scale, 0.75f, 2.35f);
+            const float particle_count_scale = std::clamp(visual_scale, 0.75f, 1.80f);
+            const int particles_per_wave = std::max(1, static_cast<int>(std::round(60.0f * particle_count_scale)));
+            const float speed_scale = std::lerp(0.85f, 1.35f, std::clamp((visual_scale - 0.75f) / 1.60f, 0.0f, 1.0f));
+            const float lifetime_scale = std::lerp(0.90f, 1.20f, std::clamp((visual_scale - 0.75f) / 1.60f, 0.0f, 1.0f));
+
             for (const ExplosionWave &wave : waves) {
-                for (int i = 0; i < 60; ++i) {
+                for (int i = 0; i < particles_per_wave; ++i) {
                     space::Particle *particle = find_free_particle();
                     if (particle == nullptr) {
                         return;
@@ -1499,16 +1947,16 @@ namespace defender {
                         space::random_float(-1.0f, 1.0f),
                         space::random_float(-0.75f, 0.75f),
                         space::random_float(-0.35f, 0.35f)));
-                    particle->position = position + dir * space::random_float(0.1f, 0.8f);
-                    particle->velocity = dir * space::random_float(wave.min_speed, wave.max_speed);
+                    particle->position = position + dir * space::random_float(0.1f, 0.8f) * visual_scale;
+                    particle->velocity = dir * space::random_float(wave.min_speed, wave.max_speed) * speed_scale;
                     particle->color = glm::vec4(
                         wave.color.r * space::random_float(0.9f, 1.1f),
                         wave.color.g * space::random_float(0.9f, 1.1f),
                         wave.color.b * space::random_float(0.9f, 1.1f),
                         0.1f);
-                    particle->size = space::random_float(wave.min_size, wave.max_size);
+                    particle->size = space::random_float(wave.min_size, wave.max_size) * visual_scale;
                     particle->lifetime = 0.0f;
-                    particle->max_lifetime = space::random_float(wave.min_lifetime, wave.max_lifetime);
+                    particle->max_lifetime = space::random_float(wave.min_lifetime, wave.max_lifetime) * lifetime_scale;
                     particle->active = true;
                 }
             }
