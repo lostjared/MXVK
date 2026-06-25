@@ -80,6 +80,7 @@ namespace defender {
             const uint32_t black_pixel = 0xFF000000u;
             fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
+            intro_rain_config.font_size += 8;
             intro_rain_config.color = "#ff0000";
             intro_rain = std::make_unique<matrix::Rain>(*this, std::move(intro_rain_config));
             reset_intro_screen();
@@ -285,7 +286,7 @@ namespace defender {
             last_ship_model_matrix = ubo.model;
             ubo.view = view;
             ubo.proj = projection;
-            if (!ship_respawning) {
+            if (ship.visible && !ship_respawning) {
                 ship_model.updateUBO(image_index, ubo);
                 ship_model.render(cmd, image_index, false);
                 draw_engine_flame(cmd, extent, view, projection);
@@ -1126,6 +1127,7 @@ namespace defender {
         void lose_life() {
             --lives;
             clear_projectiles();
+            ship.visible = false;
             if (lives <= 0) {
                 lives = 0;
                 game_over = true;
@@ -1159,6 +1161,7 @@ namespace defender {
             ship.prev_position = ship.position;
             ship.velocity = glm::vec3(0.0f);
             ship.current_speed = 0.0f;
+            ship.visible = true;
             ship_forward_direction = 1.0f;
             barrel_roll_direction = 1.0f;
             barrel_roll_progress = 0.0f;
