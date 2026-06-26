@@ -230,8 +230,6 @@ namespace defender {
 
         [[nodiscard]] glm::vec2 ufo_draw_size(const Ufo &ufo, float pulse) const;
 
-        [[nodiscard]] bool is_visible_to_player(const glm::vec3 &position, float radius) const;
-
         void draw_ufos();
 
         void draw_terrain();

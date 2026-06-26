@@ -9,31 +9,6 @@
 
 namespace defender {
 
-    bool DefenderWindow::is_visible_to_player(const glm::vec3 &position, float radius) const {
-        const VkExtent2D extent = getSwapchainExtent();
-        if (extent.width == 0U || extent.height == 0U) {
-            return false;
-        }
-
-        const glm::vec3 camera_target{nearest_world_x(camera_center_x, camera_position.x), CAMERA_HEIGHT, 0.0f};
-        const glm::vec3 forward = glm::normalize(camera_target - camera_position);
-        const glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
-        const glm::vec3 up = glm::cross(right, forward);
-        const glm::vec3 relative_position = nearest_world_position(position, camera_position.x) - camera_position;
-        const float depth = glm::dot(relative_position, forward);
-
-        constexpr float NEAR_CLIP = 0.1f;
-        constexpr float FAR_CLIP = 400.0f;
-        if (depth + radius < NEAR_CLIP || depth - radius > FAR_CLIP) {
-            return false;
-        }
-
-        const float half_height = depth * std::tan(glm::radians(25.0f));
-        const float half_width = half_height * static_cast<float>(extent.width) / static_cast<float>(extent.height);
-        return std::abs(glm::dot(relative_position, right)) <= half_width + radius &&
-               std::abs(glm::dot(relative_position, up)) <= half_height + radius;
-    }
-
     void DefenderWindow::fire_projectile() {
         const glm::vec3 forward{ship_forward_direction, 0.0f, 0.0f};
         glm::vec3 muzzle = ship.position + forward * 1.35f + glm::vec3(0.0f, -0.22f, 0.0f);
@@ -93,10 +68,6 @@ namespace defender {
                 const int frame = current_ufo_frame(ufo);
                 const SpriteAlphaBounds &bounds = ufo_sprite_bounds[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)];
                 const glm::vec2 draw_size = ufo_draw_size(ufo, current_ufo_pulse(ufo));
-                const float visible_radius = 0.5f * glm::length(draw_size);
-                if (!is_visible_to_player(ufo.position, visible_radius)) {
-                    continue;
-                }
                 const glm::vec2 body_center{
                     nearest_world_x(ufo.position.x, (x0 + x1) * 0.5f) + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
                     ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
@@ -144,7 +115,7 @@ namespace defender {
             const float max_x = std::max(x0, x1);
 
             for (auto &asteroid : asteroids) {
-                if (!asteroid.active || !is_visible_to_player(asteroid.position, asteroid.collision_radius)) {
+                if (!asteroid.active) {
                     continue;
                 }
 
