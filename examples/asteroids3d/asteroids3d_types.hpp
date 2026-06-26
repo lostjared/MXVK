@@ -237,6 +237,7 @@ namespace space {
         float size = 0.0f;
         float lifetime = 0.0f;
         float max_lifetime = 0.0f;
+        bool color_flash = false;
         bool active = false;
     };
 

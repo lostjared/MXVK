@@ -224,7 +224,7 @@ namespace defender {
         void spawn_ufo_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
         void spawn_alien_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
         void spawn_ship_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
-        void spawn_enemy_explosion(const glm::vec3 &position, float explosion_scale, const std::array<glm::vec3, 4> &wave_colors);
+        void spawn_enemy_explosion(const glm::vec3 &position, float explosion_scale, const std::array<glm::vec3, 4> &wave_colors, bool color_flash = false);
         space::Particle *find_free_particle();
         void update_particles(float dt);
         void draw_particles();
