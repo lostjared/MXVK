@@ -21,7 +21,8 @@ namespace defender {
         : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION),
           asset_root((path.empty() || path == ".") ? std::string(DEFENDER_ASSET_DIR) : path) {
         setClearColor(0.0f, 0.0f, 0.01f, 1.0f);
-        setFont(asset_root + "/data/font.ttf", HUD_FONT_SIZE);
+        setFont(asset_root + "/data/font.ttf", DEFAULT_FONT_SIZE);
+        hud_font.reset(asset_root + "/data/font.ttf", HUD_FONT_SIZE);
         countdown_font.reset(asset_root + "/data/font.ttf", COUNTDOWN_FONT_SIZE);
 
         const std::string model_vert = std::string(DEFENDER_SHADER_DIR) + "/model.vert.spv";

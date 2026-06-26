@@ -346,9 +346,9 @@ namespace defender {
         const SDL_Color white{255, 255, 255, 255};
         const SDL_Color yellow{255, 230, 80, 255};
         const SDL_Color red{255, 70, 60, 255};
-        printText("Score: " + std::to_string(score), 24, 22, white);
-        printText("Level: " + std::to_string(level), 24, 52, yellow);
-        printText("Lives: " + std::to_string(lives), 24, 82, lives <= 1 ? red : white);
+        printText("Score: " + std::to_string(score), 24, 22, white, hud_font);
+        printText("Level: " + std::to_string(level), 24, 82, yellow, hud_font);
+        printText("Lives: " + std::to_string(lives), 24, 142, lives <= 1 ? red : white, hud_font);
         draw_scanner(extent);
         if (show_fps_counter) {
             int fps_w = 0;

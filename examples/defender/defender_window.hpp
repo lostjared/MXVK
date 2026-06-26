@@ -89,8 +89,10 @@ namespace defender {
         float barrel_roll_progress = 0.0f;
         float barrel_roll_angle = 0.0f;
         static constexpr float BARREL_ROLL_DURATION = 0.65f;
-        static constexpr int HUD_FONT_SIZE = 24;
-        static constexpr int COUNTDOWN_FONT_SIZE = HUD_FONT_SIZE * 2;
+        static constexpr int DEFAULT_FONT_SIZE = 24;
+        static constexpr int HUD_FONT_SIZE = DEFAULT_FONT_SIZE * 2;
+        static constexpr int COUNTDOWN_FONT_SIZE = HUD_FONT_SIZE;
+        mxvk::Font hud_font{};
         mxvk::Font countdown_font{};
 
         space::Ship ship{};
