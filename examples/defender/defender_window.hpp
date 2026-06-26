@@ -13,6 +13,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_console.hpp"
+#include "mxvk/mxvk_controller.hpp"
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
 #include "mxvk/mxvk_sound.hpp"
 #endif
@@ -80,6 +81,11 @@ namespace defender {
         bool fire_pressed = false;
         bool roll_left_pressed = false;
         bool roll_right_pressed = false;
+        bool controller_propulsion_pressed = false;
+        bool controller_roll_left_pressed = false;
+        bool controller_roll_right_pressed = false;
+        bool controller_reverse_trigger_pressed = false;
+        float controller_vertical_input = 0.0f;
         bool show_fps_counter = false;
         bool crt_enabled = true;
         float fps_accumulator = 0.0f;
@@ -114,6 +120,7 @@ namespace defender {
         mxvk::VK_Sprite *crt_sprite = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console{};
+        mxvk::VK_Controller controller{};
         bool console_ready = false;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> background_music{};
@@ -157,6 +164,14 @@ namespace defender {
         Asteroid *find_inactive_asteroid();
 
         void clear_input_state();
+
+        bool open_controller();
+
+        void sync_controller_connection();
+
+        [[nodiscard]] float controller_axis(SDL_GamepadAxis axis) const;
+
+        void update_controller_input();
 
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         void ensure_background_music_playing();

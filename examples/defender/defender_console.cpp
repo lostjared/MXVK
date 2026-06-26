@@ -1,6 +1,7 @@
 #include "defender_window.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <ostream>
 #include <string>
@@ -33,6 +34,7 @@ namespace defender {
                 << "  clear                  Clear console output\n"
                 << "  echo <text>            Print text to the console\n"
                 << "  status                 Print current game state\n"
+                << "  controls               Print keyboard and controller bindings\n"
                 << "  restart                Restart the game and countdown\n"
                 << "  intro                  Return to the intro screen\n"
                 << "  play                   Start playing immediately\n"
@@ -58,6 +60,13 @@ namespace defender {
             return true;
         }
 
+        if (cmd == "controls") {
+            out << "Keyboard: Z thrust, X reverse, Up/W and Down move, Space fires, A/S roll.\n"
+                << "Controller: Left stick or D-pad moves, Right Trigger thrusts, Left Trigger or West reverses,\n"
+                << "            South fires, Left/Right Shoulder rolls, Start skips/restarts, Back quits.";
+            return true;
+        }
+
         if (cmd == "status") {
             out << "Mode: " << mode_name() << '\n'
                 << "Score: " << score << '\n'
@@ -65,6 +74,7 @@ namespace defender {
                 << "Level: " << level << '\n'
                 << "Game over: " << (game_over ? "yes" : "no") << '\n'
                 << "Ship respawning: " << (ship_respawning ? "yes" : "no") << '\n'
+                << "Controller: " << (controller.active() ? controller.name() : "Disconnected") << '\n'
                 << "Ship position: " << format_vec3(ship.position) << '\n'
                 << "Active UFOs: " << active_ufo_count() << '\n'
                 << "Active asteroids: " << active_asteroid_count() << '\n'
@@ -339,6 +349,73 @@ namespace defender {
         fire_pressed = false;
         roll_left_pressed = false;
         roll_right_pressed = false;
+        controller_propulsion_pressed = false;
+        controller_roll_left_pressed = false;
+        controller_roll_right_pressed = false;
+        controller_reverse_trigger_pressed = false;
+        controller_vertical_input = 0.0f;
+    }
+
+    bool DefenderWindow::open_controller() {
+        for (int index = 0; index < mxvk::VK_Controller::joysticks(); ++index) {
+            if (controller.open(index)) {
+                log_game("Controller connected: " + controller.name());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void DefenderWindow::sync_controller_connection() {
+        if (!controller.active()) {
+            open_controller();
+        }
+    }
+
+    float DefenderWindow::controller_axis(SDL_GamepadAxis axis) const {
+        if (!controller.active()) {
+            return 0.0f;
+        }
+
+        const Sint16 raw_value = controller.getAxis(axis);
+        const float magnitude = static_cast<float>(std::abs(static_cast<int>(raw_value)));
+        if (magnitude <= static_cast<float>(CONTROLLER_DEAD_ZONE)) {
+            return 0.0f;
+        }
+
+        const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) /
+                                                (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)),
+                                            0.0f,
+                                            1.0f);
+        return raw_value < 0 ? -normalized : normalized;
+    }
+
+    void DefenderWindow::update_controller_input() {
+        if (!controller.active()) {
+            controller_propulsion_pressed = false;
+            controller_roll_left_pressed = false;
+            controller_roll_right_pressed = false;
+            controller_reverse_trigger_pressed = false;
+            controller_vertical_input = 0.0f;
+            return;
+        }
+
+        controller_vertical_input = -controller_axis(SDL_GAMEPAD_AXIS_LEFTY);
+        if (controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_UP)) {
+            controller_vertical_input = 1.0f;
+        } else if (controller.getButton(SDL_GAMEPAD_BUTTON_DPAD_DOWN)) {
+            controller_vertical_input = -1.0f;
+        }
+
+        controller_propulsion_pressed = controller.getAxis(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > CONTROLLER_DEAD_ZONE;
+        controller_roll_left_pressed = controller.getButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
+        controller_roll_right_pressed = controller.getButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+
+        const bool reverse_trigger_pressed = controller.getAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > CONTROLLER_DEAD_ZONE;
+        if (reverse_trigger_pressed && !controller_reverse_trigger_pressed && mode == GameMode::Playing && !game_over && !ship_respawning) {
+            reverse_pressed = true;
+        }
+        controller_reverse_trigger_pressed = reverse_trigger_pressed;
     }
 
 } // namespace defender

@@ -21,7 +21,7 @@ namespace defender {
 
         constexpr float horizontal_acceleration = 58.0f;
         constexpr float horizontal_drag = 2.4f;
-        const bool propulsion_active = mode == GameMode::Playing && propulsion_pressed;
+        const bool propulsion_active = mode == GameMode::Playing && (propulsion_pressed || controller_propulsion_pressed);
         if (propulsion_active) {
             ship.velocity.x += ship_forward_direction * horizontal_acceleration * dt;
         } else {
@@ -35,6 +35,8 @@ namespace defender {
             vertical_input = 1.0f;
         } else if (down_pressed && !up_pressed) {
             vertical_input = -1.0f;
+        } else {
+            vertical_input = controller_vertical_input;
         }
 
         constexpr float vertical_speed = 19.0f;
@@ -75,9 +77,9 @@ namespace defender {
         }
 
         float roll_input = 0.0f;
-        if (roll_left_pressed && !roll_right_pressed) {
+        if ((roll_left_pressed || controller_roll_left_pressed) && !(roll_right_pressed || controller_roll_right_pressed)) {
             roll_input = -1.0f;
-        } else if (roll_right_pressed && !roll_left_pressed) {
+        } else if ((roll_right_pressed || controller_roll_right_pressed) && !(roll_left_pressed || controller_roll_left_pressed)) {
             roll_input = 1.0f;
         }
         if (roll_input != 0.0f) {

@@ -139,6 +139,7 @@ namespace defender {
         ensure_background_music_playing();
 #endif
         configure_console();
+        open_controller();
     }
 
     DefenderWindow::~DefenderWindow() {
@@ -178,6 +179,19 @@ namespace defender {
     }
 
     void DefenderWindow::event(SDL_Event &e) {
+        if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+            if (!controller.active()) {
+                controller.connectEvent(e);
+            }
+            sync_controller_connection();
+            return;
+        }
+        if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+            controller.connectEvent(e);
+            sync_controller_connection();
+            return;
+        }
+
         const bool was_console_visible = console.isVisible();
         const bool is_console_toggle = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F3;
         console.handleEvent(e);
@@ -216,6 +230,31 @@ namespace defender {
             restart_game();
             log_game("Game restarted from keyboard.");
             return;
+        }
+
+        if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) {
+                log_game("Exit requested from controller.");
+                exit();
+                return;
+            }
+            if (mode == GameMode::Intro && (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH || e.gbutton.button == SDL_GAMEPAD_BUTTON_START)) {
+                intro_fade = 0.01f;
+                log_game("Intro skipped from controller.");
+                return;
+            }
+            if (game_over && (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH || e.gbutton.button == SDL_GAMEPAD_BUTTON_START)) {
+                restart_game();
+                log_game("Game restarted from controller.");
+                return;
+            }
+            if (mode == GameMode::Playing && !game_over && !ship_respawning) {
+                if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                    fire_pressed = true;
+                } else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_WEST) {
+                    reverse_pressed = true;
+                }
+            }
         }
 
         if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
@@ -294,6 +333,8 @@ namespace defender {
 
         const bool console_visible = console.isVisible();
         if (!console_visible) {
+            sync_controller_connection();
+            update_controller_input();
             update_barrel_roll(dt);
             if (ship_respawning) {
                 update_respawn(dt);
