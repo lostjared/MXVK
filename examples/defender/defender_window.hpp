@@ -35,15 +35,10 @@ namespace defender {
     class DefenderWindow : public mxvk::VK_Window {
       public:
         DefenderWindow(const std::string &path, int width, int height, bool fullscreen);
-
         ~DefenderWindow() override;
-
         void event(SDL_Event &e) override;
-
         void onSwapchainRecreated() override;
-
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override;
-
       private:
         std::string asset_root;
         std::chrono::steady_clock::time_point last_frame_time = std::chrono::steady_clock::now();
@@ -140,97 +135,52 @@ namespace defender {
         uint32_t flame_vertex_count = 0;
 
         void configure_console();
-
         bool handle_console_command(const std::vector<std::string> &args, std::ostream &out);
-
         void log_game(const std::string &message, SDL_Color color = SDL_Color{180, 220, 255, 255});
-
         [[nodiscard]] const char *mode_name() const;
-
         [[nodiscard]] static std::string format_vec3(const glm::vec3 &value);
-
         bool parse_int_arg(const std::vector<std::string> &args, std::size_t index, const char *name, int &value, std::ostream &out) const;
-
         bool parse_float_arg(const std::vector<std::string> &args, std::size_t index, const char *name, float &value, std::ostream &out) const;
-
         [[nodiscard]] int active_ufo_count() const;
-
         [[nodiscard]] int active_asteroid_count() const;
-
         [[nodiscard]] int active_projectile_count() const;
-
         Ufo *find_inactive_ufo();
-
         Asteroid *find_inactive_asteroid();
-
         void clear_input_state();
-
         bool open_controller();
-
         void sync_controller_connection();
-
         [[nodiscard]] float controller_axis(SDL_GamepadAxis axis) const;
-
         void update_controller_input();
-
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         void ensure_background_music_playing();
-
         void play_sound(int sound_id);
 #endif
-
         void update_ship(float dt);
-
         void update_barrel_roll(float dt);
-
         glm::mat4 build_ship_model_matrix();
-
         glm::mat4 build_asteroid_model_matrix(const Asteroid &asteroid, const mxvk::VKAbstractModel &model_resource) const;
-
         void update_camera_position(float dt);
-
         void update_playable_world_top(const VkExtent2D &extent);
-
         void reset_intro_screen();
-
         void start_launch_countdown();
-
         void start_intro_fade_in();
-
         void draw_intro(const VkExtent2D &extent);
-
         void draw_intro_fade_in(const VkExtent2D &extent);
-
         void draw_fade_overlay(const VkExtent2D &extent, float alpha);
-
         void update_camera_scroll(float aspect);
-
         void update_countdown();
-
         void draw_countdown(VkCommandBuffer cmd, uint32_t image_index, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &projection);
-
         void init_ufos();
-
         void init_asteroids();
-
         void start_level();
-
         void update_level_progress();
-
         void respawn_ufo(Ufo &ufo, bool initial_spawn = false);
-
         void update_ufos(float dt);
-
         void respawn_asteroid(Asteroid &asteroid, bool initial_spawn = false);
-
         void update_asteroids(float dt);
-
         [[nodiscard]] float ufo_collision_radius(const Ufo &ufo) const;
-
         [[nodiscard]] bool enemy_spawn_is_clear(const glm::vec3 &position, float radius, const Ufo *ignored_ufo, const Asteroid *ignored_asteroid) const;
-
         void clamp_enemy_to_world_y(glm::vec3 &position, glm::vec3 &velocity, float radius);
-
         void separate_enemies(glm::vec3 &first_position,
                               glm::vec3 &first_velocity,
                               float first_radius,
@@ -238,92 +188,51 @@ namespace defender {
                               glm::vec3 &second_velocity,
                               float second_radius,
                               float restitution);
-
         void resolve_enemy_overlaps();
-
         [[nodiscard]] int current_ufo_frame(const Ufo &ufo) const;
-
         [[nodiscard]] float current_ufo_pulse(const Ufo &ufo) const;
-
         [[nodiscard]] glm::vec2 ufo_draw_size(const Ufo &ufo, float pulse) const;
-
         void draw_ufos();
-
         void draw_terrain();
-
         void draw_asteroids(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &projection);
-
         void create_flame_resources();
-
         void cleanup_flame_resources();
-
         void cleanup_flame_swapchain_resources();
-
         void create_flame_swapchain_resources();
-
         void create_flame_mesh();
-
         void create_flame_pipeline();
-
         void draw_engine_flame(VkCommandBuffer cmd, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &projection);
-
         void create_buffer(VkDeviceSize size,
                            VkBufferUsageFlags usage,
                            VkMemoryPropertyFlags properties,
                            VkBuffer &buffer,
                            VkDeviceMemory &buffer_memory) const;
-
         [[nodiscard]] uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
-
         void fire_projectile();
-
         void update_projectiles(float dt);
-
         void check_projectile_ufo_hits();
-
         void check_projectile_asteroid_hits();
-
         void check_ship_ufo_collisions();
-
         void check_ship_asteroid_collisions();
-
         void lose_life();
-
         void update_respawn(float dt);
-
         void reset_ship_to_origin();
-
         void reset_ufos_for_origin_start();
-
         void restart_game();
-
         void clear_projectiles();
-
         void draw_projectiles();
-
         void spawn_ufo_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
-
         void spawn_alien_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
-
         void spawn_ship_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
-
         void spawn_enemy_explosion(const glm::vec3 &position, float explosion_scale, const std::array<glm::vec3, 4> &wave_colors);
-
         space::Particle *find_free_particle();
-
         void update_particles(float dt);
-
         void draw_particles();
-
         void clear_particles();
-
         void update_fps_counter(float delta_seconds);
-
         void draw_hud(const VkExtent2D &extent);
-
         void draw_scanner(const VkExtent2D &extent);
     };
-
 } // namespace defender
 
 #endif
