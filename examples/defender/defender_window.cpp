@@ -44,6 +44,13 @@ namespace defender {
             std::string(DEFENDER_SHADER_DIR) + "/fade_overlay.frag.spv");
         const uint32_t black_pixel = 0xFF000000u;
         fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
+        crt_sprite = createSprite(
+            1,
+            1,
+            std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+            std::string(DEFENDER_SHADER_DIR) + "/crt.frag.spv");
+        crt_sprite->setShaderParams(0.0f, 3.0f, 0.5f, 0.002f);
+        enablePostProcessing(crt_sprite);
         matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
         intro_rain_config.color = "#ff0000";
         intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
@@ -176,6 +183,12 @@ namespace defender {
             log_game(std::string("FPS counter ") + (show_fps_counter ? "enabled." : "disabled."));
             return;
         }
+        if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F8 && !e.key.repeat) {
+            crt_enabled = !crt_enabled;
+            setPostProcessingEnabled(crt_enabled);
+            log_game(std::string("CRT effect ") + (crt_enabled ? "enabled." : "disabled."));
+            return;
+        }
         if (mode == GameMode::Intro && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER)) {
             intro_fade = 0.01f;
             log_game("Intro skipped from keyboard.");
@@ -253,6 +266,9 @@ namespace defender {
         last_frame_time = now;
         const float dt = std::min(delta_seconds, 0.1f);
         elapsed_seconds += dt;
+        if (crt_sprite != nullptr) {
+            crt_sprite->setShaderParams(elapsed_seconds, 3.0f, 0.5f, 0.002f);
+        }
         update_fps_counter(delta_seconds);
 
         const bool console_visible = console.isVisible();
@@ -275,6 +291,7 @@ namespace defender {
         update_particles(dt);
 
         const VkExtent2D extent = getSwapchainExtent();
+        update_playable_world_top(extent);
         const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
         if (mode == GameMode::Intro) {
@@ -285,9 +302,8 @@ namespace defender {
 
         if (mode == GameMode::IntroFadeIn || mode == GameMode::Countdown) {
             update_camera_scroll(aspect);
-            const glm::vec3 camera_target{camera_center_x, CAMERA_HEIGHT, 0.0f};
-            const glm::vec3 ideal_camera{camera_center_x, CAMERA_HEIGHT, CAMERA_DISTANCE};
-            camera_position = glm::mix(camera_position, ideal_camera, 1.0f - std::exp(-dt * 10.0f));
+            update_camera_position(dt);
+            const glm::vec3 camera_target{nearest_world_x(camera_center_x, camera_position.x), CAMERA_HEIGHT, 0.0f};
 
             const glm::mat4 view = glm::lookAt(camera_position, camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 projection = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 400.0f);
@@ -303,13 +319,17 @@ namespace defender {
 
         update_camera_scroll(aspect);
 
-        const glm::vec3 camera_target{camera_center_x, CAMERA_HEIGHT, 0.0f};
-        const glm::vec3 ideal_camera{camera_center_x, CAMERA_HEIGHT, CAMERA_DISTANCE};
-        camera_position = glm::mix(camera_position, ideal_camera, 1.0f - std::exp(-dt * 10.0f));
+        update_camera_position(dt);
+        const glm::vec3 camera_target{nearest_world_x(camera_center_x, camera_position.x), CAMERA_HEIGHT, 0.0f};
 
         const glm::mat4 view = glm::lookAt(camera_position, camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 400.0f);
         projection[1][1] *= -1.0f;
+
+        VkRect2D gameplay_scissor{};
+        gameplay_scissor.offset = {0, std::min(GAME_VIEWPORT_TOP, static_cast<int>(extent.height))};
+        gameplay_scissor.extent = {extent.width, extent.height - static_cast<uint32_t>(gameplay_scissor.offset.y)};
+        vkCmdSetScissor(cmd, 0, 1, &gameplay_scissor);
 
         star_field.update(dt, camera_position, elapsed_seconds);
         star_sprite->updateCamera(image_index, view, projection);
@@ -352,6 +372,10 @@ namespace defender {
         draw_particles();
         effect_sprite->render(cmd, image_index);
         effect_sprite->clearQueue();
+
+        VkRect2D full_scissor{};
+        full_scissor.extent = extent;
+        vkCmdSetScissor(cmd, 0, 1, &full_scissor);
 
         if (!console_visible) {
             draw_hud(extent);

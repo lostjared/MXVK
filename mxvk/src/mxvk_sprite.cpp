@@ -61,12 +61,12 @@ namespace mxvk {
             vkDestroySampler(device, spriteSampler, nullptr);
         }
 
-        if (spriteImageView != VK_NULL_HANDLE) {
+        if (!externalTexture && spriteImageView != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite image view\n";
             vkDestroyImageView(device, spriteImageView, nullptr);
         }
 
-        if (spriteImage != VK_NULL_HANDLE) {
+        if (!externalTexture && spriteImage != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite image\n";
             vkDestroyImage(device, spriteImage, nullptr);
             vkFreeMemory(device, spriteImageMemory, nullptr);
@@ -116,21 +116,22 @@ namespace mxvk {
             spriteSampler = VK_NULL_HANDLE;
         }
 
-        if (spriteImageView != VK_NULL_HANDLE) {
+        if (!externalTexture && spriteImageView != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite image view\n";
             vkDestroyImageView(device, spriteImageView, nullptr);
             spriteImageView = VK_NULL_HANDLE;
         }
 
-        if (spriteImage != VK_NULL_HANDLE) {
+        if (!externalTexture && spriteImage != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite image\n";
             vkDestroyImage(device, spriteImage, nullptr);
             spriteImage = VK_NULL_HANDLE;
         }
-        if (spriteImageMemory != VK_NULL_HANDLE) {
+        if (!externalTexture && spriteImageMemory != VK_NULL_HANDLE) {
             vkFreeMemory(device, spriteImageMemory, nullptr);
             spriteImageMemory = VK_NULL_HANDLE;
         }
+        externalTexture = false;
 
         if (fragmentShaderModule != VK_NULL_HANDLE) {
             vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
@@ -1610,6 +1611,32 @@ namespace mxvk {
 
     void VK_Sprite::setShaderParams(float p1, float p2, float p3, float p4) {
         shaderParams = glm::vec4(p1, p2, p3, p4);
+    }
+
+    void VK_Sprite::setExternalTexture(VkImageView image_view, int width, int height) {
+        if (image_view == VK_NULL_HANDLE || width <= 0 || height <= 0) {
+            throw mxvk::Exception("VKSprite::setExternalTexture received an invalid image view");
+        }
+        if (descriptorSet != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(device, descriptorPool, 1, &descriptorSet);
+            descriptorSet = VK_NULL_HANDLE;
+        }
+        if (!externalTexture && spriteImageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, spriteImageView, nullptr);
+        }
+        if (!externalTexture && spriteImage != VK_NULL_HANDLE) {
+            vkDestroyImage(device, spriteImage, nullptr);
+        }
+        if (!externalTexture && spriteImageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, spriteImageMemory, nullptr);
+        }
+        spriteImageView = image_view;
+        spriteImage = VK_NULL_HANDLE;
+        spriteImageMemory = VK_NULL_HANDLE;
+        externalTexture = true;
+        spriteWidth = width;
+        spriteHeight = height;
+        spriteLoaded = true;
     }
 
     void VK_Sprite::prepareForRendering([[maybe_unused]] VkCommandBuffer cmdBuffer) {

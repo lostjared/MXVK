@@ -44,8 +44,8 @@ namespace defender {
         }
         const float collision_radius = ufo_collision_radius(ufo);
         for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
-            const float distance = initial_spawn ? space::random_float(-52.0f, 52.0f) : side * space::random_float(34.0f, 56.0f);
-            const glm::vec3 candidate{camera_center_x + distance, space::random_float(WORLD_BOTTOM + collision_radius, WORLD_TOP - collision_radius), space::random_float(-1.2f, 1.2f)};
+            const float distance = initial_spawn ? space::random_float(-WORLD_HALF_WIDTH, WORLD_HALF_WIDTH) : side * space::random_float(34.0f, 56.0f);
+            const glm::vec3 candidate{wrap_world_x(camera_center_x + distance), space::random_float(WORLD_BOTTOM + collision_radius, playable_world_top - collision_radius), space::random_float(-1.2f, 1.2f)};
             if (enemy_spawn_is_clear(candidate, collision_radius, &ufo, nullptr)) {
                 ufo.position = candidate;
                 break;
@@ -78,15 +78,12 @@ namespace defender {
             ufo.phase += dt * ufo.bob_speed;
             ufo.position += ufo.velocity * dt;
             ufo.position.y += std::sin(ufo.phase) * dt * 1.35f;
-            if (ufo.position.y < WORLD_BOTTOM + 0.8f || ufo.position.y > WORLD_TOP - 0.8f) {
+            if (ufo.position.y < WORLD_BOTTOM + 0.8f || ufo.position.y > playable_world_top - 0.8f) {
                 ufo.velocity.y = -ufo.velocity.y;
-                ufo.position.y = std::clamp(ufo.position.y, WORLD_BOTTOM + 0.8f, WORLD_TOP - 0.8f);
+                ufo.position.y = std::clamp(ufo.position.y, WORLD_BOTTOM + 0.8f, playable_world_top - 0.8f);
             }
 
-            const float max_distance = 68.0f;
-            if (std::abs(ufo.position.x - camera_center_x) > max_distance) {
-                respawn_ufo(ufo);
-            }
+            ufo.position.x = wrap_world_x(ufo.position.x);
         }
     }
 
@@ -104,8 +101,8 @@ namespace defender {
             space::random_float(-105.0f, 105.0f),
             space::random_float(-62.0f, 62.0f));
         for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
-            const float distance = initial_spawn ? space::random_float(-58.0f, 58.0f) : side * space::random_float(36.0f, 68.0f);
-            const glm::vec3 candidate{camera_center_x + distance, space::random_float(WORLD_BOTTOM + asteroid.collision_radius, WORLD_TOP - asteroid.collision_radius), space::random_float(-1.7f, 1.3f)};
+            const float distance = initial_spawn ? space::random_float(-WORLD_HALF_WIDTH, WORLD_HALF_WIDTH) : side * space::random_float(36.0f, 68.0f);
+            const glm::vec3 candidate{wrap_world_x(camera_center_x + distance), space::random_float(WORLD_BOTTOM + asteroid.collision_radius, playable_world_top - asteroid.collision_radius), space::random_float(-1.7f, 1.3f)};
             if (enemy_spawn_is_clear(candidate, asteroid.collision_radius, nullptr, &asteroid)) {
                 asteroid.position = candidate;
                 break;
@@ -136,20 +133,17 @@ namespace defender {
             }
 
             asteroid.position += asteroid.velocity * dt;
+            asteroid.position.x = wrap_world_x(asteroid.position.x);
             asteroid.rotation += asteroid.angular_velocity * dt;
             asteroid.rotation.x = std::fmod(asteroid.rotation.x, 360.0f);
             asteroid.rotation.y = std::fmod(asteroid.rotation.y, 360.0f);
             asteroid.rotation.z = std::fmod(asteroid.rotation.z, 360.0f);
 
-            if (asteroid.position.y < WORLD_BOTTOM + asteroid.collision_radius || asteroid.position.y > WORLD_TOP - asteroid.collision_radius) {
+            if (asteroid.position.y < WORLD_BOTTOM + asteroid.collision_radius || asteroid.position.y > playable_world_top - asteroid.collision_radius) {
                 asteroid.velocity.y = -asteroid.velocity.y;
-                asteroid.position.y = std::clamp(asteroid.position.y, WORLD_BOTTOM + asteroid.collision_radius, WORLD_TOP - asteroid.collision_radius);
+                asteroid.position.y = std::clamp(asteroid.position.y, WORLD_BOTTOM + asteroid.collision_radius, playable_world_top - asteroid.collision_radius);
             }
 
-            if (std::abs(asteroid.position.x - camera_center_x) > 78.0f) {
-                asteroid.active = false;
-                asteroid.respawn_timer = space::random_float(0.4f, 2.6f);
-            }
         }
     }
 
@@ -165,7 +159,7 @@ namespace defender {
             if (!ufo.active || &ufo == ignored_ufo) {
                 continue;
             }
-            const glm::vec2 delta{ufo.position.x - position.x, ufo.position.y - position.y};
+            const glm::vec2 delta{wrapped_delta_x(ufo.position.x, position.x), ufo.position.y - position.y};
             const float min_distance = ufo_collision_radius(ufo) + radius;
             if (glm::dot(delta, delta) < min_distance * min_distance) {
                 return false;
@@ -176,7 +170,7 @@ namespace defender {
             if (!asteroid.active || &asteroid == ignored_asteroid) {
                 continue;
             }
-            const glm::vec2 delta{asteroid.position.x - position.x, asteroid.position.y - position.y};
+            const glm::vec2 delta{wrapped_delta_x(asteroid.position.x, position.x), asteroid.position.y - position.y};
             const float min_distance = asteroid.collision_radius + radius;
             if (glm::dot(delta, delta) < min_distance * min_distance) {
                 return false;
@@ -187,9 +181,9 @@ namespace defender {
     }
 
     void DefenderWindow::clamp_enemy_to_world_y(glm::vec3 &position, glm::vec3 &velocity, float radius) {
-        if (position.y < WORLD_BOTTOM + radius || position.y > WORLD_TOP - radius) {
+        if (position.y < WORLD_BOTTOM + radius || position.y > playable_world_top - radius) {
             velocity.y = -velocity.y;
-            position.y = std::clamp(position.y, WORLD_BOTTOM + radius, WORLD_TOP - radius);
+            position.y = std::clamp(position.y, WORLD_BOTTOM + radius, playable_world_top - radius);
         }
     }
 
@@ -200,7 +194,8 @@ namespace defender {
                                           glm::vec3 &second_velocity,
                                           float second_radius,
                                           float restitution) {
-        const glm::vec2 delta{second_position.x - first_position.x, second_position.y - first_position.y};
+        const float second_x = nearest_world_x(second_position.x, first_position.x);
+        const glm::vec2 delta{second_x - first_position.x, second_position.y - first_position.y};
         const float min_distance = first_radius + second_radius;
         const float distance_squared = glm::dot(delta, delta);
         if (distance_squared >= min_distance * min_distance) {
@@ -219,8 +214,9 @@ namespace defender {
         const glm::vec2 separation = normal * (overlap / inverse_mass_sum);
         first_position.x -= separation.x * first_inverse_mass;
         first_position.y -= separation.y * first_inverse_mass;
-        second_position.x += separation.x * second_inverse_mass;
+        second_position.x = wrap_world_x(second_x + separation.x * second_inverse_mass);
         second_position.y += separation.y * second_inverse_mass;
+        first_position.x = wrap_world_x(first_position.x);
 
         const glm::vec2 relative_velocity{second_velocity.x - first_velocity.x, second_velocity.y - first_velocity.y};
         const float velocity_along_normal = glm::dot(relative_velocity, normal);
@@ -320,7 +316,7 @@ namespace defender {
             }
             const float pulse = current_ufo_pulse(ufo);
             const int frame = current_ufo_frame(ufo);
-            ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(ufo.position, ufo_draw_size(ufo, pulse), ufo.tint, 0.0f);
+            ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(nearest_world_position(ufo.position, camera_position.x), ufo_draw_size(ufo, pulse), ufo.tint, 0.0f);
         }
     }
 

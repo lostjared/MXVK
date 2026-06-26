@@ -194,6 +194,10 @@ namespace mxvk {
          */
         VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
+        void enablePostProcessing(VK_Sprite *sprite);
+
+        void setPostProcessingEnabled(bool enabled) { post_process_enabled = enabled; }
+
         /**
          * @brief Create a world-space billboard sprite from a PNG file.
          * @param pngPath Path to the PNG file.
@@ -333,6 +337,8 @@ namespace mxvk {
         void createSpriteDescriptorSetLayout();
         void createSpritePipeline();
         void destroySpritePipeline();
+        void createPostProcessTargets();
+        void destroyPostProcessTargets();
         void ensureTextRenderer();
         void createTextDescriptorSetLayout();
         void createTextPipeline();
@@ -395,6 +401,12 @@ namespace mxvk {
         VkPipelineLayout sprite_pipeline_layout = VK_NULL_HANDLE;
         VkPipeline sprite_pipeline = VK_NULL_HANDLE;
         bool sprite_state_dirty = false;
+        VK_Sprite *post_process_sprite = nullptr;
+        bool post_process_enabled = true;
+        std::vector<VkImage> post_process_images{};
+        std::vector<VkDeviceMemory> post_process_memories{};
+        std::vector<VkImageView> post_process_views{};
+        std::vector<bool> post_process_initialized{};
 
         std::unique_ptr<VK_Text> text_renderer{};
         VkDescriptorSetLayout text_descriptor_set_layout = VK_NULL_HANDLE;

@@ -11,7 +11,8 @@ namespace defender {
 
     void DefenderWindow::fire_projectile() {
         const glm::vec3 forward{ship_forward_direction, 0.0f, 0.0f};
-        const glm::vec3 muzzle = ship.position + forward * 1.35f + glm::vec3(0.0f, -0.22f, 0.0f);
+        glm::vec3 muzzle = ship.position + forward * 1.35f + glm::vec3(0.0f, -0.22f, 0.0f);
+        muzzle.x = wrap_world_x(muzzle.x);
 
         for (auto &projectile : projectiles) {
             if (projectile.active) {
@@ -38,6 +39,7 @@ namespace defender {
             }
             projectile.prev_position = projectile.position;
             projectile.position += projectile.velocity * dt;
+            projectile.position.x = wrap_world_x(projectile.position.x);
             projectile.lifetime += dt;
             if (projectile.lifetime >= PROJECTILE_LIFETIME) {
                 projectile.active = false;
@@ -55,7 +57,7 @@ namespace defender {
 
             const float direction = projectile.velocity.x >= 0.0f ? 1.0f : -1.0f;
             const float x0 = projectile.prev_position.x;
-            const float x1 = projectile.position.x + direction * beam_collision_length;
+            const float x1 = x0 + wrapped_delta_x(projectile.position.x, x0) + direction * beam_collision_length;
             const float min_x = std::min(x0, x1);
             const float max_x = std::max(x0, x1);
 
@@ -67,7 +69,7 @@ namespace defender {
                 const SpriteAlphaBounds &bounds = ufo_sprite_bounds[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)];
                 const glm::vec2 draw_size = ufo_draw_size(ufo, current_ufo_pulse(ufo));
                 const glm::vec2 body_center{
-                    ufo.position.x + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
+                    nearest_world_x(ufo.position.x, (x0 + x1) * 0.5f) + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
                     ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
                 };
                 const glm::vec2 body_radius{
@@ -108,7 +110,7 @@ namespace defender {
 
             const float direction = projectile.velocity.x >= 0.0f ? 1.0f : -1.0f;
             const float x0 = projectile.prev_position.x;
-            const float x1 = projectile.position.x + direction * beam_collision_length;
+            const float x1 = x0 + wrapped_delta_x(projectile.position.x, x0) + direction * beam_collision_length;
             const float min_x = std::min(x0, x1);
             const float max_x = std::max(x0, x1);
 
@@ -117,8 +119,9 @@ namespace defender {
                     continue;
                 }
 
-                const float closest_x = std::clamp(asteroid.position.x, min_x, max_x);
-                const glm::vec2 delta{asteroid.position.x - closest_x, asteroid.position.y - projectile.position.y};
+                const float asteroid_x = nearest_world_x(asteroid.position.x, (x0 + x1) * 0.5f);
+                const float closest_x = std::clamp(asteroid_x, min_x, max_x);
+                const glm::vec2 delta{asteroid_x - closest_x, asteroid.position.y - projectile.position.y};
                 if (glm::dot(delta, delta) > asteroid.collision_radius * asteroid.collision_radius) {
                     continue;
                 }
@@ -151,7 +154,7 @@ namespace defender {
             const float pulse = current_ufo_pulse(ufo);
             const glm::vec2 draw_size = ufo_draw_size(ufo, pulse);
             const glm::vec2 body_center{
-                ufo.position.x + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
+                nearest_world_x(ufo.position.x, ship.position.x) + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
                 ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
             };
             const glm::vec2 body_radius{
@@ -195,9 +198,10 @@ namespace defender {
                 continue;
             }
 
-            const float closest_x = std::clamp(asteroid.position.x, ship.position.x - ship_half_width, ship.position.x + ship_half_width);
+            const float asteroid_x = nearest_world_x(asteroid.position.x, ship.position.x);
+            const float closest_x = std::clamp(asteroid_x, ship.position.x - ship_half_width, ship.position.x + ship_half_width);
             const float closest_y = std::clamp(asteroid.position.y, ship.position.y - ship_half_height, ship.position.y + ship_half_height);
-            const glm::vec2 delta{asteroid.position.x - closest_x, asteroid.position.y - closest_y};
+            const glm::vec2 delta{asteroid_x - closest_x, asteroid.position.y - closest_y};
             if (glm::dot(delta, delta) > asteroid.collision_radius * asteroid.collision_radius) {
                 continue;
             }
@@ -316,7 +320,8 @@ namespace defender {
             const float beam_length = 6.4f + 1.2f * life_factor;
             const float core_thickness = 0.085f + 0.025f * flash;
             const float glow_thickness = 0.30f + 0.10f * flash;
-            const glm::vec3 beam_center_offset{ship_forward_direction * beam_length * 0.38f, 0.0f, 0.0f};
+            const float direction = projectile.velocity.x >= 0.0f ? 1.0f : -1.0f;
+            const glm::vec3 beam_center_offset{direction * beam_length * 0.38f, 0.0f, 0.0f};
             const glm::vec4 glow_color{
                 1.0f,
                 0.36f + 0.28f * flash,
@@ -330,8 +335,9 @@ namespace defender {
                 std::clamp(0.45f + 0.55f * flash * life_factor, 0.0f, 1.0f),
             };
 
-            projectile_sprite->drawSprite(projectile.position + beam_center_offset, glm::vec2(beam_length, glow_thickness), glow_color);
-            projectile_sprite->drawSprite(projectile.position + beam_center_offset, glm::vec2(beam_length, core_thickness), core_color);
+            const glm::vec3 draw_position = nearest_world_position(projectile.position, camera_position.x) + beam_center_offset;
+            projectile_sprite->drawSprite(draw_position, glm::vec2(beam_length, glow_thickness), glow_color);
+            projectile_sprite->drawSprite(draw_position, glm::vec2(beam_length, core_thickness), core_color);
         }
     }
 
@@ -458,7 +464,7 @@ namespace defender {
             if (!particle.active) {
                 continue;
             }
-            effect_sprite->drawSprite(particle.position, glm::vec2(particle.size), particle.color);
+            effect_sprite->drawSprite(nearest_world_position(particle.position, camera_position.x), glm::vec2(particle.size), particle.color);
         }
     }
 

@@ -143,6 +143,8 @@ namespace mxvk {
          */
         void updateTexture(const void *pixels, int width, int height, int pitch = 0);
 
+        void setExternalTexture(VkImageView image_view, int width, int height);
+
 #ifdef MXVK_CUDA
         /** @brief Replace the sprite texture directly from CUDA device memory. */
         bool updateTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream);
@@ -282,6 +284,7 @@ namespace mxvk {
         int spriteWidth = 0;
         int spriteHeight = 0;
         bool spriteLoaded = false;
+        bool externalTexture = false;
         VkShaderModule fragmentShaderModule = VK_NULL_HANDLE;
         bool hasCustomShader = false;
         glm::vec4 shaderParams = glm::vec4(0.0f);

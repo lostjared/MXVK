@@ -19,5 +19,5 @@ layout(push_constant) uniform PushConstants {
 
 void main(void) {
     vec4 tex_color = texture(sprite_tex, out_uv);
-    out_color = vec4(tex_color.rgb, tex_color.a * clamp(pc.params.w, 0.0, 1.0));
+    out_color = vec4(pc.params.rgb, tex_color.a * clamp(pc.params.w, 0.0, 1.0));
 }

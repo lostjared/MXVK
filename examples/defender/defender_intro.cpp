@@ -17,7 +17,6 @@ namespace defender {
         if (reverse_pressed) {
             reverse_pressed = false;
             ship_forward_direction *= -1.0f;
-            ship.velocity.x *= 0.55f;
         }
 
         constexpr float horizontal_acceleration = 58.0f;
@@ -44,7 +43,8 @@ namespace defender {
         ship.velocity.y = std::lerp(ship.velocity.y, target_vertical_velocity, 1.0f - std::exp(-dt * vertical_response));
         ship.velocity.z = 0.0f;
         ship.position += ship.velocity * dt;
-        ship.position.y = std::clamp(ship.position.y, WORLD_BOTTOM, WORLD_TOP);
+        ship.position.x = wrap_world_x(ship.position.x);
+        ship.position.y = std::clamp(ship.position.y, WORLD_BOTTOM, playable_world_top);
         ship.position.z = 0.0f;
 
         const float bank = std::clamp(-ship.velocity.y * 2.0f, -22.0f, 22.0f);
@@ -105,7 +105,7 @@ namespace defender {
         const glm::quat orientation = yaw * pitch * bank * barrel_roll;
 
         glm::mat4 model(1.0f);
-        model = glm::translate(model, ship.position);
+        model = glm::translate(model, nearest_world_position(ship.position, camera_position.x));
         model *= glm::mat4_cast(orientation);
         model = glm::scale(model, glm::vec3(SHIP_MODEL_SCALE * ship_model.modelRenderScale()));
         model = glm::translate(model, ship_model.modelCenterOffset());
@@ -118,7 +118,7 @@ namespace defender {
         const glm::quat roll = glm::angleAxis(glm::radians(asteroid.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
         glm::mat4 model(1.0f);
-        model = glm::translate(model, asteroid.position);
+        model = glm::translate(model, nearest_world_position(asteroid.position, camera_position.x));
         model *= glm::mat4_cast(yaw * pitch * roll);
         model = glm::scale(model, glm::vec3(asteroid.scale * model_resource.modelRenderScale()));
         model = glm::translate(model, model_resource.modelCenterOffset());
@@ -216,18 +216,35 @@ namespace defender {
         const float scroll_limit = visible_half_width * CAMERA_SCROLL_EDGE_FRACTION;
         const bool propulsion_active = mode == GameMode::Playing && propulsion_pressed;
         const float lead_offset = propulsion_active ? ship_forward_direction * visible_half_width * 0.18f : 0.0f;
-        const float desired_camera_x = ship.position.x + lead_offset;
-        const float relative_x = ship.position.x - camera_center_x;
+        const float desired_camera_x = wrap_world_x(ship.position.x + lead_offset);
+        const float relative_x = wrapped_delta_x(ship.position.x, camera_center_x);
 
         if (relative_x > scroll_limit) {
-            camera_center_x = ship.position.x - scroll_limit;
+            camera_center_x = wrap_world_x(ship.position.x - scroll_limit);
         } else if (relative_x < -scroll_limit) {
-            camera_center_x = ship.position.x + scroll_limit;
+            camera_center_x = wrap_world_x(ship.position.x + scroll_limit);
         }
 
         if (propulsion_active) {
-            camera_center_x = std::lerp(camera_center_x, desired_camera_x, 0.04f);
+            camera_center_x = wrap_world_x(camera_center_x + wrapped_delta_x(desired_camera_x, camera_center_x) * 0.04f);
         }
+    }
+
+    void DefenderWindow::update_camera_position(float dt) {
+        const float target_x = nearest_world_x(camera_center_x, camera_position.x);
+        const float blend = 1.0f - std::exp(-dt * 10.0f);
+        camera_position.x = wrap_world_x(camera_position.x + (target_x - camera_position.x) * blend);
+        camera_position.y = CAMERA_HEIGHT;
+        camera_position.z = CAMERA_DISTANCE;
+    }
+
+    void DefenderWindow::update_playable_world_top(const VkExtent2D &extent) {
+        if (extent.height == 0U) {
+            return;
+        }
+        const float visible_half_height = std::tan(glm::radians(25.0f)) * CAMERA_DISTANCE;
+        const float top_fraction = static_cast<float>(GAME_VIEWPORT_TOP) / static_cast<float>(extent.height);
+        playable_world_top = CAMERA_HEIGHT + (0.5f - top_fraction) * 2.0f * visible_half_height;
     }
 
     void DefenderWindow::update_countdown() {
@@ -329,6 +346,7 @@ namespace defender {
         const SDL_Color red{255, 70, 60, 255};
         printText("Score: " + std::to_string(score), 24, 22, white);
         printText("Lives: " + std::to_string(lives), 24, 52, lives <= 1 ? red : white);
+        draw_scanner(extent);
         if (show_fps_counter) {
             int fps_w = 0;
             int fps_h = 0;
@@ -366,6 +384,98 @@ namespace defender {
         printText(title, center_x - title_w / 2, center_y - 52, red);
         printText(final_score, center_x - score_w / 2, center_y - 12, yellow);
         printText(prompt, center_x - prompt_w / 2, center_y + 28, white);
+    }
+
+    void DefenderWindow::draw_scanner(const VkExtent2D &extent) {
+        constexpr int SCANNER_BORDER = 2;
+        const int scanner_width = std::min(760, std::max(420, static_cast<int>(extent.width) - 320));
+        const int scanner_x = (static_cast<int>(extent.width) - scanner_width) / 2;
+        const int scanner_y = RADAR_TOP;
+        const int inner_x = scanner_x + SCANNER_BORDER;
+        const int inner_y = scanner_y + SCANNER_BORDER;
+        const int inner_width = scanner_width - SCANNER_BORDER * 2;
+        const int inner_height = RADAR_HEIGHT - SCANNER_BORDER * 2;
+        const auto draw_rect = [this](int x, int y, int width, int height, const glm::vec4 &color) {
+            fade_overlay_sprite->setShaderParams(color.r, color.g, color.b, color.a);
+            fade_overlay_sprite->drawSpriteRect(x, y, width, height);
+        };
+        const auto x_for = [inner_x, inner_width, this](float world_x) {
+            const float normalized = 0.5f + wrapped_delta_x(world_x, camera_center_x) / WORLD_WIDTH;
+            return inner_x + std::clamp(static_cast<int>(normalized * static_cast<float>(inner_width - 1)), 0, inner_width - 1);
+        };
+        const auto y_for = [inner_y, inner_height, this](float world_y) {
+            const float normalized = (playable_world_top - std::clamp(world_y, WORLD_BOTTOM, playable_world_top)) / (playable_world_top - WORLD_BOTTOM);
+            return inner_y + std::clamp(static_cast<int>(normalized * static_cast<float>(inner_height - 1)), 0, inner_height - 1);
+        };
+        const auto terrain_y_for = [](float world_x) {
+            constexpr float TERRAIN_SEGMENT_WIDTH = 8.0f;
+            const float wrapped_x = wrap_world_x(world_x) + WORLD_HALF_WIDTH;
+            const int segment = static_cast<int>(std::floor(wrapped_x / TERRAIN_SEGMENT_WIDTH));
+            const float segment_progress = std::fmod(wrapped_x, TERRAIN_SEGMENT_WIDTH) / TERRAIN_SEGMENT_WIDTH;
+            const auto height_for = [](int index) {
+                const uint32_t hash = static_cast<uint32_t>(index) * 1103515245U + 12345U;
+                return WORLD_BOTTOM + 1.0f + static_cast<float>((hash >> 16U) % 7U) * 0.26f;
+            };
+            return std::lerp(height_for(segment), height_for(segment + 1), segment_progress);
+        };
+
+        const std::string title = "RADAR";
+        int title_width = 0;
+        int ignored_height = 0;
+        if (!getTextDimensions(title, title_width, ignored_height)) {
+            title_width = 180;
+        }
+        printText(title, static_cast<int>(extent.width) / 2 - title_width / 2, 18, {120, 220, 255, 255});
+
+        draw_rect(scanner_x, scanner_y, scanner_width, RADAR_HEIGHT, {0.02f, 0.05f, 0.09f, 0.94f});
+        draw_rect(scanner_x, scanner_y, scanner_width, SCANNER_BORDER, {0.32f, 0.72f, 0.88f, 0.95f});
+        draw_rect(scanner_x, scanner_y + RADAR_HEIGHT - SCANNER_BORDER, scanner_width, SCANNER_BORDER, {0.32f, 0.72f, 0.88f, 0.95f});
+        draw_rect(scanner_x, scanner_y, SCANNER_BORDER, RADAR_HEIGHT, {0.32f, 0.72f, 0.88f, 0.95f});
+        draw_rect(scanner_x + scanner_width - SCANNER_BORDER, scanner_y, SCANNER_BORDER, RADAR_HEIGHT, {0.32f, 0.72f, 0.88f, 0.95f});
+        for (int x = inner_x; x < inner_x + inner_width; x += 2) {
+            const float progress = static_cast<float>(x - inner_x) / static_cast<float>(inner_width - 1);
+            const float world_x = wrap_world_x(camera_center_x + (progress - 0.5f) * WORLD_WIDTH);
+            draw_rect(x, y_for(terrain_y_for(world_x)), 2, 2, {0.20f, 0.62f, 0.36f, 0.9f});
+        }
+
+        const float visible_half_height = std::tan(glm::radians(25.0f)) * CAMERA_DISTANCE;
+        const float visible_half_width = visible_half_height * std::max(0.1f, static_cast<float>(extent.width) / static_cast<float>(extent.height));
+        const int bracket_half_width = std::max(1, static_cast<int>(visible_half_width / WORLD_WIDTH * static_cast<float>(inner_width)));
+        const int scanner_center_x = inner_x + inner_width / 2;
+        const int left_bracket_x = scanner_center_x - bracket_half_width;
+        const int right_bracket_x = scanner_center_x + bracket_half_width;
+        constexpr int BRACKET_ARM_LENGTH = 10;
+        draw_rect(left_bracket_x, inner_y, 2, inner_height, {0.25f, 0.85f, 1.0f, 0.9f});
+        draw_rect(left_bracket_x, inner_y, BRACKET_ARM_LENGTH, 2, {0.25f, 0.85f, 1.0f, 0.9f});
+        draw_rect(left_bracket_x, inner_y + inner_height - 2, BRACKET_ARM_LENGTH, 2, {0.25f, 0.85f, 1.0f, 0.9f});
+        draw_rect(right_bracket_x, inner_y, 2, inner_height, {0.25f, 0.85f, 1.0f, 0.9f});
+        draw_rect(right_bracket_x - BRACKET_ARM_LENGTH + 2, inner_y, BRACKET_ARM_LENGTH, 2, {0.25f, 0.85f, 1.0f, 0.9f});
+        draw_rect(right_bracket_x - BRACKET_ARM_LENGTH + 2, inner_y + inner_height - 2, BRACKET_ARM_LENGTH, 2, {0.25f, 0.85f, 1.0f, 0.9f});
+
+        for (const Ufo &ufo : ufos) {
+            if (!ufo.active) {
+                continue;
+            }
+            if (ufo.sprite_set == UfoSpriteSet::Alien) {
+                draw_rect(x_for(ufo.position.x) - 2, y_for(ufo.position.y) - 2, 5, 5, {1.0f, 0.30f, 0.75f, 1.0f});
+            } else {
+                draw_rect(x_for(ufo.position.x) - 2, y_for(ufo.position.y) - 1, 5, 3, {0.25f, 1.0f, 0.46f, 1.0f});
+            }
+        }
+
+        for (const Asteroid &asteroid : asteroids) {
+            if (asteroid.active) {
+                draw_rect(x_for(asteroid.position.x) - 1, y_for(asteroid.position.y) - 1, 3, 3, {1.0f, 0.58f, 0.18f, 1.0f});
+            }
+        }
+        for (const space::Projectile &projectile : projectiles) {
+            if (projectile.active) {
+                draw_rect(x_for(projectile.position.x), y_for(projectile.position.y), 2, 2, {1.0f, 0.95f, 0.38f, 1.0f});
+            }
+        }
+        if (ship.visible && !ship_respawning && static_cast<int>(elapsed_seconds * 8.0f) % 2 == 0) {
+            draw_rect(x_for(ship.position.x) - 3, y_for(ship.position.y) - 3, 7, 7, {1.0f, 1.0f, 1.0f, 1.0f});
+        }
     }
 
 } // namespace defender

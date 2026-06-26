@@ -65,6 +65,7 @@ namespace defender {
         Uint32 launch_start_ms = 0;
         float ship_forward_direction = 1.0f;
         float camera_center_x = 0.0f;
+        float playable_world_top = WORLD_TOP;
         float respawn_timer = 0.0f;
         int score = 0;
         int lives = 5;
@@ -80,6 +81,7 @@ namespace defender {
         bool roll_left_pressed = false;
         bool roll_right_pressed = false;
         bool show_fps_counter = false;
+        bool crt_enabled = true;
         float fps_accumulator = 0.0f;
         int fps_frame_count = 0;
         std::string fps_text = "FPS: --";
@@ -106,6 +108,7 @@ namespace defender {
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
         mxvk::VK_Sprite *fade_overlay_sprite = nullptr;
+        mxvk::VK_Sprite *crt_sprite = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console{};
         bool console_ready = false;
@@ -165,6 +168,10 @@ namespace defender {
         glm::mat4 build_ship_model_matrix();
 
         glm::mat4 build_asteroid_model_matrix(const Asteroid &asteroid, const mxvk::VKAbstractModel &model_resource) const;
+
+        void update_camera_position(float dt);
+
+        void update_playable_world_top(const VkExtent2D &extent);
 
         void reset_intro_screen();
 
@@ -289,6 +296,8 @@ namespace defender {
         void update_fps_counter(float delta_seconds);
 
         void draw_hud(const VkExtent2D &extent);
+
+        void draw_scanner(const VkExtent2D &extent);
     };
 
 } // namespace defender

@@ -571,6 +571,97 @@ namespace mxvk {
         sprite.renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
     }
 
+    void VK_Window::enablePostProcessing(VK_Sprite *sprite) {
+        post_process_sprite = sprite;
+        if (device != VK_NULL_HANDLE && !swapchain_images.empty()) {
+            createPostProcessTargets();
+        }
+    }
+
+    void VK_Window::destroyPostProcessTargets() {
+        for (VkImageView view : post_process_views) {
+            if (view != VK_NULL_HANDLE) {
+                vkDestroyImageView(device, view, nullptr);
+            }
+        }
+        for (VkImage image : post_process_images) {
+            if (image != VK_NULL_HANDLE) {
+                vkDestroyImage(device, image, nullptr);
+            }
+        }
+        for (VkDeviceMemory memory : post_process_memories) {
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, memory, nullptr);
+            }
+        }
+        post_process_views.clear();
+        post_process_images.clear();
+        post_process_memories.clear();
+        post_process_initialized.clear();
+    }
+
+    void VK_Window::createPostProcessTargets() {
+        destroyPostProcessTargets();
+        if (post_process_sprite == nullptr || swapchain_images.empty()) {
+            return;
+        }
+        post_process_images.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        post_process_memories.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        post_process_views.resize(swapchain_images.size(), VK_NULL_HANDLE);
+        post_process_initialized.assign(swapchain_images.size(), false);
+        VkPhysicalDeviceMemoryProperties memory_properties{};
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+        for (size_t i = 0; i < post_process_images.size(); ++i) {
+            VkImageCreateInfo image_info{};
+            image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            image_info.imageType = VK_IMAGE_TYPE_2D;
+            image_info.extent = {swapchain_extent.width, swapchain_extent.height, 1};
+            image_info.mipLevels = 1;
+            image_info.arrayLayers = 1;
+            image_info.format = swapchain_format;
+            image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+            image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+            image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            if (vkCreateImage(device, &image_info, nullptr, &post_process_images[i]) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to create post-process image");
+            }
+            VkMemoryRequirements requirements{};
+            vkGetImageMemoryRequirements(device, post_process_images[i], &requirements);
+            uint32_t memory_type = UINT32_MAX;
+            for (uint32_t type = 0; type < memory_properties.memoryTypeCount; ++type) {
+                if ((requirements.memoryTypeBits & (1U << type)) != 0U &&
+                    (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U) {
+                    memory_type = type;
+                    break;
+                }
+            }
+            if (memory_type == UINT32_MAX) {
+                throw mxvk::Exception("Failed to find post-process image memory type");
+            }
+            VkMemoryAllocateInfo allocation{};
+            allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocation.allocationSize = requirements.size;
+            allocation.memoryTypeIndex = memory_type;
+            if (vkAllocateMemory(device, &allocation, nullptr, &post_process_memories[i]) != VK_SUCCESS ||
+                vkBindImageMemory(device, post_process_images[i], post_process_memories[i], 0) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to allocate post-process image memory");
+            }
+            VkImageViewCreateInfo view_info{};
+            view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            view_info.image = post_process_images[i];
+            view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            view_info.format = swapchain_format;
+            view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            view_info.subresourceRange.levelCount = 1;
+            view_info.subresourceRange.layerCount = 1;
+            if (vkCreateImageView(device, &view_info, nullptr, &post_process_views[i]) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to create post-process image view");
+            }
+        }
+    }
+
     bool VK_Window::ensureRenderResources() {
         const auto sync_ready = [this]() {
             return std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
@@ -1070,6 +1161,10 @@ namespace mxvk {
             }
         }
 
+        if (post_process_sprite != nullptr) {
+            createPostProcessTargets();
+        }
+
         std::cout << "vk: createRenderResources complete\n";
         return true;
     }
@@ -1282,6 +1377,8 @@ namespace mxvk {
             std::cout << "vk: skipping cleanupSwapchain because logical device is null\n";
             return;
         }
+
+        destroyPostProcessTargets();
 
         if (!swapchain_image_views.empty()) {
             std::cout << "vk: destroying swapchain image views\n";
@@ -1523,6 +1620,7 @@ namespace mxvk {
 
         VkClearValue clear_value{};
         clear_value.color = clear_color;
+        const bool use_post_process = post_process_enabled && post_process_sprite != nullptr && image_index < post_process_images.size();
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -1547,6 +1645,28 @@ namespace mxvk {
         pre_render_dependency.imageMemoryBarrierCount = 1;
         pre_render_dependency.pImageMemoryBarriers = &to_color_barrier;
         vkCmdPipelineBarrier2(cmd, &pre_render_dependency);
+
+        if (use_post_process) {
+            VkImageMemoryBarrier2 post_target_barrier{};
+            post_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            post_target_barrier.srcStageMask = post_process_initialized[image_index] ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE;
+            post_target_barrier.srcAccessMask = post_process_initialized[image_index] ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE;
+            post_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            post_target_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            post_target_barrier.oldLayout = post_process_initialized[image_index] ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+            post_target_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            post_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            post_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            post_target_barrier.image = post_process_images[image_index];
+            post_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            post_target_barrier.subresourceRange.levelCount = 1;
+            post_target_barrier.subresourceRange.layerCount = 1;
+            VkDependencyInfo post_target_dependency{};
+            post_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            post_target_dependency.imageMemoryBarrierCount = 1;
+            post_target_dependency.pImageMemoryBarriers = &post_target_barrier;
+            vkCmdPipelineBarrier2(cmd, &post_target_dependency);
+        }
 
         VkImageMemoryBarrier2 to_depth_barrier{};
         to_depth_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -1586,7 +1706,7 @@ namespace mxvk {
 
         VkRenderingAttachmentInfo color_attachment{};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        color_attachment.imageView = swapchain_image_views[image_index];
+        color_attachment.imageView = use_post_process ? post_process_views[image_index] : swapchain_image_views[image_index];
         color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         color_attachment.resolveImageView = VK_NULL_HANDLE;
@@ -1640,7 +1760,7 @@ namespace mxvk {
         // Draw 2D overlays after custom scene rendering so HUD/text stays on top.
         if (!sprites.empty()) {
             for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
-                if (!sprite) {
+                if (!sprite || sprite.get() == post_process_sprite) {
                     continue;
                 }
                 if (sprite_pipeline != VK_NULL_HANDLE) {
@@ -1658,6 +1778,47 @@ namespace mxvk {
         vkCmdEndRendering(cmd);
         if (depth_slot < depth_image_initialized.size()) {
             depth_image_initialized[depth_slot] = true;
+        }
+
+        if (use_post_process) {
+            VkImageMemoryBarrier2 post_target_barrier{};
+            post_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            post_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            post_target_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            post_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            post_target_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            post_target_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            post_target_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            post_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            post_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            post_target_barrier.image = post_process_images[image_index];
+            post_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            post_target_barrier.subresourceRange.levelCount = 1;
+            post_target_barrier.subresourceRange.layerCount = 1;
+            VkDependencyInfo post_target_dependency{};
+            post_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            post_target_dependency.imageMemoryBarrierCount = 1;
+            post_target_dependency.pImageMemoryBarriers = &post_target_barrier;
+            vkCmdPipelineBarrier2(cmd, &post_target_dependency);
+
+            VkRenderingAttachmentInfo present_attachment{};
+            present_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            present_attachment.imageView = swapchain_image_views[image_index];
+            present_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            present_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            present_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            VkRenderingInfo present_info{};
+            present_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            present_info.renderArea.extent = swapchain_extent;
+            present_info.layerCount = 1;
+            present_info.colorAttachmentCount = 1;
+            present_info.pColorAttachments = &present_attachment;
+            vkCmdBeginRendering(cmd, &present_info);
+            post_process_sprite->setExternalTexture(post_process_views[image_index], static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
+            post_process_sprite->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
+            renderStandaloneSprite(*post_process_sprite, cmd);
+            vkCmdEndRendering(cmd);
+            post_process_initialized[image_index] = true;
         }
 
         VkImageMemoryBarrier2 to_present_barrier{};
