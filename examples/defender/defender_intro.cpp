@@ -417,7 +417,7 @@ namespace defender {
         if (!getTextDimensions(title, title_width, ignored_height)) {
             title_width = 180;
         }
-        printText(title, static_cast<int>(extent.width) / 2 - title_width / 2, 18, {120, 220, 255, 255});
+        printText(title, static_cast<int>(extent.width) / 2 - title_width / 2, 6, {120, 220, 255, 255});
 
         draw_rect(scanner_x, scanner_y, scanner_width, RADAR_HEIGHT, {0.02f, 0.05f, 0.09f, 0.94f});
         draw_rect(scanner_x, scanner_y, scanner_width, SCANNER_BORDER, {0.32f, 0.72f, 0.88f, 0.95f});
