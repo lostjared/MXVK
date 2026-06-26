@@ -61,8 +61,8 @@ namespace defender {
         }
 
         if (cmd == "controls") {
-            out << "Keyboard: Z thrust, X reverse, Up/W and Down move, Space fires, A/S roll.\n"
-                << "Controller: Left stick or D-pad moves, Right Trigger thrusts, Left Trigger or West reverses,\n"
+            out << "Keyboard: Z thrust, D boost, X reverse, Up/W and Down move, Space fires, A/S roll.\n"
+                << "Controller: Left stick or D-pad moves, Right Trigger thrusts, East boosts, Left Trigger or West reverses,\n"
                 << "            South fires, Left/Right Shoulder rolls, Start skips/restarts, Back quits.";
             return true;
         }
@@ -349,7 +349,9 @@ namespace defender {
         fire_pressed = false;
         roll_left_pressed = false;
         roll_right_pressed = false;
+        boost_pressed = false;
         controller_propulsion_pressed = false;
+        controller_boost_pressed = false;
         controller_roll_left_pressed = false;
         controller_roll_right_pressed = false;
         controller_reverse_trigger_pressed = false;
@@ -393,6 +395,7 @@ namespace defender {
     void DefenderWindow::update_controller_input() {
         if (!controller.active()) {
             controller_propulsion_pressed = false;
+            controller_boost_pressed = false;
             controller_roll_left_pressed = false;
             controller_roll_right_pressed = false;
             controller_reverse_trigger_pressed = false;
@@ -408,6 +411,7 @@ namespace defender {
         }
 
         controller_propulsion_pressed = controller.getAxis(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > CONTROLLER_DEAD_ZONE;
+        controller_boost_pressed = controller.getButton(SDL_GAMEPAD_BUTTON_EAST);
         controller_roll_left_pressed = controller.getButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
         controller_roll_right_pressed = controller.getButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
 

@@ -21,13 +21,15 @@ namespace defender {
 
         constexpr float horizontal_acceleration = 58.0f;
         constexpr float horizontal_drag = 2.4f;
-        const bool propulsion_active = mode == GameMode::Playing && (propulsion_pressed || controller_propulsion_pressed);
+        const bool boost_active = mode == GameMode::Playing && (boost_pressed || controller_boost_pressed);
+        const bool propulsion_active = mode == GameMode::Playing && (propulsion_pressed || controller_propulsion_pressed || boost_active);
+        const float max_horizontal_speed = ship.max_speed * (boost_active ? 2.0f : 1.0f);
         if (propulsion_active) {
             ship.velocity.x += ship_forward_direction * horizontal_acceleration * dt;
         } else {
             ship.velocity.x = std::lerp(ship.velocity.x, 0.0f, 1.0f - std::exp(-dt * horizontal_drag));
         }
-        ship.velocity.x = std::clamp(ship.velocity.x, -ship.max_speed, ship.max_speed);
+        ship.velocity.x = std::clamp(ship.velocity.x, -max_horizontal_speed, max_horizontal_speed);
         ship.current_speed = std::abs(ship.velocity.x);
 
         float vertical_input = 0.0f;

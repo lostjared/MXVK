@@ -76,7 +76,9 @@ namespace defender {
         bool fire_pressed = false;
         bool roll_left_pressed = false;
         bool roll_right_pressed = false;
+        bool boost_pressed = false;
         bool controller_propulsion_pressed = false;
+        bool controller_boost_pressed = false;
         bool controller_roll_left_pressed = false;
         bool controller_roll_right_pressed = false;
         bool controller_reverse_trigger_pressed = false;

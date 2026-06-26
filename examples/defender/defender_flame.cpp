@@ -262,7 +262,9 @@ namespace defender {
     }
 
     void DefenderWindow::draw_engine_flame(VkCommandBuffer cmd, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &projection) {
-        if (!propulsion_pressed || ship.current_speed <= 1.0f || flame_pipeline == VK_NULL_HANDLE || flame_vertex_buffer == VK_NULL_HANDLE || flame_vertex_count == 0) {
+        const bool boost_active = boost_pressed || controller_boost_pressed;
+        const bool propulsion_active = propulsion_pressed || controller_propulsion_pressed || boost_active;
+        if (!propulsion_active || ship.current_speed <= 1.0f || flame_pipeline == VK_NULL_HANDLE || flame_vertex_buffer == VK_NULL_HANDLE || flame_vertex_count == 0) {
             return;
         }
 
@@ -282,7 +284,7 @@ namespace defender {
 
         space::FlamePushConstants pc{};
         pc.mvp = projection * view * last_ship_model_matrix;
-        pc.params = glm::vec4(elapsed_seconds, std::clamp(ship.current_speed / ship.max_speed, 0.0f, 1.0f), 0.0f, 0.0f);
+        pc.params = glm::vec4(elapsed_seconds, std::clamp(ship.current_speed / ship.max_speed, 0.0f, 2.0f), boost_active ? 1.0f : 0.0f, 0.0f);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, flame_pipeline);
         vkCmdPushConstants(cmd,

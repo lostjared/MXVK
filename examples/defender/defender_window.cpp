@@ -272,6 +272,8 @@ namespace defender {
                 }
             } else if (e.key.key == SDLK_Z) {
                 propulsion_pressed = accepts_ship_thrust && pressed;
+            } else if (e.key.key == SDLK_D) {
+                boost_pressed = accepts_ship_thrust && pressed;
             } else if (e.key.key == SDLK_UP || e.key.key == SDLK_W) {
                 up_pressed = pressed;
             } else if (e.key.key == SDLK_DOWN) {
