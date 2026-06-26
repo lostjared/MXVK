@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <format>
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -20,6 +21,39 @@ namespace defender {
             asteroid.active = false;
             asteroid.respawn_timer = space::random_float(0.6f, 4.5f);
         }
+    }
+
+    void DefenderWindow::start_level() {
+        const int ufo_count = std::min(MAX_UFOS, level + 2);
+        const int asteroid_count = std::min(MAX_ASTEROIDS, std::max(1, level));
+
+        for (auto &ufo : ufos) {
+            ufo.active = false;
+        }
+        for (auto &asteroid : asteroids) {
+            asteroid.active = false;
+        }
+
+        for (int i = 0; i < ufo_count; ++i) {
+            respawn_ufo(ufos[static_cast<std::size_t>(i)]);
+        }
+        for (int i = 0; i < asteroid_count; ++i) {
+            respawn_asteroid(asteroids[static_cast<std::size_t>(i)]);
+        }
+
+        level_active = true;
+        log_game(std::format("Level {} started: {} UFO(s), {} asteroid(s).", level, ufo_count, asteroid_count));
+    }
+
+    void DefenderWindow::update_level_progress() {
+        if (!level_active || ship_respawning || game_over || active_ufo_count() != 0 || active_asteroid_count() != 0) {
+            return;
+        }
+
+        ++level;
+        level_active = false;
+        log_game(std::format("Level cleared. Advancing to level {}.", level), SDL_Color{120, 255, 180, 255});
+        start_level();
     }
 
     void DefenderWindow::respawn_ufo(Ufo &ufo, bool initial_spawn) {
@@ -59,19 +93,8 @@ namespace defender {
     }
 
     void DefenderWindow::update_ufos(float dt) {
-        if (!ufos_enabled) {
-            if (std::abs(camera_center_x) < 18.0f && std::abs(ship.position.x) < 18.0f) {
-                return;
-            }
-            ufos_enabled = true;
-        }
-
         for (auto &ufo : ufos) {
             if (!ufo.active) {
-                ufo.respawn_timer -= dt;
-                if (ufo.respawn_timer <= 0.0f) {
-                    respawn_ufo(ufo);
-                }
                 continue;
             }
 
@@ -116,19 +139,8 @@ namespace defender {
     }
 
     void DefenderWindow::update_asteroids(float dt) {
-        if (!asteroids_enabled) {
-            if (std::abs(camera_center_x) < 12.0f && std::abs(ship.position.x) < 12.0f) {
-                return;
-            }
-            asteroids_enabled = true;
-        }
-
         for (auto &asteroid : asteroids) {
             if (!asteroid.active) {
-                asteroid.respawn_timer -= dt;
-                if (asteroid.respawn_timer <= 0.0f) {
-                    respawn_asteroid(asteroid);
-                }
                 continue;
             }
 
@@ -143,7 +155,6 @@ namespace defender {
                 asteroid.velocity.y = -asteroid.velocity.y;
                 asteroid.position.y = std::clamp(asteroid.position.y, WORLD_BOTTOM + asteroid.collision_radius, playable_world_top - asteroid.collision_radius);
             }
-
         }
     }
 
@@ -317,6 +328,24 @@ namespace defender {
             const float pulse = current_ufo_pulse(ufo);
             const int frame = current_ufo_frame(ufo);
             ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(nearest_world_position(ufo.position, camera_position.x), ufo_draw_size(ufo, pulse), ufo.tint, 0.0f);
+        }
+    }
+
+    void DefenderWindow::draw_terrain() {
+        constexpr float TERRAIN_SEGMENT_WIDTH = 8.0f;
+        constexpr float TERRAIN_LINE_WIDTH = 0.07f;
+        constexpr int VISIBLE_SEGMENTS = 8;
+        const int first_segment = static_cast<int>(std::floor((camera_position.x - static_cast<float>(VISIBLE_SEGMENTS) * TERRAIN_SEGMENT_WIDTH) / TERRAIN_SEGMENT_WIDTH));
+        const glm::vec4 terrain_color{0.18f, 0.86f, 0.40f, 0.92f};
+
+        for (int segment = first_segment; segment < first_segment + VISIBLE_SEGMENTS * 2 + 1; ++segment) {
+            const float left_x = static_cast<float>(segment) * TERRAIN_SEGMENT_WIDTH;
+            const float right_x = left_x + TERRAIN_SEGMENT_WIDTH;
+            const float left_y = terrain_height(left_x);
+            const float right_y = terrain_height(right_x);
+            const glm::vec2 delta{right_x - left_x, right_y - left_y};
+            terrain_sprite->drawSprite({(left_x + right_x) * 0.5f, (left_y + right_y) * 0.5f, 0.0f},
+                                       {glm::length(delta), TERRAIN_LINE_WIDTH}, terrain_color, std::atan2(delta.y, delta.x));
         }
     }
 

@@ -69,10 +69,10 @@ namespace defender {
         float respawn_timer = 0.0f;
         int score = 0;
         int lives = 5;
+        int level = 1;
+        bool level_active = false;
         bool game_over = false;
         bool ship_respawning = false;
-        bool ufos_enabled = false;
-        bool asteroids_enabled = false;
         bool reverse_pressed = false;
         bool propulsion_pressed = false;
         bool up_pressed = false;
@@ -102,6 +102,7 @@ namespace defender {
         mxvk::VKAbstractModel ship_model{};
         std::array<mxvk::VKAbstractModel, MAX_ASTEROIDS> asteroid_models{};
         mxvk::VK_Sprite3D *star_sprite = nullptr;
+        mxvk::VK_Sprite3D *terrain_sprite = nullptr;
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
         std::array<std::array<mxvk::VK_Sprite3D *, UFO_ANIMATION_FRAMES>, UFO_SPRITE_SET_COUNT> ufo_sprite_sets{};
         std::array<std::array<SpriteAlphaBounds, UFO_ANIMATION_FRAMES>, UFO_SPRITE_SET_COUNT> ufo_sprite_bounds{};
@@ -195,6 +196,10 @@ namespace defender {
 
         void init_asteroids();
 
+        void start_level();
+
+        void update_level_progress();
+
         void respawn_ufo(Ufo &ufo, bool initial_spawn = false);
 
         void update_ufos(float dt);
@@ -225,7 +230,11 @@ namespace defender {
 
         [[nodiscard]] glm::vec2 ufo_draw_size(const Ufo &ufo, float pulse) const;
 
+        [[nodiscard]] bool is_visible_to_player(const glm::vec3 &position, float radius) const;
+
         void draw_ufos();
+
+        void draw_terrain();
 
         void draw_asteroids(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &projection);
 

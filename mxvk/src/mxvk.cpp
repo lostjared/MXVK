@@ -978,7 +978,7 @@ namespace mxvk {
             create_info.queueFamilyIndexCount = 0;
             create_info.pQueueFamilyIndices = nullptr;
         }
-        
+
         create_info.preTransform = support.capabilities.currentTransform;
         create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         create_info.presentMode = present_mode;
@@ -1293,7 +1293,7 @@ namespace mxvk {
             new_extent.width = std::clamp(static_cast<uint32_t>(pixel_w),
                                           surface_capabilities.minImageExtent.width,
                                           surface_capabilities.maxImageExtent.width);
-                                          
+
             new_extent.height = std::clamp(static_cast<uint32_t>(pixel_h),
                                            surface_capabilities.minImageExtent.height,
                                            surface_capabilities.maxImageExtent.height);
@@ -1302,10 +1302,10 @@ namespace mxvk {
         if (new_extent.width == 0 || new_extent.height == 0) {
             return;
         }
-        
+
         const uint32_t target_w = std::clamp(static_cast<uint32_t>(pixel_w),
-                                                 surface_capabilities.minImageExtent.width,
-                                                 surface_capabilities.maxImageExtent.width);
+                                             surface_capabilities.minImageExtent.width,
+                                             surface_capabilities.maxImageExtent.width);
         const uint32_t target_h = std::clamp(static_cast<uint32_t>(pixel_h),
                                              surface_capabilities.minImageExtent.height,
                                              surface_capabilities.maxImageExtent.height);
@@ -1323,7 +1323,7 @@ namespace mxvk {
             swapchain_extent.height == new_extent.height) {
             return;
         }
-        
+
         std::cout << std::format("mxvk: recreating swapchain for {}x{} window\n", new_extent.width, new_extent.height);
         vkDeviceWaitIdle(device);
         onSwapchainAboutToRecreate();
@@ -1345,12 +1345,12 @@ namespace mxvk {
             std::cerr << "mxvk: failed to recreate swapchain after resize\n";
             if (old_swapchain != VK_NULL_HANDLE) {
                 retired_swapchains.push_back(old_swapchain);
-                //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+                // vkDestroySwapchainKHR(device, old_swapchain, nullptr);
             }
             return;
         }
         if (old_swapchain != VK_NULL_HANDLE) {
-            //vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+            // vkDestroySwapchainKHR(device, old_swapchain, nullptr);
             retired_swapchains.push_back(old_swapchain);
         }
 
@@ -1448,7 +1448,7 @@ namespace mxvk {
             framebuffer_resized = true;
             return;
         }
-        
+
         if (swapchain_extent.width != 0 && swapchain_extent.height != 0) {
             if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
                 swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {

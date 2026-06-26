@@ -65,6 +65,20 @@ namespace defender {
         star_field.init(STAR_COUNT, 16.0f, 112.0f);
         star_field.setSprite(star_sprite);
 
+        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> terrain_surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
+        if (terrain_surface == nullptr) {
+            throw mxvk::Exception("Failed to create defender terrain surface");
+        }
+        const SDL_PixelFormatDetails *terrain_format = SDL_GetPixelFormatDetails(terrain_surface->format);
+        if (terrain_format == nullptr) {
+            throw mxvk::Exception("Failed to query defender terrain surface format");
+        }
+        SDL_FillSurfaceRect(terrain_surface.get(), nullptr, SDL_MapRGBA(terrain_format, nullptr, 255, 255, 255, 255));
+        terrain_sprite = createSprite3D(terrain_surface.get());
+        terrain_sprite->setDepthTestEnabled(false);
+        terrain_sprite->setDepthWriteEnabled(false);
+        terrain_sprite->setAlphaDiscardThreshold(0.01f);
+
         projectile_sprite = createSprite3D(asset_root + "/data/particle_projectile.png");
         projectile_sprite->setDepthTestEnabled(true);
         projectile_sprite->setDepthWriteEnabled(false);
@@ -142,6 +156,9 @@ namespace defender {
         }
         if (star_sprite != nullptr) {
             star_sprite->cleanup();
+        }
+        if (terrain_sprite != nullptr) {
+            terrain_sprite->cleanup();
         }
         if (projectile_sprite != nullptr) {
             projectile_sprite->cleanup();
@@ -240,6 +257,9 @@ namespace defender {
             asteroid_model.resize(this);
         }
         star_field.resize(this);
+        if (terrain_sprite != nullptr) {
+            terrain_sprite->resize(this);
+        }
         if (projectile_sprite != nullptr) {
             projectile_sprite->resize(this);
         }
@@ -286,6 +306,7 @@ namespace defender {
                 check_projectile_asteroid_hits();
                 check_ship_ufo_collisions();
                 check_ship_asteroid_collisions();
+                update_level_progress();
             }
         }
         update_particles(dt);
@@ -336,6 +357,11 @@ namespace defender {
         star_field.draw();
         star_sprite->render(cmd, image_index);
         star_sprite->clearQueue();
+
+        terrain_sprite->updateCamera(image_index, view, projection);
+        draw_terrain();
+        terrain_sprite->render(cmd, image_index);
+        terrain_sprite->clearQueue();
 
         for (auto &sprite_set : ufo_sprite_sets) {
             for (mxvk::VK_Sprite3D *sprite : sprite_set) {

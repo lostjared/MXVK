@@ -9,11 +9,11 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <mxvk/mxvk_version.hpp>
 #include <optional>
 #include <string>
 #include <vector>
 #include <volk/volk.h>
-#include <mxvk/mxvk_version.hpp>
 
 #ifdef ENABLE_VALIDATION
 #define MXVK_VALIDATION true
@@ -417,7 +417,7 @@ namespace mxvk {
         std::string font_path{};
         int font_size = 24;
         VkClearColorValue clear_color{{0.0f, 0.0f, 0.0f, 1.0f}};
-	std::vector<VkSwapchainKHR> retired_swapchains;
+        std::vector<VkSwapchainKHR> retired_swapchains;
     };
 
 } // namespace mxvk

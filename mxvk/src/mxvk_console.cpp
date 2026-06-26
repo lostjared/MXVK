@@ -847,9 +847,9 @@ namespace mxvk {
             }
 
             scroll_thumb_sprite->drawSpriteRect(scrollbar_x,
-                                                 consoleSpriteY(scrollbar_thumb_y, scrollbar_thumb_h),
-                                                 scrollbar_w,
-                                                 scrollbar_thumb_h);
+                                                consoleSpriteY(scrollbar_thumb_y, scrollbar_thumb_h),
+                                                scrollbar_w,
+                                                scrollbar_thumb_h);
         }
 
         if (scroll_offset > 0) {

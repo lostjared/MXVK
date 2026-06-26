@@ -417,14 +417,14 @@ namespace mxvk {
             return;
         }
 
-            logVKAbstractModelStep("teardown begin", true);
+        logVKAbstractModelStep("teardown begin", true);
         windowPtr = targetWindow;
         destroyPipelines();
         destroyDescriptors();
         destroyTextures();
         obj.cleanup(windowPtr->getDevice());
         windowPtr = nullptr;
-            logVKAbstractModelStep("teardown complete", true);
+        logVKAbstractModelStep("teardown complete", true);
     }
 
     void VKAbstractModel::computeBoundsAndScale() {

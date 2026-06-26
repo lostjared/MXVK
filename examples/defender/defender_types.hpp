@@ -54,6 +54,18 @@ namespace defender {
         return position;
     }
 
+    [[nodiscard]] inline float terrain_height(float world_x) {
+        constexpr float TERRAIN_SEGMENT_WIDTH = 8.0f;
+        const float wrapped_x = wrap_world_x(world_x) + WORLD_HALF_WIDTH;
+        const int segment = static_cast<int>(std::floor(wrapped_x / TERRAIN_SEGMENT_WIDTH));
+        const float segment_progress = std::fmod(wrapped_x, TERRAIN_SEGMENT_WIDTH) / TERRAIN_SEGMENT_WIDTH;
+        const auto height_for = [](int index) {
+            const uint32_t hash = static_cast<uint32_t>(index) * 1103515245U + 12345U;
+            return WORLD_BOTTOM + 1.0f + static_cast<float>((hash >> 16U) % 7U) * 0.26f;
+        };
+        return std::lerp(height_for(segment), height_for(segment + 1), segment_progress);
+    }
+
 } // namespace defender
 
 #endif

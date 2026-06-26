@@ -4,9 +4,9 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_console.hpp"
 
+#include <SDL3/SDL.h>
 #include <iosfwd>
 #include <vector>
-#include <SDL3/SDL.h>
 
 namespace mxvk {
 
@@ -14,7 +14,7 @@ namespace mxvk {
       public:
         VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen);
         void event(SDL_Event &e) override;
-        void print(const std::string &text, SDL_Color col = {255,255,255,255});
+        void print(const std::string &text, SDL_Color col = {255, 255, 255, 255});
         void proc() override;
         virtual void console_proc() = 0;
         virtual void console_event(SDL_Event &e) = 0;

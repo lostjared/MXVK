@@ -266,7 +266,9 @@ namespace defender {
         launch_timer = std::min<Uint32>(now - launch_start_ms, launch_duration);
         if (launch_timer >= launch_duration) {
             mode = GameMode::Playing;
-            ufos_enabled = false;
+            if (!level_active) {
+                start_level();
+            }
             reverse_pressed = false;
             propulsion_pressed = false;
             fire_pressed = false;
@@ -345,7 +347,8 @@ namespace defender {
         const SDL_Color yellow{255, 230, 80, 255};
         const SDL_Color red{255, 70, 60, 255};
         printText("Score: " + std::to_string(score), 24, 22, white);
-        printText("Lives: " + std::to_string(lives), 24, 52, lives <= 1 ? red : white);
+        printText("Level: " + std::to_string(level), 24, 52, yellow);
+        printText("Lives: " + std::to_string(lives), 24, 82, lives <= 1 ? red : white);
         draw_scanner(extent);
         if (show_fps_counter) {
             int fps_w = 0;
@@ -407,17 +410,6 @@ namespace defender {
             const float normalized = (playable_world_top - std::clamp(world_y, WORLD_BOTTOM, playable_world_top)) / (playable_world_top - WORLD_BOTTOM);
             return inner_y + std::clamp(static_cast<int>(normalized * static_cast<float>(inner_height - 1)), 0, inner_height - 1);
         };
-        const auto terrain_y_for = [](float world_x) {
-            constexpr float TERRAIN_SEGMENT_WIDTH = 8.0f;
-            const float wrapped_x = wrap_world_x(world_x) + WORLD_HALF_WIDTH;
-            const int segment = static_cast<int>(std::floor(wrapped_x / TERRAIN_SEGMENT_WIDTH));
-            const float segment_progress = std::fmod(wrapped_x, TERRAIN_SEGMENT_WIDTH) / TERRAIN_SEGMENT_WIDTH;
-            const auto height_for = [](int index) {
-                const uint32_t hash = static_cast<uint32_t>(index) * 1103515245U + 12345U;
-                return WORLD_BOTTOM + 1.0f + static_cast<float>((hash >> 16U) % 7U) * 0.26f;
-            };
-            return std::lerp(height_for(segment), height_for(segment + 1), segment_progress);
-        };
 
         const std::string title = "RADAR";
         int title_width = 0;
@@ -435,7 +427,7 @@ namespace defender {
         for (int x = inner_x; x < inner_x + inner_width; x += 2) {
             const float progress = static_cast<float>(x - inner_x) / static_cast<float>(inner_width - 1);
             const float world_x = wrap_world_x(camera_center_x + (progress - 0.5f) * WORLD_WIDTH);
-            draw_rect(x, y_for(terrain_y_for(world_x)), 2, 2, {0.20f, 0.62f, 0.36f, 0.9f});
+            draw_rect(x, y_for(terrain_height(world_x)), 2, 2, {0.20f, 0.62f, 0.36f, 0.9f});
         }
 
         const float visible_half_height = std::tan(glm::radians(25.0f)) * CAMERA_DISTANCE;

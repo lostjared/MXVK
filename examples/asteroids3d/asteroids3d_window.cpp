@@ -1,7 +1,7 @@
-#include "asteroids3d_types.hpp"
 #include "asteroids3d_window.hpp"
-#include "ship.hpp"
+#include "asteroids3d_types.hpp"
 #include "rain.hpp"
+#include "ship.hpp"
 #include "starfield.hpp"
 
 #include "mxvk/argz.hpp"
@@ -16,22 +16,21 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <exception>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <format>
 #include <limits>
-#include <mutex>
 #include <memory>
-#include <ostream>
+#include <mutex>
 #include <optional>
+#include <ostream>
 #include <string>
+#include <thread>
 #include <vector>
-#include <thread>
-#include <thread>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>

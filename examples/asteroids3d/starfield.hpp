@@ -6,7 +6,7 @@
 namespace mxvk {
     class VK_Sprite3D;
     class VK_Window;
-}
+} // namespace mxvk
 
 namespace space {
 

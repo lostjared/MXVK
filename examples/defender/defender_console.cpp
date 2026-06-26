@@ -62,6 +62,7 @@ namespace defender {
             out << "Mode: " << mode_name() << '\n'
                 << "Score: " << score << '\n'
                 << "Lives: " << lives << '\n'
+                << "Level: " << level << '\n'
                 << "Game over: " << (game_over ? "yes" : "no") << '\n'
                 << "Ship respawning: " << (ship_respawning ? "yes" : "no") << '\n'
                 << "Ship position: " << format_vec3(ship.position) << '\n'
@@ -97,6 +98,9 @@ namespace defender {
             ship_respawning = false;
             mode = GameMode::Playing;
             ship.visible = true;
+            if (!level_active) {
+                start_level();
+            }
             log_game("Play mode activated from console.");
             out << "Playing.";
             return true;

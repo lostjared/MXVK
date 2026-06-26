@@ -100,8 +100,8 @@ namespace mxvk {
         [[nodiscard]] Sint16 getAxis(int axis) const;
 
       protected:
-        SDL_Joystick *stick = nullptr;  ///< Underlying SDL joystick handle.
-        int deviceIndex = -1;        ///< Open index in the current joystick list.
+        SDL_Joystick *stick = nullptr; ///< Underlying SDL joystick handle.
+        int deviceIndex = -1;          ///< Open index in the current joystick list.
         SDL_JoystickID instanceId = 0; ///< Stable SDL joystick instance identifier.
     };
 
@@ -201,8 +201,8 @@ namespace mxvk {
       protected:
         bool openByInstanceId(SDL_JoystickID instanceId, int index_hint = -1);
 
-        SDL_Gamepad *stick = nullptr; ///< Underlying SDL gamepad handle.
-        int deviceIndex = -1;        ///< Open index in the current gamepad list.
+        SDL_Gamepad *stick = nullptr;  ///< Underlying SDL gamepad handle.
+        int deviceIndex = -1;          ///< Open index in the current gamepad list.
         SDL_JoystickID instanceId = 0; ///< Stable SDL gamepad instance identifier.
     };
 

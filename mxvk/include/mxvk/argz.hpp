@@ -684,33 +684,33 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width = 1280;                 ///< Viewport width in pixels (default: 1280).
-    int height = 720;                 ///< Viewport height in pixels (default: 720).
-    bool resolutionSpecified = false; ///< Whether -r/--resolution was provided.
-    std::string path = ".";           ///< Asset search path (default: ".").
-    bool fullscreen = false;          ///< Whether fullscreen mode was requested.
-    bool fast = false;                ///< Whether fast mode was requested (@c --fast).
-    std::string filename;             ///< Optional input filename (@c --filename).
-    std::string output;               ///< Optional output filename (@c --output).
-    std::string crf;                  ///< Optional CRF value (@c --crf).
-    std::string encodePreset;         ///< Optional encoder preset (@c --encode-preset).
-    std::string encodeTune;           ///< Optional encoder tune (@c --encode-tune).
-    std::string encodeCodec;          ///< Optional encoder codec policy (@c --encode-codec).
-    bool encodeRealtime = false;      ///< Enable low-latency encoder settings (@c --encode-realtime).
+    int width = 1280;                  ///< Viewport width in pixels (default: 1280).
+    int height = 720;                  ///< Viewport height in pixels (default: 720).
+    bool resolutionSpecified = false;  ///< Whether -r/--resolution was provided.
+    std::string path = ".";            ///< Asset search path (default: ".").
+    bool fullscreen = false;           ///< Whether fullscreen mode was requested.
+    bool fast = false;                 ///< Whether fast mode was requested (@c --fast).
+    std::string filename;              ///< Optional input filename (@c --filename).
+    std::string output;                ///< Optional output filename (@c --output).
+    std::string crf;                   ///< Optional CRF value (@c --crf).
+    std::string encodePreset;          ///< Optional encoder preset (@c --encode-preset).
+    std::string encodeTune;            ///< Optional encoder tune (@c --encode-tune).
+    std::string encodeCodec;           ///< Optional encoder codec policy (@c --encode-codec).
+    bool encodeRealtime = false;       ///< Enable low-latency encoder settings (@c --encode-realtime).
     bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
-    bool repeat = false;              ///< Repeat video playback when a file reaches EOF.
+    bool repeat = false;               ///< Repeat video playback when a file reaches EOF.
     bool binary = false;               ///< Use binary glyphs only (@c --binary).
-    int font_size = 22;               ///< Matrix rain font size in pixels (@c --font-size).
-    std::string font_path;            ///< Optional font file path (@c --font-path).
-    std::string color;                ///< Optional rain RGB tint (@c --color).
-    std::string texture;              ///< Optional texture file path (@c --texture).
-    std::string shaderPath;           ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    std::string fragmentPath;         ///< Optional fragment shader SPV path (@c --fragment).
-    int camera_index = 0;             ///< Optional camera index
-    int index = 0;                    ///< Optional acidcam filter mode index.
-    int shader_index = 0;             ///< Optional initial shader entry index.
-    std::string resource;             ///< Resource file
-    std::string resource_path;        ///< Resource path
+    int font_size = 22;                ///< Matrix rain font size in pixels (@c --font-size).
+    std::string font_path;             ///< Optional font file path (@c --font-path).
+    std::string color;                 ///< Optional rain RGB tint (@c --color).
+    std::string texture;               ///< Optional texture file path (@c --texture).
+    std::string shaderPath;            ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    std::string fragmentPath;          ///< Optional fragment shader SPV path (@c --fragment).
+    int camera_index = 0;              ///< Optional camera index
+    int index = 0;                     ///< Optional acidcam filter mode index.
+    int shader_index = 0;              ///< Optional initial shader entry index.
+    std::string resource;              ///< Resource file
+    std::string resource_path;         ///< Resource path
 };
 
 /**
