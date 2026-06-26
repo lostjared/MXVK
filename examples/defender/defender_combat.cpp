@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <format>
 #include <string>
 
@@ -46,7 +47,6 @@ namespace defender {
 
     void DefenderWindow::check_projectile_ufo_hits() {
         constexpr float beam_collision_length = 7.4f;
-        constexpr float ufo_hit_half_height = 0.62f;
 
         for (auto &projectile : projectiles) {
             if (!projectile.active) {
@@ -63,14 +63,28 @@ namespace defender {
                 if (!ufo.active) {
                     continue;
                 }
-                const float half_width = ufo.base_size * 0.58f;
-                const bool overlaps_x = (ufo.position.x + half_width) >= min_x && (ufo.position.x - half_width) <= max_x;
-                const bool overlaps_y = std::abs(ufo.position.y - projectile.position.y) <= ufo_hit_half_height;
+                const int frame = current_ufo_frame(ufo);
+                const SpriteAlphaBounds &bounds = ufo_sprite_bounds[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)];
+                const glm::vec2 draw_size = ufo_draw_size(ufo, current_ufo_pulse(ufo));
+                const glm::vec2 body_center{
+                    ufo.position.x + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
+                    ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
+                };
+                const glm::vec2 body_radius{
+                    std::max(0.001f, (bounds.max_x - bounds.min_x) * 0.5f * draw_size.x),
+                    std::max(0.001f, (bounds.max_y - bounds.min_y) * 0.5f * draw_size.y),
+                };
+                const bool overlaps_x = (body_center.x + body_radius.x) >= min_x && (body_center.x - body_radius.x) <= max_x;
+                const bool overlaps_y = std::abs(body_center.y - projectile.position.y) <= body_radius.y;
                 if (!overlaps_x || !overlaps_y) {
                     continue;
                 }
 
-                spawn_ufo_explosion(ufo.position);
+                if (ufo.sprite_set == UfoSpriteSet::Alien) {
+                    spawn_alien_explosion(ufo.position);
+                } else {
+                    spawn_ufo_explosion(ufo.position);
+                }
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
                 play_sound(ufo_explosion_sound);
 #endif
@@ -78,7 +92,7 @@ namespace defender {
                 ufo.respawn_timer = space::random_float(1.2f, 2.8f);
                 projectile.active = false;
                 score += 5;
-                log_game(std::format("UFO destroyed. Score={}.", score));
+                log_game(std::format("{} destroyed. Score={}.", ufo.sprite_set == UfoSpriteSet::Alien ? "Alien" : "UFO", score));
                 break;
             }
         }
@@ -135,7 +149,7 @@ namespace defender {
             const int frame = current_ufo_frame(ufo);
             const SpriteAlphaBounds &bounds = ufo_sprite_bounds[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)];
             const float pulse = current_ufo_pulse(ufo);
-            const glm::vec2 draw_size{ufo.base_size * pulse, ufo.base_size * 0.58f * pulse};
+            const glm::vec2 draw_size = ufo_draw_size(ufo, pulse);
             const glm::vec2 body_center{
                 ufo.position.x + ((bounds.min_x + bounds.max_x) * 0.5f) * draw_size.x,
                 ufo.position.y + ((bounds.min_y + bounds.max_y) * 0.5f) * draw_size.y,
@@ -155,8 +169,12 @@ namespace defender {
                 continue;
             }
 
-            spawn_ufo_explosion(ufo.position);
-            spawn_ufo_explosion(ship.position);
+            if (ufo.sprite_set == UfoSpriteSet::Alien) {
+                spawn_alien_explosion(ufo.position);
+            } else {
+                spawn_ufo_explosion(ufo.position);
+            }
+            spawn_ship_explosion(ship.position);
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             play_sound(ufo_explosion_sound);
 #endif
@@ -185,7 +203,7 @@ namespace defender {
             }
 
             spawn_ufo_explosion(asteroid.position, asteroid.scale);
-            spawn_ufo_explosion(ship.position);
+            spawn_ship_explosion(ship.position);
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             play_sound(asteroid_explosion_sound);
 #endif
@@ -267,8 +285,8 @@ namespace defender {
         game_over = false;
         ship_respawning = false;
         respawn_timer = 0.0f;
-        left_pressed = false;
-        right_pressed = false;
+        reverse_pressed = false;
+        propulsion_pressed = false;
         up_pressed = false;
         down_pressed = false;
         roll_left_pressed = false;
@@ -318,6 +336,36 @@ namespace defender {
     }
 
     void DefenderWindow::spawn_ufo_explosion(const glm::vec3 &position, float explosion_scale) {
+        constexpr std::array<glm::vec3, 4> colors = {
+            glm::vec3{1.0f, 1.0f, 1.0f},
+            glm::vec3{1.0f, 0.86f, 0.34f},
+            glm::vec3{1.0f, 0.42f, 0.08f},
+            glm::vec3{0.75f, 0.90f, 1.0f},
+        };
+        spawn_enemy_explosion(position, explosion_scale, colors);
+    }
+
+    void DefenderWindow::spawn_alien_explosion(const glm::vec3 &position, float explosion_scale) {
+        constexpr std::array<glm::vec3, 4> colors = {
+            glm::vec3{0.82f, 1.0f, 0.52f},
+            glm::vec3{0.35f, 1.0f, 0.18f},
+            glm::vec3{0.08f, 0.72f, 0.18f},
+            glm::vec3{0.70f, 1.0f, 0.82f},
+        };
+        spawn_enemy_explosion(position, explosion_scale, colors);
+    }
+
+    void DefenderWindow::spawn_ship_explosion(const glm::vec3 &position, float explosion_scale) {
+        constexpr std::array<glm::vec3, 4> colors = {
+            glm::vec3{1.0f, 0.72f, 0.62f},
+            glm::vec3{1.0f, 0.20f, 0.12f},
+            glm::vec3{0.76f, 0.02f, 0.02f},
+            glm::vec3{1.0f, 0.36f, 0.22f},
+        };
+        spawn_enemy_explosion(position, explosion_scale, colors);
+    }
+
+    void DefenderWindow::spawn_enemy_explosion(const glm::vec3 &position, float explosion_scale, const std::array<glm::vec3, 4> &wave_colors) {
         struct ExplosionWave {
             float min_speed;
             float max_speed;
@@ -325,14 +373,13 @@ namespace defender {
             float max_size;
             float min_lifetime;
             float max_lifetime;
-            glm::vec3 color;
         };
 
         constexpr std::array<ExplosionWave, 4> waves = {
-            ExplosionWave{24.0f, 42.0f, 0.42f, 0.78f, 0.75f, 1.35f, {1.0f, 1.0f, 1.0f}},
-            ExplosionWave{16.0f, 32.0f, 0.32f, 0.58f, 0.90f, 1.60f, {1.0f, 0.86f, 0.34f}},
-            ExplosionWave{10.0f, 24.0f, 0.20f, 0.42f, 1.05f, 1.85f, {1.0f, 0.42f, 0.08f}},
-            ExplosionWave{5.0f, 16.0f, 0.12f, 0.26f, 1.20f, 2.10f, {0.75f, 0.90f, 1.0f}},
+            ExplosionWave{24.0f, 42.0f, 0.42f, 0.78f, 0.75f, 1.35f},
+            ExplosionWave{16.0f, 32.0f, 0.32f, 0.58f, 0.90f, 1.60f},
+            ExplosionWave{10.0f, 24.0f, 0.20f, 0.42f, 1.05f, 1.85f},
+            ExplosionWave{5.0f, 16.0f, 0.12f, 0.26f, 1.20f, 2.10f},
         };
 
         const float visual_scale = std::clamp(explosion_scale, 0.75f, 2.35f);
@@ -341,7 +388,9 @@ namespace defender {
         const float speed_scale = std::lerp(0.85f, 1.35f, std::clamp((visual_scale - 0.75f) / 1.60f, 0.0f, 1.0f));
         const float lifetime_scale = std::lerp(0.90f, 1.20f, std::clamp((visual_scale - 0.75f) / 1.60f, 0.0f, 1.0f));
 
-        for (const ExplosionWave &wave : waves) {
+        for (std::size_t wave_index = 0; wave_index < waves.size(); ++wave_index) {
+            const ExplosionWave &wave = waves[wave_index];
+            const glm::vec3 &wave_color = wave_colors[wave_index];
             for (int i = 0; i < particles_per_wave; ++i) {
                 space::Particle *particle = find_free_particle();
                 if (particle == nullptr) {
@@ -354,9 +403,9 @@ namespace defender {
                 particle->position = position + dir * space::random_float(0.1f, 0.8f) * visual_scale;
                 particle->velocity = dir * space::random_float(wave.min_speed, wave.max_speed) * speed_scale;
                 particle->color = glm::vec4(
-                    wave.color.r * space::random_float(0.9f, 1.1f),
-                    wave.color.g * space::random_float(0.9f, 1.1f),
-                    wave.color.b * space::random_float(0.9f, 1.1f),
+                    wave_color.r * space::random_float(0.9f, 1.1f),
+                    wave_color.g * space::random_float(0.9f, 1.1f),
+                    wave_color.b * space::random_float(0.9f, 1.1f),
                     0.1f);
                 particle->size = space::random_float(wave.min_size, wave.max_size) * visual_scale;
                 particle->lifetime = 0.0f;

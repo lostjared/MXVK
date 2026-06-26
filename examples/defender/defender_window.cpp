@@ -79,6 +79,14 @@ namespace defender {
             ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setDepthTestEnabled(true);
             ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setDepthWriteEnabled(false);
             ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Ufox)][static_cast<std::size_t>(i)]->setAlphaDiscardThreshold(0.02f);
+
+            const std::string alien_frame_path = asset_root + std::format("/data/alien{}.png", i + 1);
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> alien_surface(load_light_background_png(alien_frame_path), SDL_DestroySurface);
+            ufo_sprite_bounds[static_cast<std::size_t>(UfoSpriteSet::Alien)][static_cast<std::size_t>(i)] = calculate_alpha_bounds(alien_surface.get());
+            ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Alien)][static_cast<std::size_t>(i)] = createSprite3D(alien_surface.get());
+            ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Alien)][static_cast<std::size_t>(i)]->setDepthTestEnabled(true);
+            ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Alien)][static_cast<std::size_t>(i)]->setDepthWriteEnabled(false);
+            ufo_sprite_sets[static_cast<std::size_t>(UfoSpriteSet::Alien)][static_cast<std::size_t>(i)]->setAlphaDiscardThreshold(0.02f);
         }
 
         std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> explosion_surface(space::load_color_keyed_png(asset_root + "/data/particle_explosion.png", 12), SDL_DestroySurface);
@@ -181,14 +189,19 @@ namespace defender {
 
         if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
             const bool pressed = e.type == SDL_EVENT_KEY_DOWN;
+            const bool accepts_ship_thrust = mode == GameMode::Playing && !game_over && !ship_respawning;
             if (e.key.key == SDLK_A) {
                 roll_left_pressed = pressed;
             } else if (e.key.key == SDLK_S) {
                 roll_right_pressed = pressed;
-            } else if (e.key.key == SDLK_LEFT) {
-                left_pressed = pressed;
-            } else if (e.key.key == SDLK_RIGHT || e.key.key == SDLK_D) {
-                right_pressed = pressed;
+            } else if (e.key.key == SDLK_X) {
+                if (accepts_ship_thrust && pressed && !e.key.repeat) {
+                    reverse_pressed = true;
+                } else if (!accepts_ship_thrust) {
+                    reverse_pressed = false;
+                }
+            } else if (e.key.key == SDLK_Z) {
+                propulsion_pressed = accepts_ship_thrust && pressed;
             } else if (e.key.key == SDLK_UP || e.key.key == SDLK_W) {
                 up_pressed = pressed;
             } else if (e.key.key == SDLK_DOWN) {

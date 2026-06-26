@@ -72,8 +72,8 @@ namespace defender {
         bool ship_respawning = false;
         bool ufos_enabled = false;
         bool asteroids_enabled = false;
-        bool left_pressed = false;
-        bool right_pressed = false;
+        bool reverse_pressed = false;
+        bool propulsion_pressed = false;
         bool up_pressed = false;
         bool down_pressed = false;
         bool fire_pressed = false;
@@ -216,6 +216,8 @@ namespace defender {
 
         [[nodiscard]] float current_ufo_pulse(const Ufo &ufo) const;
 
+        [[nodiscard]] glm::vec2 ufo_draw_size(const Ufo &ufo, float pulse) const;
+
         void draw_ufos();
 
         void draw_asteroids(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &projection);
@@ -269,6 +271,12 @@ namespace defender {
         void draw_projectiles();
 
         void spawn_ufo_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
+
+        void spawn_alien_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
+
+        void spawn_ship_explosion(const glm::vec3 &position, float explosion_scale = 1.0f);
+
+        void spawn_enemy_explosion(const glm::vec3 &position, float explosion_scale, const std::array<glm::vec3, 4> &wave_colors);
 
         space::Particle *find_free_particle();
 

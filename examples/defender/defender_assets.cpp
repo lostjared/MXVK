@@ -104,7 +104,7 @@ namespace defender {
             SDL_GetRGBA(pixels[index], format_details, nullptr, &r, &g, &b, &a);
             const int min_channel = std::min({static_cast<int>(r), static_cast<int>(g), static_cast<int>(b)});
             const int max_channel = std::max({static_cast<int>(r), static_cast<int>(g), static_cast<int>(b)});
-            return a != 0 && min_channel >= 220 && (max_channel - min_channel) <= 18;
+            return a != 0 && min_channel >= 215 && (max_channel - min_channel) <= 28;
         };
 
         const auto push_background = [&](const int index) {

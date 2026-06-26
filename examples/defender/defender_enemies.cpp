@@ -34,7 +34,14 @@ namespace defender {
         ufo.phase = space::random_float(0.0f, 2.0f * space::PI);
         ufo.bob_speed = space::random_float(1.1f, 2.8f);
         ufo.spin_speed = space::random_float(2.8f, 6.2f) * (space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f);
-        ufo.sprite_set = space::random_float(0.0f, 1.0f) < 0.5f ? UfoSpriteSet::Classic : UfoSpriteSet::Ufox;
+        const float sprite_roll = space::random_float(0.0f, 1.0f);
+        if (sprite_roll < 0.34f) {
+            ufo.sprite_set = UfoSpriteSet::Classic;
+        } else if (sprite_roll < 0.67f) {
+            ufo.sprite_set = UfoSpriteSet::Ufox;
+        } else {
+            ufo.sprite_set = UfoSpriteSet::Alien;
+        }
         const float collision_radius = ufo_collision_radius(ufo);
         for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
             const float distance = initial_spawn ? space::random_float(-52.0f, 52.0f) : side * space::random_float(34.0f, 56.0f);
@@ -147,6 +154,9 @@ namespace defender {
     }
 
     [[nodiscard]] float DefenderWindow::ufo_collision_radius(const Ufo &ufo) const {
+        if (ufo.sprite_set == UfoSpriteSet::Alien) {
+            return ufo.base_size * 0.46f + ENEMY_SEPARATION_PADDING;
+        }
         return ufo.base_size * 0.58f + ENEMY_SEPARATION_PADDING;
     }
 
@@ -296,6 +306,13 @@ namespace defender {
         return 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f;
     }
 
+    [[nodiscard]] glm::vec2 DefenderWindow::ufo_draw_size(const Ufo &ufo, float pulse) const {
+        if (ufo.sprite_set == UfoSpriteSet::Alien) {
+            return glm::vec2(ufo.base_size * 0.82f * pulse);
+        }
+        return glm::vec2(ufo.base_size * pulse, ufo.base_size * 0.58f * pulse);
+    }
+
     void DefenderWindow::draw_ufos() {
         for (const auto &ufo : ufos) {
             if (!ufo.active) {
@@ -303,7 +320,7 @@ namespace defender {
             }
             const float pulse = current_ufo_pulse(ufo);
             const int frame = current_ufo_frame(ufo);
-            ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(ufo.position, glm::vec2(ufo.base_size * pulse, ufo.base_size * 0.58f * pulse), ufo.tint, 0.0f);
+            ufo_sprite_sets[static_cast<std::size_t>(ufo.sprite_set)][static_cast<std::size_t>(frame)]->drawSprite(ufo.position, ufo_draw_size(ufo, pulse), ufo.tint, 0.0f);
         }
     }
 

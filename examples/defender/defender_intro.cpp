@@ -14,18 +14,21 @@ namespace defender {
     void DefenderWindow::update_ship(float dt) {
         ship.prev_position = ship.position;
 
-        float horizontal_input = 0.0f;
-        if (left_pressed && !right_pressed) {
-            horizontal_input = -1.0f;
-        } else if (right_pressed && !left_pressed) {
-            horizontal_input = 1.0f;
-        }
-        if (horizontal_input != 0.0f) {
-            ship_forward_direction = horizontal_input;
+        if (reverse_pressed) {
+            reverse_pressed = false;
+            ship_forward_direction *= -1.0f;
+            ship.velocity.x *= 0.55f;
         }
 
-        const float target_horizontal_velocity = horizontal_input * 18.0f;
-        ship.velocity.x = std::lerp(ship.velocity.x, target_horizontal_velocity, 1.0f - std::exp(-dt * 7.0f));
+        constexpr float horizontal_acceleration = 58.0f;
+        constexpr float horizontal_drag = 2.4f;
+        const bool propulsion_active = mode == GameMode::Playing && propulsion_pressed;
+        if (propulsion_active) {
+            ship.velocity.x += ship_forward_direction * horizontal_acceleration * dt;
+        } else {
+            ship.velocity.x = std::lerp(ship.velocity.x, 0.0f, 1.0f - std::exp(-dt * horizontal_drag));
+        }
+        ship.velocity.x = std::clamp(ship.velocity.x, -ship.max_speed, ship.max_speed);
         ship.current_speed = std::abs(ship.velocity.x);
 
         float vertical_input = 0.0f;
@@ -35,8 +38,10 @@ namespace defender {
             vertical_input = -1.0f;
         }
 
-        const float target_vertical_velocity = vertical_input * 17.0f;
-        ship.velocity.y = std::lerp(ship.velocity.y, target_vertical_velocity, 1.0f - std::exp(-dt * 9.0f));
+        constexpr float vertical_speed = 19.0f;
+        constexpr float vertical_response = 12.0f;
+        const float target_vertical_velocity = vertical_input * vertical_speed;
+        ship.velocity.y = std::lerp(ship.velocity.y, target_vertical_velocity, 1.0f - std::exp(-dt * vertical_response));
         ship.velocity.z = 0.0f;
         ship.position += ship.velocity * dt;
         ship.position.y = std::clamp(ship.position.y, WORLD_BOTTOM, WORLD_TOP);
@@ -46,7 +51,8 @@ namespace defender {
         const float pitch = std::clamp(ship.velocity.y * 0.9f, -12.0f, 12.0f);
         ship.rotation.x = pitch;
         ship.rotation.y = ship_forward_direction > 0.0f ? -90.0f : 90.0f;
-        ship.rotation.z = bank;
+        const float thrust_bank = propulsion_active ? ship_forward_direction * -7.0f : 0.0f;
+        ship.rotation.z = bank + thrust_bank;
 
         if (ship.fire_cooldown > 0) {
             --ship.fire_cooldown;
@@ -208,12 +214,19 @@ namespace defender {
         const float visible_half_height = std::tan(glm::radians(25.0f)) * CAMERA_DISTANCE;
         const float visible_half_width = visible_half_height * std::max(0.1f, aspect);
         const float scroll_limit = visible_half_width * CAMERA_SCROLL_EDGE_FRACTION;
+        const bool propulsion_active = mode == GameMode::Playing && propulsion_pressed;
+        const float lead_offset = propulsion_active ? ship_forward_direction * visible_half_width * 0.18f : 0.0f;
+        const float desired_camera_x = ship.position.x + lead_offset;
         const float relative_x = ship.position.x - camera_center_x;
 
         if (relative_x > scroll_limit) {
             camera_center_x = ship.position.x - scroll_limit;
         } else if (relative_x < -scroll_limit) {
             camera_center_x = ship.position.x + scroll_limit;
+        }
+
+        if (propulsion_active) {
+            camera_center_x = std::lerp(camera_center_x, desired_camera_x, 0.04f);
         }
     }
 
@@ -237,6 +250,8 @@ namespace defender {
         if (launch_timer >= launch_duration) {
             mode = GameMode::Playing;
             ufos_enabled = false;
+            reverse_pressed = false;
+            propulsion_pressed = false;
             fire_pressed = false;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             play_sound(takeoff_sound);

@@ -18,7 +18,8 @@ namespace defender {
 
     enum class UfoSpriteSet : std::size_t {
         Classic = 0,
-        Ufox = 1
+        Ufox = 1,
+        Alien = 2
     };
 
     struct Ufo {

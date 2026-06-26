@@ -146,7 +146,7 @@ namespace defender {
                 out << "Ship is already destroyed.";
                 return true;
             }
-            spawn_ufo_explosion(ship.position);
+            spawn_ship_explosion(ship.position);
             lose_life();
             log_game("Ship destroyed from console.", SDL_Color{255, 120, 80, 255});
             out << "Ship destroyed.";
@@ -328,8 +328,8 @@ namespace defender {
     }
 
     void DefenderWindow::clear_input_state() {
-        left_pressed = false;
-        right_pressed = false;
+        reverse_pressed = false;
+        propulsion_pressed = false;
         up_pressed = false;
         down_pressed = false;
         fire_pressed = false;

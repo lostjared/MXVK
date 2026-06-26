@@ -262,7 +262,7 @@ namespace defender {
     }
 
     void DefenderWindow::draw_engine_flame(VkCommandBuffer cmd, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &projection) {
-        if (ship.current_speed <= 1.0f || flame_pipeline == VK_NULL_HANDLE || flame_vertex_buffer == VK_NULL_HANDLE || flame_vertex_count == 0) {
+        if (!propulsion_pressed || ship.current_speed <= 1.0f || flame_pipeline == VK_NULL_HANDLE || flame_vertex_buffer == VK_NULL_HANDLE || flame_vertex_count == 0) {
             return;
         }
 
