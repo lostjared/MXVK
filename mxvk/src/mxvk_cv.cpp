@@ -1,5 +1,5 @@
 /**
- * @file vk_cv.cpp
+ * @file mxvk_cv.cpp
  * @brief Implementation of mxvk::VK_Capture (Vulkan + OpenCV variant).
  */
 #include "mxvk/mxvk_cv.hpp"

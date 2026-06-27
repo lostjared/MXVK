@@ -1,5 +1,5 @@
 /**
- * @file vk_text.hpp
+ * @file mxvk_text.hpp
  * @brief Vulkan SDL_ttf text renderer.
  *
  * VKText rasterises text strings into SDL surfaces, uploads them as

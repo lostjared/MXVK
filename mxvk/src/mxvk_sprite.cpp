@@ -1,6 +1,6 @@
 /**
- * @file vk_sprite.cpp
- * @brief Implementation of mx::VKSprite Vulkan 2-D sprite renderer.
+ * @file mxvk_sprite.cpp
+ * @brief Implementation of mxvk::VK_Sprite Vulkan 2-D sprite renderer.
  */
 #include "mxvk/mxvk_sprite.hpp"
 #include "mxvk/mxvk_opencv_compat.hpp"

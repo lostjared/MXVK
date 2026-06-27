@@ -20,6 +20,8 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Early Screenshots](#early-screenshots)
 
 
+<a id="what-this-project-is"></a>
+
 ## What This Project Is
 
 - A static library (`mxvk`) for Vulkan-based rendering.
@@ -38,6 +40,8 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 View on YouTube: https://youtu.be/Y3PyGg3qBUA
 
 
+<a id="core-dependencies"></a>
+
 ## Core Dependencies
 
 The root CMake configuration checks for and uses:
@@ -53,6 +57,8 @@ The root CMake configuration checks for and uses:
 - Optional: OpenCV (when building with `-DCV=ON`)
 - Optional: FFmpeg for MXWrite (when building with `-DWITH_MXWRITE=AUTO|ON`)
 
+
+<a id="build"></a>
 
 ## Build
 
@@ -112,6 +118,8 @@ cmake -S . -B build -DFRACTAL_ZOOM=ON
 cmake -S . -B build -DEXAMPLES=OFF
 ```
 
+
+<a id="command-line-arguments"></a>
 
 ## Command Line Arguments
 
@@ -192,6 +200,8 @@ Examples:
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
 
+<a id="examples"></a>
+
 ## Examples
 
 The examples are grouped below by what they demonstrate. Most accept the shared arguments documented above, and the per-example `README.md` files carry the full control maps for the larger demos.
@@ -243,6 +253,8 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 If you want a quick tour of the core demos, `./run.pl --all` executes the default example sweep used by `testapps.pl`.
 
 
+<a id="mxwrite"></a>
+
 ## MXWrite
 
 MXWrite is the FFmpeg-based video writer library included in this repository. It is useful when you want to export RGBA frames to a video file from a C++20 application without building a separate project.
@@ -278,6 +290,8 @@ if (writer.open("output.mp4", 1280, 720, 30.0f, opts)) {
 
 When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite` target so consumers can gate MXWrite-specific code consistently.
 
+<a id="project-layout"></a>
+
 ## Project Layout
 
 - `mxvk/`
@@ -293,6 +307,8 @@ When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite
 
 - The example CMake files copy required runtime assets into each example's output directory after build.
 
+
+<a id="early-screenshots"></a>
 
 ## Early Screenshots
 

@@ -1,5 +1,5 @@
 /**
- * @file loadpng.cpp
+ * @file mxvk_png.cpp
  * @brief Implementation of mxvk PNG loading and saving utilities.
  */
 #include "mxvk/mxvk_png.hpp"

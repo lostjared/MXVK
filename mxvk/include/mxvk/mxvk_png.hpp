@@ -1,5 +1,5 @@
 /**
- * @file loadpng.hpp
+ * @file mxvk_png.hpp
  * @brief PNG image loading and saving utilities via SDL3.
  */
 #ifndef __LOADPNG_H__

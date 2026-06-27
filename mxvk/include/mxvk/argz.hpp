@@ -736,7 +736,7 @@ struct Arguments {
  * |      | --binary           | Use binary glyphs only                        |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
- * | -C   | --color            | Matrix rain RGB tint (#RRGGBB or R,G,B)       |
+ * | -C   | --color            | Matrix rain RGB tint (\#RRGGBB or R,G,B)      |
  * |      | --texture          | Texture file                                 |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  * |      | --fragment         | Fragment shader SPV path                     |

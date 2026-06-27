@@ -60,6 +60,7 @@ namespace mxvk {
          * @brief Retrieve a configuration item by section and key.
          * @param section Section name (text inside [] brackets).
          * @param key     Key name within that section.
+         * @param default_value Value returned when the key is not present.
          * @return The matching Item, or a default-constructed one if not found.
          */
         VK_ConfigItem itemAtKey(const std::string &section, const std::string &key, const std::string &default_value = "") const;

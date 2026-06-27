@@ -1,5 +1,5 @@
 /**
- * @file vk_sprite.hpp
+ * @file mxvk_sprite.hpp
  * @brief Vulkan 2-D sprite renderer with optional custom shaders and instancing.
  *
  * VKSprite manages a Vulkan texture, a screen-space quad, and an optional

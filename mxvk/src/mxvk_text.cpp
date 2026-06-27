@@ -1,6 +1,6 @@
 /**
- * @file vk_text.cpp
- * @brief Implementation of mx::VKText Vulkan SDL_ttf text renderer.
+ * @file mxvk_text.cpp
+ * @brief Implementation of mxvk::VK_Text Vulkan SDL_ttf text renderer.
  */
 #include "mxvk/mxvk_text.hpp"
 #include <algorithm>
