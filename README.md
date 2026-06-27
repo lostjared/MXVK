@@ -4,7 +4,7 @@
 
 MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on practical 2D and 3D application development.
 
-It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
+It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -25,10 +25,12 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 ## What This Project Is
 
 - A static library (`mxvk`) for Vulkan-based rendering.
+- A small 2D/3D math and software-raster helper library used by the engine tests and examples.
 - A set of examples under `examples/` that exercise key features:
 	- dynamic rendering and custom pipelines
 	- sprite rendering and shader effects
 	- text rendering
+	- engine math, projection, and software 3D raster tests
 	- Matrix-style digital rain rendering
 	- model rendering
 	- game loops and input handling
@@ -184,6 +186,9 @@ each `run.pl` invocation, and stops on the first failure or `Ctrl-C`.
 Examples:
 ```bash
 ./run.pl sprite_example -r 1920x1080 -f
+./run.pl 3dmath
+./run.pl 3dmath_cube
+./run.pl 3dmath_texture --filename ./examples/sprite_example/data/intro.png
 ./run.pl model_example
 ./run.pl planet
 ./run.pl pong
@@ -213,6 +218,14 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 - `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
 - `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+
+### Engine Math Tests
+
+These programs are not intended as standalone applications. They are small visual tests for the engine's `mxvk/mxvk_math.h` math helpers, projection code, triangle drawing, filled polygons, lighting, and software texture sampling inside the MXVK render loop.
+
+- `3dmath` - minimal rotating triangle test using `vec4D`, `Mat4D`, `RenderList`, and `PipeLine` projection/drawing helpers. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `3dmath_cube` - rotating cube test for matrix transforms, backface culling, depth sorting, diffuse face shading, filled triangle rasterization, and line clipping. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `3dmath_texture` - textured rotating cube test for the same software 3D path plus PNG loading and software UV sampling. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** `Escape` quits.
 
 ### Shader And Effect Demos
 
@@ -295,7 +308,7 @@ When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite
 ## Project Layout
 
 - `mxvk/`
-	- Engine source, headers, and built-in shaders.
+	- Engine source, headers, built-in shaders, and the `mxvk/mxvk_math.h` math helpers used by the 3D math tests.
 - `examples/`
 	- Runnable examples and sample assets.
 - `models/`
