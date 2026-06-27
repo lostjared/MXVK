@@ -559,6 +559,12 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(static_example)
     add_subdirectory(examples/sprite_example)
     mxvk_configure_mingw_target(sprite_example)
+    add_subdirectory(examples/3dmath)
+    mxvk_configure_mingw_target(math3d)
+    add_subdirectory(examples/3dmath_cube)
+    mxvk_configure_mingw_target(math3d_cube)
+    add_subdirectory(examples/3dmath_texture)
+    mxvk_configure_mingw_target(math3d_texture)
     add_subdirectory(examples/sprite3d_example)
     mxvk_configure_mingw_target(sprite3d_example)
     add_subdirectory(examples/text_example)
@@ -710,6 +716,9 @@ if(EXAMPLES)
         hello_world
         static_example
         sprite_example
+        math3d
+        math3d_cube
+        math3d_texture
         sprite3d_example
         text_example
         model_example

@@ -1,0 +1,239 @@
+#include "mxvk/argz.hpp"
+#include "mxvk/mxvk.hpp"
+#include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_math.h"
+
+#include <SDL3/SDL.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstdlib>
+#include <format>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace {
+    class SurfaceDeleter {
+      public:
+        void operator()(SDL_Surface *surface) const {
+            SDL_DestroySurface(surface);
+        }
+    };
+
+    using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
+
+    SurfacePtr create_frame_surface(int width, int height) {
+        SurfacePtr surface(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
+        if (!surface) {
+            throw mxvk::Exception(std::format("Failed to create 3dmath_cube frame surface: {}", SDL_GetError()));
+        }
+        return surface;
+    }
+
+    struct FaceDraw {
+        std::array<int, 4> indices{};
+        float depth = 0.0F;
+        mxvk::MXCOLOR color = mxvk::MXVK_RGB(255, 255, 255);
+    };
+} // namespace
+
+namespace example {
+    class Math3DCubeWindow : public mxvk::VK_Window {
+      public:
+        Math3DCubeWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+              fallback_width(width),
+              fallback_height(height) {
+            setClearColor(0.012F, 0.015F, 0.022F, 1.0F);
+            mxvk::BuildTables();
+        }
+
+        void event(SDL_Event &e) override {
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
+                exit();
+            }
+        }
+
+        void proc() override {
+            const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
+            const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
+
+            ensure_framebuffer(width, height);
+            if (frame_sprite == nullptr || frame_surface == nullptr || frame_format == nullptr) {
+                return;
+            }
+
+            const float time = static_cast<float>(SDL_GetTicks()) * 0.001F;
+            clear_frame(mxvk::MXVK_RGB(3, 4, 8));
+
+            const std::array<mxvk::vec4D, 8> cube_vertices = {
+                mxvk::vec4D{-1.0F, -1.0F, -1.0F, 1.0F},
+                mxvk::vec4D{1.0F, -1.0F, -1.0F, 1.0F},
+                mxvk::vec4D{1.0F, 1.0F, -1.0F, 1.0F},
+                mxvk::vec4D{-1.0F, 1.0F, -1.0F, 1.0F},
+                mxvk::vec4D{-1.0F, -1.0F, 1.0F, 1.0F},
+                mxvk::vec4D{1.0F, -1.0F, 1.0F, 1.0F},
+                mxvk::vec4D{1.0F, 1.0F, 1.0F, 1.0F},
+                mxvk::vec4D{-1.0F, 1.0F, 1.0F, 1.0F},
+            };
+
+            mxvk::Mat4D rotation;
+            rotation.BuildXYZ(time * 31.0F, time * 43.0F, time * 17.0F);
+
+            std::array<mxvk::vec4D, 8> camera_vertices{};
+            std::array<mxvk::vec4D, 8> projected{};
+            for (std::size_t i = 0; i < cube_vertices.size(); ++i) {
+                mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
+                point.z += 4.25F;
+                camera_vertices[i] = point;
+                projected[i] = project_to_screen(point, width, height);
+            }
+
+            const std::array<std::array<int, 4>, 6> cube_faces = {{
+                {0, 3, 2, 1},
+                {4, 5, 6, 7},
+                {0, 4, 7, 3},
+                {1, 2, 6, 5},
+                {3, 7, 6, 2},
+                {0, 1, 5, 4},
+            }};
+
+            mxvk::vec3D light_dir(-0.35F, -0.55F, -1.0F);
+            light_dir.Normalize();
+
+            std::vector<FaceDraw> faces;
+            faces.reserve(cube_faces.size());
+            for (const auto &indices : cube_faces) {
+                const mxvk::vec4D &a = camera_vertices[static_cast<std::size_t>(indices[0])];
+                const mxvk::vec4D &b = camera_vertices[static_cast<std::size_t>(indices[1])];
+                const mxvk::vec4D &c = camera_vertices[static_cast<std::size_t>(indices[2])];
+                mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
+                normal.Normalize();
+
+                const mxvk::vec4D center = (a + b + c + camera_vertices[static_cast<std::size_t>(indices[3])]) * 0.25F;
+                const mxvk::vec4D view_vector(-center.x, -center.y, -center.z, 1.0F);
+                if (normal.DotProduct(view_vector) <= 0.0F) {
+                    continue;
+                }
+
+                const float diffuse = std::max(0.0F, normal.DotProduct(mxvk::vec4D(light_dir.x, light_dir.y, light_dir.z, 1.0F)));
+                const float intensity = std::clamp(0.25F + diffuse * 0.75F, 0.0F, 1.0F);
+                const mxvk::MXCOLOR color = mxvk::shade_color(mxvk::MXVK_RGB(76, 164, 255), intensity);
+                faces.push_back({indices, center.z, color});
+            }
+
+            std::ranges::sort(faces, [](const FaceDraw &left, const FaceDraw &right) {
+                return left.depth > right.depth;
+            });
+
+            for (const FaceDraw &face : faces) {
+                mxvk::PipeLine fill_pipeline;
+                fill_pipeline.Begin(width, height, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
+                const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[0])];
+                const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[1])];
+                const mxvk::vec4D &c = projected[static_cast<std::size_t>(face.indices[2])];
+                const mxvk::vec4D &d = projected[static_cast<std::size_t>(face.indices[3])];
+                fill_pipeline.DrawFilledTriangle(a, b, c, face.color);
+                fill_pipeline.DrawFilledTriangle(a, c, d, face.color);
+                fill_pipeline.End();
+            }
+
+            const int outline_size = std::max(1, width / 640);
+            mxvk::PipeLine outline_pipeline;
+            outline_pipeline.Begin(width, height, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
+            for (const FaceDraw &face : faces) {
+                for (int i = 0; i < 4; ++i) {
+                    const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>(i)])];
+                    const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>((i + 1) % 4)])];
+                    outline_pipeline.DrawClipedLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), mxvk::MXVK_RGB(235, 245, 255));
+                }
+            }
+            outline_pipeline.End();
+
+            frame_sprite->updateTexture(frame_surface.get());
+            frame_sprite->drawSpriteRect(0, 0, width, height);
+        }
+
+      private:
+        SurfacePtr frame_surface;
+        const SDL_PixelFormatDetails *frame_format = nullptr;
+        mxvk::VK_Sprite *frame_sprite = nullptr;
+        int frame_width = 0;
+        int frame_height = 0;
+        int fallback_width = 1280;
+        int fallback_height = 720;
+
+        void ensure_framebuffer(int width, int height) {
+            if (frame_surface != nullptr && frame_width == width && frame_height == height) {
+                return;
+            }
+
+            frame_surface = create_frame_surface(width, height);
+            frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
+            if (frame_format == nullptr) {
+                throw mxvk::Exception(std::format("Failed to query 3dmath_cube frame format: {}", SDL_GetError()));
+            }
+
+            frame_width = width;
+            frame_height = height;
+
+            clear_frame(mxvk::MXVK_RGB(3, 4, 8));
+            if (frame_sprite == nullptr) {
+                frame_sprite = createSprite(frame_surface.get());
+            } else {
+                frame_sprite->updateTexture(frame_surface.get());
+            }
+        }
+
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
+            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
+        }
+
+        void clear_frame(mxvk::MXCOLOR color) {
+            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
+        }
+
+        void put_pixel(int x, int y, mxvk::MXCOLOR color) {
+            if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
+                return;
+            }
+            auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
+            auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
+            *pixel = map_color(color);
+        }
+
+        void put_block(int x, int y, int size, mxvk::MXCOLOR color) {
+            for (int by = 0; by < size; ++by) {
+                for (int bx = 0; bx < size; ++bx) {
+                    put_pixel(x + bx, y + by, color);
+                }
+            }
+        }
+
+        static mxvk::vec4D project_to_screen(const mxvk::vec4D &point, int width, int height) {
+            const float scale = static_cast<float>(std::min(width, height)) * 0.52F;
+            const float center_x = static_cast<float>(width) * 0.5F;
+            const float center_y = static_cast<float>(height) * 0.5F;
+            const float z = std::max(point.z, 0.001F);
+            return {center_x + (point.x / z) * scale, center_y - (point.y / z) * scale, point.z, 1.0F};
+        }
+    };
+} // namespace example
+
+int main(int argc, char **argv) {
+    try {
+        Arguments args = proc_args(argc, argv);
+        example::Math3DCubeWindow window(args.path, "MXVK 3D Math Cube", args.width, args.height, args.fullscreen);
+        window.loop();
+    } catch (mxvk::Exception &e) {
+        std::cerr << std::format("mxvk: Exception: {}\n", e.text());
+        return EXIT_FAILURE;
+    } catch (ArgException<std::string> &e) {
+        std::cerr << std::format("mxvk: Argument Exception: {}\n", e.text());
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
