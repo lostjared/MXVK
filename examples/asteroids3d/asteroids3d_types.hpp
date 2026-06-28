@@ -38,7 +38,7 @@ namespace space {
     constexpr int SHOTS_PER_BURST = 5;
     constexpr int FIRE_DELAY = 3;
     constexpr int EXPLOSION_DURATION_FRAMES = 90;
-    constexpr float ROUND_TIME_LIMIT_SECONDS = 150.0f;
+    constexpr float ROUND_TIME_LIMIT_SECONDS = 270.0f;
     constexpr float SHIP_MODEL_SCALE = 1.55f;
     constexpr float ASTEROID_SHIP_COLLISION_SCALE = 1.08f;
     constexpr float ASTEROID_PROJECTILE_COLLISION_SCALE = 1.18f;

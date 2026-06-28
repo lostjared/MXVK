@@ -2260,6 +2260,81 @@ namespace space {
             ui_pixel->drawSpriteRect(x, y, width, height);
         }
 
+        std::optional<glm::ivec2> project_world_to_screen(const glm::vec3 &world_position, const VkExtent2D &extent) const {
+            const glm::vec4 clip = projection_matrix * view_matrix * glm::vec4(world_position, 1.0f);
+            if (clip.w <= 0.0001f) {
+                return std::nullopt;
+            }
+
+            const glm::vec3 ndc = glm::vec3(clip) / clip.w;
+            if (ndc.z < 0.0f || ndc.z > 1.0f) {
+                return std::nullopt;
+            }
+
+            const int x = static_cast<int>((ndc.x * 0.5f + 0.5f) * static_cast<float>(extent.width));
+            const int y = static_cast<int>((ndc.y * 0.5f + 0.5f) * static_cast<float>(extent.height));
+            return glm::ivec2{x, y};
+        }
+
+        bool cannon_has_asteroid_target(const glm::vec3 &muzzle, const glm::vec3 &forward) const {
+            constexpr float AIM_ASSIST_SCALE = 1.04f;
+            const float max_range = PROJECTILE_SPEED * PROJECTILE_LIFETIME;
+            for (const auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    continue;
+                }
+
+                const glm::vec3 to_asteroid = asteroid.position - muzzle;
+                const float along_ray = glm::dot(to_asteroid, forward);
+                if (along_ray < 0.0f || along_ray > max_range) {
+                    continue;
+                }
+
+                const glm::vec3 closest_point = muzzle + forward * along_ray;
+                const float hit_radius = asteroid.radius * ASTEROID_PROJECTILE_COLLISION_SCALE * AIM_ASSIST_SCALE;
+                if (glm::length(closest_point - asteroid.position) <= hit_radius) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void draw_cannon_crosshair(const VkExtent2D &extent) {
+            if (ui_pixel == nullptr || !ship.visible || ship.exploding || extent.width < 160U || extent.height < 120U) {
+                return;
+            }
+
+            constexpr float AIM_DISTANCE = 120.0f;
+            constexpr float MUZZLE_OFFSET = 0.08f;
+            constexpr int ARM_LENGTH = 18;
+            constexpr int GAP = 6;
+            constexpr int THICKNESS = 2;
+            const glm::vec3 forward = ship.forward();
+            const glm::vec3 muzzle = ship.position + forward * MUZZLE_OFFSET;
+            const glm::vec3 aim_position = muzzle + forward * AIM_DISTANCE;
+            const std::optional<glm::ivec2> screen_position = project_world_to_screen(aim_position, extent);
+            if (!screen_position.has_value()) {
+                return;
+            }
+
+            const int x = std::clamp(screen_position->x, ARM_LENGTH + 2, static_cast<int>(extent.width) - ARM_LENGTH - 2);
+            const int y = std::clamp(screen_position->y, ARM_LENGTH + 2, static_cast<int>(extent.height) - ARM_LENGTH - 2);
+            const bool target_locked = cannon_has_asteroid_target(muzzle, forward);
+            const glm::vec4 shadow = target_locked ? glm::vec4{0.0f, 0.02f, 0.07f, 0.7f} : glm::vec4{0.05f, 0.0f, 0.0f, 0.7f};
+            const glm::vec4 crosshair_color = target_locked ? glm::vec4{0.12f, 0.58f, 1.0f, 0.98f} : glm::vec4{1.0f, 0.03f, 0.02f, 0.96f};
+
+            draw_ui_rect(x - ARM_LENGTH - 1, y - THICKNESS / 2 - 1, ARM_LENGTH - GAP + 2, THICKNESS + 2, shadow);
+            draw_ui_rect(x + GAP - 1, y - THICKNESS / 2 - 1, ARM_LENGTH - GAP + 2, THICKNESS + 2, shadow);
+            draw_ui_rect(x - THICKNESS / 2 - 1, y - ARM_LENGTH - 1, THICKNESS + 2, ARM_LENGTH - GAP + 2, shadow);
+            draw_ui_rect(x - THICKNESS / 2 - 1, y + GAP - 1, THICKNESS + 2, ARM_LENGTH - GAP + 2, shadow);
+
+            draw_ui_rect(x - ARM_LENGTH, y - THICKNESS / 2, ARM_LENGTH - GAP, THICKNESS, crosshair_color);
+            draw_ui_rect(x + GAP, y - THICKNESS / 2, ARM_LENGTH - GAP, THICKNESS, crosshair_color);
+            draw_ui_rect(x - THICKNESS / 2, y - ARM_LENGTH, THICKNESS, ARM_LENGTH - GAP, crosshair_color);
+            draw_ui_rect(x - THICKNESS / 2, y + GAP, THICKNESS, ARM_LENGTH - GAP, crosshair_color);
+            draw_ui_rect(x - 1, y - 1, 3, 3, crosshair_color);
+        }
+
         void draw_radar(const VkExtent2D &extent) {
             if (ui_pixel == nullptr || extent.width < 360U || extent.height < 280U) {
                 return;
@@ -2324,6 +2399,7 @@ namespace space {
             const SDL_Color red{220, 60, 60, 255};
             const SDL_Color yellow{255, 220, 120, 255};
             const VkExtent2D extent = getSwapchainExtent();
+            draw_cannon_crosshair(extent);
             draw_radar(extent);
             const int right_x = std::max(25, static_cast<int>(extent.width) - 250);
             printText("MXVK Asteroids v1.0", right_x, 25, red);
