@@ -14,6 +14,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
 - [Command Line Arguments](#command-line-arguments)
+- [Debugging Examples](#debugging-examples)
 - [Examples](#examples)
 - [Recent Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
@@ -209,6 +210,36 @@ Examples:
 ./run.pl compute_shader --camera 0
 ./run.pl opencv_example --camera 0 -r 1280x720
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
+```
+
+<a id="debugging-examples"></a>
+
+## Debugging Examples
+
+Use `debug.pl` from the repository root to launch a built example under GDB:
+
+```bash
+./debug.pl <example> [extra args...]
+```
+
+The script resolves the executable name from `examples/<example>/CMakeLists.txt`, then looks for it under `build/examples/<example>/`. It changes into the executable directory before launching GDB so relative runtime files behave like a normal `run.pl` launch.
+
+`debug.pl` also passes the example asset path automatically with `-p`. Most examples receive `-p examples/<example>`, while examples whose CMake file sets `ASSET_DIR` to the target output directory receive `-p build/examples/<example>`. Any extra arguments after the example name are forwarded to the program.
+
+Internally, the script executes GDB in quiet mode and immediately starts the program:
+
+```bash
+gdb -q -ex "set confirm off" -ex "run" --args ./<executable> -p <asset_path> [extra args...]
+```
+
+When the program crashes or hits a breakpoint, you are left at the GDB prompt. Useful commands include `bt` for a backtrace, `frame <n>` to inspect a stack frame, `print <expr>` to inspect values, `continue` to resume, and `quit` to exit.
+
+Examples:
+
+```bash
+./debug.pl sprite_example -r 1920x1080
+./debug.pl model_example --filename ./models/torus.mxmod.z
+./debug.pl opencv_example --camera 0 -r 1280x720
 ```
 
 <a id="examples"></a>
