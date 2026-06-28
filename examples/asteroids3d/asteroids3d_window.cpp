@@ -371,12 +371,14 @@ namespace space {
         bool debug_menu = false;
         bool inverted_controls = false;
         bool crt_enabled = false;
+        bool ship_returning_to_field = false;
         float keyboard_yaw = 0.0f;
         float keyboard_pitch = 0.0f;
         float keyboard_roll = 0.0f;
         float smooth_yaw = 0.0f;
         float smooth_pitch = 0.0f;
         float smooth_roll = 0.0f;
+        float return_message_cooldown = 0.0f;
 
         Ship ship{};
         std::array<Projectile, MAX_PROJECTILES> projectiles{};
@@ -393,6 +395,7 @@ namespace space {
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
+        mxvk::VK_Sprite *ui_pixel = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console;
         mxvk::VK_Controller controller;
@@ -838,6 +841,18 @@ namespace space {
 
             const int current_step = loading_step_index.load(std::memory_order_relaxed);
             if (current_step == 0) {
+                std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> ui_surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
+                if (ui_surface == nullptr) {
+                    throw mxvk::Exception("Failed to create asteroids3d UI pixel surface");
+                }
+                const SDL_PixelFormatDetails *format_details = SDL_GetPixelFormatDetails(ui_surface->format);
+                if (format_details == nullptr || !SDL_FillSurfaceRect(ui_surface.get(), nullptr, SDL_MapRGBA(format_details, nullptr, 255, 255, 255, 255))) {
+                    throw mxvk::Exception("Failed to initialize asteroids3d UI pixel surface");
+                }
+                ui_pixel = createSprite(ui_surface.get(), "", std::string(ASTEROIDS3D_SHADER_DIR) + "/fade_overlay.frag.spv");
+                if (ui_pixel == nullptr) {
+                    throw mxvk::Exception("Failed to create asteroids3d UI pixel sprite");
+                }
                 std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> star_surface(load_color_keyed_png(asset_root + "/data/particle_star.png", 12), SDL_DestroySurface);
                 star_sprite = createSprite3D(star_surface.get());
                 if (star_sprite == nullptr) {
@@ -975,6 +990,8 @@ namespace space {
             smooth_yaw = 0.0f;
             smooth_pitch = 0.0f;
             smooth_roll = 0.0f;
+            ship_returning_to_field = false;
+            return_message_cooldown = 0.0f;
             round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
         }
 
@@ -1227,6 +1244,81 @@ namespace space {
             }
         }
 
+        static float normalize_degrees(float degrees) {
+            while (degrees > 180.0f) {
+                degrees -= 360.0f;
+            }
+            while (degrees < -180.0f) {
+                degrees += 360.0f;
+            }
+            return degrees;
+        }
+
+        static float ease_angle_degrees(float current, float target, float blend) {
+            return current + normalize_degrees(target - current) * std::clamp(blend, 0.0f, 1.0f);
+        }
+
+        glm::vec3 asteroid_field_center() const {
+            glm::vec3 sum{0.0f};
+            int count = 0;
+            for (const auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    continue;
+                }
+                sum += asteroid.position;
+                ++count;
+            }
+            if (count == 0) {
+                return glm::vec3(0.0f);
+            }
+            return sum / static_cast<float>(count);
+        }
+
+        bool ship_is_outside_return_volume() const {
+            constexpr float RETURN_PADDING = 18.0f;
+            return ship.position.x < BOUNDARY_X_MIN - RETURN_PADDING ||
+                   ship.position.x > BOUNDARY_X_MAX + RETURN_PADDING ||
+                   ship.position.y < BOUNDARY_Y_MIN - RETURN_PADDING ||
+                   ship.position.y > BOUNDARY_Y_MAX + RETURN_PADDING ||
+                   ship.position.z < BOUNDARY_Z_MIN - RETURN_PADDING ||
+                   ship.position.z > BOUNDARY_Z_MAX + RETURN_PADDING;
+        }
+
+        void update_ship_return_to_field(float dt) {
+            if (active_asteroids() == 0) {
+                ship_returning_to_field = false;
+                return;
+            }
+
+            constexpr float RETURN_START_DISTANCE = 145.0f;
+            constexpr float RETURN_STOP_DISTANCE = 92.0f;
+            const float nearest_distance = nearest_asteroid_distance();
+            const bool outside_return_volume = ship_is_outside_return_volume();
+            if (!ship_returning_to_field && (outside_return_volume || nearest_distance > RETURN_START_DISTANCE)) {
+                ship_returning_to_field = true;
+                if (return_message_cooldown <= 0.0f) {
+                    log_game("Return assist engaged: steering back toward the asteroid field.", SDL_Color{120, 220, 255, 255});
+                    return_message_cooldown = 3.0f;
+                }
+            } else if (ship_returning_to_field && !outside_return_volume && nearest_distance < RETURN_STOP_DISTANCE) {
+                ship_returning_to_field = false;
+                log_game("Return assist disengaged.");
+            }
+
+            if (!ship_returning_to_field) {
+                return;
+            }
+
+            const glm::vec3 to_field = normalize_or_zero(asteroid_field_center() - ship.position);
+            const float target_yaw = glm::degrees(std::atan2(-to_field.x, -to_field.z));
+            const float target_pitch = glm::degrees(std::asin(std::clamp(to_field.y, -1.0f, 1.0f)));
+            const float blend = 1.0f - std::exp(-dt * 1.8f);
+            ship.rotation.y = ease_angle_degrees(ship.rotation.y, target_yaw, blend);
+            ship.rotation.x = ease_angle_degrees(ship.rotation.x, target_pitch, blend);
+            ship.rotation.z = ease_angle_degrees(ship.rotation.z, 0.0f, blend * 0.8f);
+            ship.current_speed = std::max(ship.current_speed, 8.0f);
+        }
+
         void fire_projectile() {
             const glm::vec3 forward = ship.forward();
             const float muzzle_offset = 0.08f;
@@ -1261,6 +1353,7 @@ namespace space {
                     ship.velocity = glm::vec3(0.0f);
                     ship.rotation = glm::vec3(0.0f);
                     ship.current_speed = 1.0f;
+                    ship_returning_to_field = false;
                     clear_particles();
                     log_game("Ship respawned at origin.");
                 }
@@ -1273,6 +1366,10 @@ namespace space {
                 return;
             }
 
+            if (return_message_cooldown > 0.0f) {
+                return_message_cooldown = std::max(0.0f, return_message_cooldown - dt);
+            }
+            update_ship_return_to_field(dt);
             const glm::vec3 forward = ship.forward();
             ship.prev_position = ship.position;
             ship.velocity = forward * ship.current_speed;
@@ -2155,12 +2252,79 @@ namespace space {
             throw mxvk::Exception("Failed to find asteroids3d memory type");
         }
 
+        void draw_ui_rect(int x, int y, int width, int height, const glm::vec4 &color) {
+            if (ui_pixel == nullptr || width <= 0 || height <= 0) {
+                return;
+            }
+            ui_pixel->setShaderParams(color.r, color.g, color.b, color.a);
+            ui_pixel->drawSpriteRect(x, y, width, height);
+        }
+
+        void draw_radar(const VkExtent2D &extent) {
+            if (ui_pixel == nullptr || extent.width < 360U || extent.height < 280U) {
+                return;
+            }
+
+            constexpr int BORDER = 2;
+            constexpr float RADAR_RANGE = 180.0f;
+            const int radar_size = std::clamp(static_cast<int>(std::min(extent.width, extent.height)) / 4, 150, 220);
+            const int radar_x = 24;
+            const int radar_y = std::max(230, static_cast<int>(extent.height) - radar_size - 24);
+            const int inner_x = radar_x + BORDER;
+            const int inner_y = radar_y + BORDER;
+            const int inner_size = radar_size - BORDER * 2;
+            const int center_x = inner_x + inner_size / 2;
+            const int center_y = inner_y + inner_size / 2;
+            const float half_size = static_cast<float>(inner_size) * 0.5f;
+
+            draw_ui_rect(radar_x, radar_y, radar_size, radar_size, {0.01f, 0.025f, 0.045f, 0.74f});
+            const glm::vec4 border_color = ship_returning_to_field ? glm::vec4{1.0f, 0.64f, 0.18f, 0.94f} : glm::vec4{0.16f, 0.66f, 0.82f, 0.9f};
+            draw_ui_rect(radar_x, radar_y, radar_size, BORDER, border_color);
+            draw_ui_rect(radar_x, radar_y + radar_size - BORDER, radar_size, BORDER, border_color);
+            draw_ui_rect(radar_x, radar_y, BORDER, radar_size, border_color);
+            draw_ui_rect(radar_x + radar_size - BORDER, radar_y, BORDER, radar_size, border_color);
+
+            draw_ui_rect(center_x, inner_y, 1, inner_size, {0.10f, 0.30f, 0.38f, 0.7f});
+            draw_ui_rect(inner_x, center_y, inner_size, 1, {0.10f, 0.30f, 0.38f, 0.7f});
+            draw_ui_rect(center_x - inner_size / 4, inner_y, 1, inner_size, {0.08f, 0.22f, 0.28f, 0.45f});
+            draw_ui_rect(center_x + inner_size / 4, inner_y, 1, inner_size, {0.08f, 0.22f, 0.28f, 0.45f});
+            draw_ui_rect(inner_x, center_y - inner_size / 4, inner_size, 1, {0.08f, 0.22f, 0.28f, 0.45f});
+            draw_ui_rect(inner_x, center_y + inner_size / 4, inner_size, 1, {0.08f, 0.22f, 0.28f, 0.45f});
+
+            for (const auto &asteroid : asteroids) {
+                if (!asteroid.active) {
+                    continue;
+                }
+                glm::vec2 relative{asteroid.position.x - ship.position.x, asteroid.position.z - ship.position.z};
+                const float distance = glm::length(relative);
+                const bool clamped_to_edge = distance > RADAR_RANGE;
+                if (clamped_to_edge && distance > 1e-4f) {
+                    relative *= RADAR_RANGE / distance;
+                }
+                const int dot_x = center_x + static_cast<int>((relative.x / RADAR_RANGE) * half_size);
+                const int dot_y = center_y + static_cast<int>((relative.y / RADAR_RANGE) * half_size);
+                const int dot_size = std::clamp(static_cast<int>(asteroid.radius * 0.55f), 3, 8);
+                const float altitude = std::clamp((asteroid.position.y - BOUNDARY_Y_MIN) / (BOUNDARY_Y_MAX - BOUNDARY_Y_MIN), 0.0f, 1.0f);
+                const glm::vec4 dot_color = clamped_to_edge
+                                                ? glm::vec4{1.0f, 0.38f, 0.16f, 0.9f}
+                                                : glm::vec4{1.0f, 0.55f + altitude * 0.28f, 0.18f, 1.0f};
+                draw_ui_rect(dot_x - dot_size / 2, dot_y - dot_size / 2, dot_size, dot_size, dot_color);
+            }
+
+            draw_ui_rect(center_x - 5, center_y, 11, 2, {0.95f, 1.0f, 1.0f, 1.0f});
+            draw_ui_rect(center_x, center_y - 5, 2, 11, {0.95f, 1.0f, 1.0f, 1.0f});
+
+            const SDL_Color label_color = ship_returning_to_field ? SDL_Color{255, 180, 80, 255} : SDL_Color{120, 220, 255, 255};
+            printText(ship_returning_to_field ? "RADAR RETURN" : "RADAR", radar_x, std::max(4, radar_y - 22), label_color);
+        }
+
         void draw_hud([[maybe_unused]] float aspect) {
             set_ui_font_size(18);
             const SDL_Color white{255, 255, 255, 255};
             const SDL_Color red{220, 60, 60, 255};
             const SDL_Color yellow{255, 220, 120, 255};
             const VkExtent2D extent = getSwapchainExtent();
+            draw_radar(extent);
             const int right_x = std::max(25, static_cast<int>(extent.width) - 250);
             printText("MXVK Asteroids v1.0", right_x, 25, red);
             printText("Score: " + std::to_string(ship.score), right_x, 50, white);
