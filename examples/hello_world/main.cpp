@@ -21,7 +21,7 @@ namespace example {
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen)
             : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION),
               shader_root(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
-            setClearColor(0.02F, 0.03F, 0.06F, 1.0F);
+            setClearColor(0.02f, 0.03f, 0.06f, 1.0f);
         }
 
         ~ExampleWindow() override {
@@ -46,7 +46,7 @@ namespace example {
             const float elapsed_seconds = std::chrono::duration<float>(now - start_time).count();
             const VkExtent2D extent = getSwapchainExtent();
             const float aspect =
-                (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0F;
+                (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const PushConstants push_constants{elapsed_seconds, aspect};
             vkCmdPushConstants(
@@ -142,7 +142,7 @@ namespace example {
                 rasterizer.depthClampEnable = VK_FALSE;
                 rasterizer.rasterizerDiscardEnable = VK_FALSE;
                 rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-                rasterizer.lineWidth = 1.0F;
+                rasterizer.lineWidth = 1.0f;
                 rasterizer.cullMode = VK_CULL_MODE_NONE;
                 rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
                 rasterizer.depthBiasEnable = VK_FALSE;

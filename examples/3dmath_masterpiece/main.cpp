@@ -85,7 +85,7 @@ namespace {
 
     struct FaceDraw {
         std::array<int, 4> indices{};
-        float depth = 0.0F;
+        float depth = 0.0f;
         mxvk::MXCOLOR color = mxvk::MXVK_RGB(255, 255, 255);
     };
 
@@ -94,7 +94,7 @@ namespace {
         int center_y = 0;
         int size = 24;
         int color = 1;
-        float phase = 0.0F;
+        float phase = 0.0f;
         bool flashing = false;
     };
 
@@ -1177,7 +1177,7 @@ namespace example {
         void drawBoard(Uint64 now, float scaleX, float scaleY) {
             constexpr int vertical_gap = 5;
             const int row_step = game_block_height + game_block_spacing + vertical_gap;
-            const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72F)));
+            const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72f)));
 
             for (int i = 0; i < board_cols; ++i) {
                 for (int j = 0; j < board_rows; ++j) {
@@ -1228,7 +1228,7 @@ namespace example {
             const int by = game_next_panel_y + 15;
             constexpr int vertical_gap = 5;
             const int row_step = game_block_height + game_block_spacing + vertical_gap;
-            const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72F)));
+            const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72f)));
 
             for (int i = 0; i < piece_height; ++i) {
                 const int sprite_index = std::clamp(piece.next_colors[static_cast<std::size_t>(i)], 0, 9);
@@ -1308,29 +1308,29 @@ namespace example {
         }
 
         [[nodiscard]] static mxvk::vec4D projectCubePoint(const mxvk::vec4D &point, const CubeInstance &cube) {
-            const float scale = static_cast<float>(cube.size) * 2.25F;
-            const float z = std::max(point.z, 0.001F);
+            const float scale = static_cast<float>(cube.size) * 2.25f;
+            const float z = std::max(point.z, 0.001f);
             return {
                 static_cast<float>(cube.center_x) + (point.x / z) * scale,
                 static_cast<float>(cube.center_y) - (point.y / z) * scale,
                 point.z,
-                1.0F,
+                1.0f,
             };
         }
 
         void drawCube(const CubeInstance &cube) {
-            const float time = static_cast<float>(SDL_GetTicks()) * 0.001F;
-            const float flash_scale = cube.flashing ? 0.72F + std::sin(time * 24.0F) * 0.28F : 1.0F;
+            const float time = static_cast<float>(SDL_GetTicks()) * 0.001f;
+            const float flash_scale = cube.flashing ? 0.72f + std::sin(time * 24.0f) * 0.28f : 1.0f;
             const mxvk::MXCOLOR base_color = mxvk::shade_color(blockColor(cube.color), flash_scale);
             const std::array<mxvk::vec4D, 8> cube_vertices = {
-                mxvk::vec4D{-1.0F, -1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{1.0F, -1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{1.0F, 1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, 1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, -1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{1.0F, -1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{1.0F, 1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, 1.0F, 1.0F, 1.0F},
+                mxvk::vec4D{-1.0f, -1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{1.0f, -1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{1.0f, 1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, 1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, -1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{1.0f, -1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{1.0f, 1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, 1.0f, 1.0f, 1.0f},
             };
             const std::array<std::array<int, 4>, 6> cube_faces = {{
                 {0, 3, 2, 1},
@@ -1342,18 +1342,18 @@ namespace example {
             }};
 
             mxvk::Mat4D rotation;
-            rotation.BuildXYZ(0.0F, time * 112.0F + cube.phase, 0.0F);
+            rotation.BuildXYZ(0.0f, time * 112.0f + cube.phase, 0.0f);
 
             std::array<mxvk::vec4D, 8> camera_vertices{};
             std::array<mxvk::vec4D, 8> projected{};
             for (std::size_t i = 0; i < cube_vertices.size(); ++i) {
                 mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
-                point.z += 4.2F;
+                point.z += 4.2f;
                 camera_vertices[i] = point;
                 projected[i] = projectCubePoint(point, cube);
             }
 
-            mxvk::vec3D light_dir(-0.35F, -0.55F, -1.0F);
+            mxvk::vec3D light_dir(-0.35f, -0.55f, -1.0f);
             light_dir.Normalize();
 
             std::vector<FaceDraw> faces;
@@ -1365,14 +1365,14 @@ namespace example {
                 mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
                 normal.Normalize();
 
-                const mxvk::vec4D center = (a + b + c + camera_vertices[static_cast<std::size_t>(indices[3])]) * 0.25F;
-                const mxvk::vec4D view_vector(-center.x, -center.y, -center.z, 1.0F);
-                if (normal.DotProduct(view_vector) <= 0.0F) {
+                const mxvk::vec4D center = (a + b + c + camera_vertices[static_cast<std::size_t>(indices[3])]) * 0.25f;
+                const mxvk::vec4D view_vector(-center.x, -center.y, -center.z, 1.0f);
+                if (normal.DotProduct(view_vector) <= 0.0f) {
                     continue;
                 }
 
-                const float diffuse = std::max(0.0F, normal.DotProduct(mxvk::vec4D(light_dir.x, light_dir.y, light_dir.z, 1.0F)));
-                const float intensity = std::clamp(0.28F + diffuse * 0.72F, 0.0F, 1.0F);
+                const float diffuse = std::max(0.0f, normal.DotProduct(mxvk::vec4D(light_dir.x, light_dir.y, light_dir.z, 1.0f)));
+                const float intensity = std::clamp(0.28f + diffuse * 0.72f, 0.0f, 1.0f);
                 faces.push_back({indices, center.z, mxvk::shade_color(base_color, intensity)});
             }
 

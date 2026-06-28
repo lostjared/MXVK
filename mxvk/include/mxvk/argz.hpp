@@ -700,6 +700,7 @@ struct Arguments {
     bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
     bool repeat = false;               ///< Repeat video playback when a file reaches EOF.
     bool binary = false;               ///< Use binary glyphs only (@c --binary).
+    bool enable_crt = false;           ///< Enable CRT post-processing at startup (@c --enable-crt).
     int font_size = 22;                ///< Matrix rain font size in pixels (@c --font-size).
     std::string font_path;             ///< Optional font file path (@c --font-path).
     std::string color;                 ///< Optional rain RGB tint (@c --color).
@@ -734,6 +735,7 @@ struct Arguments {
  * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
  * |      | --repeat           | Repeat video playback at EOF                 |
  * |      | --binary           | Use binary glyphs only                        |
+ * |      | --enable-crt       | Enable CRT post-processing at startup         |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
  * | -C   | --color            | Matrix rain RGB tint (\#RRGGBB or R,G,B)      |
@@ -771,6 +773,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
         .addOptionDouble(310, "repeat", "repeat video playback")
         .addOptionDouble(315, "binary", "use binary glyphs only")
+        .addOptionDouble(319, "enable-crt", "enable CRT post-processing at startup")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
         .addOptionSingleValue('j', "matrix rain font file path")
@@ -805,6 +808,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool mxwriteBlockWhenFull = false;
     bool repeat = false;
     bool binary = false;
+    bool enable_crt = false;
     int font_size = 22;
     std::string font_path;
     std::string color;
@@ -855,6 +859,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 315:
             binary = true;
+            break;
+        case 319:
+            enable_crt = true;
             break;
         case 'z':
         case 316:
@@ -941,6 +948,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.mxwriteBlockWhenFull = mxwriteBlockWhenFull;
     args.repeat = repeat;
     args.binary = binary;
+    args.enable_crt = enable_crt;
     args.font_size = font_size;
     args.font_path = font_path;
     args.color = color;

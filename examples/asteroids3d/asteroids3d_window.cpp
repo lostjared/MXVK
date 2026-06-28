@@ -44,9 +44,10 @@ namespace space {
 
     class Asteroids3DWindow : public mxvk::VK_Window {
       public:
-        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen)
+        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_crt)
             : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION),
-              asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path) {
+              asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
+              crt_enabled(enable_crt) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
             }
@@ -2519,6 +2520,6 @@ namespace space {
 } // namespace space
 
 void space::run_asteroids3d(const Arguments &args) {
-    Asteroids3DWindow window(args.path, args.width, args.height, args.fullscreen);
+    Asteroids3DWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_crt);
     window.loop();
 }

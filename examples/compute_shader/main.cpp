@@ -341,7 +341,7 @@ class ComputeWindow : public mxvk::VK_Window {
     int requestedShaderIndex = 0;
     int shaderMode = 0;
     int initialShaderMode = 0;
-    float alpha = 1.0F;
+    float alpha = 1.0f;
     bool captureUploadPathLogged = false;
     double videoFps = 0.0;
     double sourceFps = 0.0;
@@ -907,7 +907,7 @@ class ComputeWindow : public mxvk::VK_Window {
             samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-            samplerInfo.maxAnisotropy = 1.0F;
+            samplerInfo.maxAnisotropy = 1.0f;
             VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &computeSampler));
 
             loadSPV();
@@ -1525,22 +1525,22 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         const std::array<float, 16> vertices = {
-            0.0F,
-            0.0F,
-            0.0F,
-            0.0F,
-            1.0F,
-            0.0F,
-            1.0F,
-            0.0F,
-            1.0F,
-            1.0F,
-            1.0F,
-            1.0F,
-            0.0F,
-            1.0F,
-            0.0F,
-            1.0F,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+            1.0f,
+            1.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+            1.0f,
         };
         const std::array<uint16_t, 6> indices = {0, 1, 2, 0, 2, 3};
 
@@ -1683,7 +1683,7 @@ class ComputeWindow : public mxvk::VK_Window {
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.cullMode = VK_CULL_MODE_NONE;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        rasterizer.lineWidth = 1.0F;
+        rasterizer.lineWidth = 1.0f;
 
         VkPipelineMultisampleStateCreateInfo multisample{};
         multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1946,13 +1946,13 @@ class ComputeWindow : public mxvk::VK_Window {
         } pc{
             static_cast<float>(swapchain_extent.width),
             static_cast<float>(swapchain_extent.height),
-            0.0F,
-            0.0F,
+            0.0f,
+            0.0f,
             static_cast<float>(swapchain_extent.width),
             static_cast<float>(swapchain_extent.height),
-            0.0F,
-            0.0F,
-            {0.0F, 0.0F, 0.0F, 0.0F},
+            0.0f,
+            0.0f,
+            {0.0f, 0.0f, 0.0f, 0.0f},
         };
 
         vkCmdPushConstants(cmd, displayPipeLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -2172,15 +2172,15 @@ class ComputeWindow : public mxvk::VK_Window {
 
         static int alphaDir = 1;
         if (alphaDir == 1) {
-            alpha += 0.005F;
-            if (alpha >= (255.0F / 32.0F)) {
-                alpha = 255.0F / 32.0F;
+            alpha += 0.005f;
+            if (alpha >= (255.0f / 32.0f)) {
+                alpha = 255.0f / 32.0f;
                 alphaDir = -1;
             }
         } else {
-            alpha -= 0.005F;
-            if (alpha <= 1.0F) {
-                alpha = 1.0F;
+            alpha -= 0.005f;
+            if (alpha <= 1.0f) {
+                alpha = 1.0f;
                 alphaDir = 1;
             }
         }

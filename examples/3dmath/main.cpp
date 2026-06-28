@@ -48,7 +48,7 @@ namespace example {
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
               fallback_width(width),
               fallback_height(height) {
-            setClearColor(0.015F, 0.016F, 0.022F, 1.0F);
+            setClearColor(0.015f, 0.016f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
             SurfacePtr surface = create_pixel_surface();
@@ -68,16 +68,16 @@ namespace example {
 
             const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
             const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
-            const float time = static_cast<float>(SDL_GetTicks()) * 0.001F;
+            const float time = static_cast<float>(SDL_GetTicks()) * 0.001f;
 
             mxvk::vec4D vertices[3] = {
-                {-0.75F, -0.45F, 2.6F, 1.0F},
-                {0.75F, -0.45F, 2.6F, 1.0F},
-                {0.0F, 0.75F, 2.6F, 1.0F},
+                {-0.75f, -0.45f, 2.6f, 1.0f},
+                {0.75f, -0.45f, 2.6f, 1.0f},
+                {0.0f, 0.75f, 2.6f, 1.0f},
             };
 
             mxvk::Mat4D rotation;
-            rotation.BuildXYZ(25.0F, time * 42.0F, time * 18.0F);
+            rotation.BuildXYZ(25.0f, time * 42.0f, time * 18.0f);
 
             mxvk::RenderList render_list;
             mxvk::Triangle triangle;
@@ -86,7 +86,7 @@ namespace example {
             for (int i = 0; i < 3; ++i) {
                 triangle.vlist[i] = vertices[i];
                 triangle.tlist[i] = rotation.MulVec(vertices[i]);
-                triangle.tlist[i].z += 3.0F;
+                triangle.tlist[i].z += 3.0f;
             }
             render_list.BuildRenderList(triangle);
 
@@ -105,13 +105,13 @@ namespace example {
         int fallback_height = 720;
 
         static void project_to_screen(mxvk::RenderList &render_list, int width, int height) {
-            const float scale = static_cast<float>(std::min(width, height)) * 0.42F;
-            const float center_x = static_cast<float>(width) * 0.5F;
-            const float center_y = static_cast<float>(height) * 0.5F;
+            const float scale = static_cast<float>(std::min(width, height)) * 0.42f;
+            const float center_x = static_cast<float>(width) * 0.5f;
+            const float center_y = static_cast<float>(height) * 0.5f;
 
             for (auto &poly : render_list.polys) {
                 for (auto &vertex : poly.tlist) {
-                    const float z = std::max(vertex.z, 0.001F);
+                    const float z = std::max(vertex.z, 0.001f);
                     vertex.x = center_x + (vertex.x / z) * scale;
                     vertex.y = center_y - (vertex.y / z) * scale;
                 }

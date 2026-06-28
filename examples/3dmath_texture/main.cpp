@@ -45,18 +45,18 @@ namespace {
                 return mxvk::MXVK_RGB(255, 255, 255);
             }
 
-            u = std::clamp(u, 0.0F, 1.0F);
-            v = std::clamp(v, 0.0F, 1.0F);
-            const int x = std::clamp(static_cast<int>(u * static_cast<float>(width - 1) + 0.5F), 0, width - 1);
-            const int y = std::clamp(static_cast<int>(v * static_cast<float>(height - 1) + 0.5F), 0, height - 1);
+            u = std::clamp(u, 0.0f, 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+            const int x = std::clamp(static_cast<int>(u * static_cast<float>(width - 1) + 0.5f), 0, width - 1);
+            const int y = std::clamp(static_cast<int>(v * static_cast<float>(height - 1) + 0.5f), 0, height - 1);
             return pixels[static_cast<std::size_t>(y * width + x)];
         }
 
         [[nodiscard]] mxvk::MXCOLOR sample_nearest(float u, float v) const {
-            u = std::clamp(u, 0.0F, 1.0F);
-            v = std::clamp(v, 0.0F, 1.0F);
-            const int x = static_cast<int>(u * static_cast<float>(width - 1) + 0.5F);
-            const int y = static_cast<int>(v * static_cast<float>(height - 1) + 0.5F);
+            u = std::clamp(u, 0.0f, 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+            const int x = static_cast<int>(u * static_cast<float>(width - 1) + 0.5f);
+            const int y = static_cast<int>(v * static_cast<float>(height - 1) + 0.5f);
             return pixels[static_cast<std::size_t>(y * width + x)];
         }
     };
@@ -64,13 +64,13 @@ namespace {
     struct TexVertex {
         mxvk::vec4D position;
         mxvk::vec2D uv;
-        float depth = 1.0F;
+        float depth = 1.0f;
     };
 
     struct FaceDraw {
         std::array<int, 4> indices{};
-        float depth = 0.0F;
-        float intensity = 1.0F;
+        float depth = 0.0f;
+        float intensity = 1.0f;
     };
 
     [[nodiscard]] std::string resolve_texture_path(const Arguments &args) {
@@ -145,7 +145,7 @@ namespace example {
               texture(load_texture(resolve_texture_path(args))),
               fallback_width(args.width),
               fallback_height(args.height) {
-            setClearColor(0.012F, 0.015F, 0.022F, 1.0F);
+            setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
         }
 
@@ -154,7 +154,7 @@ namespace example {
                 exit();
             }
             if (e.type == SDL_EVENT_MOUSE_WHEEL) {
-                const float delta = (e.wheel.y != 0.0F) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
+                const float delta = (e.wheel.y != 0.0f) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
                 camera_distance = std::clamp(camera_distance - delta * CAMERA_ZOOM_STEP, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
             }
         }
@@ -168,22 +168,22 @@ namespace example {
                 return;
             }
 
-            const float time = static_cast<float>(SDL_GetTicks()) * 0.001F;
+            const float time = static_cast<float>(SDL_GetTicks()) * 0.001f;
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
 
             const std::array<mxvk::vec4D, 8> cube_vertices = {
-                mxvk::vec4D{-1.0F, -1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{1.0F, -1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{1.0F, 1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, 1.0F, -1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, -1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{1.0F, -1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{1.0F, 1.0F, 1.0F, 1.0F},
-                mxvk::vec4D{-1.0F, 1.0F, 1.0F, 1.0F},
+                mxvk::vec4D{-1.0f, -1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{1.0f, -1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{1.0f, 1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, 1.0f, -1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, -1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{1.0f, -1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{1.0f, 1.0f, 1.0f, 1.0f},
+                mxvk::vec4D{-1.0f, 1.0f, 1.0f, 1.0f},
             };
 
             mxvk::Mat4D rotation;
-            rotation.BuildXYZ(time * 31.0F, time * 43.0F, time * 17.0F);
+            rotation.BuildXYZ(time * 31.0f, time * 43.0f, time * 17.0f);
 
             std::array<mxvk::vec4D, 8> camera_vertices{};
             std::array<mxvk::vec4D, 8> projected{};
@@ -203,7 +203,7 @@ namespace example {
                 {0, 1, 5, 4},
             }};
 
-            mxvk::vec3D light_dir(-0.35F, -0.55F, -1.0F);
+            mxvk::vec3D light_dir(-0.35f, -0.55f, -1.0f);
             light_dir.Normalize();
 
             std::vector<FaceDraw> faces;
@@ -215,14 +215,14 @@ namespace example {
                 mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
                 normal.Normalize();
 
-                const mxvk::vec4D center = (a + b + c + camera_vertices[static_cast<std::size_t>(indices[3])]) * 0.25F;
-                const mxvk::vec4D view_vector(-center.x, -center.y, -center.z, 1.0F);
-                if (normal.DotProduct(view_vector) <= 0.0F) {
+                const mxvk::vec4D center = (a + b + c + camera_vertices[static_cast<std::size_t>(indices[3])]) * 0.25f;
+                const mxvk::vec4D view_vector(-center.x, -center.y, -center.z, 1.0f);
+                if (normal.DotProduct(view_vector) <= 0.0f) {
                     continue;
                 }
 
-                const float diffuse = std::max(0.0F, normal.DotProduct(mxvk::vec4D(light_dir.x, light_dir.y, light_dir.z, 1.0F)));
-                const float intensity = std::clamp(0.35F + diffuse * 0.65F, 0.0F, 1.0F);
+                const float diffuse = std::max(0.0f, normal.DotProduct(mxvk::vec4D(light_dir.x, light_dir.y, light_dir.z, 1.0f)));
+                const float intensity = std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f);
                 faces.push_back({indices, center.z, intensity});
             }
 
@@ -235,10 +235,10 @@ namespace example {
                 const auto index1 = static_cast<std::size_t>(face.indices[1]);
                 const auto index2 = static_cast<std::size_t>(face.indices[2]);
                 const auto index3 = static_cast<std::size_t>(face.indices[3]);
-                const TexVertex a{projected[index0], {0.0F, 1.0F}, camera_vertices[index0].z};
-                const TexVertex b{projected[index1], {1.0F, 1.0F}, camera_vertices[index1].z};
-                const TexVertex c{projected[index2], {1.0F, 0.0F}, camera_vertices[index2].z};
-                const TexVertex d{projected[index3], {0.0F, 0.0F}, camera_vertices[index3].z};
+                const TexVertex a{projected[index0], {0.0f, 1.0f}, camera_vertices[index0].z};
+                const TexVertex b{projected[index1], {1.0f, 1.0f}, camera_vertices[index1].z};
+                const TexVertex c{projected[index2], {1.0f, 0.0f}, camera_vertices[index2].z};
+                const TexVertex d{projected[index3], {0.0f, 0.0f}, camera_vertices[index3].z};
                 draw_textured_triangle(a, b, c, face.intensity);
                 draw_textured_triangle(a, c, d, face.intensity);
             }
@@ -256,10 +256,10 @@ namespace example {
         int frame_height = 0;
         int fallback_width = 1280;
         int fallback_height = 720;
-        float camera_distance = 4.25F;
-        static constexpr float MIN_CAMERA_DISTANCE = 2.2F;
-        static constexpr float MAX_CAMERA_DISTANCE = 10.0F;
-        static constexpr float CAMERA_ZOOM_STEP = 0.45F;
+        float camera_distance = 4.25f;
+        static constexpr float MIN_CAMERA_DISTANCE = 2.2f;
+        static constexpr float MAX_CAMERA_DISTANCE = 10.0f;
+        static constexpr float CAMERA_ZOOM_STEP = 0.45f;
 
         void ensure_framebuffer(int width, int height) {
             if (frame_surface != nullptr && frame_width == width && frame_height == height) {
@@ -329,7 +329,7 @@ namespace example {
             if (std::fabs(area) <= mxvk::EPSILON) {
                 return;
             }
-            const bool positive_area = area > 0.0F;
+            const bool positive_area = area > 0.0f;
 
             const int min_x = std::max(0, static_cast<int>(std::floor(std::min({p0.x, p1.x, p2.x}))));
             const int max_x = std::min(frame_width - 1, static_cast<int>(std::ceil(std::max({p0.x, p1.x, p2.x}))));
@@ -340,10 +340,10 @@ namespace example {
                 return;
             }
 
-            const float inv_area = 1.0F / area;
-            const float inv_z0 = 1.0F / std::max(a.depth, 0.001F);
-            const float inv_z1 = 1.0F / std::max(b.depth, 0.001F);
-            const float inv_z2 = 1.0F / std::max(c.depth, 0.001F);
+            const float inv_area = 1.0f / area;
+            const float inv_z0 = 1.0f / std::max(a.depth, 0.001f);
+            const float inv_z1 = 1.0f / std::max(b.depth, 0.001f);
+            const float inv_z2 = 1.0f / std::max(c.depth, 0.001f);
             const float u_over_z0 = a.uv.x * inv_z0;
             const float u_over_z1 = b.uv.x * inv_z1;
             const float u_over_z2 = c.uv.x * inv_z2;
@@ -358,7 +358,7 @@ namespace example {
             const float w2_dx = p1.y - p0.y;
             const float w2_dy = -(p1.x - p0.x);
 
-            const mxvk::vec2D row_start(static_cast<float>(min_x) + 0.5F, static_cast<float>(min_y) + 0.5F);
+            const mxvk::vec2D row_start(static_cast<float>(min_x) + 0.5f, static_cast<float>(min_y) + 0.5f);
             float row_w0 = mxvk::edge_function(p1, p2, row_start);
             float row_w1 = mxvk::edge_function(p2, p0, row_start);
             float row_w2 = mxvk::edge_function(p0, p1, row_start);
@@ -369,8 +369,8 @@ namespace example {
                 float w2 = row_w2;
 
                 for (int x = min_x; x <= max_x; ++x) {
-                    if ((positive_area && w0 >= 0.0F && w1 >= 0.0F && w2 >= 0.0F) ||
-                        (!positive_area && w0 <= 0.0F && w1 <= 0.0F && w2 <= 0.0F)) {
+                    if ((positive_area && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) ||
+                        (!positive_area && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
                         const float b0 = w0 * inv_area;
                         const float b1 = w1 * inv_area;
                         const float b2 = w2 * inv_area;
@@ -394,11 +394,11 @@ namespace example {
         }
 
         static mxvk::vec4D project_to_screen(const mxvk::vec4D &point, int width, int height) {
-            const float scale = static_cast<float>(std::min(width, height)) * 0.52F;
-            const float center_x = static_cast<float>(width) * 0.5F;
-            const float center_y = static_cast<float>(height) * 0.5F;
-            const float z = std::max(point.z, 0.001F);
-            return {center_x + (point.x / z) * scale, center_y - (point.y / z) * scale, point.z, 1.0F};
+            const float scale = static_cast<float>(std::min(width, height)) * 0.52f;
+            const float center_x = static_cast<float>(width) * 0.5f;
+            const float center_y = static_cast<float>(height) * 0.5f;
+            const float z = std::max(point.z, 0.001f);
+            return {center_x + (point.x / z) * scale, center_y - (point.y / z) * scale, point.z, 1.0f};
         }
     };
 } // namespace example

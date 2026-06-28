@@ -7,6 +7,7 @@ Asteroids3D is a 3D take on the classic Asteroids formula. You fly a ship throug
 - `-p <path>` or `--path <path>` - asset root, usually handled automatically by `run.pl`
 - `-r <WxH>` or `--resolution <WxH>` - window resolution
 - `-f` or `--fullscreen` - fullscreen mode
+- `--enable-crt` - start with the CRT post-processing shader enabled
 
 ## Controls
 
@@ -34,6 +35,6 @@ Asteroids3D is a 3D take on the classic Asteroids formula. You fly a ship throug
 
 The sample combines a ship model, multiple asteroid meshes, projectiles, particle effects, and a starfield. It updates movement, collision detection, scoring, and spawning in the main loop, then renders the scene with separate model and sprite passes.
 
-The CRT effect is attached through `mxvk::VK_Window`'s post-processing path and is off by default. Press `F8` at runtime to enable or disable the final full-screen shader pass.
+The CRT effect is attached through `mxvk::VK_Window`'s post-processing path and is off by default unless `--enable-crt` is provided. Press `F8` at runtime to enable or disable the final full-screen shader pass.
 
 The built-in console exposes commands for restarting, toggling the HUD, switching controls, and quitting, which makes the example useful both as a gameplay demo and as a reference for in-engine debugging.

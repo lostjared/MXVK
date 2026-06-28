@@ -163,6 +163,8 @@ Supported options:
 	- Enable MXWrite low-latency/realtime encoder settings.
 - `--mxwrite-block`
 	- Make MXWrite block when its internal queue is full instead of dropping frames.
+- `--enable-crt`
+	- Start examples that support CRT post-processing with the effect enabled.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`
@@ -297,7 +299,7 @@ These programs are not intended as standalone applications. They are small visua
 ### Games And Interactive Scenes
 
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
-- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
+- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
 - `defender` - side-scrolling 3D starfield shooter with model-based ship and asteroids, animated UFO sprites, radar/HUD, controller support, console commands, Matrix-rain intro, CRT post-processing, and optional SDL3_mixer audio. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` or `Space` starts, `Z` thrusts, `D` boosts, `X` reverses, `W` / `Up` and `Down` move vertically, `A` / `S` roll, `Space` fires, `F3` toggles the console, `F4` toggles FPS, `F8` toggles CRT, `Escape` quits.
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
 - `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.
