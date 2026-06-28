@@ -220,6 +220,9 @@ namespace mxvk {
             vkDeviceWaitIdle(device);
         }
 
+        post_process_sprite = nullptr;
+        owned_post_process_sprite = nullptr;
+
         if (!sprites.empty()) {
             std::cout << std::format("vk: releasing {} sprite(s)\n", sprites.size());
             sprites.clear();
@@ -572,7 +575,78 @@ namespace mxvk {
         sprite.renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
     }
 
+    VK_Sprite *VK_Window::attachPostProcessingShader(const std::string &fragmentShaderPath, float p1, float p2, float p3, float p4) {
+        if (fragmentShaderPath.empty()) {
+            throw mxvk::Exception("Cannot attach post-processing shader with an empty fragment shader path");
+        }
+
+        detachPostProcessingShader();
+
+        VK_Sprite *sprite = createSprite(
+            1,
+            1,
+            resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR),
+            fragmentShaderPath);
+        const uint32_t black_pixel = 0xFF000000u;
+        sprite->updateTexture(&black_pixel, 1, 1);
+
+        owned_post_process_sprite = sprite;
+        post_process_start_time = std::chrono::steady_clock::now();
+        setPostProcessingShaderParams(p1, p2, p3, p4);
+        enablePostProcessing(sprite);
+        return sprite;
+    }
+
+    void VK_Window::detachPostProcessingShader() {
+        if (device != VK_NULL_HANDLE && post_process_sprite != nullptr) {
+            vkDeviceWaitIdle(device);
+        }
+
+        post_process_sprite = nullptr;
+        destroyPostProcessTargets();
+        post_process_time_enabled = false;
+
+        if (owned_post_process_sprite != nullptr) {
+            const VK_Sprite *const sprite_to_remove = owned_post_process_sprite;
+            sprites.erase(
+                std::remove_if(
+                    sprites.begin(),
+                    sprites.end(),
+                    [sprite_to_remove](const std::unique_ptr<VK_Sprite> &sprite) {
+                        return sprite.get() == sprite_to_remove;
+                    }),
+                sprites.end());
+            owned_post_process_sprite = nullptr;
+            sprite_state_dirty = true;
+        }
+    }
+
+    void VK_Window::setPostProcessingShaderParams(float p1, float p2, float p3, float p4) {
+        post_process_params = {p1, p2, p3, p4};
+        if (post_process_sprite != nullptr) {
+            post_process_sprite->setShaderParams(p1, p2, p3, p4);
+        }
+    }
+
+    void VK_Window::setPostProcessingShaderTimeEnabled(bool enabled) {
+        post_process_time_enabled = enabled;
+        post_process_start_time = std::chrono::steady_clock::now();
+    }
+
     void VK_Window::enablePostProcessing(VK_Sprite *sprite) {
+        if (owned_post_process_sprite != nullptr && sprite != owned_post_process_sprite) {
+            const VK_Sprite *const sprite_to_remove = owned_post_process_sprite;
+            sprites.erase(
+                std::remove_if(
+                    sprites.begin(),
+                    sprites.end(),
+                    [sprite_to_remove](const std::unique_ptr<VK_Sprite> &existing_sprite) {
+                        return existing_sprite.get() == sprite_to_remove;
+                    }),
+                sprites.end());
+            owned_post_process_sprite = nullptr;
+            sprite_state_dirty = true;
+        }
         post_process_sprite = sprite;
         if (device != VK_NULL_HANDLE && !swapchain_images.empty()) {
             createPostProcessTargets();
@@ -1815,6 +1889,10 @@ namespace mxvk {
             present_info.colorAttachmentCount = 1;
             present_info.pColorAttachments = &present_attachment;
             vkCmdBeginRendering(cmd, &present_info);
+            if (post_process_time_enabled) {
+                post_process_params[0] = std::chrono::duration<float>(std::chrono::steady_clock::now() - post_process_start_time).count();
+                post_process_sprite->setShaderParams(post_process_params[0], post_process_params[1], post_process_params[2], post_process_params[3]);
+            }
             post_process_sprite->setExternalTexture(post_process_views[image_index], static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
             post_process_sprite->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
             renderStandaloneSprite(*post_process_sprite, cmd);

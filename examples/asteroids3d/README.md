@@ -15,6 +15,7 @@ Asteroids3D is a 3D take on the classic Asteroids formula. You fly a ship throug
 - `F1` - toggle the debug HUD while playing
 - `F2` - toggle arcade versus inverted pitch controls
 - `F3` - open or close the in-game console
+- `F8` - toggle the CRT post-processing shader on or off
 - `Left` / `Right` - yaw the ship with the keyboard
 - `W` / `S` - pitch the ship, with inversion controlled by `F2`
 - `A` / `D` - roll the ship manually
@@ -32,5 +33,7 @@ Asteroids3D is a 3D take on the classic Asteroids formula. You fly a ship throug
 ## How It Works
 
 The sample combines a ship model, multiple asteroid meshes, projectiles, particle effects, and a starfield. It updates movement, collision detection, scoring, and spawning in the main loop, then renders the scene with separate model and sprite passes.
+
+The CRT effect is attached through `mxvk::VK_Window`'s post-processing path and is off by default. Press `F8` at runtime to enable or disable the final full-screen shader pass.
 
 The built-in console exposes commands for restarting, toggling the HUD, switching controls, and quitting, which makes the example useful both as a gameplay demo and as a reference for in-engine debugging.

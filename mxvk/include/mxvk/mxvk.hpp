@@ -6,6 +6,7 @@
 #include "mxvk_text.hpp"
 #include <SDL3/SDL.h>
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -193,6 +194,31 @@ namespace mxvk {
          * @return Non-owning pointer to the created sprite.
          */
         VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+
+        /**
+         * @brief Attach a full-screen post-processing fragment shader.
+         *
+         * The window renders the normal scene into an offscreen color target, then draws that
+         * target through the supplied sprite-compatible fragment shader into the swapchain.
+         * Shader params are passed through the existing sprite push-constant vec4.
+         *
+         * @param fragmentShaderPath Post-process fragment shader SPIR-V path.
+         * @param p1 First shader parameter.
+         * @param p2 Second shader parameter.
+         * @param p3 Third shader parameter.
+         * @param p4 Fourth shader parameter.
+         * @return Non-owning pointer to the internal post-process sprite for advanced setup.
+         */
+        VK_Sprite *attachPostProcessingShader(const std::string &fragmentShaderPath, float p1 = 0.0f, float p2 = 0.0f, float p3 = 0.0f, float p4 = 0.0f);
+
+        /** @brief Detach the current post-processing shader and return to direct swapchain rendering. */
+        void detachPostProcessingShader();
+
+        /** @brief Set the post-processing shader params passed as a vec4 push constant. */
+        void setPostProcessingShaderParams(float p1 = 0.0f, float p2 = 0.0f, float p3 = 0.0f, float p4 = 0.0f);
+
+        /** @brief Keep shader param 1 updated with elapsed render time in seconds. */
+        void setPostProcessingShaderTimeEnabled(bool enabled);
 
         void enablePostProcessing(VK_Sprite *sprite);
 
@@ -404,7 +430,11 @@ namespace mxvk {
         VkPipeline sprite_pipeline = VK_NULL_HANDLE;
         bool sprite_state_dirty = false;
         VK_Sprite *post_process_sprite = nullptr;
+        VK_Sprite *owned_post_process_sprite = nullptr;
         bool post_process_enabled = true;
+        bool post_process_time_enabled = false;
+        std::array<float, 4> post_process_params{};
+        std::chrono::steady_clock::time_point post_process_start_time = std::chrono::steady_clock::now();
         std::vector<VkImage> post_process_images{};
         std::vector<VkDeviceMemory> post_process_memories{};
         std::vector<VkImageView> post_process_views{};

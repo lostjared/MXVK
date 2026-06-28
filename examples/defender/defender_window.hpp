@@ -114,7 +114,6 @@ namespace defender {
         mxvk::VK_Sprite3D *effect_sprite = nullptr;
         mxvk::VK_Sprite *intro_sprite = nullptr;
         mxvk::VK_Sprite *fade_overlay_sprite = nullptr;
-        mxvk::VK_Sprite *crt_sprite = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console{};
         mxvk::VK_Controller controller{};

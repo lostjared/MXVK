@@ -14,6 +14,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
 - [Command Line Arguments](#command-line-arguments)
+- [VK_Window Post-Processing](#vk-window-post-processing)
 - [Debugging Examples](#debugging-examples)
 - [Examples](#examples)
 - [Recent Optimizations](#recent-optimizations)
@@ -212,6 +213,14 @@ Examples:
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
 
+<a id="vk-window-post-processing"></a>
+
+## VK_Window Post-Processing
+
+`mxvk::VK_Window` can render the normal scene into an offscreen color target and then draw that image through an optional full-screen fragment shader before presenting. Attach a sprite-compatible fragment shader with `attachPostProcessingShader(...)`, pass effect parameters with `setPostProcessingShaderParams(...)`, enable automatic elapsed-time updates for parameter 1 with `setPostProcessingShaderTimeEnabled(true)`, and toggle the pass at runtime with `setPostProcessingEnabled(...)`.
+
+`defender` and `asteroids3d` use this path for the CRT shader. In both examples, press `F8` to toggle the CRT post-processing effect on or off.
+
 <a id="debugging-examples"></a>
 
 ## Debugging Examples
@@ -288,7 +297,7 @@ These programs are not intended as standalone applications. They are small visua
 ### Games And Interactive Scenes
 
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
-- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
+- `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
 - `defender` - side-scrolling 3D starfield shooter with model-based ship and asteroids, animated UFO sprites, radar/HUD, controller support, console commands, Matrix-rain intro, CRT post-processing, and optional SDL3_mixer audio. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` or `Space` starts, `Z` thrusts, `D` boosts, `X` reverses, `W` / `Up` and `Down` move vertically, `A` / `S` roll, `Space` fires, `F3` toggles the console, `F4` toggles FPS, `F8` toggles CRT, `Escape` quits.
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
 - `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.

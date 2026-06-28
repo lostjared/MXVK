@@ -52,6 +52,9 @@ namespace space {
             }
 
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+            attachPostProcessingShader(std::string(ASTEROIDS3D_SHADER_DIR) + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
+            setPostProcessingShaderTimeEnabled(true);
+            setPostProcessingEnabled(crt_enabled);
             load_loading_screen_resources();
             configure_console();
             open_controller();
@@ -123,6 +126,12 @@ namespace space {
                     log_game("Exit requested from intro screen.");
                     exit();
                 }
+                return;
+            }
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F8 && !e.key.repeat) {
+                crt_enabled = !crt_enabled;
+                setPostProcessingEnabled(crt_enabled);
+                log_game(std::string("CRT effect ") + (crt_enabled ? "enabled." : "disabled."));
                 return;
             }
             if (mode == GameMode::Intro &&
@@ -361,6 +370,7 @@ namespace space {
         bool restart_after_intro = false;
         bool debug_menu = false;
         bool inverted_controls = false;
+        bool crt_enabled = false;
         float keyboard_yaw = 0.0f;
         float keyboard_pitch = 0.0f;
         float keyboard_roll = 0.0f;

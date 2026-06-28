@@ -45,13 +45,8 @@ namespace defender {
             std::string(DEFENDER_SHADER_DIR) + "/fade_overlay.frag.spv");
         const uint32_t black_pixel = 0xFF000000u;
         fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
-        crt_sprite = createSprite(
-            1,
-            1,
-            std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-            std::string(DEFENDER_SHADER_DIR) + "/crt.frag.spv");
-        crt_sprite->setShaderParams(0.0f, 3.0f, 0.5f, 0.002f);
-        enablePostProcessing(crt_sprite);
+        attachPostProcessingShader(std::string(DEFENDER_SHADER_DIR) + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
+        setPostProcessingShaderTimeEnabled(true);
         matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
         intro_rain_config.color = "#ff0000";
         intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
@@ -328,9 +323,6 @@ namespace defender {
         last_frame_time = now;
         const float dt = std::min(delta_seconds, 0.1f);
         elapsed_seconds += dt;
-        if (crt_sprite != nullptr) {
-            crt_sprite->setShaderParams(elapsed_seconds, 3.0f, 0.5f, 0.002f);
-        }
         update_fps_counter(delta_seconds);
 
         const bool console_visible = console.isVisible();
