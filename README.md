@@ -15,6 +15,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Build](#build)
 - [Command Line Arguments](#command-line-arguments)
 - [Examples](#examples)
+- [Recent Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
 - [Project Layout](#project-layout)
 - [Early Screenshots](#early-screenshots)
@@ -32,8 +33,10 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 	- text rendering
 	- engine math, projection, and software 3D raster tests
 	- Matrix-style digital rain rendering
+	- reusable Matrix rain texture generation
 	- model rendering
 	- game loops and input handling
+	- controller input, console overlays, post-processing, and audio-enabled gameplay when optional features are present
 	- simple gameplay examples and UI state flow
 	- optional OpenCV camera/video workflows
 
@@ -199,7 +202,9 @@ Examples:
 ./run.pl matrix
 ./run.pl glitch_cube -r 1280x720
 ./run.pl starship
+./run.pl defender
 ./run.pl walk
+./run.pl 3dmath_masterpiece
 ./run.pl compute_shader --camera 0
 ./run.pl opencv_example --camera 0 -r 1280x720
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
@@ -215,9 +220,11 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 
 - `cfg_example` - config persistence smoke test. **Inputs:** none. **Controls:** none; it runs once, prints the incremented counter, and exits.
 - `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `skeleton` - smallest practical subclass of `mxvk::VK_Window`, intended as a copyable starting point for new examples. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
 - `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `rain` - static helper library used by Matrix-style examples to render configurable glyph rain into an SDL surface and MXVK sprite texture. It is not launched directly through `run.pl`.
 
 ### Engine Math Tests
 
@@ -226,6 +233,7 @@ These programs are not intended as standalone applications. They are small visua
 - `3dmath` - minimal rotating triangle test using `vec4D`, `Mat4D`, `RenderList`, and `PipeLine` projection/drawing helpers. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `3dmath_cube` - rotating cube test for matrix transforms, backface culling, depth sorting, diffuse face shading, filled triangle rasterization, and line clipping. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `3dmath_texture` - textured rotating cube test for the same software 3D path plus PNG loading and software UV sampling. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** `Escape` quits.
+- `3dmath_masterpiece` - MasterPiece variant that renders the board and falling blocks as CPU-rasterized spinning 3D cubes before uploading the frame through an MXVK sprite. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** arrow keys move, `Up` or `A` rotates forward, `S` rotates backward, `P` pauses, `Escape` returns to the menu.
 
 ### Shader And Effect Demos
 
@@ -249,6 +257,7 @@ These programs are not intended as standalone applications. They are small visua
 
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
 - `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
+- `defender` - side-scrolling 3D starfield shooter with model-based ship and asteroids, animated UFO sprites, radar/HUD, controller support, console commands, Matrix-rain intro, CRT post-processing, and optional SDL3_mixer audio. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` or `Space` starts, `Z` thrusts, `D` boosts, `X` reverses, `W` / `Up` and `Down` move vertically, `A` / `S` roll, `Space` fires, `F3` toggles the console, `F4` toggles FPS, `F8` toggles CRT, `Escape` quits.
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
 - `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.
 - `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `W` / `A` / `S` / `D` move, mouse or right stick look, `Left Shift` sprint, `Left Ctrl` crouch, `Space` jump, left click or right shoulder fire, `F` toggles the FPS overlay, `Escape` releases the mouse or quits.
@@ -264,6 +273,16 @@ These programs are not intended as standalone applications. They are small visua
 - `opencv_model` - maps a live camera feed onto a textured 3D model. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--filename`, and standard example arguments. **Controls:** left mouse drag orbits, mouse wheel zooms, arrow keys rotate the model, `Escape` quits.
 
 If you want a quick tour of the core demos, `./run.pl --all` executes the default example sweep used by `testapps.pl`.
+
+<a id="recent-optimizations"></a>
+
+## Recent Optimizations
+
+- Sprite and 3D sprite paths now keep more GPU state alive across frames, track dirty state, and support instanced sprite batches. This reduces repeated descriptor/pipeline work in sprite-heavy demos such as `binary_matrix`, `defender`, `starship`, and `pong`.
+- Text rendering caches uploaded glyph/text textures and evicts old entries instead of recreating Vulkan images for repeated strings every frame. HUD-heavy examples use this path for steadier frame times.
+- `compute_shader` now presents the Vulkan compute output through a full-screen sampled draw, avoiding a readback or sprite upload for display. When CUDA interop is available, GPU capture frames can be copied directly into the Vulkan compute input image; otherwise the CPU fallback path remains available.
+- `fractal_zoom` uses cached adaptive reference-orbit data, throttled rebuilds while the view is changing, and a direct shader path while coordinates are still safe for f32. Deep zooms switch to perturbation data only when needed.
+- Matrix rain is factored into the reusable `rain` library so `matrix`, `binary_matrix`, `model_example`, `planet`, and `defender` can share glyph loading, tinting, resize handling, and texture sync code.
 
 
 <a id="mxwrite"></a>
