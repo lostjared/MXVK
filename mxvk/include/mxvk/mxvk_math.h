@@ -1955,34 +1955,63 @@ namespace mxvk {
      * @param draw_span Span drawing callable.
      */
     template <typename DrawSpan>
-    void draw_filled_triangle_spans(vec2D p0, vec2D p1, vec2D p2, MXCOLOR color, DrawSpan &&draw_span) {
+    void draw_filled_triangle_spans_clipped(vec2D p0, vec2D p1, vec2D p2, int clip_min_y, int clip_max_y, MXCOLOR color, DrawSpan &&draw_span) {
         if (std::fabs(edge_function(p0, p1, p2)) <= EPSILON) {
             return;
         }
 
-        const std::array<vec2D, 3> points{p0, p1, p2};
-        const int min_y = static_cast<int>(std::floor(std::min({p0.y, p1.y, p2.y})));
-        const int max_y = static_cast<int>(std::ceil(std::max({p0.y, p1.y, p2.y})));
+        struct SpanEdge {
+            int y0 = 0;
+            int y1 = -1;
+            float x0 = 0.0f;
+            float slope = 0.0f;
+
+            [[nodiscard]] float x_at(int y) const {
+                return x0 + static_cast<float>(y - y0) * slope;
+            }
+        };
+
+        const int min_y = std::max(clip_min_y, static_cast<int>(std::floor(std::min({p0.y, p1.y, p2.y}))));
+        const int max_y = std::min(clip_max_y, static_cast<int>(std::ceil(std::max({p0.y, p1.y, p2.y}))));
+        if (min_y > max_y) {
+            return;
+        }
+
+        std::array<SpanEdge, 3> edges{};
+        int edge_count = 0;
+        const auto add_edge = [&](vec2D a, vec2D b) {
+            if (std::fabs(a.y - b.y) <= EPSILON) {
+                return;
+            }
+            if (a.y > b.y) {
+                std::swap(a, b);
+            }
+
+            const int y0 = std::max(min_y, static_cast<int>(std::ceil(a.y - 0.5f)));
+            const int y1 = std::min(max_y, static_cast<int>(std::ceil(b.y - 0.5f)) - 1);
+            if (y0 > y1) {
+                return;
+            }
+
+            SpanEdge &edge = edges[static_cast<std::size_t>(edge_count++)];
+            edge.y0 = y0;
+            edge.y1 = y1;
+            edge.slope = (b.x - a.x) / (b.y - a.y);
+            edge.x0 = a.x + ((static_cast<float>(y0) + 0.5f) - a.y) * edge.slope;
+        };
+
+        add_edge(p0, p1);
+        add_edge(p1, p2);
+        add_edge(p2, p0);
 
         for (int y = min_y; y <= max_y; ++y) {
-            const float sample_y = static_cast<float>(y) + 0.5f;
             std::array<float, 3> intersections{};
             int intersection_count = 0;
 
-            for (int edge = 0; edge < 3; ++edge) {
-                const vec2D &a = points[static_cast<std::size_t>(edge)];
-                const vec2D &b = points[static_cast<std::size_t>((edge + 1) % 3)];
-                if (std::fabs(a.y - b.y) <= EPSILON) {
-                    continue;
-                }
-                const float min_edge_y = std::min(a.y, b.y);
-                const float max_edge_y = std::max(a.y, b.y);
-                if (sample_y < min_edge_y || sample_y >= max_edge_y) {
-                    continue;
-                }
-                const float t = (sample_y - a.y) / (b.y - a.y);
-                if (intersection_count < static_cast<int>(intersections.size())) {
-                    intersections[static_cast<std::size_t>(intersection_count++)] = a.x + t * (b.x - a.x);
+            for (int edge_index = 0; edge_index < edge_count; ++edge_index) {
+                const SpanEdge &edge = edges[static_cast<std::size_t>(edge_index)];
+                if (y >= edge.y0 && y <= edge.y1) {
+                    intersections[static_cast<std::size_t>(intersection_count++)] = edge.x_at(y);
                 }
             }
 
@@ -2003,6 +2032,11 @@ namespace mxvk {
                 draw_span(x0, x1, y, color);
             }
         }
+    }
+
+    template <typename DrawSpan>
+    void draw_filled_triangle_spans(vec2D p0, vec2D p1, vec2D p2, MXCOLOR color, DrawSpan &&draw_span) {
+        draw_filled_triangle_spans_clipped(p0, p1, p2, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), color, std::forward<DrawSpan>(draw_span));
     }
 
     /// Clipped software rasterization pipeline for lines and filled triangles.
@@ -2189,8 +2223,8 @@ namespace mxvk {
                 return;
             }
 
-            draw_filled_triangle_spans(p0, p1, p2, color, [this](int x0, int x1, int y, MXCOLOR pixel_color) {
-                if (y < clip_min_y || y > clip_max_y || x1 < clip_min_x || x0 > clip_max_x) {
+            draw_filled_triangle_spans_clipped(p0, p1, p2, clip_min_y, clip_max_y, color, [this](int x0, int x1, int y, MXCOLOR pixel_color) {
+                if (x1 < clip_min_x || x0 > clip_max_x) {
                     return;
                 }
                 x0 = std::max(x0, clip_min_x);

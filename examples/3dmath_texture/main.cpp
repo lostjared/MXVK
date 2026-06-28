@@ -51,6 +51,14 @@ namespace {
             const int y = std::clamp(static_cast<int>(v * static_cast<float>(height - 1) + 0.5F), 0, height - 1);
             return pixels[static_cast<std::size_t>(y * width + x)];
         }
+
+        [[nodiscard]] mxvk::MXCOLOR sample_nearest(float u, float v) const {
+            u = std::clamp(u, 0.0F, 1.0F);
+            v = std::clamp(v, 0.0F, 1.0F);
+            const int x = static_cast<int>(u * static_cast<float>(width - 1) + 0.5F);
+            const int y = static_cast<int>(v * static_cast<float>(height - 1) + 0.5F);
+            return pixels[static_cast<std::size_t>(y * width + x)];
+        }
     };
 
     struct TexVertex {
@@ -292,7 +300,28 @@ namespace example {
             *pixel = map_color(color);
         }
 
+        void put_pixel_unchecked(int x, int y, mxvk::MXCOLOR color) {
+            auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
+            auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
+            *pixel = map_color(color);
+        }
+
+        [[nodiscard]] static mxvk::MXCOLOR shade_texture_color(mxvk::MXCOLOR color, float intensity) {
+            const auto scale = [intensity](std::uint8_t component) {
+                return static_cast<mxvk::MXCOLOR>(static_cast<int>(static_cast<float>(component) * intensity)) & 0xFFU;
+            };
+
+            return (static_cast<mxvk::MXCOLOR>(mxvk::color_a(color)) << 24U) |
+                   (scale(mxvk::color_r(color)) << 16U) |
+                   (scale(mxvk::color_g(color)) << 8U) |
+                   scale(mxvk::color_b(color));
+        }
+
         void draw_textured_triangle(const TexVertex &a, const TexVertex &b, const TexVertex &c, float intensity) {
+            if (texture.width <= 0 || texture.height <= 0 || texture.pixels.empty()) {
+                return;
+            }
+
             const mxvk::vec2D p0(a.position.x, a.position.y);
             const mxvk::vec2D p1(b.position.x, b.position.y);
             const mxvk::vec2D p2(c.position.x, c.position.y);
@@ -300,38 +329,67 @@ namespace example {
             if (std::fabs(area) <= mxvk::EPSILON) {
                 return;
             }
+            const bool positive_area = area > 0.0F;
 
             const int min_x = std::max(0, static_cast<int>(std::floor(std::min({p0.x, p1.x, p2.x}))));
             const int max_x = std::min(frame_width - 1, static_cast<int>(std::ceil(std::max({p0.x, p1.x, p2.x}))));
             const int min_y = std::max(0, static_cast<int>(std::floor(std::min({p0.y, p1.y, p2.y}))));
             const int max_y = std::min(frame_height - 1, static_cast<int>(std::ceil(std::max({p0.y, p1.y, p2.y}))));
 
+            if (min_x > max_x || min_y > max_y) {
+                return;
+            }
+
+            const float inv_area = 1.0F / area;
+            const float inv_z0 = 1.0F / std::max(a.depth, 0.001F);
+            const float inv_z1 = 1.0F / std::max(b.depth, 0.001F);
+            const float inv_z2 = 1.0F / std::max(c.depth, 0.001F);
+            const float u_over_z0 = a.uv.x * inv_z0;
+            const float u_over_z1 = b.uv.x * inv_z1;
+            const float u_over_z2 = c.uv.x * inv_z2;
+            const float v_over_z0 = a.uv.y * inv_z0;
+            const float v_over_z1 = b.uv.y * inv_z1;
+            const float v_over_z2 = c.uv.y * inv_z2;
+
+            const float w0_dx = p2.y - p1.y;
+            const float w0_dy = -(p2.x - p1.x);
+            const float w1_dx = p0.y - p2.y;
+            const float w1_dy = -(p0.x - p2.x);
+            const float w2_dx = p1.y - p0.y;
+            const float w2_dy = -(p1.x - p0.x);
+
+            const mxvk::vec2D row_start(static_cast<float>(min_x) + 0.5F, static_cast<float>(min_y) + 0.5F);
+            float row_w0 = mxvk::edge_function(p1, p2, row_start);
+            float row_w1 = mxvk::edge_function(p2, p0, row_start);
+            float row_w2 = mxvk::edge_function(p0, p1, row_start);
+
             for (int y = min_y; y <= max_y; ++y) {
+                float w0 = row_w0;
+                float w1 = row_w1;
+                float w2 = row_w2;
+
                 for (int x = min_x; x <= max_x; ++x) {
-                    const mxvk::vec2D p(static_cast<float>(x) + 0.5F, static_cast<float>(y) + 0.5F);
-                    const float w0 = mxvk::edge_function(p1, p2, p);
-                    const float w1 = mxvk::edge_function(p2, p0, p);
-                    const float w2 = mxvk::edge_function(p0, p1, p);
-                    if (!((area > 0.0F && w0 >= 0.0F && w1 >= 0.0F && w2 >= 0.0F) ||
-                          (area < 0.0F && w0 <= 0.0F && w1 <= 0.0F && w2 <= 0.0F))) {
-                        continue;
+                    if ((positive_area && w0 >= 0.0F && w1 >= 0.0F && w2 >= 0.0F) ||
+                        (!positive_area && w0 <= 0.0F && w1 <= 0.0F && w2 <= 0.0F)) {
+                        const float b0 = w0 * inv_area;
+                        const float b1 = w1 * inv_area;
+                        const float b2 = w2 * inv_area;
+                        const float inv_z = (b0 * inv_z0) + (b1 * inv_z1) + (b2 * inv_z2);
+                        if (std::fabs(inv_z) > mxvk::EPSILON) {
+                            const float u = ((u_over_z0 * b0) + (u_over_z1 * b1) + (u_over_z2 * b2)) / inv_z;
+                            const float v = ((v_over_z0 * b0) + (v_over_z1 * b1) + (v_over_z2 * b2)) / inv_z;
+                            put_pixel_unchecked(x, y, shade_texture_color(texture.sample_nearest(u, v), intensity));
+                        }
                     }
 
-                    const float inv_area = 1.0F / area;
-                    const float b0 = w0 * inv_area;
-                    const float b1 = w1 * inv_area;
-                    const float b2 = w2 * inv_area;
-                    const float inv_z0 = 1.0F / std::max(a.depth, 0.001F);
-                    const float inv_z1 = 1.0F / std::max(b.depth, 0.001F);
-                    const float inv_z2 = 1.0F / std::max(c.depth, 0.001F);
-                    const float inv_z = (b0 * inv_z0) + (b1 * inv_z1) + (b2 * inv_z2);
-                    if (std::fabs(inv_z) <= mxvk::EPSILON) {
-                        continue;
-                    }
-                    const float u = ((a.uv.x * inv_z0 * b0) + (b.uv.x * inv_z1 * b1) + (c.uv.x * inv_z2 * b2)) / inv_z;
-                    const float v = ((a.uv.y * inv_z0 * b0) + (b.uv.y * inv_z1 * b1) + (c.uv.y * inv_z2 * b2)) / inv_z;
-                    put_pixel(x, y, mxvk::shade_color(texture.sample(u, v), intensity));
+                    w0 += w0_dx;
+                    w1 += w1_dx;
+                    w2 += w2_dx;
                 }
+
+                row_w0 += w0_dy;
+                row_w1 += w1_dy;
+                row_w2 += w2_dy;
             }
         }
 
