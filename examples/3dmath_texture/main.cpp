@@ -145,6 +145,10 @@ namespace example {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
+            if (e.type == SDL_EVENT_MOUSE_WHEEL) {
+                const float delta = (e.wheel.y != 0.0F) ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
+                camera_distance = std::clamp(camera_distance - delta * CAMERA_ZOOM_STEP, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
+            }
         }
 
         void proc() override {
@@ -177,7 +181,7 @@ namespace example {
             std::array<mxvk::vec4D, 8> projected{};
             for (std::size_t i = 0; i < cube_vertices.size(); ++i) {
                 mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
-                point.z += 4.25F;
+                point.z += camera_distance;
                 camera_vertices[i] = point;
                 projected[i] = project_to_screen(point, width, height);
             }
@@ -231,18 +235,6 @@ namespace example {
                 draw_textured_triangle(a, c, d, face.intensity);
             }
 
-            const int outline_size = std::max(1, width / 640);
-            mxvk::PipeLine outline_pipeline;
-            outline_pipeline.Begin(width, height, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
-            for (const FaceDraw &face : faces) {
-                for (int i = 0; i < 4; ++i) {
-                    const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>(i)])];
-                    const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>((i + 1) % 4)])];
-                    outline_pipeline.DrawClipedLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), mxvk::MXVK_RGB(235, 245, 255));
-                }
-            }
-            outline_pipeline.End();
-
             frame_sprite->updateTexture(frame_surface.get());
             frame_sprite->drawSpriteRect(0, 0, width, height);
         }
@@ -256,6 +248,10 @@ namespace example {
         int frame_height = 0;
         int fallback_width = 1280;
         int fallback_height = 720;
+        float camera_distance = 4.25F;
+        static constexpr float MIN_CAMERA_DISTANCE = 2.2F;
+        static constexpr float MAX_CAMERA_DISTANCE = 10.0F;
+        static constexpr float CAMERA_ZOOM_STEP = 0.45F;
 
         void ensure_framebuffer(int width, int height) {
             if (frame_surface != nullptr && frame_width == width && frame_height == height) {
@@ -294,14 +290,6 @@ namespace example {
             auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
             auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
             *pixel = map_color(color);
-        }
-
-        void put_block(int x, int y, int size, mxvk::MXCOLOR color) {
-            for (int by = 0; by < size; ++by) {
-                for (int bx = 0; bx < size; ++bx) {
-                    put_pixel(x + bx, y + by, color);
-                }
-            }
         }
 
         void draw_textured_triangle(const TexVertex &a, const TexVertex &b, const TexVertex &c, float intensity) {
