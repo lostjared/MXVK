@@ -198,6 +198,7 @@ namespace mxvk {
         if (!initWindow(title, width, height, flags)) {
             throw mxvk::Exception("Error on init of Window");
         }
+        showCursor(!full);
 
         std::cout << "mxvk: initializing Vulkan runtime and rendering resources\n";
         if (!initVulkan(validiation)) {
