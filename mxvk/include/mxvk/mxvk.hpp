@@ -224,6 +224,8 @@ namespace mxvk {
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data);
 
+	void showCursor(bool on);
+
       protected:
         /**
          * @brief Load a SPIR-V file from disk.

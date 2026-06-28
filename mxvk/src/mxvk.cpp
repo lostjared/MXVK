@@ -2546,6 +2546,13 @@ namespace mxvk {
         return sprite_ptr;
     }
 
+    void VK_Window::showCursor(bool on) {
+	    if(on)
+		    SDL_ShowCursor();
+	    else
+		    SDL_HideCursor();
+    }
+
     void VK_Window::createSpriteDescriptorSetLayout() {
         if (device == VK_NULL_HANDLE || sprite_descriptor_set_layout != VK_NULL_HANDLE) {
             return;
