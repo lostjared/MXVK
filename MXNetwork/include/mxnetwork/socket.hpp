@@ -33,10 +33,14 @@ namespace mxnetwork {
         TYPE_INVALID = 0,
         /** @brief IPv4 stream socket. */
         TYPE_INET,
+        /** @brief IPv6 stream socket. */
+        TYPE_INET6,
         /** @brief UNIX-domain stream socket. */
         TYPE_UNIX,
         /** @brief IPv4 datagram socket. */
         TYPE_INET_DGRAM,
+        /** @brief IPv6 datagram socket. */
+        TYPE_INET6_DGRAM,
         /** @brief UNIX-domain datagram socket. */
         TYPE_UNIX_DGRAM
     };

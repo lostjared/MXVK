@@ -74,8 +74,12 @@ namespace mxnetwork {
     bool Socket::connect(const std::string_view host, const std::string_view port) {
         if (type == SocketType::TYPE_INET)
             return mx_socket_connect(&sock, std::string(host).c_str(), std::string(port).c_str(), SOCK_STREAM);
+        else if (type == SocketType::TYPE_INET6)
+            return mx_socket_ipv6_connect(&sock, std::string(host).c_str(), std::string(port).c_str(), SOCK_STREAM);
         else if (type == SocketType::TYPE_INET_DGRAM)
             return mx_socket_connect(&sock, std::string(host).c_str(), std::string(port).c_str(), SOCK_DGRAM);
+        else if (type == SocketType::TYPE_INET6_DGRAM)
+            return mx_socket_ipv6_connect(&sock, std::string(host).c_str(), std::string(port).c_str(), SOCK_DGRAM);
         return false;
     }
 
@@ -90,8 +94,12 @@ namespace mxnetwork {
     bool Socket::listen(std::string_view port, int backlog) {
         if (type == SocketType::TYPE_INET)
             return mx_socket_listen(&sock, std::string(port).c_str(), backlog, SOCK_STREAM);
+        else if (type == SocketType::TYPE_INET6)
+            return mx_socket_ipv6_listen(&sock, std::string(port).c_str(), backlog, SOCK_STREAM);
         else if (type == SocketType::TYPE_INET_DGRAM)
             return mx_socket_listen(&sock, std::string(port).c_str(), backlog, SOCK_DGRAM);
+        else if (type == SocketType::TYPE_INET6_DGRAM)
+            return mx_socket_ipv6_listen(&sock, std::string(port).c_str(), backlog, SOCK_DGRAM);
         return false;
     }
 
@@ -122,7 +130,15 @@ namespace mxnetwork {
     }
 
     bool Socket::bind(std::string_view port) {
-        if (!mx_socket_bind(&sock, std::string(port).c_str())) {
+        bool bound = false;
+        if (type == SocketType::TYPE_INET || type == SocketType::TYPE_INET_DGRAM)
+            bound = mx_socket_bind(&sock, std::string(port).c_str());
+        else if (type == SocketType::TYPE_INET6 || type == SocketType::TYPE_INET6_DGRAM)
+            bound = mx_socket_ipv6_bind(&sock, std::string(port).c_str());
+        else
+            bound = mx_socket_bind(&sock, std::string(port).c_str());
+
+        if (!bound) {
             throw Exception("Could not bind UDP socket.");
         }
         return true;
@@ -185,6 +201,8 @@ namespace mxnetwork {
     ssize_t Socket::sendto(const void *buf, size_t bytes) {
         if (type == SocketType::TYPE_INET_DGRAM)
             return mx_socket_sendto(&sock, buf, bytes);
+        else if (type == SocketType::TYPE_INET6_DGRAM)
+            return mx_socket_ipv6_sendto(&sock, buf, bytes);
         else if (type == SocketType::TYPE_UNIX_DGRAM)
             return mx_socket_unix_sendto(&sock, buf, bytes);
         return 0;
@@ -192,6 +210,8 @@ namespace mxnetwork {
     ssize_t Socket::recvfrom(void *buf, size_t bytes) {
         if (type == SocketType::TYPE_INET_DGRAM)
             return mx_socket_recvfrom(&sock, buf, bytes);
+        else if (type == SocketType::TYPE_INET6_DGRAM)
+            return mx_socket_ipv6_recvfrom(&sock, buf, bytes);
         else if (type == SocketType::TYPE_UNIX_DGRAM)
             return mx_socket_unix_recvfrom(&sock, buf, bytes);
         return 0;
@@ -206,6 +226,9 @@ namespace mxnetwork {
         if (type == SocketType::TYPE_INET || type == SocketType::TYPE_INET_DGRAM) {
             size_t len_size = (static_cast<size_t>(s.addrlen) > sizeof(sock.inet)) ? sizeof(sock.inet) : static_cast<size_t>(s.addrlen);
             memcpy(&sock.inet, &s.inet, len_size);
+        } else if (type == SocketType::TYPE_INET6 || type == SocketType::TYPE_INET6_DGRAM) {
+            size_t len_size = (static_cast<size_t>(s.addrlen) > sizeof(sock.inet6)) ? sizeof(sock.inet6) : static_cast<size_t>(s.addrlen);
+            memcpy(&sock.inet6, &s.inet6, len_size);
         } else if (type == SocketType::TYPE_UNIX || type == SocketType::TYPE_UNIX_DGRAM)
             sock.sun = s.sun;
     }

@@ -66,11 +66,12 @@ typedef int mx_socket_fd;
  * @brief Cross-platform socket state used by the C API.
  */
 typedef struct {
-    mx_socket_fd sockfd;    /**< Underlying socket handle. */
-    socklen_t addrlen;      /**< Length of the active address structure. */
-    bool blocking;          /**< True when the socket is in blocking mode. */
-    struct sockaddr_un sun; /**< UNIX-domain address storage. */
-    struct sockaddr_in inet; /**< IPv4 address storage. */
+    mx_socket_fd sockfd;       /**< Underlying socket handle. */
+    socklen_t addrlen;         /**< Length of the active address structure. */
+    bool blocking;             /**< True when the socket is in blocking mode. */
+    struct sockaddr_un sun;    /**< UNIX-domain address storage. */
+    struct sockaddr_in inet;   /**< IPv4 address storage. */
+    struct sockaddr_in6 inet6; /**< IPv6 address storage. */
 } MXSocket;
 
 #ifdef __cplusplus
@@ -91,6 +92,15 @@ extern "C" {
  * @return True on success.
  */
 [[nodiscard]] bool mx_socket_listen(MXSocket *s, const char *port, int backlog, int type);
+/**
+ * @brief Create and bind an IPv6 Internet socket for listening.
+ * @param s Socket state to configure.
+ * @param port Service or port name to bind.
+ * @param backlog Maximum pending connection queue length.
+ * @param type Socket kind, typically SOCK_STREAM or SOCK_DGRAM.
+ * @return True on success.
+ */
+[[nodiscard]] bool mx_socket_ipv6_listen(MXSocket *s, const char *port, int backlog, int type);
 /**
  * @brief Create and bind a UNIX-domain socket for listening.
  * @param s Socket state to configure.
@@ -128,6 +138,15 @@ void mx_socket_close(MXSocket *s);
  * @return True on success.
  */
 [[nodiscard]] bool mx_socket_connect(MXSocket *s, const char *host, const char *port, int type);
+/**
+ * @brief Connect an IPv6 Internet socket to a remote host.
+ * @param s Socket state to configure.
+ * @param host Remote host name or address.
+ * @param port Remote service or port name.
+ * @param type Socket kind, typically SOCK_STREAM or SOCK_DGRAM.
+ * @return True on success.
+ */
+[[nodiscard]] bool mx_socket_ipv6_connect(MXSocket *s, const char *host, const char *port, int type);
 /**
  * @brief Connect a UNIX-domain socket to a local path.
  * @param s Socket state to configure.
@@ -182,6 +201,13 @@ ssize_t mx_socket_send(MXSocket *s, const void *data, size_t len, int flags);
  */
 [[nodiscard]] bool mx_socket_bind(MXSocket *s, const char *port);
 /**
+ * @brief Bind an IPv6 Internet socket to a local port.
+ * @param s Socket state to configure.
+ * @param port Service or port name.
+ * @return True on success.
+ */
+[[nodiscard]] bool mx_socket_ipv6_bind(MXSocket *s, const char *port);
+/**
  * @brief Bind a UNIX-domain socket to a local path.
  * @param s Socket state to configure.
  * @param path Filesystem path for the socket.
@@ -213,6 +239,14 @@ ssize_t mx_socket_write_all(MXSocket *sock, const void *buf, size_t bytes);
  */
 ssize_t mx_socket_sendto(MXSocket *sock, const void *buf, size_t bytes);
 /**
+ * @brief Send a datagram using an IPv6 Internet socket.
+ * @param sock Socket state.
+ * @param buf Input buffer.
+ * @param bytes Number of bytes to send.
+ * @return Number of bytes sent, or a negative error value.
+ */
+ssize_t mx_socket_ipv6_sendto(MXSocket *sock, const void *buf, size_t bytes);
+/**
  * @brief Receive a datagram using an Internet socket.
  * @param sock Socket state.
  * @param buf Output buffer.
@@ -220,6 +254,14 @@ ssize_t mx_socket_sendto(MXSocket *sock, const void *buf, size_t bytes);
  * @return Number of bytes received, or a negative error value.
  */
 ssize_t mx_socket_recvfrom(MXSocket *sock, void *buf, size_t bytes);
+/**
+ * @brief Receive a datagram using an IPv6 Internet socket.
+ * @param sock Socket state.
+ * @param buf Output buffer.
+ * @param bytes Maximum number of bytes to receive.
+ * @return Number of bytes received, or a negative error value.
+ */
+ssize_t mx_socket_ipv6_recvfrom(MXSocket *sock, void *buf, size_t bytes);
 /**
  * @brief Send a datagram using a UNIX-domain socket.
  * @param sock Socket state.

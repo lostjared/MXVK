@@ -129,8 +129,10 @@ int main() {
 The main socket types are:
 
 - `mxnetwork::SocketType::TYPE_INET` for IPv4 TCP sockets.
+- `mxnetwork::SocketType::TYPE_INET6` for IPv6 TCP sockets.
 - `mxnetwork::SocketType::TYPE_UNIX` for Unix-domain stream sockets.
 - `mxnetwork::SocketType::TYPE_INET_DGRAM` for IPv4 UDP sockets.
+- `mxnetwork::SocketType::TYPE_INET6_DGRAM` for IPv6 UDP sockets.
 - `mxnetwork::SocketType::TYPE_UNIX_DGRAM` for Unix-domain datagram sockets.
 
 ## Examples

@@ -16,6 +16,187 @@
 
 #endif
 
+static void mx_socket_store_inet_address(MXSocket *sock, const struct sockaddr *addr, socklen_t addrlen) {
+    if (sock == nullptr || addr == nullptr)
+        return;
+
+    sock->addrlen = addrlen;
+    if (addr->sa_family == AF_INET6) {
+        size_t len_size = ((size_t)addrlen > sizeof(sock->inet6)) ? sizeof(sock->inet6) : (size_t)addrlen;
+        memcpy(&sock->inet6, addr, len_size);
+    } else if (addr->sa_family == AF_INET) {
+        size_t len_size = ((size_t)addrlen > sizeof(sock->inet)) ? sizeof(sock->inet) : (size_t)addrlen;
+        memcpy(&sock->inet, addr, len_size);
+    }
+}
+
+static bool mx_socket_inet_listen(MXSocket *sock, const char *port, int backlog, int type, int family) {
+    if (port == nullptr)
+        return false;
+
+    if (!mx_socket_init(sock))
+        return false;
+
+    struct addrinfo hints;
+    struct addrinfo *rt, *rp;
+    mx_socket_fd sfd = NULL_SOCKET, s;
+    int optval = 1;
+
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_canonname = nullptr;
+    hints.ai_addr = nullptr;
+    hints.ai_next = nullptr;
+    hints.ai_socktype = type;
+    hints.ai_family = family;
+    hints.ai_flags = AI_PASSIVE;
+    s = getaddrinfo(nullptr, port, &hints, &rt);
+    if (s != 0)
+        return false;
+
+    for (rp = rt; rp != NULL; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+#ifdef _WIN32
+        if (sfd == INVALID_SOCKET)
+#else
+        if (sfd == -1)
+#endif
+            continue;
+
+#ifdef _WIN32
+        if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof(optval)) == -1) {
+#else
+        if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
+#endif
+            mx_close_socket(sfd);
+            freeaddrinfo(rt);
+            return false;
+        }
+
+        if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+            break;
+
+        if (sfd != NULL_SOCKET)
+            mx_close_socket(sfd);
+        sfd = NULL_SOCKET;
+    }
+
+    if (sfd == NULL_SOCKET) {
+        freeaddrinfo(rt);
+        return false;
+    }
+
+    if (rp != nullptr && sfd != NULL_SOCKET) {
+        if (listen(sfd, backlog) == -1) {
+            freeaddrinfo(rt);
+            mx_close_socket(sfd);
+            return false;
+        }
+        sock->sockfd = sfd;
+        mx_socket_store_inet_address(sock, rp->ai_addr, rp->ai_addrlen);
+    } else {
+        if (sfd != NULL_SOCKET)
+            mx_close_socket(sfd);
+        freeaddrinfo(rt);
+        return false;
+    }
+
+    freeaddrinfo(rt);
+    return true;
+}
+
+static bool mx_socket_inet_connect(MXSocket *sock, const char *host, const char *port, int type, int family) {
+    if (host == nullptr || port == nullptr)
+        return false;
+
+    if (!mx_socket_init(sock))
+        return false;
+
+    struct addrinfo hints;
+    struct addrinfo *rt, *rp;
+    mx_socket_fd sfd = NULL_SOCKET, s;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_canonname = nullptr;
+    hints.ai_addr = nullptr;
+    hints.ai_next = nullptr;
+    hints.ai_family = family;
+    hints.ai_socktype = type;
+    s = getaddrinfo(host, port, &hints, &rt);
+    if (s != 0) {
+        errno = ENOSYS;
+        return false;
+    }
+    for (rp = rt; rp != nullptr; rp = rp->ai_next) {
+        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+#ifdef _WIN32
+        if (sfd == INVALID_SOCKET)
+#else
+        if (sfd == -1)
+#endif
+            continue;
+
+        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+            break;
+
+        if (sfd != NULL_SOCKET) {
+            mx_close_socket(sfd);
+            sfd = NULL_SOCKET;
+        }
+    }
+
+    if (rp != nullptr) {
+        sock->sockfd = sfd;
+        mx_socket_store_inet_address(sock, rp->ai_addr, rp->ai_addrlen);
+    } else {
+        freeaddrinfo(rt);
+        if (sfd != NULL_SOCKET)
+            mx_close_socket(sfd);
+        return false;
+    }
+
+    freeaddrinfo(rt);
+    return true;
+}
+
+static bool mx_socket_inet_bind(MXSocket *sock, const char *port, int family) {
+    if (!mx_socket_init(sock) || port == nullptr)
+        return false;
+
+    mx_socket_fd sockfd = NULL_SOCKET;
+    struct addrinfo hints = {};
+    struct addrinfo *result = nullptr;
+    struct addrinfo *rp = nullptr;
+    hints.ai_family = family;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE;
+    int s = getaddrinfo(nullptr, port, &hints, &result);
+    if (s != 0) {
+        return false;
+    }
+    bool set_value = false;
+    for (rp = result; rp != nullptr; rp = rp->ai_next) {
+        sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+#ifdef _WIN32
+        if (sockfd == INVALID_SOCKET)
+#else
+        if (sockfd == -1)
+#endif
+            continue;
+
+        if (bind(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
+            mx_socket_store_inet_address(sock, rp->ai_addr, rp->ai_addrlen);
+            set_value = true;
+            break;
+        }
+        mx_close_socket(sockfd);
+        sockfd = NULL_SOCKET;
+    }
+    freeaddrinfo(result);
+    if (!set_value)
+        return false;
+    sock->sockfd = sockfd;
+    return true;
+}
+
 [[nodiscard]] bool mx_socket_unix_listen(MXSocket *sock, const char *path, int backlog, int type) {
     if (path == nullptr)
         return false;
@@ -85,78 +266,11 @@
 }
 
 [[nodiscard]] bool mx_socket_listen(MXSocket *sock, const char *port, int backlog, int type) {
-    if (port == nullptr)
-        return false;
+    return mx_socket_inet_listen(sock, port, backlog, type, AF_INET);
+}
 
-    if (!mx_socket_init(sock))
-        return false;
-
-    struct addrinfo hints;
-    struct addrinfo *rt, *rp;
-    mx_socket_fd sfd = NULL_SOCKET, optval, s;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_canonname = nullptr;
-    hints.ai_addr = nullptr;
-    hints.ai_next = nullptr;
-    hints.ai_socktype = type;
-    hints.ai_family = AF_INET;
-    hints.ai_flags = AI_PASSIVE;
-    s = getaddrinfo(nullptr, port, &hints, &rt);
-    if (s != 0)
-        return false;
-
-    optval = 1;
-
-    for (rp = rt; rp != NULL; rp = rp->ai_next) {
-        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-#ifdef _WIN32
-        if (sfd == INVALID_SOCKET)
-#else
-        if (sfd == -1)
-#endif
-            continue;
-
-#ifdef _WIN32
-        if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof(optval)) == -1) {
-#else
-        if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1) {
-#endif
-            mx_close_socket(sfd);
-            freeaddrinfo(rt);
-            return false;
-        }
-
-        if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
-            break;
-
-        if (sfd != NULL_SOCKET)
-            mx_close_socket(sfd);
-        sfd = NULL_SOCKET;
-    }
-
-    if (sfd == NULL_SOCKET) {
-        freeaddrinfo(rt);
-        return false;
-    }
-
-    if (rp != nullptr && sfd != NULL_SOCKET) {
-        if (listen(sfd, backlog) == -1) {
-            freeaddrinfo(rt);
-            mx_close_socket(sfd);
-            return false;
-        }
-        sock->sockfd = sfd;
-        sock->addrlen = rp->ai_addrlen;
-        memcpy(&sock->inet, rp->ai_addr, rp->ai_addrlen);
-    } else {
-        if (sfd != NULL_SOCKET)
-            mx_close_socket(sfd);
-        return false;
-    }
-
-    freeaddrinfo(rt);
-    return true;
+[[nodiscard]] bool mx_socket_ipv6_listen(MXSocket *sock, const char *port, int backlog, int type) {
+    return mx_socket_inet_listen(sock, port, backlog, type, AF_INET6);
 }
 
 [[nodiscard]] bool mx_socket_accept(const MXSocket *input, MXSocket *output) {
@@ -200,6 +314,7 @@
     output->blocking = input->blocking;
     output->sun = input->sun;
     output->inet = input->inet;
+    output->inet6 = input->inet6;
     return true;
 }
 
@@ -243,87 +358,19 @@ void mx_socket_close(MXSocket *sock) {
 }
 
 [[nodiscard]] bool mx_socket_connect(MXSocket *sock, const char *host, const char *port, int type) {
-    if (host == nullptr || port == nullptr)
-        return false;
+    return mx_socket_inet_connect(sock, host, port, type, AF_INET);
+}
 
-    if (!mx_socket_init(sock))
-        return false;
-
-    struct addrinfo hints;
-    struct addrinfo *rt, *rp;
-    mx_socket_fd sfd = NULL_SOCKET, s;
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_canonname = nullptr;
-    hints.ai_addr = nullptr;
-    hints.ai_next = nullptr;
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = type;
-    s = getaddrinfo(host, port, &hints, &rt);
-    if (s != 0) {
-        errno = ENOSYS;
-        return false;
-    }
-    for (rp = rt; rp != nullptr; rp = rp->ai_next) {
-        sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-#ifdef _WIN32
-        if (sfd == INVALID_SOCKET)
-#else
-        if (sfd == -1)
-#endif
-            continue;
-
-        if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
-            break;
-
-        if (sfd != NULL_SOCKET) {
-            mx_close_socket(sfd);
-            sfd = NULL_SOCKET;
-        }
-    }
-
-    if (rp != nullptr) {
-        sock->sockfd = sfd;
-        sock->addrlen = rp->ai_addrlen;
-        memcpy(&sock->inet, rp->ai_addr, rp->ai_addrlen);
-    } else {
-        freeaddrinfo(rt);
-        if (sfd != NULL_SOCKET)
-            mx_close_socket(sfd);
-        return false;
-    }
-
-    freeaddrinfo(rt);
-    return true;
+[[nodiscard]] bool mx_socket_ipv6_connect(MXSocket *sock, const char *host, const char *port, int type) {
+    return mx_socket_inet_connect(sock, host, port, type, AF_INET6);
 }
 
 [[nodiscard]] bool mx_socket_bind(MXSocket *sock, const char *port) {
-    if (!mx_socket_init(sock) || port == nullptr)
-        return false;
-    mx_socket_fd sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    struct addrinfo hints = {};
-    struct addrinfo *result = nullptr;
-    struct addrinfo *rp = nullptr;
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_PASSIVE;
-    int s = getaddrinfo(nullptr, port, &hints, &result);
-    if (s != 0) {
-        return false;
-    }
-    bool set_value = false;
-    for (rp = result; rp != nullptr; rp = rp->ai_next) {
-        if (bind(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
-            memcpy(&sock->inet, rp->ai_addr, rp->ai_addrlen);
-            sock->addrlen = rp->ai_addrlen;
-            set_value = true;
-            break;
-        }
-    }
-    freeaddrinfo(result);
-    if (!set_value)
-        return false;
-    sock->sockfd = sockfd;
-    return true;
+    return mx_socket_inet_bind(sock, port, AF_INET);
+}
+
+[[nodiscard]] bool mx_socket_ipv6_bind(MXSocket *sock, const char *port) {
+    return mx_socket_inet_bind(sock, port, AF_INET6);
 }
 
 [[nodiscard]] bool mx_socket_unix_bind(MXSocket *s, const char *path) {
@@ -539,7 +586,28 @@ ssize_t mx_socket_sendto(MXSocket *sock, const void *buf, size_t src_bytes) {
     bytes = sendto(sock->sockfd, (const char *)buf, MX_LEN(src_bytes), 0, (struct sockaddr *)&sock->inet, sock->addrlen);
     return bytes;
 }
+
+ssize_t mx_socket_ipv6_sendto(MXSocket *sock, const void *buf, size_t src_bytes) {
+    if (sock == nullptr || buf == nullptr || src_bytes == 0)
+        return -1;
+
+    ssize_t bytes = 0;
+    bytes = sendto(sock->sockfd, (const char *)buf, MX_LEN(src_bytes), 0, (struct sockaddr *)&sock->inet6, sock->addrlen);
+    return bytes;
+}
+
 ssize_t mx_socket_recvfrom(MXSocket *sock, void *buf, size_t src_bytes) {
+    if (sock == nullptr || buf == nullptr || src_bytes == 0)
+        return -1;
+
+    ssize_t bytes = 0;
+    socklen_t len = (socklen_t)sizeof(struct sockaddr_storage);
+    struct sockaddr_storage caddr;
+    bytes = recvfrom(sock->sockfd, (char *)buf, MX_LEN(src_bytes), 0, (struct sockaddr *)&caddr, &len);
+    return bytes;
+}
+
+ssize_t mx_socket_ipv6_recvfrom(MXSocket *sock, void *buf, size_t src_bytes) {
     if (sock == nullptr || buf == nullptr || src_bytes == 0)
         return -1;
 
