@@ -83,6 +83,8 @@ add_dependencies(asteroids3d asteroids3d_shaders)
 target_compile_definitions(asteroids3d PRIVATE
     ASTEROIDS3D_SHADER_DIR="${ASTEROIDS3D_SHADER_OUTPUT_DIR}"
     ASTEROIDS3D_ASSET_DIR="$<TARGET_FILE_DIR:asteroids3d>"
+    ASTEROIDS3D_SOURCE_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+    ASTEROIDS3D_DEFENDER_SOUND_DIR="${CMAKE_SOURCE_DIR}/examples/defender/data"
 )
 
 add_custom_command(TARGET asteroids3d POST_BUILD
@@ -96,6 +98,16 @@ add_custom_command(TARGET asteroids3d POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/rain/data/NotoSansCJK-Regular.ttc
         $<TARGET_FILE_DIR:asteroids3d>/data/NotoSansCJK-Regular.ttc
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/music.ogg
+        $<TARGET_FILE_DIR:asteroids3d>/data/music.ogg
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/cannon.wav
+        $<TARGET_FILE_DIR:asteroids3d>/data/cannon.wav
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/examples/defender/data/crash.wav
+        ${CMAKE_SOURCE_DIR}/examples/defender/data/asteroid.wav
+        $<TARGET_FILE_DIR:asteroids3d>/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid.obj
         $<TARGET_FILE_DIR:asteroids3d>/data/asteroid.obj

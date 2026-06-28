@@ -10,6 +10,9 @@
 #include "mxvk/mxvk_console.hpp"
 #include "mxvk/mxvk_controller.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+#include "mxvk/mxvk_sound.hpp"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -22,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <filesystem>
 #include <format>
 #include <limits>
 #include <memory>
@@ -51,6 +55,10 @@ namespace space {
             load_loading_screen_resources();
             configure_console();
             open_controller();
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            load_sound_effects();
+            ensure_background_music_playing();
+#endif
         }
 
         ~Asteroids3DWindow() override {
@@ -60,6 +68,11 @@ namespace space {
             if (loading_thread.joinable()) {
                 loading_thread.join();
             }
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (sound_effects) {
+                sound_effects->stopMusic();
+            }
+#endif
             cleanup_flame_resources();
             ship_model.cleanup(this);
             for (auto &model : asteroid_models) {
@@ -213,6 +226,9 @@ namespace space {
             elapsed_seconds += dt;
 
             sync_controller_connection();
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            ensure_background_music_playing();
+#endif
 
             const VkExtent2D extent = getSwapchainExtent();
             const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
@@ -338,6 +354,8 @@ namespace space {
         float intro_fade = 1.0f;
         Uint32 intro_last_update_ms = 0;
         float loading_rain_opacity = 1.0f;
+        static constexpr int INTRO_RAIN_TEXTURE_WIDTH = 1280;
+        static constexpr int INTRO_RAIN_TEXTURE_HEIGHT = 720;
         bool loading_black_frame_pending = false;
         bool loading_black_frame_shown = false;
         bool restart_after_intro = false;
@@ -368,6 +386,13 @@ namespace space {
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::VK_Console console;
         mxvk::VK_Controller controller;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::unique_ptr<mxvk::VK_Mixer> sound_effects{};
+        int background_music_track = -1;
+        int crash_sound = -1;
+        int cannon_sound = -1;
+        int asteroid_explosion_sound = -1;
+#endif
         bool console_ready = false;
         std::atomic<bool> game_resources_loaded{false};
         std::atomic<bool> loading_failed{false};
@@ -545,6 +570,50 @@ namespace space {
             return raw_value < 0 ? -curved : curved;
         }
 
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::string asteroids3d_asset_path(const std::string &filename) const {
+            const std::string local_path = asset_root + "/data/" + filename;
+            if (std::filesystem::exists(local_path)) {
+                return local_path;
+            }
+            return std::string(ASTEROIDS3D_SOURCE_DATA_DIR) + "/" + filename;
+        }
+
+        std::string sound_effect_path(const std::string &filename) const {
+            const std::string local_path = asset_root + "/data/" + filename;
+            if (std::filesystem::exists(local_path)) {
+                return local_path;
+            }
+            return std::string(ASTEROIDS3D_DEFENDER_SOUND_DIR) + "/" + filename;
+        }
+
+        void load_sound_effects() {
+            sound_effects = std::make_unique<mxvk::VK_Mixer>();
+            background_music_track = sound_effects->loadMusic(asteroids3d_asset_path("music.ogg"));
+            crash_sound = sound_effects->loadWav(sound_effect_path("crash.wav"));
+            cannon_sound = sound_effects->loadWav(asteroids3d_asset_path("cannon.wav"));
+            asteroid_explosion_sound = sound_effects->loadWav(sound_effect_path("asteroid.wav"));
+        }
+
+        void ensure_background_music_playing() {
+            if (!sound_effects || background_music_track < 0) {
+                return;
+            }
+            if (!sound_effects->isMusicPlaying(background_music_track)) {
+                if (sound_effects->playMusic(background_music_track, -1) != 0) {
+                    throw mxvk::Exception("Could not start asteroids3d background music");
+                }
+            }
+        }
+
+        void play_sound(int sound_id) {
+            if (!sound_effects || sound_id < 0) {
+                return;
+            }
+            sound_effects->playWav(sound_id);
+        }
+#endif
+
         void load_loading_screen_resources() {
             set_ui_font_size(18);
 
@@ -554,6 +623,8 @@ namespace space {
                 std::string(ASTEROIDS3D_SHADER_DIR) + "/intro.frag.spv");
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
             intro_rain_config.color = "#ff0000";
+            intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
+            intro_rain_config.surface_height = INTRO_RAIN_TEXTURE_HEIGHT;
             intro_rain = std::make_unique<matrix::Rain>(*this, std::move(intro_rain_config));
             reset_intro_screen();
             loading_step_index.store(0, std::memory_order_relaxed);
@@ -659,11 +730,11 @@ namespace space {
             intro_sprite->setShaderParams(static_cast<float>(current_ms) / 1000.0f, 0.0f, 0.0f, intro_fade);
             intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
             if (intro_rain != nullptr) {
-                intro_rain->update_and_render(*this);
+                intro_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
             }
         }
 
-        void draw_loading([[maybe_unused]] const VkExtent2D &extent) {
+        void draw_loading(const VkExtent2D &extent) {
             if (loading_failed.load(std::memory_order_relaxed) || model_preload_failed.load(std::memory_order_relaxed)) {
                 if (intro_rain != nullptr) {
                     intro_rain->set_opacity(0.0f);
@@ -681,7 +752,7 @@ namespace space {
                     const float target_rain_opacity = 1.0f - (static_cast<float>(loading_progress_percent) / 100.0f);
                     loading_rain_opacity = std::lerp(loading_rain_opacity, target_rain_opacity, 0.25f);
                     intro_rain->set_opacity(loading_rain_opacity);
-                    intro_rain->update_and_render(*this);
+                    intro_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
                 }
                 set_ui_font_size(40);
                 printText("Loading " + std::to_string(loading_progress_percent) + "%", 25, 25, {255, 255, 255, 255});
@@ -1160,6 +1231,9 @@ namespace space {
                 projectile.color = PROJECTILE_COLOR;
                 projectile.lifetime = 0.0f;
                 projectile.active = true;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+                play_sound(cannon_sound);
+#endif
                 log_game(std::format("Projectile fired from ({:.1f}, {:.1f}, {:.1f}).", muzzle.x, muzzle.y, muzzle.z));
                 return;
             }
@@ -1256,6 +1330,9 @@ namespace space {
             const float radius = asteroid.radius * 0.5f;
 
             spawn_asteroid_explosion(hit_position);
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            play_sound(asteroid_explosion_sound);
+#endif
 
             if (generation >= MAX_GENERATIONS) {
                 ship.score += SMALL_ASTEROID_POINTS;
@@ -1456,6 +1533,9 @@ namespace space {
             ship.overheat_cooldown = 0;
             ship.continuous_fire_timer = 0;
             ship.burst_count = 0;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            play_sound(crash_sound);
+#endif
             log_game(std::format("Ship destroyed. Lives remaining: {}.", std::max(0, ship.lives)), SDL_Color{255, 120, 80, 255});
             if (ship.lives <= 0) {
                 log_game(std::format("Game over. Final score: {}.", ship.score), SDL_Color{255, 90, 90, 255});
