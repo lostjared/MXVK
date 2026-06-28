@@ -17,6 +17,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Examples](#examples)
 - [Recent Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
+- [MXNetwork](#mxnetwork)
 - [Project Layout](#project-layout)
 - [Early Screenshots](#early-screenshots)
 
@@ -321,6 +322,59 @@ if (writer.open("output.mp4", 1280, 720, 30.0f, opts)) {
 ```
 
 When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite` target so consumers can gate MXWrite-specific code consistently.
+
+<a id="mxnetwork"></a>
+
+## MXNetwork
+
+MXNetwork is the small C++20 socket library included in this repository. It provides a C-compatible low-level socket API plus a move-only C++ RAII wrapper for TCP, UDP, and Unix-domain socket workflows.
+
+### Build
+
+MXNetwork is included from the root CMake build as the static `mxnetwork` library. The root build disables MXNetwork's standalone examples and uses the library where needed, such as the optional multiplayer path in `tetris`.
+
+```bash
+cmake -S . -B build
+cmake --build build -j
+```
+
+To build MXNetwork directly with its own examples, configure the `MXNetwork` subdirectory:
+
+```bash
+cmake -S MXNetwork -B build-mxnetwork
+cmake --build build-mxnetwork -j
+```
+
+MXNetwork's standalone build includes TCP, UDP, Unix-domain socket, relay, and file-download examples. Use `-DMXNETWORK_EXAMPLES=OFF` when building that subdirectory if you only want the library.
+
+### Usage
+
+Consumer code includes [`MXNetwork/include/mxnetwork/socket.hpp`](MXNetwork/include/mxnetwork/socket.hpp) and links against `libmxnetwork::mxnetwork` when using this repository directly. Installed consumers can use `find_package(mxnetwork REQUIRED)` and link against `mxnetwork::mxnetwork`.
+
+The C++ API provides `mxnetwork::Socket` for move-only socket ownership, plus `mxnetwork::MXNetworkInit` for platform socket initialization and cleanup.
+
+```cpp
+#include "mxnetwork/socket.hpp"
+
+#include <iostream>
+#include <string>
+
+int main() {
+    mxnetwork::MXNetworkInit network_init;
+    mx_socket_ignore_pipe_signal();
+
+    mxnetwork::Socket socket(mxnetwork::SocketType::TYPE_INET);
+    if (!socket.connect("127.0.0.1", "8080")) {
+        std::cerr << "connect failed\n";
+        return 1;
+    }
+
+    const std::string message = "hello";
+    socket.write_all(message.data(), message.size());
+}
+```
+
+The wrapper supports IPv4 TCP sockets, IPv4 UDP datagrams, Unix-domain stream sockets, and Unix-domain datagrams where the platform supports them. Common helpers include `connect`, `listen`, `accept`, `bind`, `setblocking`, `read`, `write`, `read_all`, `write_all`, `sendto`, `recvfrom`, `valid`, and `close`.
 
 <a id="project-layout"></a>
 
