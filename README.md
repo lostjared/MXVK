@@ -327,7 +327,7 @@ When built through MXVK, the library exports `MXWRITE_ENABLED=1` on the `mxwrite
 
 ## MXNetwork
 
-MXNetwork is the small C++20 socket library included in this repository. It provides a C-compatible low-level socket API plus a move-only C++ RAII wrapper for TCP, UDP, and Unix-domain socket workflows.
+MXNetwork is the small C++20 socket library included in this repository. It provides a C-compatible low-level socket API plus a move-only C++ RAII wrapper for IPv4/IPv6 TCP and UDP, plus Unix-domain socket workflows.
 
 ### Build
 
@@ -345,7 +345,7 @@ cmake -S MXNetwork -B build-mxnetwork
 cmake --build build-mxnetwork -j
 ```
 
-MXNetwork's standalone build includes TCP, UDP, Unix-domain socket, relay, and file-download examples. Use `-DMXNETWORK_EXAMPLES=OFF` when building that subdirectory if you only want the library.
+MXNetwork's standalone build includes TCP, UDP, Unix-domain socket, relay, and file-download examples. TCP and UDP examples use the same wrapper methods that are available to IPv4 and IPv6 socket types. Use `-DMXNETWORK_EXAMPLES=OFF` when building that subdirectory if you only want the library.
 
 ### Usage
 
@@ -374,7 +374,24 @@ int main() {
 }
 ```
 
-The wrapper supports IPv4 TCP sockets, IPv4 UDP datagrams, Unix-domain stream sockets, and Unix-domain datagrams where the platform supports them. Common helpers include `connect`, `listen`, `accept`, `bind`, `setblocking`, `read`, `write`, `read_all`, `write_all`, `sendto`, `recvfrom`, `valid`, and `close`.
+The wrapper supports IPv4 TCP sockets, IPv6 TCP sockets, IPv4 UDP datagrams, IPv6 UDP datagrams, Unix-domain stream sockets, and Unix-domain datagrams where the platform supports them. Common helpers include `connect`, `listen`, `accept`, `bind`, `setblocking`, `read`, `write`, `read_all`, `write_all`, `sendto`, `recvfrom`, `valid`, and `close`.
+
+IPv6 uses dedicated socket types while keeping the same method names as IPv4:
+
+- `mxnetwork::SocketType::TYPE_INET6` for IPv6 TCP sockets.
+- `mxnetwork::SocketType::TYPE_INET6_DGRAM` for IPv6 UDP sockets.
+
+For example, an IPv6 TCP connection only changes the socket type and address:
+
+```cpp
+mxnetwork::Socket socket(mxnetwork::SocketType::TYPE_INET6);
+if (!socket.connect("::1", "8080")) {
+    std::cerr << "IPv6 connect failed\n";
+    return 1;
+}
+```
+
+For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`, `sendto`, and `recvfrom` dispatch through MXNetwork's IPv6 datagram helpers.
 
 <a id="project-layout"></a>
 
