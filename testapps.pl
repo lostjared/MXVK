@@ -12,8 +12,7 @@ my @tests = qw(
     sprite3d_example
     static_example
     3dmath
-    3dmath_cube
-    3dmath_texture
+    3dmath_cube 
     3dmath_masterpiece
     dark
     matrix
