@@ -1951,6 +1951,8 @@ namespace mxvk {
      * @param p0 First triangle vertex in screen coordinates.
      * @param p1 Second triangle vertex in screen coordinates.
      * @param p2 Third triangle vertex in screen coordinates.
+     * @param clip_min_y Minimum inclusive scanline to rasterize.
+     * @param clip_max_y Maximum inclusive scanline to rasterize.
      * @param color Packed ARGB color.
      * @param draw_span Span drawing callable.
      */

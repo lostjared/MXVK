@@ -6,9 +6,9 @@
 # Output is written to docs/doxygen/html by default.
 
 DOXYFILE_ENCODING       = UTF-8
-PROJECT_NAME            = "MXVK"
-PROJECT_NUMBER          = "0.9.1"
-PROJECT_BRIEF           = "A C++20 Vulkan rendering framework with SDL3 integration."
+PROJECT_NAME            = "MXVK Vulkan Framework"
+PROJECT_NUMBER          = "0.9.2"
+PROJECT_BRIEF           = "C++20 Vulkan rendering framework for practical 2D and 3D application development with SDL3."
 OUTPUT_DIRECTORY        = docs/doxygen
 CREATE_SUBDIRS          = YES
 
@@ -32,7 +32,7 @@ GENERATE_XML            = NO
 HTML_OUTPUT             = html
 HTML_FILE_EXTENSION     = .html
 #HTML_EXTRA_STYLESHEET   = doxygen-dark.csu1
-HTML_HEADER             =
+HTML_HEADER             = docs/doxygen/mxvk_header.html
 HTML_FOOTER             =
 HTML_STYLESHEET         =
 HTML_COLORSTYLE         = LIGHT
