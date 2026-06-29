@@ -16,6 +16,7 @@ Asteroids3D is a 3D take on the classic Asteroids formula. You fly a ship throug
 - `F1` - toggle the debug HUD while playing
 - `F2` - toggle arcade versus inverted pitch controls
 - `F3` - open or close the in-game console
+- `F7` - toggle chase camera versus first-person camera while playing
 - `F8` - toggle the CRT post-processing shader on or off
 - `Left` / `Right` - yaw the ship with the keyboard
 - `W` / `S` - pitch the ship, with inversion controlled by `F2`

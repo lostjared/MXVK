@@ -195,6 +195,11 @@ namespace space {
                     log_game(std::string("Controls set to ") + (inverted_controls ? "inverted." : "arcade."));
                     return;
                 }
+                if (e.key.key == SDLK_F7 && !e.key.repeat) {
+                    begin_camera_transition(!first_person_camera);
+                    log_game(std::string("Camera set to ") + (first_person_camera ? "first person." : "chase view."));
+                    return;
+                }
             }
         }
 
@@ -320,12 +325,7 @@ namespace space {
                 return;
             }
 
-            const glm::vec3 ship_forward = ship.forward();
-            const glm::vec3 camera_target = ship.position + ship_forward * 6.0f;
-            const glm::vec3 ideal_camera = ship.position - ship_forward * ship.camera_distance + glm::vec3(0.0f, ship.camera_height, 0.0f);
-            camera_position = glm::mix(camera_position, ideal_camera, 1.0f - std::exp(-dt * 10.0f));
-            const glm::vec3 up(0.0f, 1.0f, 0.0f);
-            view_matrix = glm::lookAt(camera_position, camera_target, up);
+            update_camera(dt);
             projection_matrix = glm::perspective(glm::radians(50.0f), aspect, 0.1f, 500.0f);
             projection_matrix[1][1] *= -1.0f;
 
@@ -341,8 +341,10 @@ namespace space {
             star_sprite->clearQueue();
 
             draw_asteroids(image_index);
-            draw_ship(image_index);
-            draw_engine_flame(cmd, extent);
+            if (!first_person_camera && !camera_transition_active) {
+                draw_ship(image_index);
+                draw_engine_flame(cmd, extent);
+            }
             draw_projectiles();
             draw_particles();
             projectile_sprite->render(cmd, image_index);
@@ -371,6 +373,8 @@ namespace space {
         bool restart_after_intro = false;
         bool debug_menu = false;
         bool inverted_controls = false;
+        bool first_person_camera = false;
+        bool camera_transition_active = false;
         bool crt_enabled = false;
         bool ship_returning_to_field = false;
         float keyboard_yaw = 0.0f;
@@ -380,6 +384,8 @@ namespace space {
         float smooth_pitch = 0.0f;
         float smooth_roll = 0.0f;
         float return_message_cooldown = 0.0f;
+        float camera_transition_elapsed = 0.0f;
+        static constexpr float CAMERA_TRANSITION_SECONDS = 0.75f;
 
         Ship ship{};
         std::array<Projectile, MAX_PROJECTILES> projectiles{};
@@ -387,6 +393,11 @@ namespace space {
         std::array<Particle, MAX_PARTICLES> particles{};
         StarField star_field{};
         glm::vec3 camera_position{0.0f, 1.6f, 6.0f};
+        glm::vec3 camera_target_position{0.0f, 1.6f, 0.0f};
+        glm::vec3 camera_up_vector{0.0f, 1.0f, 0.0f};
+        glm::vec3 camera_transition_start_position{0.0f, 1.6f, 6.0f};
+        glm::vec3 camera_transition_start_target{0.0f, 1.6f, 0.0f};
+        glm::vec3 camera_transition_start_up{0.0f, 1.0f, 0.0f};
         glm::mat4 view_matrix{1.0f};
         glm::mat4 projection_matrix{1.0f};
 
@@ -487,6 +498,7 @@ namespace space {
                         << "Asteroids: " << active_asteroids() << '\n'
                         << "Time left: " << format_round_time() << '\n'
                         << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n'
+                        << "Camera: " << (first_person_camera ? "first person" : "chase") << '\n'
                         << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n'
                         << "Controller: " << controller_status() << '\n'
                         << "Debug HUD: " << (debug_menu ? "on" : "off") << '\n';
@@ -993,6 +1005,12 @@ namespace space {
             smooth_roll = 0.0f;
             ship_returning_to_field = false;
             return_message_cooldown = 0.0f;
+            first_person_camera = false;
+            camera_transition_active = false;
+            camera_transition_elapsed = 0.0f;
+            camera_position = glm::vec3(0.0f, ship.camera_height, ship.camera_distance);
+            camera_target_position = glm::vec3(0.0f, 0.0f, -6.0f);
+            camera_up_vector = glm::vec3(0.0f, 1.0f, 0.0f);
             round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
         }
 
@@ -1853,6 +1871,83 @@ namespace space {
             return std::format("{:02d}:{:02d}", minutes, seconds);
         }
 
+        glm::mat4 ship_rotation_matrix() const {
+            glm::mat4 rotation(1.0f);
+            rotation = glm::rotate(rotation, glm::radians(ship.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+            rotation = glm::rotate(rotation, glm::radians(ship.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+            rotation = glm::rotate(rotation, glm::radians(ship.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+            return rotation;
+        }
+
+        struct CameraPose {
+            glm::vec3 position{0.0f};
+            glm::vec3 target{0.0f};
+            glm::vec3 up{0.0f, 1.0f, 0.0f};
+        };
+
+        CameraPose chase_camera_pose(const glm::vec3 &ship_forward) const {
+            CameraPose pose{};
+            pose.position = ship.position - ship_forward * ship.camera_distance + glm::vec3(0.0f, ship.camera_height, 0.0f);
+            pose.target = ship.position + ship_forward * 6.0f;
+            pose.up = glm::vec3(0.0f, 1.0f, 0.0f);
+            return pose;
+        }
+
+        CameraPose first_person_camera_pose(const glm::mat4 &ship_rotation_matrix, const glm::vec3 &ship_forward) const {
+            constexpr glm::vec3 FIRST_PERSON_CAMERA_OFFSET{0.0f, 0.16f, -0.30f};
+
+            CameraPose pose{};
+            const glm::vec3 cockpit_offset = glm::vec3(ship_rotation_matrix * glm::vec4(FIRST_PERSON_CAMERA_OFFSET * rendered_ship_scale(), 0.0f));
+            pose.position = ship.position + cockpit_offset;
+            pose.target = pose.position + ship_forward * 8.0f;
+            pose.up = normalize_or_zero(glm::vec3(ship_rotation_matrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+            return pose;
+        }
+
+        static float smooth_camera_transition(float value) {
+            value = std::clamp(value, 0.0f, 1.0f);
+            return value * value * (3.0f - 2.0f * value);
+        }
+
+        void begin_camera_transition(bool target_first_person_camera) {
+            first_person_camera = target_first_person_camera;
+            camera_transition_active = true;
+            camera_transition_elapsed = 0.0f;
+            camera_transition_start_position = camera_position;
+            camera_transition_start_target = camera_target_position;
+            camera_transition_start_up = camera_up_vector;
+        }
+
+        void update_camera(float dt) {
+            const glm::mat4 ship_rotation_matrix = this->ship_rotation_matrix();
+            const glm::vec3 ship_forward = normalize_or_zero(glm::vec3(ship_rotation_matrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+            const CameraPose target_pose = first_person_camera ? first_person_camera_pose(ship_rotation_matrix, ship_forward) : chase_camera_pose(ship_forward);
+
+            if (camera_transition_active) {
+                camera_transition_elapsed += dt;
+                const float blend = smooth_camera_transition(camera_transition_elapsed / CAMERA_TRANSITION_SECONDS);
+                camera_position = glm::mix(camera_transition_start_position, target_pose.position, blend);
+                camera_target_position = glm::mix(camera_transition_start_target, target_pose.target, blend);
+                camera_up_vector = normalize_or_zero(glm::mix(camera_transition_start_up, target_pose.up, blend));
+                if (camera_transition_elapsed >= CAMERA_TRANSITION_SECONDS) {
+                    camera_transition_active = false;
+                    camera_position = target_pose.position;
+                    camera_target_position = target_pose.target;
+                    camera_up_vector = target_pose.up;
+                }
+            } else if (first_person_camera) {
+                camera_position = target_pose.position;
+                camera_target_position = target_pose.target;
+                camera_up_vector = target_pose.up;
+            } else {
+                camera_position = glm::mix(camera_position, target_pose.position, 1.0f - std::exp(-dt * 10.0f));
+                camera_target_position = target_pose.target;
+                camera_up_vector = target_pose.up;
+            }
+
+            view_matrix = glm::lookAt(camera_position, camera_target_position, camera_up_vector);
+        }
+
         void draw_ship(uint32_t image_index) {
             if (!ship.visible) {
                 return;
@@ -2411,6 +2506,7 @@ namespace space {
             printText("[F1 for Debug]", right_x, 150, white);
             printText(inverted_controls ? "[Inverted] F2/Y" : "[Arcade] F2/Y", right_x, 175, white);
             printText("[F3 for Console]", right_x, 200, white);
+            printText(first_person_camera ? "[First Person] F7" : "[Chase View] F7", right_x, 225, white);
 
             if (!debug_menu) {
                 return;
@@ -2426,7 +2522,8 @@ namespace space {
             printText("Farthest Object: " + std::to_string(farthest_asteroid_distance()), 25, 175, white);
             printText("Speed: " + std::to_string(ship.current_speed) + " / " + std::to_string(ship.max_speed), 25, 200, white);
             printText("Controller: " + controller_status(), 25, 225, white);
-            printText("Press ENTER to randomize asteroids", 25, 250, white);
+            printText(std::string("Camera: ") + (first_person_camera ? "First person" : "Chase"), 25, 250, white);
+            printText("Press ENTER to randomize asteroids", 25, 275, white);
         }
 
         int active_asteroids() const {
