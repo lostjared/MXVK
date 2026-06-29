@@ -66,6 +66,10 @@ namespace space {
         }
 
         ~Asteroids3DWindow() override {
+            if (mouse_capture_active) {
+                SDL_SetWindowRelativeMouseMode(getSDLWindow(), false);
+                mouse_capture_active = false;
+            }
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
@@ -111,6 +115,7 @@ namespace space {
             console.handleEvent(e);
             if (is_console_toggle) {
                 log_game(console.isVisible() ? "Console opened." : "Console closed.");
+                sync_mouse_capture();
                 return;
             }
             if (was_console_visible) {
@@ -195,11 +200,30 @@ namespace space {
                     log_game(std::string("Controls set to ") + (inverted_controls ? "inverted." : "arcade."));
                     return;
                 }
+                if (e.key.key == SDLK_F5 && !e.key.repeat) {
+                    set_mouse_look_controls(!mouse_look_controls);
+                    log_game(std::string("Control scheme set to ") + (mouse_look_controls ? "keyboard/mouse." : "classic keyboard."));
+                    return;
+                }
                 if (e.key.key == SDLK_F7 && !e.key.repeat) {
                     begin_camera_transition(!first_person_camera);
                     log_game(std::string("Camera set to ") + (first_person_camera ? "first person." : "chase view."));
                     return;
                 }
+            }
+            if (mode == GameMode::Playing && mouse_look_controls && e.type == SDL_EVENT_MOUSE_MOTION) {
+                if (ignore_next_mouse_motion) {
+                    ignore_next_mouse_motion = false;
+                    return;
+                }
+                apply_mouse_look(e.motion.xrel, e.motion.yrel);
+                return;
+            }
+            if (mode == GameMode::Playing && mouse_look_controls && e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                if (can_fire()) {
+                    fire_projectile();
+                }
+                return;
             }
         }
 
@@ -273,6 +297,7 @@ namespace space {
             }
 
             const bool console_visible = console.isVisible();
+            sync_mouse_capture();
             update_round_timer(dt);
             if (mode == GameMode::GameOver) {
                 draw_game_over(image_index, aspect);
@@ -373,6 +398,9 @@ namespace space {
         bool restart_after_intro = false;
         bool debug_menu = false;
         bool inverted_controls = false;
+        bool mouse_look_controls = false;
+        bool mouse_capture_active = false;
+        bool ignore_next_mouse_motion = false;
         bool first_person_camera = false;
         bool camera_transition_active = false;
         bool crt_enabled = false;
@@ -386,6 +414,7 @@ namespace space {
         float return_message_cooldown = 0.0f;
         float camera_transition_elapsed = 0.0f;
         static constexpr float CAMERA_TRANSITION_SECONDS = 0.75f;
+        static constexpr float MOUSE_LOOK_SENSITIVITY = 0.04f;
 
         Ship ship{};
         std::array<Projectile, MAX_PROJECTILES> projectiles{};
@@ -472,6 +501,7 @@ namespace space {
                         << "  play               Start or resume play\n"
                         << "  debug              Toggle debug HUD\n"
                         << "  controls           Toggle arcade/inverted pitch controls\n"
+                        << "  input              Toggle classic keyboard versus keyboard/mouse controls\n"
                         << "  about              Print program banner\n"
                         << "  quit / exit        Close the window\n";
                     return true;
@@ -498,6 +528,7 @@ namespace space {
                         << "Asteroids: " << active_asteroids() << '\n'
                         << "Time left: " << format_round_time() << '\n'
                         << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n'
+                        << "Control scheme: " << (mouse_look_controls ? "keyboard/mouse" : "classic keyboard") << '\n'
                         << "Camera: " << (first_person_camera ? "first person" : "chase") << '\n'
                         << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n'
                         << "Controller: " << controller_status() << '\n'
@@ -538,6 +569,13 @@ namespace space {
                     inverted_controls = !inverted_controls;
                     log_game(std::string("Controls set to ") + (inverted_controls ? "inverted from console." : "arcade from console."));
                     out << "Controls set to " << (inverted_controls ? "inverted." : "arcade.");
+                    return true;
+                }
+
+                if (cmd == "input") {
+                    set_mouse_look_controls(!mouse_look_controls);
+                    log_game(std::string("Control scheme set to ") + (mouse_look_controls ? "keyboard/mouse from console." : "classic keyboard from console."));
+                    out << "Control scheme set to " << (mouse_look_controls ? "keyboard/mouse." : "classic keyboard.");
                     return true;
                 }
 
@@ -594,6 +632,34 @@ namespace space {
                                                 1.0f);
             const float curved = normalized * normalized;
             return raw_value < 0 ? -curved : curved;
+        }
+
+        void set_mouse_look_controls(bool enabled) {
+            mouse_look_controls = enabled;
+            keyboard_yaw = 0.0f;
+            keyboard_pitch = 0.0f;
+            keyboard_roll = 0.0f;
+            smooth_yaw = 0.0f;
+            smooth_pitch = 0.0f;
+            smooth_roll = 0.0f;
+            sync_mouse_capture();
+        }
+
+        void sync_mouse_capture() {
+            const bool should_capture = mouse_look_controls && mode == GameMode::Playing && !console.isVisible();
+            if (should_capture == mouse_capture_active) {
+                return;
+            }
+
+            SDL_SetWindowRelativeMouseMode(getSDLWindow(), should_capture);
+            mouse_capture_active = should_capture;
+            ignore_next_mouse_motion = should_capture;
+        }
+
+        void apply_mouse_look(float delta_x, float delta_y) {
+            ship.rotation.y -= delta_x * MOUSE_LOOK_SENSITIVITY;
+            const float pitch_delta = inverted_controls ? delta_y * MOUSE_LOOK_SENSITIVITY : -delta_y * MOUSE_LOOK_SENSITIVITY;
+            ship.rotation.x = std::clamp(ship.rotation.x + pitch_delta, -75.0f, 75.0f);
         }
 
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
@@ -1005,6 +1071,7 @@ namespace space {
             smooth_roll = 0.0f;
             ship_returning_to_field = false;
             return_message_cooldown = 0.0f;
+            set_mouse_look_controls(false);
             first_person_camera = false;
             camera_transition_active = false;
             camera_transition_elapsed = 0.0f;
@@ -1106,19 +1173,21 @@ namespace space {
             }
 
             float keyboard_pitch_target = 0.0f;
-            if (inverted_controls) {
-                if (keys[SDL_SCANCODE_W]) {
-                    keyboard_pitch_target = -1.0f;
-                }
-                if (keys[SDL_SCANCODE_S]) {
-                    keyboard_pitch_target = 1.0f;
-                }
-            } else {
-                if (keys[SDL_SCANCODE_W]) {
-                    keyboard_pitch_target = 1.0f;
-                }
-                if (keys[SDL_SCANCODE_S]) {
-                    keyboard_pitch_target = -1.0f;
+            if (!mouse_look_controls) {
+                if (inverted_controls) {
+                    if (keys[SDL_SCANCODE_W]) {
+                        keyboard_pitch_target = -1.0f;
+                    }
+                    if (keys[SDL_SCANCODE_S]) {
+                        keyboard_pitch_target = 1.0f;
+                    }
+                } else {
+                    if (keys[SDL_SCANCODE_W]) {
+                        keyboard_pitch_target = 1.0f;
+                    }
+                    if (keys[SDL_SCANCODE_S]) {
+                        keyboard_pitch_target = -1.0f;
+                    }
                 }
             }
             ramp_axis(keyboard_pitch, keyboard_pitch_target, 2.8f, 8.0f);
@@ -1184,9 +1253,11 @@ namespace space {
                 ship.rotation.z = glm::mix(ship.rotation.z, 0.0f, 3.0f * dt);
             }
 
-            if (keys[SDL_SCANCODE_UP]) {
+            const bool speed_up_key = mouse_look_controls ? keys[SDL_SCANCODE_W] : keys[SDL_SCANCODE_UP];
+            const bool slow_down_key = mouse_look_controls ? keys[SDL_SCANCODE_S] : keys[SDL_SCANCODE_DOWN];
+            if (speed_up_key) {
                 increase_speed(dt);
-            } else if (keys[SDL_SCANCODE_DOWN]) {
+            } else if (slow_down_key) {
                 decrease_speed(dt);
             } else {
                 if (ship.current_speed > 5.0f) {
@@ -2506,7 +2577,8 @@ namespace space {
             printText("[F1 for Debug]", right_x, 150, white);
             printText(inverted_controls ? "[Inverted] F2/Y" : "[Arcade] F2/Y", right_x, 175, white);
             printText("[F3 for Console]", right_x, 200, white);
-            printText(first_person_camera ? "[First Person] F7" : "[Chase View] F7", right_x, 225, white);
+            printText(mouse_look_controls ? "[Mouse Look] F5" : "[Classic Keys] F5", right_x, 225, white);
+            printText(first_person_camera ? "[First Person] F7" : "[Chase View] F7", right_x, 250, white);
 
             if (!debug_menu) {
                 return;
@@ -2517,13 +2589,14 @@ namespace space {
             printText("Velocity X,Y,Z: " + vec3_string(ship.velocity), 25, 50, white);
             printText("FPS: " + std::to_string(fps), 25, 75, white);
             printText("Aseroids destroyed: " + std::to_string(MAX_ASTEROIDS - active_asteroids()), 25, 100, white);
-            printText("Controls: Arrows to Move, W,S Tilt Up/Down - SPACE to shoot", 25, 125, white);
+            printText(mouse_look_controls ? "Controls: Mouse look, W/S speed, A/D roll, click/SPACE to shoot" : "Controls: Arrows to Move, W,S Tilt Up/Down - SPACE to shoot", 25, 125, white);
             printText("Nearest Object: " + std::to_string(nearest_asteroid_distance()), 25, 150, white);
             printText("Farthest Object: " + std::to_string(farthest_asteroid_distance()), 25, 175, white);
             printText("Speed: " + std::to_string(ship.current_speed) + " / " + std::to_string(ship.max_speed), 25, 200, white);
             printText("Controller: " + controller_status(), 25, 225, white);
-            printText(std::string("Camera: ") + (first_person_camera ? "First person" : "Chase"), 25, 250, white);
-            printText("Press ENTER to randomize asteroids", 25, 275, white);
+            printText(std::string("Input: ") + (mouse_look_controls ? "Keyboard/mouse" : "Classic keyboard"), 25, 250, white);
+            printText(std::string("Camera: ") + (first_person_camera ? "First person" : "Chase"), 25, 275, white);
+            printText("Press ENTER to randomize asteroids", 25, 300, white);
         }
 
         int active_asteroids() const {
