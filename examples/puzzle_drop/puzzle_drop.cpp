@@ -860,14 +860,13 @@ namespace {
             ubo.model = block_matrix(x, y);
             ubo.view = view;
             ubo.proj = proj;
-            const int index = texture_index(type);
+            const bool use_wildcard_texture = type == BlockType::Match || type == BlockType::Clear;
+            const int index = texture_index(use_wildcard_texture ? BlockType::Match : type);
             glm::vec3 tint = BLOCK_TINTS[index];
-            if (type == BlockType::Clear) {
-                tint = BLOCK_TINTS[(x + y + lines) % 9];
-            } else if (type == BlockType::Match) {
+            if (use_wildcard_texture) {
                 tint = wildcard_color;
             }
-            ubo.fx = glm::vec4(tint, type == BlockType::Match ? 2.0f : 1.0f);
+            ubo.fx = glm::vec4(tint, use_wildcard_texture ? 2.0f : 1.0f);
             cube_model->renderWithPushConstants(cmd, image_index, static_cast<size_t>(index), ubo, false);
         }
 
