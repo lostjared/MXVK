@@ -57,9 +57,11 @@ The root CMake configuration checks for and uses:
 - C++20 compiler
 - SDL3
 - SDL3_ttf
+- optional: SDL3_mixer (use -DMIXER=ON)
 - Vulkan 1.4+
 - PNG
 - ZLIB
+- optional: JPEG (use -DJPEG=ON)
 - glm
 - glslc (shader compiler)
 - Optional: OpenCV (when building with `-DCV=ON`)
