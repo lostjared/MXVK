@@ -11,6 +11,10 @@ my @tests = qw(
     sprite_example
     sprite3d_example
     static_example
+    3dmath
+    3dmath_cube
+    3dmath_texture
+    3dmath_masterpiece
     dark
     matrix
     binary_matrix
@@ -23,6 +27,7 @@ my @tests = qw(
     moon
     asteroids
     asteroids3d
+    defender
     glitch_cube
     tictactoe
     pong

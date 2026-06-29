@@ -23,6 +23,16 @@ if (defined $program && $program eq '--all') {
     exec(@cmd) or die "Failed to exec test runner: $!\n";
 }
 
+if (defined $program && $program eq "--debug") {
+    my $rundebug = "$root/debug.pl";
+    if(!-f $rundebug) {
+         die "Error:  Could not find debug runner at $rundebug\n";
+    }
+
+    my @cmd = ($rundebug, @ARGV);
+    exec(@cmd) or die "Failed to run debug script runner: $!\n";
+}
+
 sub resolve_executable_name {
     my ($cmake_file) = @_;
     return undef if !-f $cmake_file;
@@ -55,7 +65,8 @@ sub should_use_build_asset_path {
 
 if (!$program) {
     print "Usage: ./run.pl <program_name> [extra args...]\n";
-    print "   or: ./run.pl --all [extra args...]\n\n";
+    print "   or: ./run.pl --all [extra args...]\n";
+    print "   or: ./run.pl --debug program [extra args...]\n\n";
     print "Available programs:\n";
     my %progs;   
     if (-d $build_dir) {
