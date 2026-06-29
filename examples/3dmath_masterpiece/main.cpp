@@ -36,6 +36,7 @@ namespace {
     constexpr int game_block_width = 31;
     constexpr int game_block_height = 14;
     constexpr int game_block_spacing = 1;
+    constexpr int GRID_VERTICAL_GAP = 5;
     constexpr int game_next_panel_x = 450;
     constexpr int game_next_panel_y = 180;
     constexpr int menu_item_count = 4;
@@ -47,6 +48,14 @@ namespace {
     constexpr Uint32 joy_repeat_delay_ms = 180;
     constexpr Sint16 joystick_dead_zone = 16000;
     constexpr mxvk::MXCOLOR transparent_black = 0x00000000U;
+    constexpr float GRID_YAW_SPEED = 115.0f;
+    constexpr float GRID_PITCH_SPEED = 90.0f;
+    constexpr float GRID_ZOOM_SPEED = 3.2f;
+    constexpr float GRID_MIN_PITCH = -70.0f;
+    constexpr float GRID_MAX_PITCH = 70.0f;
+    constexpr float GRID_MIN_CAMERA_DISTANCE = 1.65f;
+    constexpr float GRID_MAX_CAMERA_DISTANCE = 9.0f;
+    constexpr float GRID_DEFAULT_CAMERA_DISTANCE = 2.45f;
 
     enum class Screen {
         Intro,
@@ -96,6 +105,12 @@ namespace {
         int color = 1;
         float phase = 0.0f;
         bool flashing = false;
+    };
+
+    struct GridCubePlacement {
+        int center_x = 0;
+        int center_y = 0;
+        int size = 24;
     };
 
     SurfacePtr createFrameSurface(int width, int height) {
@@ -361,6 +376,7 @@ namespace example {
         void proc() override {
             const Uint64 now = SDL_GetTicks();
             layout = computeLayout();
+            updateGridViewInput(now);
             pollController(now);
 
             switch (screen) {
@@ -440,6 +456,10 @@ namespace example {
         Uint64 intro_start_ms = 0;
         Uint64 last_update_ms = 0;
         Uint64 fall_accumulator_ms = 0;
+        Uint64 last_view_update_ms = 0;
+        float grid_pitch = 0.0f;
+        float grid_yaw = 0.0f;
+        float camera_distance = GRID_DEFAULT_CAMERA_DISTANCE;
         Uint32 joy_repeat_left_ms = 0;
         Uint32 joy_repeat_right_ms = 0;
         Uint32 joy_repeat_up_ms = 0;
@@ -777,9 +797,9 @@ namespace example {
                 if (!movePiece(0, 1)) {
                     lockPiece(SDL_GetTicks());
                 }
-            } else if (key == 'a' || key == 'A' || key == SDLK_UP) {
+            } else if (key == SDLK_UP) {
                 rotatePieceColors(true);
-            } else if (key == 's' || key == 'S') {
+            } else if (key == SDLK_Q) {
                 rotatePieceColors(false);
             }
         }
@@ -1174,9 +1194,76 @@ namespace example {
             frame_sprite->drawSpriteRect(0, 0, layout.width, layout.height);
         }
 
+        void updateGridViewInput(Uint64 now) {
+            if (last_view_update_ms == 0U) {
+                last_view_update_ms = now;
+                return;
+            }
+
+            const float delta_seconds = static_cast<float>(now - last_view_update_ms) * 0.001f;
+            last_view_update_ms = now;
+            if (screen != Screen::Game || awaiting_name) {
+                return;
+            }
+
+            const bool *keys = SDL_GetKeyboardState(nullptr);
+            if (keys == nullptr) {
+                return;
+            }
+
+            if (keys[SDL_SCANCODE_A]) {
+                grid_yaw -= GRID_YAW_SPEED * delta_seconds;
+            }
+            if (keys[SDL_SCANCODE_D]) {
+                grid_yaw += GRID_YAW_SPEED * delta_seconds;
+            }
+            if (keys[SDL_SCANCODE_W]) {
+                grid_pitch = std::clamp(grid_pitch + GRID_PITCH_SPEED * delta_seconds, GRID_MIN_PITCH, GRID_MAX_PITCH);
+            }
+            if (keys[SDL_SCANCODE_S]) {
+                grid_pitch = std::clamp(grid_pitch - GRID_PITCH_SPEED * delta_seconds, GRID_MIN_PITCH, GRID_MAX_PITCH);
+            }
+            if (keys[SDL_SCANCODE_PAGEUP]) {
+                camera_distance = std::max(GRID_MIN_CAMERA_DISTANCE, camera_distance - GRID_ZOOM_SPEED * delta_seconds);
+            }
+            if (keys[SDL_SCANCODE_PAGEDOWN]) {
+                camera_distance = std::min(GRID_MAX_CAMERA_DISTANCE, camera_distance + GRID_ZOOM_SPEED * delta_seconds);
+            }
+        }
+
+        [[nodiscard]] GridCubePlacement transformGridCube(int grid_x, int grid_y, int size, float scaleX, float scaleY) const {
+            const float cell_step_x = static_cast<float>(game_block_width + game_block_spacing) * scaleX;
+            const float cell_step_y = static_cast<float>(game_block_height + game_block_spacing + GRID_VERTICAL_GAP) * scaleY;
+            const float board_center_x = (static_cast<float>(game_board_start_x) +
+                                          (static_cast<float>(board_cols - 1) * static_cast<float>(game_block_width + game_block_spacing) + static_cast<float>(game_block_width)) * 0.5f) *
+                                         scaleX;
+            const float board_center_y = (static_cast<float>(game_board_start_y + 10) +
+                                          (static_cast<float>(board_rows - 1) * static_cast<float>(game_block_height + game_block_spacing + GRID_VERTICAL_GAP) + static_cast<float>(game_block_height)) * 0.5f) *
+                                             scaleY +
+                                         10.0f;
+            const float pitch = grid_pitch * 3.14159265358979323846f / 180.0f;
+            const float yaw = grid_yaw * 3.14159265358979323846f / 180.0f;
+            const float cos_pitch = std::cos(pitch);
+            const float sin_pitch = std::sin(pitch);
+            const float cos_yaw = std::cos(yaw);
+            const float sin_yaw = std::sin(yaw);
+            const float local_x = (static_cast<float>(grid_x) - (static_cast<float>(board_cols) - 1.0f) * 0.5f) * cell_step_x;
+            const float local_y = (static_cast<float>(grid_y) - (static_cast<float>(board_rows) - 1.0f) * 0.5f) * cell_step_y;
+            const float pitched_y = local_y * cos_pitch;
+            const float pitched_z = local_y * sin_pitch;
+            const float yawed_x = local_x * cos_yaw + pitched_z * sin_yaw;
+            const float yawed_z = -local_x * sin_yaw + pitched_z * cos_yaw;
+            const float focal_length = std::max(static_cast<float>(layout.width), static_cast<float>(layout.height)) * 1.1f;
+            const float camera_z = focal_length * (camera_distance / GRID_DEFAULT_CAMERA_DISTANCE);
+            const float perspective_scale = std::clamp(focal_length / std::max(1.0f, camera_z + yawed_z), 0.35f, 2.3f);
+            return {
+                static_cast<int>(std::lround(board_center_x + yawed_x * perspective_scale)),
+                static_cast<int>(std::lround(board_center_y + pitched_y * perspective_scale)),
+                std::max(4, static_cast<int>(std::lround(static_cast<float>(size) * perspective_scale))),
+            };
+        }
+
         void drawBoard(Uint64 now, float scaleX, float scaleY) {
-            constexpr int vertical_gap = 5;
-            const int row_step = game_block_height + game_block_spacing + vertical_gap;
             const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72f)));
 
             for (int i = 0; i < board_cols; ++i) {
@@ -1187,12 +1274,11 @@ namespace example {
                     }
 
                     const int sprite_index = cell.flash_until != 0U ? flashingSpriteIndex(i, j, now) : std::clamp(cell.color, 0, 9);
-                    const int x = game_board_start_x + i * (game_block_width + game_block_spacing);
-                    const int y = game_board_start_y + j * row_step + 10;
+                    const GridCubePlacement cube = transformGridCube(i, j, cube_size, scaleX, scaleY);
                     drawCube({
-                        static_cast<int>(std::lround((static_cast<float>(x) + static_cast<float>(game_block_width) * 0.5f) * scaleX)),
-                        static_cast<int>(std::lround((static_cast<float>(y) + static_cast<float>(game_block_height) * 0.5f) * scaleY)) + 10,
-                        cube_size,
+                        cube.center_x,
+                        cube.center_y,
+                        cube.size,
                         sprite_index,
                         static_cast<float>(i * 23 + j * 11),
                         cell.flash_until != 0U,
@@ -1210,12 +1296,11 @@ namespace example {
                     continue;
                 }
 
-                const int x = game_board_start_x + piece.x * (game_block_width + game_block_spacing);
-                const int y = game_board_start_y + row * row_step + 10;
+                const GridCubePlacement cube = transformGridCube(piece.x, row, cube_size, scaleX, scaleY);
                 drawCube({
-                    static_cast<int>(std::lround((static_cast<float>(x) + static_cast<float>(game_block_width) * 0.5f) * scaleX)),
-                    static_cast<int>(std::lround((static_cast<float>(y) + static_cast<float>(game_block_height) * 0.5f) * scaleY)) + 10,
-                    cube_size,
+                    cube.center_x,
+                    cube.center_y,
+                    cube.size,
                     std::clamp(piece.colors[static_cast<std::size_t>(i)], 0, 9),
                     static_cast<float>(piece.x * 23 + row * 11),
                     false,
@@ -1226,8 +1311,7 @@ namespace example {
         void drawNextPiece(Uint64 now, float scaleX, float scaleY) {
             const int bx = game_next_panel_x + 70;
             const int by = game_next_panel_y + 15;
-            constexpr int vertical_gap = 5;
-            const int row_step = game_block_height + game_block_spacing + vertical_gap;
+            const int row_step = game_block_height + game_block_spacing + GRID_VERTICAL_GAP;
             const int cube_size = std::max(10, static_cast<int>(std::lround(static_cast<float>(game_block_height + game_block_spacing) * scaleY * 0.72f)));
 
             for (int i = 0; i < piece_height; ++i) {
@@ -1281,14 +1365,6 @@ namespace example {
             auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
             auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
             *pixel = mapColor(color);
-        }
-
-        void putBlock(int x, int y, int size, mxvk::MXCOLOR color) {
-            for (int by = 0; by < size; ++by) {
-                for (int bx = 0; bx < size; ++bx) {
-                    putPixel(x + bx, y + by, color);
-                }
-            }
         }
 
         [[nodiscard]] static mxvk::MXCOLOR blockColor(int color) {
@@ -1391,18 +1467,6 @@ namespace example {
                 fill_pipeline.DrawFilledTriangle(a, c, d, face.color);
                 fill_pipeline.End();
             }
-
-            const int outline_size = std::max(1, cube.size / 24);
-            mxvk::PipeLine outline_pipeline;
-            outline_pipeline.Begin(frame_width, frame_height, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { putBlock(x, y, outline_size, color); });
-            for (const FaceDraw &face : faces) {
-                for (int i = 0; i < 4; ++i) {
-                    const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>(i)])];
-                    const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>((i + 1) % 4)])];
-                    outline_pipeline.DrawClipedLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), mxvk::MXVK_RGB(235, 245, 255));
-                }
-            }
-            outline_pipeline.End();
         }
 
         void drawHud(float scaleX, float scaleY) {

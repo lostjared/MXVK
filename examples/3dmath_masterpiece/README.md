@@ -7,8 +7,10 @@ The cube blocks are rasterized through `mxvk_math` into a CPU-side frame surface
 ## Controls
 
 - Arrow keys move the falling column.
-- Up or A rotates colors forward.
-- S rotates colors backward.
+- Up rotates colors forward.
+- Q rotates colors backward.
+- Hold W/A/S/D to rotate the puzzle grid.
+- Hold Page Up/Page Down to zoom the cube view.
 - P pauses.
 - Escape returns to the menu.
 
