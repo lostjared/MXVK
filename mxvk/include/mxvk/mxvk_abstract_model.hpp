@@ -122,6 +122,20 @@ namespace mxvk {
         void render(VkCommandBuffer cmd, uint32_t imageIndex, bool wireframe = false) const;
 
         /**
+         * @brief Record one draw using push constants for per-draw transforms and an explicit texture slot.
+         * @param cmd Active command buffer, inside a dynamic rendering scope.
+         * @param imageIndex Current swapchain image index.
+         * @param textureIndex Texture slot to bind for all submeshes in this draw.
+         * @param ubo Transform/effect payload copied into vertex-stage push constants.
+         * @param wireframe Render using the optional wireframe pipeline when available.
+         */
+        void renderWithPushConstants(VkCommandBuffer cmd,
+                                     uint32_t imageIndex,
+                                     size_t textureIndex,
+                                     const UniformBufferObject &ubo,
+                                     bool wireframe = false);
+
+        /**
          * @brief Rebuild swapchain-dependent resources after resize.
          * @param window Active MXVK window.
          */

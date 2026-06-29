@@ -10,8 +10,6 @@
 #include <memory>
 #include <random>
 #include <string>
-#include <string_view>
-#include <vector>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -47,6 +45,7 @@ namespace {
     constexpr float INTRO_FADE_STEP = 0.01f;
     constexpr Uint32 INTRO_FADE_INTERVAL_MS = 35U;
     constexpr float INTRO_START_FADE = 1.0f;
+    constexpr size_t FRAME_TEXTURE_INDEX = 10;
 
     enum class BlockType {
         Null = 0,
@@ -159,26 +158,7 @@ namespace {
         BlockType type = BlockType::Null;
         int clear_value = 0;
         int flash_counter = 0;
-        std::unique_ptr<mxvk::VKAbstractModel> model{};
     };
-
-    struct CubeModel {
-        std::unique_ptr<mxvk::VKAbstractModel> model{};
-        BlockType type = BlockType::Null;
-    };
-
-    const std::array<std::string_view, 10> TEXTURE_MANIFESTS{{
-        "red1.txt",
-        "red2.txt",
-        "red3.txt",
-        "green1.txt",
-        "green2.txt",
-        "green3.txt",
-        "blue1.txt",
-        "blue2.txt",
-        "blue3.txt",
-        "match.txt",
-    }};
 
     const std::array<glm::vec3, 10> BLOCK_TINTS{{
         {1.00f, 0.48f, 0.42f},
@@ -229,8 +209,7 @@ namespace {
                 std::format("{}/intro1.png", data_root),
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(puzzle_drop_SHADER_DIR) + "/intro.frag.spv");
-            init_grid_backdrop_model();
-            init_frame_models();
+            init_cube_model();
             reset_game();
             reset_intro_screen();
         }
@@ -243,9 +222,12 @@ namespace {
         }
 
         void onSwapchainRecreated() override {
-            for_each_model([this](mxvk::VKAbstractModel &model) {
-                model.resize(this);
-            });
+            if (cube_model) {
+                cube_model->resize(this);
+            }
+            if (grid_backdrop_model) {
+                grid_backdrop_model->resize(this);
+            }
         }
 
         void event(SDL_Event &e) override {
@@ -267,9 +249,17 @@ namespace {
                 exit();
                 break;
             case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+                if (game_over) {
+                    reset_game();
+                    game_started = true;
+                }
+                break;
             case SDLK_SPACE:
-                reset_game();
-                game_started = true;
+                if (!game_over) {
+                    reset_game();
+                    game_started = true;
+                }
                 break;
             case SDLK_1:
                 difficulty = 0;
@@ -333,10 +323,12 @@ namespace {
                 return;
             }
 
-            printText(std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1), 24, 22, primary);
             if (game_over) {
-                printText("Game Over. Press Space for a new game.", 24, 54, secondary);
+                print_game_over_text(secondary);
+                return;
             }
+
+            printText(std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1), 24, 22, primary);
         }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
@@ -361,21 +353,19 @@ namespace {
             for (int y = 0; y < BOARD_HEIGHT; ++y) {
                 for (int x = 0; x < BOARD_WIDTH; ++x) {
                     Cell &cell = board[y][x];
-                    if (!cell.model || cell.type == BlockType::Null) {
+                    if (cell.type == BlockType::Null) {
                         continue;
                     }
                     if (cell.type == BlockType::Clear && ((cell.flash_counter / 6) % 2) != 0) {
                         continue;
                     }
-                    draw_cube(cmd, image_index, *cell.model, cell.type, x, y, view, proj);
+                    draw_cube(cmd, image_index, cell.type, x, y, view, proj);
                 }
             }
 
             if (game_started && !game_over) {
-                for (std::size_t i = 0; i < piece.blocks.size(); ++i) {
-                    if (active_models[i].model) {
-                        draw_cube(cmd, image_index, *active_models[i].model, piece.blocks[i].type, piece.blocks[i].x, piece.blocks[i].y, view, proj);
-                    }
+                for (const Block &block : piece.blocks) {
+                    draw_cube(cmd, image_index, block.type, block.x, block.y, view, proj);
                 }
             }
         }
@@ -387,8 +377,7 @@ namespace {
         std::mt19937 rng{};
         std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
         Piece piece{};
-        std::array<CubeModel, 3> active_models{};
-        std::vector<CubeModel> frame_models{};
+        std::unique_ptr<mxvk::VKAbstractModel> cube_model{};
         std::unique_ptr<mxvk::VKAbstractModel> grid_backdrop_model{};
         std::array<mxvk::VK_Sprite *, 8> backgrounds{};
         mxvk::VK_Sprite *intro_sprite = nullptr;
@@ -538,12 +527,10 @@ namespace {
 
         void cycle_piece_blocks() {
             piece.shift(ShiftDirection::Up);
-            refresh_active_models();
         }
 
         void reset_game() {
             reset_held_piece_input();
-            clear_board_models();
             for (auto &row : board) {
                 for (Cell &cell : row) {
                     cell.type = BlockType::Null;
@@ -555,7 +542,6 @@ namespace {
             lines = 0;
             game_over = false;
             piece.new_piece(BOARD_WIDTH / 2, 0, rng);
-            refresh_active_models();
             last_fall = std::chrono::steady_clock::now();
             last_process = last_fall;
         }
@@ -567,7 +553,6 @@ namespace {
             }
             set_piece();
             piece.new_piece(BOARD_WIDTH / 2, 0, rng);
-            refresh_active_models();
             if (!check_piece(piece, 0, 0)) {
                 game_over = true;
             }
@@ -597,7 +582,6 @@ namespace {
                 cell.type = block.type;
                 cell.clear_value = 0;
                 cell.flash_counter = 0;
-                cell.model = load_cube_model(block.type);
                 if (block.y == 0) {
                     game_over = true;
                 }
@@ -664,7 +648,6 @@ namespace {
                         target.type = source.type;
                         target.clear_value = source.clear_value;
                         target.flash_counter = source.flash_counter;
-                        target.model = std::move(source.model);
                         source.type = BlockType::Null;
                         source.clear_value = 0;
                         source.flash_counter = 0;
@@ -680,7 +663,9 @@ namespace {
                         ++cell.clear_value;
                         ++cell.flash_counter;
                         if (cell.clear_value > 50) {
-                            cleanup_cell(cell);
+                            cell.type = BlockType::Null;
+                            cell.clear_value = 0;
+                            cell.flash_counter = 0;
                         }
                         updated = true;
                     }
@@ -716,98 +701,55 @@ namespace {
             }
         }
 
-        void init_frame_models() {
-            frame_models.reserve((BOARD_HEIGHT * 2) + BOARD_WIDTH + 2);
-            for (int i = 0; i < (BOARD_HEIGHT * 2) + BOARD_WIDTH + 2; ++i) {
-                CubeModel cube{};
-                cube.type = BlockType::Null;
-                cube.model = std::make_unique<mxvk::VKAbstractModel>();
-                cube.model->load(this, tetris_data_root + "/cube.mxmod.z", tetris_data_root + "/manifest_gray.txt", tetris_data_root, 1.0f);
-                cube.model->setShaders(this,
-                                       std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
-                                       std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
-                frame_models.push_back(std::move(cube));
-            }
-        }
+        void init_cube_model() {
+            cube_model = std::make_unique<mxvk::VKAbstractModel>();
+            cube_model->load(this,
+                             tetris_data_root + "/cube.mxmod.z",
+                             data_root + "/cube_textures.txt",
+                             data_root,
+                             1.0f);
+            cube_model->setShaders(this,
+                                   std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
+                                   std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
 
-        void init_grid_backdrop_model() {
             grid_backdrop_model = std::make_unique<mxvk::VKAbstractModel>();
-            grid_backdrop_model->load(this, tetris_data_root + "/cube.mxmod.z", tetris_data_root + "/manifest_gray.txt", tetris_data_root, 1.0f);
+            grid_backdrop_model->load(this,
+                                      tetris_data_root + "/cube.mxmod.z",
+                                      tetris_data_root + "/manifest_gray.txt",
+                                      tetris_data_root,
+                                      1.0f);
             grid_backdrop_model->setShaders(this,
                                             std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
                                             std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
             grid_backdrop_model->setAlphaBlending(true);
         }
 
-        [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_cube_model(BlockType type) {
-            const int index = texture_index(type);
-            auto model = std::make_unique<mxvk::VKAbstractModel>();
-            const bool wildcard = type == BlockType::Match;
-            const std::string texture_manifest = wildcard ? tetris_data_root + "/manifest_gray.txt" : data_root + "/" + std::string(TEXTURE_MANIFESTS[index]);
-            const std::string texture_root = wildcard ? tetris_data_root : data_root;
-            model->load(this,
-                        tetris_data_root + "/cube.mxmod.z",
-                        texture_manifest,
-                        texture_root,
-                        1.0f);
-            model->setShaders(this,
-                              std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
-                              std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
-            return model;
-        }
-
-        void refresh_active_models() {
-            for (std::size_t i = 0; i < active_models.size(); ++i) {
-                if (active_models[i].model) {
-                    active_models[i].model->cleanup(this);
-                }
-                active_models[i].type = piece.blocks[i].type;
-                active_models[i].model = load_cube_model(piece.blocks[i].type);
-            }
-        }
-
-        template <typename Fn>
-        void for_each_model(Fn fn) {
-            for (auto &row : board) {
-                for (Cell &cell : row) {
-                    if (cell.model) {
-                        fn(*cell.model);
-                    }
-                }
-            }
-            for (CubeModel &cube : active_models) {
-                if (cube.model) {
-                    fn(*cube.model);
-                }
-            }
-            for (CubeModel &cube : frame_models) {
-                if (cube.model) {
-                    fn(*cube.model);
-                }
-            }
-            if (grid_backdrop_model) {
-                fn(*grid_backdrop_model);
-            }
-        }
-
         void cleanup_models() {
-            clear_board_models();
-            for (CubeModel &cube : active_models) {
-                if (cube.model) {
-                    cube.model->cleanup(this);
-                }
-                cube.model.reset();
+            if (cube_model) {
+                cube_model->cleanup(this);
+                cube_model.reset();
             }
-            for (CubeModel &cube : frame_models) {
-                if (cube.model) {
-                    cube.model->cleanup(this);
-                }
-            }
-            frame_models.clear();
             if (grid_backdrop_model) {
                 grid_backdrop_model->cleanup(this);
                 grid_backdrop_model.reset();
             }
+        }
+
+        void print_game_over_text(const SDL_Color &color) {
+            const std::string text = std::format("Game Over: Lines cleared: {} [Press Enter to Restart]", lines);
+            const VkExtent2D extent = getSwapchainExtent();
+            int text_width = 0;
+            int text_height = 0;
+            if (!getTextDimensions(text, text_width, text_height)) {
+                printText(text, 24, 54, color);
+                return;
+            }
+
+            const int screen_width = static_cast<int>(extent.width);
+            const int screen_height = static_cast<int>(extent.height);
+            const int x = std::max(0, (screen_width - text_width) / 2);
+            const int y = std::max(0, (screen_height - text_height) / 2);
+            printText(text, x, y, color);
         }
 
         void reset_intro_screen() {
@@ -859,27 +801,6 @@ namespace {
             intro_sprite->clearQueue();
         }
 
-        void clear_board_models() {
-            for (auto &row : board) {
-                for (Cell &cell : row) {
-                    if (cell.model) {
-                        cell.model->cleanup(this);
-                        cell.model.reset();
-                    }
-                }
-            }
-        }
-
-        void cleanup_cell(Cell &cell) {
-            if (cell.model) {
-                cell.model->cleanup(this);
-                cell.model.reset();
-            }
-            cell.type = BlockType::Null;
-            cell.clear_value = 0;
-            cell.flash_counter = 0;
-        }
-
         void draw_background(VkCommandBuffer cmd, const VkExtent2D &extent) {
             const int index = std::clamp(level - 1, 0, static_cast<int>(backgrounds.size()) - 1);
             mxvk::VK_Sprite *background = backgrounds[index];
@@ -914,8 +835,7 @@ namespace {
             ubo.view = view;
             ubo.proj = proj;
             ubo.fx = glm::vec4(0.16f, 0.16f, 0.17f, 0.62f);
-            grid_backdrop_model->updateUBO(image_index, ubo);
-            grid_backdrop_model->render(cmd, image_index, false);
+            grid_backdrop_model->renderWithPushConstants(cmd, image_index, 0, ubo, false);
         }
 
         [[nodiscard]] glm::mat4 block_matrix(int x, int y, float scale = CUBE_SCALE) const {
@@ -927,12 +847,15 @@ namespace {
 
         void draw_cube(VkCommandBuffer cmd,
                        uint32_t image_index,
-                       mxvk::VKAbstractModel &model,
                        BlockType type,
                        int x,
                        int y,
                        const glm::mat4 &view,
                        const glm::mat4 &proj) const {
+            if (!cube_model) {
+                return;
+            }
+
             mxvk::UniformBufferObject ubo{};
             ubo.model = block_matrix(x, y);
             ubo.view = view;
@@ -945,35 +868,35 @@ namespace {
                 tint = wildcard_color;
             }
             ubo.fx = glm::vec4(tint, type == BlockType::Match ? 2.0f : 1.0f);
-            model.updateUBO(image_index, ubo);
-            model.render(cmd, image_index, false);
+            cube_model->renderWithPushConstants(cmd, image_index, static_cast<size_t>(index), ubo, false);
         }
 
-        void draw_frame(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &proj) {
-            std::size_t index = 0;
+        void draw_frame(VkCommandBuffer cmd, uint32_t image_index, const glm::mat4 &view, const glm::mat4 &proj) const {
             for (int y = 0; y < BOARD_HEIGHT; ++y) {
-                draw_frame_cube(cmd, image_index, *frame_models[index++].model, -1, y, view, proj);
-                draw_frame_cube(cmd, image_index, *frame_models[index++].model, BOARD_WIDTH, y, view, proj);
+                draw_frame_cube(cmd, image_index, -1, y, view, proj);
+                draw_frame_cube(cmd, image_index, BOARD_WIDTH, y, view, proj);
             }
             for (int x = -1; x <= BOARD_WIDTH; ++x) {
-                draw_frame_cube(cmd, image_index, *frame_models[index++].model, x, BOARD_HEIGHT, view, proj);
+                draw_frame_cube(cmd, image_index, x, BOARD_HEIGHT, view, proj);
             }
         }
 
         void draw_frame_cube(VkCommandBuffer cmd,
                              uint32_t image_index,
-                             mxvk::VKAbstractModel &model,
                              int x,
                              int y,
                              const glm::mat4 &view,
                              const glm::mat4 &proj) const {
+            if (!cube_model) {
+                return;
+            }
+
             mxvk::UniformBufferObject ubo{};
             ubo.model = block_matrix(x, y, CUBE_SCALE * 0.82f);
             ubo.view = view;
             ubo.proj = proj;
             ubo.fx = glm::vec4(0.58f, 0.62f, 0.66f, 1.0f);
-            model.updateUBO(image_index, ubo);
-            model.render(cmd, image_index, false);
+            cube_model->renderWithPushConstants(cmd, image_index, FRAME_TEXTURE_INDEX, ubo, false);
         }
     };
 } // namespace

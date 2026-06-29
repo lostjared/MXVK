@@ -19,6 +19,11 @@
 namespace mxvk {
 
     namespace {
+        struct ModelPushConstants {
+            glm::mat4 model{1.0f};
+            glm::vec4 fx{0.0f};
+        };
+
         void logVKAbstractModelStep(const std::string &message, bool important = false) {
             if (important) {
                 std::cout << "mxvk_abstract_model: " << message << '\n';
@@ -389,6 +394,51 @@ namespace mxvk {
 
             obj.drawSubMesh(cmd, i);
         }
+    }
+
+    void VKAbstractModel::renderWithPushConstants(VkCommandBuffer cmd,
+                                                  uint32_t imageIndex,
+                                                  size_t textureIndex,
+                                                  const UniformBufferObject &ubo,
+                                                  bool wireframe) {
+        if (cmd == VK_NULL_HANDLE || imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
+            return;
+        }
+
+        const VkPipeline pipeline = (wireframe && pipelineWireframe != VK_NULL_HANDLE) ? pipelineWireframe : pipelineFill;
+        if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
+            return;
+        }
+
+        const size_t textureCount = std::max<size_t>(1, textures.size());
+        textureIndex = std::min(textureIndex, textureCount - 1U);
+        const size_t setIndex = static_cast<size_t>(imageIndex) * textureCount + textureIndex;
+        if (setIndex >= descriptorSets.size()) {
+            return;
+        }
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        updateUBO(imageIndex, ubo);
+        const ModelPushConstants pushConstants{
+            .model = ubo.model,
+            .fx = ubo.fx,
+        };
+        vkCmdPushConstants(cmd,
+                           pipelineLayout,
+                           VK_SHADER_STAGE_VERTEX_BIT,
+                           0,
+                           sizeof(ModelPushConstants),
+                           &pushConstants);
+        vkCmdBindDescriptorSets(cmd,
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipelineLayout,
+                                0,
+                                1,
+                                &descriptorSets[setIndex],
+                                0,
+                                nullptr);
+
+        obj.draw(cmd);
     }
 
     void VKAbstractModel::resize(VK_Window *targetWindow) {
@@ -1698,6 +1748,12 @@ namespace mxvk {
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
             layoutInfo.pSetLayouts = &descriptorSetLayout;
+            VkPushConstantRange pushConstantRange{};
+            pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            pushConstantRange.offset = 0;
+            pushConstantRange.size = sizeof(ModelPushConstants);
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushConstantRange;
 
             if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");
