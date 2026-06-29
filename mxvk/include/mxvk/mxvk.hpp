@@ -89,6 +89,18 @@ namespace mxvk {
         virtual void render();
 
         /**
+         * @brief Record resource transitions that must happen before dynamic rendering begins.
+         *
+         * This callback is invoked after the command buffer begins recording and before
+         * vkCmdBeginRendering. Override this for resources that need per-frame image
+         * transitions or uploads before they are sampled by custom rendering.
+         *
+         * @param cmd Active command buffer in recording state, outside a rendering scope.
+         * @param image_index Current swapchain image index.
+         */
+        virtual void onPrepareFrameRendering(VkCommandBuffer cmd, uint32_t image_index);
+
+        /**
          * @brief Execute one processing/update step.
          */
         virtual void proc();

@@ -557,6 +557,8 @@ namespace mxvk {
 
     void VK_Window::onSwapchainRecreated() {}
 
+    void VK_Window::onPrepareFrameRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
+
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
     void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) {
@@ -565,13 +567,9 @@ namespace mxvk {
         }
 
         if (sprite_pipeline == VK_NULL_HANDLE) {
-            createSpritePipeline();
+            return;
         }
-
-        sprite.prepareForRendering(cmd);
-        if (sprite_pipeline != VK_NULL_HANDLE) {
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
-        }
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
         sprite.renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
     }
 
@@ -1773,6 +1771,7 @@ namespace mxvk {
             vkCmdPipelineBarrier2(cmd, &pre_depth_dependency);
         }
 
+        onPrepareFrameRendering(cmd, image_index);
         for (const std::unique_ptr<VK_Sprite> &sprite : sprites) {
             if (sprite) {
                 sprite->prepareForRendering(cmd);
@@ -2486,10 +2485,6 @@ namespace mxvk {
 
         sprite->loadSprite(pngPath, fragmentShaderPath);
 
-        if (fragmentShaderPath.empty()) {
-            createSpritePipeline();
-        }
-
         VK_Sprite *const sprite_ptr = sprite.get();
         sprites.push_back(std::move(sprite));
         sprite_state_dirty = true;
@@ -2525,10 +2520,6 @@ namespace mxvk {
 
         sprite->loadSprite(surface, fragmentShaderPath);
 
-        if (fragmentShaderPath.empty()) {
-            createSpritePipeline();
-        }
-
         VK_Sprite *const sprite_ptr = sprite.get();
         sprites.push_back(std::move(sprite));
         sprite_state_dirty = true;
@@ -2559,10 +2550,6 @@ namespace mxvk {
         sprite->setDepthAttachmentFormat(depth_format);
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
-
-        if (fragmentShaderPath.empty()) {
-            createSpritePipeline();
-        }
 
         VK_Sprite *const sprite_ptr = sprite.get();
         sprites.push_back(std::move(sprite));

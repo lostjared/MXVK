@@ -1348,14 +1348,15 @@ namespace mxvk {
         return true;
     }
 
-    void VK_Sprite::recordCudaReadyBarrier(VkCommandBuffer cmdBuffer) {
-        if (!cudaImageNeedsShaderBarrier) {
-            return;
+    bool VK_Sprite::transitionCudaImageForShaderRead() {
+        if (cudaImageLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && !cudaImageNeedsShaderBarrier) {
+            return true;
         }
 
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.oldLayout = cudaImageLayout;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1368,15 +1369,26 @@ namespace mxvk {
         barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
+        endSingleTimeCommands(commandBuffer);
 
         cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         cudaImageNeedsShaderBarrier = false;
         if (!cudaSampleBarrierLogged) {
-            std::cout << "mxvk: CUDA interop sync: Vulkan records GENERAL -> SHADER_READ_ONLY barrier before sampling\n";
+            std::cout << "mxvk: CUDA interop sync: Vulkan transitions GENERAL -> SHADER_READ_ONLY before sampling\n";
             cudaSampleBarrierLogged = true;
         }
+        return true;
+    }
+
+    void VK_Sprite::recordCudaReadyBarrier(VkCommandBuffer cmdBuffer) {
+        if (!cudaImageNeedsShaderBarrier) {
+            return;
+        }
+
+        (void)cmdBuffer;
+        transitionCudaImageForShaderRead();
     }
 
     bool VK_Sprite::updateTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
@@ -1462,7 +1474,7 @@ namespace mxvk {
         }
 
         cudaImageNeedsShaderBarrier = true;
-        return true;
+        return transitionCudaImageForShaderRead();
     }
 
     bool VK_Sprite::updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch) {
@@ -1494,7 +1506,7 @@ namespace mxvk {
         }
 
         cudaImageNeedsShaderBarrier = true;
-        return true;
+        return transitionCudaImageForShaderRead();
     }
 #endif
 

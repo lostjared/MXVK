@@ -38,6 +38,7 @@ namespace defender {
         ~DefenderWindow() override;
         void event(SDL_Event &e) override;
         void onSwapchainRecreated() override;
+        void onPrepareFrameRendering(VkCommandBuffer cmd, uint32_t image_index) override;
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override;
       private:
         std::string asset_root;

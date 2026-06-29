@@ -183,7 +183,6 @@ namespace defender {
         intro_sprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
         if (intro_rain != nullptr) {
             intro_rain->set_opacity(intro_fade);
-            intro_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
         }
         printText("Press Enter", 24, static_cast<int>(extent.height) - 52, {255, 230, 80, 255});
     }

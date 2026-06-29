@@ -314,6 +314,16 @@ namespace defender {
         create_flame_swapchain_resources();
     }
 
+    void DefenderWindow::onPrepareFrameRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {
+        if (mode != GameMode::Intro || intro_rain == nullptr) {
+            return;
+        }
+
+        const VkExtent2D extent = getSwapchainExtent();
+        intro_rain->set_opacity(intro_fade);
+        intro_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
+    }
+
     void DefenderWindow::onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) {
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         ensure_background_music_playing();
