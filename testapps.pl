@@ -7,10 +7,11 @@ my $missing_executable_exit_code = 3;
 
 my @tests = qw(
     hello_world
-    text_example
+    text_examploe
     sprite_example
     sprite3d_example
     static_example
+    surface
     3dmath
     3dmath_cube 
     3dmath_masterpiece
@@ -33,6 +34,7 @@ my @tests = qw(
     pool_demo
     puzzle
     tetris
+    puzzle_drop
     tux_example
     walk
 );
