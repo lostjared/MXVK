@@ -50,6 +50,7 @@ namespace {
     constexpr int MATRIX_RAIN_TEXTURE_HEIGHT = 720;
     constexpr size_t FRAME_TEXTURE_INDEX = 10;
     constexpr size_t LEVEL_GRAPHIC_COUNT = 8;
+    constexpr size_t PREVIEW_BLOCK_TEXTURE_COUNT = 10;
 
     enum class BlockType {
         Null = 0,
@@ -177,6 +178,19 @@ namespace {
         {1.00f, 0.92f, 0.35f},
     }};
 
+    const std::array<std::string, PREVIEW_BLOCK_TEXTURE_COUNT> PREVIEW_BLOCK_TEXTURE_FILES{{
+        "red1.png",
+        "red2.png",
+        "red3.png",
+        "green1.png",
+        "green2.png",
+        "green3.png",
+        "blue1.png",
+        "blue2.png",
+        "blue3.png",
+        "red3.png",
+    }};
+
     [[nodiscard]] bool is_play_block(BlockType type) {
         return type >= BlockType::Red1 && type <= BlockType::Match;
     }
@@ -224,6 +238,12 @@ namespace {
             rain_config.surface_height = MATRIX_RAIN_TEXTURE_HEIGHT;
             matrix_rain = std::make_unique<matrix::Rain>(*this, std::move(rain_config));
             try_open_first_gamepad();
+            preview_border_sprite = createSprite(1, 1);
+            const uint32_t white_pixel = 0xFFFFFFFFu;
+            preview_border_sprite->updateTexture(&white_pixel, 1, 1);
+            for (std::size_t i = 0; i < preview_block_sprites.size(); ++i) {
+                preview_block_sprites[i] = createSprite(data_root + "/" + PREVIEW_BLOCK_TEXTURE_FILES[i]);
+            }
             init_cube_model();
             reset_game();
             reset_intro_screen();
@@ -385,10 +405,13 @@ namespace {
         std::mt19937 rng{};
         std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
         Piece piece{};
+        Piece next_piece{};
         std::unique_ptr<mxvk::VKAbstractModel> cube_model{};
         std::unique_ptr<mxvk::VKAbstractModel> grid_backdrop_model{};
         std::array<mxvk::VK_Sprite *, LEVEL_GRAPHIC_COUNT> backgrounds{};
         mxvk::VK_Sprite *intro_sprite = nullptr;
+        mxvk::VK_Sprite *preview_border_sprite = nullptr;
+        std::array<mxvk::VK_Sprite *, PREVIEW_BLOCK_TEXTURE_COUNT> preview_block_sprites{};
         std::unique_ptr<matrix::Rain> matrix_rain{};
         SDL_Gamepad *gamepad = nullptr;
         SDL_JoystickID gamepad_id = 0;
@@ -464,6 +487,8 @@ namespace {
                     draw_cube(cmd, image_index, block.type, block.x, block.y, view, proj);
                 }
             }
+
+            draw_next_piece_preview(cmd, extent);
         }
 
         void randomize_wildcard_color() {
@@ -782,6 +807,7 @@ namespace {
             lines = 0;
             game_over = false;
             piece.new_piece(BOARD_WIDTH / 2, 0, rng);
+            next_piece.new_piece(BOARD_WIDTH / 2, 0, rng);
             last_fall = std::chrono::steady_clock::now();
             last_process = last_fall;
         }
@@ -792,7 +818,8 @@ namespace {
                 return;
             }
             set_piece();
-            piece.new_piece(BOARD_WIDTH / 2, 0, rng);
+            piece = next_piece;
+            next_piece.new_piece(BOARD_WIDTH / 2, 0, rng);
             if (!check_piece(piece, 0, 0)) {
                 game_over = true;
             }
@@ -1062,6 +1089,73 @@ namespace {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
             background->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
             background->clearQueue();
+        }
+
+        void draw_sprite_rect(mxvk::VK_Sprite *sprite, VkCommandBuffer cmd, const VkExtent2D &extent, int x, int y, int w, int h) {
+            if (sprite == nullptr || w <= 0 || h <= 0 || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
+                return;
+            }
+            sprite->drawSpriteRect(x, y, w, h);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
+            sprite->clearQueue();
+        }
+
+        void draw_next_piece_preview(VkCommandBuffer cmd, const VkExtent2D &extent) {
+            if (!game_started || intro_active || game_over || preview_border_sprite == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
+                return;
+            }
+
+            const int panel_size = std::min({180, static_cast<int>(static_cast<float>(extent.width) * 0.22f), static_cast<int>(static_cast<float>(extent.height) * 0.30f)});
+            if (panel_size < 72) {
+                return;
+            }
+
+            const int margin = 24;
+            const int panel_x = static_cast<int>(extent.width) - panel_size - margin;
+            const int panel_y = 88;
+            const int border = 4;
+
+            draw_sprite_rect(preview_border_sprite, cmd, extent, panel_x, panel_y, panel_size, border);
+            draw_sprite_rect(preview_border_sprite, cmd, extent, panel_x, panel_y + panel_size - border, panel_size, border);
+            draw_sprite_rect(preview_border_sprite, cmd, extent, panel_x, panel_y, border, panel_size);
+            draw_sprite_rect(preview_border_sprite, cmd, extent, panel_x + panel_size - border, panel_y, border, panel_size);
+
+            printText("Next", panel_x + 12, panel_y - 28, SDL_Color{255, 255, 255, 255});
+
+            int min_x = next_piece.blocks[0].x;
+            int max_x = next_piece.blocks[0].x;
+            int min_y = next_piece.blocks[0].y;
+            int max_y = next_piece.blocks[0].y;
+            for (const Block &block : next_piece.blocks) {
+                min_x = std::min(min_x, block.x);
+                max_x = std::max(max_x, block.x);
+                min_y = std::min(min_y, block.y);
+                max_y = std::max(max_y, block.y);
+            }
+
+            const float inner_padding = 28.0f;
+            const float inner_size = static_cast<float>(panel_size) - inner_padding * 2.0f;
+            const int cells_wide = max_x - min_x + 1;
+            const int cells_high = max_y - min_y + 1;
+            const int block_size = static_cast<int>(std::min(34.0f, inner_size / static_cast<float>(std::max(cells_wide, cells_high))));
+            const float piece_w = static_cast<float>(cells_wide * block_size);
+            const float piece_h = static_cast<float>(cells_high * block_size);
+            const float center_x = static_cast<float>(panel_x) + static_cast<float>(panel_size) * 0.5f;
+            const float center_y = static_cast<float>(panel_y) + static_cast<float>(panel_size) * 0.5f;
+            const float origin_x = center_x - piece_w * 0.5f;
+            const float origin_y = center_y - piece_h * 0.5f;
+
+            for (const Block &block : next_piece.blocks) {
+                const int index = texture_index(block.type);
+                if (index < 0 || index >= static_cast<int>(preview_block_sprites.size())) {
+                    continue;
+                }
+                mxvk::VK_Sprite *block_sprite = preview_block_sprites[static_cast<std::size_t>(index)];
+                const float x = origin_x + static_cast<float>(block.x - min_x) * static_cast<float>(block_size);
+                const float y = origin_y + static_cast<float>(block.y - min_y) * static_cast<float>(block_size);
+                draw_sprite_rect(block_sprite, cmd, extent, static_cast<int>(x), static_cast<int>(y), block_size, block_size);
+            }
         }
 
         void render_matrix_rain(VkCommandBuffer cmd, const VkExtent2D &extent, float opacity) {
