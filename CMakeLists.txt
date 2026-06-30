@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(libmxvk VERSION 0.9.3)
+project(libmxvk VERSION 0.10.0)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile commands for tooling" FORCE)
