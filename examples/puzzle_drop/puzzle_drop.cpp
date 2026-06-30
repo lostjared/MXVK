@@ -49,6 +49,7 @@ namespace {
     constexpr int MATRIX_RAIN_TEXTURE_WIDTH = 1280;
     constexpr int MATRIX_RAIN_TEXTURE_HEIGHT = 720;
     constexpr size_t FRAME_TEXTURE_INDEX = 10;
+    constexpr size_t LEVEL_GRAPHIC_COUNT = 8;
 
     enum class BlockType {
         Null = 0,
@@ -202,9 +203,14 @@ namespace {
             rng.seed(rd());
             setClearColor(0.03f, 0.04f, 0.05f, 1.0f);
             setFont(puzzle_drop_FONT_PATH, 22);
-            for (int i = 0; i < static_cast<int>(backgrounds.size()); ++i) {
+            std::array<std::string, LEVEL_GRAPHIC_COUNT> level_graphics{};
+            for (size_t i = 0; i < level_graphics.size(); ++i) {
+                level_graphics[i] = std::format("{}/level{}.png", data_root, i + 1);
+            }
+            std::shuffle(level_graphics.begin(), level_graphics.end(), rng);
+            for (size_t i = 0; i < backgrounds.size(); ++i) {
                 backgrounds[i] = createSprite(
-                    std::format("{}/level{}.png", data_root, i + 1),
+                    level_graphics[i],
                     std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                     std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_background.frag.spv");
             }
@@ -262,12 +268,6 @@ namespace {
             case SDLK_RETURN:
             case SDLK_KP_ENTER:
                 if (game_over) {
-                    reset_game();
-                    game_started = true;
-                }
-                break;
-            case SDLK_SPACE:
-                if (!game_over) {
                     reset_game();
                     game_started = true;
                 }
@@ -362,7 +362,7 @@ namespace {
         Piece piece{};
         std::unique_ptr<mxvk::VKAbstractModel> cube_model{};
         std::unique_ptr<mxvk::VKAbstractModel> grid_backdrop_model{};
-        std::array<mxvk::VK_Sprite *, 8> backgrounds{};
+        std::array<mxvk::VK_Sprite *, LEVEL_GRAPHIC_COUNT> backgrounds{};
         mxvk::VK_Sprite *intro_sprite = nullptr;
         std::unique_ptr<matrix::Rain> matrix_rain{};
         std::chrono::steady_clock::time_point last_fall{std::chrono::steady_clock::now()};
@@ -713,7 +713,7 @@ namespace {
 
         void add_score() {
             ++lines;
-            if ((lines % 6) == 0 && level < 7) {
+            if ((lines % 6) == 0 && level < static_cast<int>(backgrounds.size())) {
                 ++level;
             }
         }
