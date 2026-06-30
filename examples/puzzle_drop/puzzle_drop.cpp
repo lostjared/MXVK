@@ -19,6 +19,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "rain.hpp"
 
 #ifndef puzzle_drop_ASSET_DIR
 #define puzzle_drop_ASSET_DIR "."
@@ -45,6 +46,8 @@ namespace {
     constexpr float INTRO_FADE_STEP = 0.01f;
     constexpr Uint32 INTRO_FADE_INTERVAL_MS = 35U;
     constexpr float INTRO_START_FADE = 1.0f;
+    constexpr int MATRIX_RAIN_TEXTURE_WIDTH = 1280;
+    constexpr int MATRIX_RAIN_TEXTURE_HEIGHT = 720;
     constexpr size_t FRAME_TEXTURE_INDEX = 10;
 
     enum class BlockType {
@@ -209,6 +212,11 @@ namespace {
                 std::format("{}/intro1.png", data_root),
                 std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
                 std::string(puzzle_drop_SHADER_DIR) + "/intro.frag.spv");
+            matrix::RainConfig rain_config = matrix::make_matrix_rain_config(asset_root, false);
+            rain_config.color = "#2f8dff";
+            rain_config.surface_width = MATRIX_RAIN_TEXTURE_WIDTH;
+            rain_config.surface_height = MATRIX_RAIN_TEXTURE_HEIGHT;
+            matrix_rain = std::make_unique<matrix::Rain>(*this, std::move(rain_config));
             init_cube_model();
             reset_game();
             reset_intro_screen();
@@ -227,6 +235,9 @@ namespace {
             }
             if (grid_backdrop_model) {
                 grid_backdrop_model->resize(this);
+            }
+            if (matrix_rain) {
+                matrix_rain->on_swapchain_recreated(*this);
             }
         }
 
@@ -334,10 +345,51 @@ namespace {
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
             const VkExtent2D extent = getSwapchainExtent();
             if (intro_active) {
+                draw_game_scene(cmd, image_index, extent);
                 render_intro(cmd, extent);
                 return;
             }
 
+            draw_game_scene(cmd, image_index, extent);
+        }
+
+      private:
+        std::string asset_root;
+        std::string data_root;
+        std::string tetris_data_root;
+        std::mt19937 rng{};
+        std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
+        Piece piece{};
+        std::unique_ptr<mxvk::VKAbstractModel> cube_model{};
+        std::unique_ptr<mxvk::VKAbstractModel> grid_backdrop_model{};
+        std::array<mxvk::VK_Sprite *, 8> backgrounds{};
+        mxvk::VK_Sprite *intro_sprite = nullptr;
+        std::unique_ptr<matrix::Rain> matrix_rain{};
+        std::chrono::steady_clock::time_point last_fall{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point last_process{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point last_input_update{std::chrono::steady_clock::now()};
+        float horizontal_move_timer = 0.0f;
+        float soft_drop_timer = 0.0f;
+        float cycle_timer = 0.0f;
+        int horizontal_move_direction = 0;
+        bool soft_drop_held = false;
+        bool cycle_held = false;
+        int difficulty = 0;
+        int level = 1;
+        int lines = 0;
+        glm::vec3 wildcard_color{1.0f, 0.0f, 1.0f};
+        bool intro_active = true;
+        float intro_fade = INTRO_START_FADE;
+        std::chrono::steady_clock::time_point intro_last_update{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point intro_start{std::chrono::steady_clock::now()};
+        float background_time = 0.0f;
+        bool game_started = false;
+        bool game_over = false;
+        float grid_yaw = -10.0f;
+        float grid_pitch = -8.0f;
+        float camera_distance = 2.32f;
+
+        void draw_game_scene(VkCommandBuffer cmd, uint32_t image_index, const VkExtent2D &extent) {
             draw_background(cmd, extent);
 
             const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
@@ -363,47 +415,12 @@ namespace {
                 }
             }
 
-            if (game_started && !game_over) {
+            if ((game_started || intro_active) && !game_over) {
                 for (const Block &block : piece.blocks) {
                     draw_cube(cmd, image_index, block.type, block.x, block.y, view, proj);
                 }
             }
         }
-
-      private:
-        std::string asset_root;
-        std::string data_root;
-        std::string tetris_data_root;
-        std::mt19937 rng{};
-        std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
-        Piece piece{};
-        std::unique_ptr<mxvk::VKAbstractModel> cube_model{};
-        std::unique_ptr<mxvk::VKAbstractModel> grid_backdrop_model{};
-        std::array<mxvk::VK_Sprite *, 8> backgrounds{};
-        mxvk::VK_Sprite *intro_sprite = nullptr;
-        std::chrono::steady_clock::time_point last_fall{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point last_process{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point last_input_update{std::chrono::steady_clock::now()};
-        float horizontal_move_timer = 0.0f;
-        float soft_drop_timer = 0.0f;
-        float cycle_timer = 0.0f;
-        int horizontal_move_direction = 0;
-        bool soft_drop_held = false;
-        bool cycle_held = false;
-        int difficulty = 0;
-        int level = 1;
-        int lines = 0;
-        glm::vec3 wildcard_color{1.0f, 0.0f, 1.0f};
-        bool intro_active = true;
-        float intro_fade = INTRO_START_FADE;
-        std::chrono::steady_clock::time_point intro_last_update{std::chrono::steady_clock::now()};
-        std::chrono::steady_clock::time_point intro_start{std::chrono::steady_clock::now()};
-        float background_time = 0.0f;
-        bool game_started = false;
-        bool game_over = false;
-        float grid_yaw = -10.0f;
-        float grid_pitch = -8.0f;
-        float camera_distance = 2.32f;
 
         void randomize_wildcard_color() {
             std::uniform_int_distribution<int> dist(0, 254);
@@ -758,6 +775,10 @@ namespace {
             intro_last_update = std::chrono::steady_clock::now();
             intro_start = intro_last_update;
             game_started = false;
+            if (matrix_rain) {
+                matrix_rain->set_opacity(1.0f);
+                matrix_rain->reset();
+            }
             reset_held_piece_input();
         }
 
@@ -769,6 +790,9 @@ namespace {
         void finish_intro(const std::chrono::steady_clock::time_point &now) {
             intro_active = false;
             intro_fade = 0.0f;
+            if (matrix_rain) {
+                matrix_rain->set_opacity(0.0f);
+            }
             game_started = true;
             last_fall = now;
             last_process = now;
@@ -799,6 +823,7 @@ namespace {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
             intro_sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
             intro_sprite->clearQueue();
+            render_matrix_rain(cmd, extent, std::clamp(intro_fade, 0.0f, 1.0f));
         }
 
         void draw_background(VkCommandBuffer cmd, const VkExtent2D &extent) {
@@ -812,6 +837,21 @@ namespace {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
             background->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
             background->clearQueue();
+        }
+
+        void render_matrix_rain(VkCommandBuffer cmd, const VkExtent2D &extent, float opacity) {
+            if (matrix_rain == nullptr || sprite_pipeline == VK_NULL_HANDLE || sprite_pipeline_layout == VK_NULL_HANDLE) {
+                return;
+            }
+            matrix_rain->set_opacity(opacity);
+            matrix_rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
+            mxvk::VK_Sprite *rain_sprite = matrix_rain->sprite();
+            if (rain_sprite == nullptr) {
+                return;
+            }
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
+            rain_sprite->renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
+            rain_sprite->clearQueue();
         }
 
         [[nodiscard]] glm::vec3 block_position(int x, int y) const {
