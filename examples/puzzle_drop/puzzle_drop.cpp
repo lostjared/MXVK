@@ -223,6 +223,7 @@ namespace {
             rain_config.surface_width = MATRIX_RAIN_TEXTURE_WIDTH;
             rain_config.surface_height = MATRIX_RAIN_TEXTURE_HEIGHT;
             matrix_rain = std::make_unique<matrix::Rain>(*this, std::move(rain_config));
+            try_open_first_gamepad();
             init_cube_model();
             reset_game();
             reset_intro_screen();
@@ -232,6 +233,7 @@ namespace {
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
+            close_gamepad();
             cleanup_models();
         }
 
@@ -252,6 +254,27 @@ namespace {
                 exit();
                 return;
             }
+
+            if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+                if (!open_gamepad(e.gdevice.which)) {
+                    try_open_first_gamepad();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                if (gamepad != nullptr && e.gdevice.which == gamepad_id) {
+                    close_gamepad();
+                    try_open_first_gamepad();
+                }
+                return;
+            }
+
+            if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                handle_gamepad_button_down(e.gbutton.button);
+                return;
+            }
+
             if (e.type != SDL_EVENT_KEY_DOWN || e.key.repeat) {
                 return;
             }
@@ -302,6 +325,7 @@ namespace {
             const auto now = std::chrono::steady_clock::now();
             const float delta_seconds = std::chrono::duration<float>(now - last_input_update).count();
             last_input_update = now;
+            try_open_first_gamepad();
             randomize_wildcard_color();
 
             if (intro_active) {
@@ -313,6 +337,7 @@ namespace {
                     handle_view_controls(keys, delta_seconds);
                     handle_piece_controls(keys, delta_seconds);
                 }
+                handle_gamepad_input(delta_seconds);
             }
 
             if (game_started && !game_over) {
@@ -365,15 +390,24 @@ namespace {
         std::array<mxvk::VK_Sprite *, LEVEL_GRAPHIC_COUNT> backgrounds{};
         mxvk::VK_Sprite *intro_sprite = nullptr;
         std::unique_ptr<matrix::Rain> matrix_rain{};
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepad_id = 0;
         std::chrono::steady_clock::time_point last_fall{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_process{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_input_update{std::chrono::steady_clock::now()};
         float horizontal_move_timer = 0.0f;
         float soft_drop_timer = 0.0f;
         float cycle_timer = 0.0f;
+        float gamepad_move_repeat_timer = 0.0f;
+        float gamepad_soft_drop_repeat_timer = 0.0f;
+        float gamepad_cycle_repeat_timer = 0.0f;
+        float gamepad_move_held_seconds = 0.0f;
         int horizontal_move_direction = 0;
+        int gamepad_move_direction = 0;
         bool soft_drop_held = false;
         bool cycle_held = false;
+        bool gamepad_soft_drop_held = false;
+        bool gamepad_cycle_held = false;
         int difficulty = 0;
         int level = 1;
         int lines = 0;
@@ -388,6 +422,16 @@ namespace {
         float grid_yaw = -10.0f;
         float grid_pitch = -8.0f;
         float camera_distance = 2.32f;
+        static constexpr Sint16 GAMEPAD_DEADZONE = 10000;
+        static constexpr float GAMEPAD_MOVE_INITIAL_DELAY_SECONDS = 0.22f;
+        static constexpr float GAMEPAD_MOVE_REPEAT_SECONDS = 0.12f;
+        static constexpr float GAMEPAD_SOFT_DROP_INITIAL_DELAY_SECONDS = 0.18f;
+        static constexpr float GAMEPAD_SOFT_DROP_REPEAT_SECONDS = 0.08f;
+        static constexpr float GAMEPAD_CYCLE_INITIAL_DELAY_SECONDS = 0.16f;
+        static constexpr float GAMEPAD_CYCLE_REPEAT_SECONDS = 0.11f;
+        static constexpr float GAMEPAD_STICK_ROTATE_SPEED = 120.0f;
+        static constexpr float GAMEPAD_STICK_PITCH_SPEED = 100.0f;
+        static constexpr float GAMEPAD_STICK_SCALE = 1.0f / 32768.0f;
 
         void draw_game_scene(VkCommandBuffer cmd, uint32_t image_index, const VkExtent2D &extent) {
             draw_background(cmd, extent);
@@ -522,6 +566,126 @@ namespace {
             }
         }
 
+        void handle_gamepad_input(float delta_seconds) {
+            if (gamepad == nullptr || !game_started || game_over) {
+                reset_held_gamepad_input();
+                return;
+            }
+
+            const Sint16 left_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+            const Sint16 left_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+            const Sint16 right_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+            const Sint16 right_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
+
+            const bool dpad_left = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool dpad_right = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool dpad_down = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+            const bool dpad_up = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+
+            const int move_direction = dpad_left == dpad_right
+                                           ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1
+                                                                                                              : 0)
+                                           : (dpad_left ? -1 : 1);
+            if (move_direction == 0) {
+                gamepad_move_direction = 0;
+                gamepad_move_held_seconds = 0.0f;
+                gamepad_move_repeat_timer = 0.0f;
+            } else if (move_direction != gamepad_move_direction) {
+                gamepad_move_direction = move_direction;
+                gamepad_move_held_seconds = 0.0f;
+                gamepad_move_repeat_timer = 0.0f;
+                move_piece_horizontal(gamepad_move_direction);
+            } else {
+                gamepad_move_held_seconds += delta_seconds;
+                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS)
+                                            ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS
+                                            : GAMEPAD_MOVE_REPEAT_SECONDS;
+                gamepad_move_repeat_timer += delta_seconds;
+                if (gamepad_move_repeat_timer >= threshold) {
+                    move_piece_horizontal(gamepad_move_direction);
+                    gamepad_move_repeat_timer = 0.0f;
+                }
+            }
+
+            const bool soft_drop_down = dpad_down || left_y > GAMEPAD_DEADZONE;
+            if (!soft_drop_down) {
+                gamepad_soft_drop_held = false;
+                gamepad_soft_drop_repeat_timer = 0.0f;
+            } else {
+                const float threshold = gamepad_soft_drop_held ? GAMEPAD_SOFT_DROP_REPEAT_SECONDS : GAMEPAD_SOFT_DROP_INITIAL_DELAY_SECONDS;
+                gamepad_soft_drop_repeat_timer += delta_seconds;
+                if (gamepad_soft_drop_repeat_timer >= threshold) {
+                    key_down();
+                    last_fall = std::chrono::steady_clock::now();
+                    gamepad_soft_drop_repeat_timer = 0.0f;
+                    gamepad_soft_drop_held = true;
+                }
+            }
+
+            if (!dpad_up) {
+                gamepad_cycle_held = false;
+                gamepad_cycle_repeat_timer = 0.0f;
+            } else {
+                const float threshold = gamepad_cycle_held ? GAMEPAD_CYCLE_REPEAT_SECONDS : GAMEPAD_CYCLE_INITIAL_DELAY_SECONDS;
+                gamepad_cycle_repeat_timer += delta_seconds;
+                if (gamepad_cycle_repeat_timer >= threshold) {
+                    cycle_piece_blocks();
+                    gamepad_cycle_repeat_timer = 0.0f;
+                    gamepad_cycle_held = true;
+                }
+            }
+
+            if (std::abs(right_x) > GAMEPAD_DEADZONE) {
+                grid_yaw += static_cast<float>(right_x) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_ROTATE_SPEED * delta_seconds;
+            }
+            if (std::abs(right_y) > GAMEPAD_DEADZONE) {
+                grid_pitch = std::clamp(grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds,
+                                        -70.0f,
+                                        70.0f);
+            }
+
+            constexpr float ZOOM_SPEED = 3.2f;
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                camera_distance = std::min(7.0f, camera_distance + ZOOM_SPEED * delta_seconds);
+            }
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+                camera_distance = std::max(1.35f, camera_distance - ZOOM_SPEED * delta_seconds);
+            }
+        }
+
+        void handle_gamepad_button_down(Uint8 button) {
+            if (intro_active) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    skip_intro();
+                }
+                return;
+            }
+
+            if (game_over) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    reset_game();
+                    game_started = true;
+                } else if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                    exit();
+                }
+                return;
+            }
+
+            if (!game_started) {
+                return;
+            }
+
+            if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                rotate_right();
+            } else if (button == SDL_GAMEPAD_BUTTON_WEST) {
+                rotate_left();
+            } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
+                hard_drop();
+            } else if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                exit();
+            }
+        }
+
         void reset_held_piece_input() {
             horizontal_move_timer = 0.0f;
             soft_drop_timer = 0.0f;
@@ -529,6 +693,16 @@ namespace {
             horizontal_move_direction = 0;
             soft_drop_held = false;
             cycle_held = false;
+        }
+
+        void reset_held_gamepad_input() {
+            gamepad_move_repeat_timer = 0.0f;
+            gamepad_soft_drop_repeat_timer = 0.0f;
+            gamepad_cycle_repeat_timer = 0.0f;
+            gamepad_move_held_seconds = 0.0f;
+            gamepad_move_direction = 0;
+            gamepad_soft_drop_held = false;
+            gamepad_cycle_held = false;
         }
 
         void move_piece_horizontal(int direction) {
@@ -546,8 +720,57 @@ namespace {
             piece.shift(ShiftDirection::Up);
         }
 
+        void hard_drop() {
+            if (!game_started || game_over) {
+                return;
+            }
+            while (check_piece(piece, 0, 1)) {
+                piece.move_down();
+            }
+            key_down();
+            last_fall = std::chrono::steady_clock::now();
+        }
+
+        bool open_gamepad(SDL_JoystickID id) {
+            if (gamepad != nullptr && gamepad_id == id) {
+                return true;
+            }
+            close_gamepad();
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
+                return false;
+            }
+            gamepad_id = id;
+            return true;
+        }
+
+        void close_gamepad() {
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepad_id = 0;
+            }
+        }
+
+        void try_open_first_gamepad() {
+            if (gamepad != nullptr) {
+                return;
+            }
+            int count = 0;
+            SDL_JoystickID *ids = SDL_GetGamepads(&count);
+            if (ids == nullptr || count <= 0) {
+                if (ids != nullptr) {
+                    SDL_free(ids);
+                }
+                return;
+            }
+            open_gamepad(ids[0]);
+            SDL_free(ids);
+        }
+
         void reset_game() {
             reset_held_piece_input();
+            reset_held_gamepad_input();
             for (auto &row : board) {
                 for (Cell &cell : row) {
                     cell.type = BlockType::Null;
@@ -780,6 +1003,7 @@ namespace {
                 matrix_rain->reset();
             }
             reset_held_piece_input();
+            reset_held_gamepad_input();
         }
 
         void skip_intro() {
@@ -798,6 +1022,7 @@ namespace {
             last_process = now;
             last_input_update = now;
             reset_held_piece_input();
+            reset_held_gamepad_input();
         }
 
         void update_intro(const std::chrono::steady_clock::time_point &now) {
