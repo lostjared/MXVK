@@ -701,36 +701,6 @@ if(EXAMPLES)
                 ${target_runtime_dir}/data/default.ttf
         )
 
-        get_target_property(target_source_dir ${target_name} SOURCE_DIR)
-        if(target_source_dir AND EXISTS "${target_source_dir}/data")
-            list(APPEND copy_commands
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_VERTEX_SPV}
-                    ${target_source_dir}/data/sprite.vert.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_VERTEX_SPV}
-                    ${target_source_dir}/data/sprite_vert.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_FRAGMENT_SPV}
-                    ${target_source_dir}/data/sprite.frag.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_FRAGMENT_SPV}
-                    ${target_source_dir}/data/sprite_frag.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_TEXT_VERTEX_SPV}
-                    ${target_source_dir}/data/text.vert.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_TEXT_VERTEX_SPV}
-                    ${target_source_dir}/data/text_vert.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_TEXT_FRAGMENT_SPV}
-                    ${target_source_dir}/data/text.frag.spv
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${mxvk_TEXT_FRAGMENT_SPV}
-                    ${target_source_dir}/data/text_frag.spv
-            )
-        endif()
-
         add_custom_target(${copy_target}
             ${copy_commands}
             COMMENT "Copying MXVK sprite/text runtime shaders to ${target_name} data directory"
