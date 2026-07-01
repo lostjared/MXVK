@@ -44,8 +44,8 @@ namespace example {
         };
 
       public:
-        FractalWindow([[maybe_unused]] const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION),
+        FractalWindow([[maybe_unused]] const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)) {
         }
 
@@ -1026,7 +1026,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::FractalWindow window(args.path, args.width, args.height, args.fullscreen);
+        example::FractalWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

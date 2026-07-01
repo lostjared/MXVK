@@ -2412,7 +2412,7 @@ namespace walk {
     class WalkWindow final : public mxvk::VK_IOWindow {
       public:
         WalkWindow(const Arguments &args)
-            : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen),
+            : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen, args.enable_vsync),
               assetRoot(args.path.empty() ? std::string(WALK_ASSET_DIR) : args.path),
               modelRoot(WALK_MODELS_DIR) {
             logEnv(std::format("initializing window {}x{} (fullscreen={})", args.width, args.height, args.fullscreen ? "true" : "false"));

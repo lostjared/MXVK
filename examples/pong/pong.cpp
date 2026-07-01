@@ -241,8 +241,8 @@ namespace {
 
     class PongWindow final : public mxvk::VK_Window {
       public:
-        PongWindow(const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION),
+        PongWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path),
               dataRoot(assetRoot + "/data"),
               paddle1(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
@@ -1994,7 +1994,7 @@ namespace {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        PongWindow window(args.path, args.width, args.height, args.fullscreen);
+        PongWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

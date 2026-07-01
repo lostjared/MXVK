@@ -11,7 +11,7 @@ namespace example {
         std::string current_path = ".";
 
       public:
-        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION) {
+        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             current_path = path.empty() ? std::string(text_example_ASSET_DIR) : path;
             setFont(current_path + "/data/font.ttf", 24);
         }
@@ -31,7 +31,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::ExampleWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen);
+        example::ExampleWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         ex_window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

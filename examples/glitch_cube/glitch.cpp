@@ -16,8 +16,8 @@ namespace example {
 
     class GlitchCubeWindow : public mxvk::VK_Window {
       public:
-        GlitchCubeWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+        GlitchCubeWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(GLITCH_CUBE_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/cube.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/cube.tex";
@@ -159,7 +159,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::GlitchCubeWindow window(args.filename, args.path, "MXVK Glitch Cube", args.width, args.height, args.fullscreen);
+        example::GlitchCubeWindow window(args.filename, args.path, "MXVK Glitch Cube", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

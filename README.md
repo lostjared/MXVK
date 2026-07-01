@@ -167,6 +167,9 @@ Supported options:
 	- Make MXWrite block when its internal queue is full instead of dropping frames.
 - `--enable-crt`
 	- Start examples that support CRT post-processing with the effect enabled.
+- `--enable-vsync`
+	- Request FIFO swapchain present mode instead of the default low-latency MAILBOX preference.
+	- Example: `./run.pl hello_world --enable-vsync`.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`

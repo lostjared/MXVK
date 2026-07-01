@@ -97,8 +97,8 @@ namespace example {
                    const std::string &title,
                    int width,
                    int height,
-                   bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+                   bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root(path.empty() ? std::string(MOON_ASSET_DIR) : path) {
             const std::string model_path = filename.empty() ? (asset_root + "/data/moon.obj") : filename;
             const std::string texture_base_path = asset_root + "/data";
@@ -381,7 +381,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::MoonWindow window(args.filename, args.path, args.fragmentPath, "MXVK Moon Example", args.width, args.height, args.fullscreen);
+        example::MoonWindow window(args.filename, args.path, args.fragmentPath, "MXVK Moon Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

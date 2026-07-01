@@ -50,11 +50,12 @@ namespace example {
                      int width,
                      int height,
                      bool fullscreen,
+                     bool enable_vsync,
                      bool binary,
                      int font_size,
                      const std::string &font_path,
                      const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(PLANET_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/saturn.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/saturn.tex";
@@ -231,7 +232,7 @@ int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
         example::PlanetWindow window(
-            args.filename, args.path, "MXVK Planet Example", args.width, args.height, args.fullscreen, args.binary,
+            args.filename, args.path, "MXVK Planet Example", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary,
             args.font_size, args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {

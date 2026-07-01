@@ -8,7 +8,7 @@
 namespace skeleton {
     class SkeletonWindow : public mxvk::VK_Window {
       public:
-        SkeletonWindow(int width, int height, bool full) : mxvk::VK_Window(" -[ MXVK Skeleton ] - ", width, height, full, MXVK_VALIDATION) {
+        SkeletonWindow(int width, int height, bool full, bool enable_vsync) : mxvk::VK_Window(" -[ MXVK Skeleton ] - ", width, height, full, MXVK_VALIDATION, enable_vsync) {
             std::cout << "skeleton: started example.\n";
         }
         void event(SDL_Event &e) override {
@@ -33,7 +33,7 @@ namespace skeleton {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        skeleton::SkeletonWindow window(args.width, args.height, args.fullscreen);
+        skeleton::SkeletonWindow window(args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

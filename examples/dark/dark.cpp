@@ -20,8 +20,8 @@ namespace example {
 
     class DarkWindow : public mxvk::VK_Window {
       public:
-        DarkWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+        DarkWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot((path.empty() || path == ".") ? std::string(DARK_ASSET_DIR) : path) {
             fallbackWidth = width;
             fallbackHeight = height;
@@ -181,7 +181,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::DarkWindow window(args.filename, args.path, "MXVK Dark Crystal Pyramid", args.width, args.height, args.fullscreen);
+        example::DarkWindow window(args.filename, args.path, "MXVK Dark Crystal Pyramid", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

@@ -17,8 +17,8 @@
 
 namespace defender {
 
-    DefenderWindow::DefenderWindow(const std::string &path, int width, int height, bool fullscreen)
-        : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION),
+    DefenderWindow::DefenderWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+        : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
           asset_root((path.empty() || path == ".") ? std::string(DEFENDER_ASSET_DIR) : path) {
         setClearColor(0.0f, 0.0f, 0.01f, 1.0f);
         setFont(asset_root + "/data/font.ttf", DEFAULT_FONT_SIZE);

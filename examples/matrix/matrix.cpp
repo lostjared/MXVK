@@ -22,11 +22,12 @@ namespace example {
                      const int width,
                      const int height,
                      const bool fullscreen,
+                     const bool enable_vsync,
                      const bool binary,
                      const int font_size,
                      const std::string &font_path,
                      const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               rain(std::make_unique<matrix::Rain>(
                   *this, [path, binary, font_size, font_path, color]() {
                       matrix::RainConfig config = matrix::make_matrix_rain_config(path.empty() ? std::string(matrix_ASSET_DIR) : path, binary);
@@ -76,7 +77,7 @@ int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
         example::MatrixWindow window(
-            args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen, args.binary,
+            args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary,
             args.font_size, args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {

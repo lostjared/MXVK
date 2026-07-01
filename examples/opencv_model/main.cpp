@@ -31,7 +31,7 @@ namespace example {
     class OpenCVModelWindow : public mxvk::VK_Window {
       public:
         OpenCVModelWindow(const Arguments &args, const std::string &title)
-            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
               assetRoot(args.path.empty() ? std::string(opencv_model_ASSET_DIR) : args.path),
               shaderRoot(args.shaderPath.empty() ? std::string(opencv_model_SHADER_DIR) : args.shaderPath),
               cameraIndex(args.camera_index),

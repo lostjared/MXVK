@@ -303,8 +303,8 @@ namespace {
 
     class TetrisWindow final : public mxvk::VK_Window {
       public:
-        TetrisWindow(const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION),
+        TetrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
               dataRoot(assetRoot + "/data"),
               highScores(resolveScoreFilePath()) {
@@ -2463,7 +2463,7 @@ namespace {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        TetrisWindow window(args.path, args.width, args.height, args.fullscreen);
+        TetrisWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (const mxnetwork::Exception &e) {
         std::cerr << std::format("mxnetwork: Exception: {}\n", e.text());

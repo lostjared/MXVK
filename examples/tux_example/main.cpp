@@ -149,8 +149,8 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-        ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+        ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(tux_example_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/tux.obj") : filename;
             const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
@@ -240,7 +240,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::ModelWindow window(args.filename, args.path, "MXVK Tux Example", args.width, args.height, args.fullscreen);
+        example::ModelWindow window(args.filename, args.path, "MXVK Tux Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

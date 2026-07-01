@@ -244,8 +244,8 @@ namespace example {
 
     class MasterPieceWindow final : public mxvk::VK_Window {
       public:
-        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("MasterPiece", width, height, fullscreen, MXVK_VALIDATION),
+        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("MasterPiece", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root(resolveAssetRoot(path)),
               puzzle_asset_root(resolvePuzzleAssetRoot(resolveAssetRoot(path))),
               high_scores(scorePath(asset_root)) {
@@ -1333,7 +1333,7 @@ int main(int argc, char **argv) {
             args.height = base_height;
         }
 
-        example::MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen);
+        example::MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

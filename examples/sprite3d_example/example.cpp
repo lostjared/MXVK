@@ -141,8 +141,8 @@ namespace example {
 
     class ExampleWindow : public mxvk::VK_Window {
       public:
-        ExampleWindow(const std::string &path, const std::string &text, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION) {
+        ExampleWindow(const std::string &path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             current_path = path.empty() ? std::string(sprite3d_example_ASSET_DIR) : path;
             if (current_path == ".") {
                 current_path = sprite3d_example_ASSET_DIR;
@@ -435,7 +435,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::ExampleWindow window(args.path, "VK_Sprite3D Example", args.width, args.height, args.fullscreen);
+        example::ExampleWindow window(args.path, "VK_Sprite3D Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

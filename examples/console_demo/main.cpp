@@ -16,8 +16,8 @@ namespace example {
                           const std::string &title,
                           const int width,
                           const int height,
-                          const bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION) {
+                          const bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             const std::string base_path = path.empty() ? std::string(console_demo_ASSET_DIR) : path;
             const std::string sprite_vert_path = base_path + "/data/sprite.vert.spv";
             const std::string shader_path = base_path + "/data/background_pulse.frag.spv";
@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
                                           "MXVK_Console_Demo",
                                           args.width,
                                           args.height,
-                                          args.fullscreen);
+                                          args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

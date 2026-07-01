@@ -147,8 +147,9 @@ namespace example {
                            const int width,
                            const int height,
                            const bool fullscreen,
+                           const bool enable_vsync,
                            const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(binary_matrix_ASSET_DIR) : path),
               rng(std::random_device{}()) {
             if (assetRoot == ".") {
@@ -521,7 +522,7 @@ int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
         example::BinaryMatrixWindow window(
-            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.color);
+            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

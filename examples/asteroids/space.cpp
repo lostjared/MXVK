@@ -121,8 +121,8 @@ void bresenhamLine(int x0, int y0, int x1, int y1, Func plot) {
 
 class SpaceRoxWindow : public mxvk::VK_Window {
   public:
-    SpaceRoxWindow(const std::string &path, int wx, int wy, bool full)
-        : mxvk::VK_Window("-[ SpaceRox - MXVK ]-", wx, wy, full, MXVK_VALIDATION),
+    SpaceRoxWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync)
+        : mxvk::VK_Window("-[ SpaceRox - MXVK ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync),
           current_path((path.empty() || path == ".") ? std::string(asteroids_ASSET_DIR) : path),
           w(wx),
           h(wy) {
@@ -1408,7 +1408,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
 int main(int argc, char **argv) {
     Arguments args = proc_args(argc, argv);
     try {
-        SpaceRoxWindow window(args.path, args.width, args.height, args.fullscreen);
+        SpaceRoxWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

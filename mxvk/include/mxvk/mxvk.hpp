@@ -31,6 +31,11 @@ namespace mxvk {
      */
     class VK_Window {
       public:
+        enum class PresentModePreference {
+            LowLatency,
+            Vsync
+        };
+
         /**
          * @brief Construct an empty window object.
          */
@@ -55,8 +60,10 @@ namespace mxvk {
          * @param height Window height in pixels.
          * @param full Enables fullscreen mode when true.
          * @param validiation Enables validation-related behavior when true.
+         * @param presentModePreference Preferred swapchain present-mode policy.
          */
-        VK_Window(const std::string &title, int width, int height, bool full = false, bool validiation = true);
+        VK_Window(const std::string &title, int width, int height, bool full = false, bool validiation = true, PresentModePreference presentModePreference = PresentModePreference::LowLatency);
+        VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync);
 
         // no copy
         VK_Window(const VK_Window &) = delete;
@@ -381,7 +388,7 @@ namespace mxvk {
 
         static SwapchainSupport querySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
         static VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &available_formats);
-        static VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR> &available_present_modes);
+        VkPresentModeKHR choosePresentMode(const std::vector<VkPresentModeKHR> &available_present_modes) const;
         static VkExtent2D chooseExtent(const VkSurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
         static bool hasValidationLayerSupport();
         static std::optional<VkDebugUtilsMessengerCreateInfoEXT> makeDebugMessengerCreateInfo();
@@ -462,6 +469,7 @@ namespace mxvk {
         bool sdl_initialized = false;
         bool active = false;
         bool validation_enabled = false;
+        PresentModePreference present_mode_preference = PresentModePreference::LowLatency;
         bool framebuffer_resized = false;
         bool force_swapchain_recreate = false;
         uint64_t last_resize_event_ms = 0;

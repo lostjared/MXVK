@@ -81,7 +81,11 @@ namespace mxvk {
         return available_formats.front();
     }
 
-    VkPresentModeKHR VK_Window::choosePresentMode(const std::vector<VkPresentModeKHR> &available_present_modes) {
+    VkPresentModeKHR VK_Window::choosePresentMode(const std::vector<VkPresentModeKHR> &available_present_modes) const {
+        if (present_mode_preference == PresentModePreference::Vsync) {
+            return VK_PRESENT_MODE_FIFO_KHR;
+        }
+
         for (const VkPresentModeKHR present_mode : available_present_modes) {
             if (present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
                 return present_mode;
@@ -192,7 +196,7 @@ namespace mxvk {
         throw mxvk::Exception(std::format("Failed to locate shader file '{}'", shaderFileName));
     }
 
-    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation) {
+    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, PresentModePreference presentModePreference) : present_mode_preference(presentModePreference) {
         std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={})\n", title, width, height, full, validiation);
         SDL_WindowFlags flags = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (full) {
@@ -213,6 +217,9 @@ namespace mxvk {
         }
         std::cout << "mxvk: VK_Window construction complete\n";
     }
+
+    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync)
+        : VK_Window(title, width, height, full, validiation, enableVsync ? PresentModePreference::Vsync : PresentModePreference::LowLatency) {}
 
     VK_Window::~VK_Window() {
         std::cout << "mxvk: destructor invoked, releasing resources\n";

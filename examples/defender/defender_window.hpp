@@ -34,7 +34,7 @@ namespace defender {
 
     class DefenderWindow : public mxvk::VK_Window {
       public:
-        DefenderWindow(const std::string &path, int width, int height, bool fullscreen);
+        DefenderWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync);
         ~DefenderWindow() override;
         void event(SDL_Event &e) override;
         void onSwapchainRecreated() override;

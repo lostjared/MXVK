@@ -258,8 +258,8 @@ class MasterPieceWindow : public mxvk::VK_Window {
     static constexpr Uint32 JOY_REPEAT_DELAY = 150;
 
   public:
-    MasterPieceWindow(const std::string &path, int wx, int wy, bool full)
-        : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION),
+    MasterPieceWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync)
+        : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync),
           current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path),
           w(wx),
           h(wy) {
@@ -1426,7 +1426,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
 int main(int argc, char **argv) {
     Arguments args = proc_args(argc, argv);
     try {
-        MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen);
+        MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         SDL_Log("mxvk: Exception: %s\n", e.text().c_str());

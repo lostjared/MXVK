@@ -44,8 +44,8 @@ namespace {
 namespace example {
     class Math3DWindow : public mxvk::VK_Window {
       public:
-        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               fallback_width(width),
               fallback_height(height) {
             setClearColor(0.015f, 0.016f, 0.022f, 1.0f);
@@ -123,7 +123,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DWindow window(args.path, "MXVK 3D Math", args.width, args.height, args.fullscreen);
+        example::Math3DWindow window(args.path, "MXVK 3D Math", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

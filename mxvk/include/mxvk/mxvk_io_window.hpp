@@ -12,7 +12,7 @@ namespace mxvk {
 
     class VK_IOWindow : public VK_Window {
       public:
-        VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen);
+        VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen, const bool enableVsync = false);
         void event(SDL_Event &e) override;
         void print(const std::string &text, SDL_Color col = {255, 255, 255, 255});
         void proc() override;

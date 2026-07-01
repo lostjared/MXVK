@@ -38,11 +38,12 @@ namespace example {
                     int width,
                     int height,
                     bool fullscreen,
+                    bool enable_vsync,
                     bool binaryTextureMode,
                     int fontSize,
                     const std::string &fontPath,
                     const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path),
               binaryTextureMode(binaryTextureMode) {
             const std::string modelPath = filename;
@@ -381,6 +382,7 @@ int main(int argc, char **argv) {
             args.width,
             args.height,
             args.fullscreen,
+            args.enable_vsync,
             args.binary,
             args.font_size,
             args.font_path,

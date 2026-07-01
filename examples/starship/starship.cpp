@@ -70,8 +70,8 @@ namespace example {
 
     class StarshipWindow : public mxvk::VK_Window {
       public:
-        StarshipWindow(const std::string filename, const std::string &title, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION) {
+        StarshipWindow(const std::string filename, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             const std::string modelVertPath = std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
             const std::string modelFragPath = std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
 
@@ -1412,7 +1412,7 @@ int main(int argc, char **argv) {
         if (filename.empty()) {
             filename = args.path + "/data/starship.obj";
         }
-        example::StarshipWindow window(filename, "MXVK Starship Example", args.width, args.height, args.fullscreen);
+        example::StarshipWindow window(filename, "MXVK Starship Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

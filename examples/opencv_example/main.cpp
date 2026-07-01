@@ -127,7 +127,7 @@ namespace example {
         }
 
       public:
-        ExampleWindow(const Arguments &args, const std::string &text) : mxvk::VK_Window(text, args.width, args.height, args.fullscreen, MXVK_VALIDATION) {
+        ExampleWindow(const Arguments &args, const std::string &text) : mxvk::VK_Window(text, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync) {
             current_path = args.path.empty() ? std::string(opencv_example_ASSET_DIR) : args.path;
             shader_path = args.shaderPath.empty() ? std::string(opencv_example_SHADER_DIR) : args.shaderPath;
             setFont(current_path + "/data/font.ttf", 20);

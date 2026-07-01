@@ -257,8 +257,8 @@ namespace demo {
 
     class PoolWindow final : public mxvk::VK_Window {
       public:
-        PoolWindow(int width, int height, bool fullscreen, std::string asset_root)
-            : mxvk::VK_Window("3D Pool / MXVK", width, height, fullscreen, MXVK_VALIDATION),
+        PoolWindow(int width, int height, bool fullscreen, bool enable_vsync, std::string asset_root)
+            : mxvk::VK_Window("3D Pool / MXVK", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(std::move(asset_root)),
               highScores((std::filesystem::path(assetRoot) / "pool_scores.dat").string()),
               fallbackWidth(width),
@@ -1679,7 +1679,7 @@ int main(int argc, char **argv) {
         Arguments args = proc_args(argc, argv);
         std::string assets = resolveAssetRoot(args.path);
         SDL_Log("pool_demo: using asset root: %s", assets.c_str());
-        demo::PoolWindow window(args.width, args.height, args.fullscreen, assets);
+        demo::PoolWindow window(args.width, args.height, args.fullscreen, args.enable_vsync, assets);
         window.loop();
     } catch (const mxvk::Exception &e) {
         SDL_Log("mxvk: Exception: %s", e.text().c_str());

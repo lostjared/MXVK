@@ -18,8 +18,8 @@ namespace example {
         };
 
       public:
-        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen)
-            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION),
+        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               shader_root(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
             setClearColor(0.02f, 0.03f, 0.06f, 1.0f);
         }
@@ -247,7 +247,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::ExampleWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen);
+        example::ExampleWindow ex_window(args.path, "VK_Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         ex_window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

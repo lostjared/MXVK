@@ -105,7 +105,7 @@ struct ComputePC {
 class ComputeWindow : public mxvk::VK_Window {
   public:
     explicit ComputeWindow(const Arguments &args)
-        : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION),
+        : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
           assetRoot(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path),
           inputFilename(args.filename),
           usingFile(!inputFilename.empty()),

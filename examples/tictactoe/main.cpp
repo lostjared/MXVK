@@ -19,8 +19,8 @@
 namespace example {
     class TicTacToeWindow : public mxvk::VK_Window {
       public:
-        TicTacToeWindow(const std::string &assetPath, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("-[ MXVK Tic-Tac-Toe ]-", width, height, fullscreen, MXVK_VALIDATION),
+        TicTacToeWindow(const std::string &assetPath, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("-[ MXVK Tic-Tac-Toe ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               rng(std::random_device{}()) {
             assetRoot = assetPath.empty() ? std::string(tictactoe_ASSET_DIR) : assetPath;
             const std::string fontPath = assetPath.empty() ? std::string(tictactoe_FONT_PATH) : assetRoot + "/data/font.ttf";
@@ -359,7 +359,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::TicTacToeWindow window(args.path, args.width, args.height, args.fullscreen);
+        example::TicTacToeWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

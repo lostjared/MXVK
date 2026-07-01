@@ -4,7 +4,7 @@
 
 namespace mxvk {
 
-    VK_IOWindow::VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION) {
+    VK_IOWindow::VK_IOWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen, const bool enableVsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enableVsync) {
         const std::string base_path = path;
         console.attach(*this, base_path + "/data/font.ttf", 20);
         console.setSpriteYOriginTopLeft(true);

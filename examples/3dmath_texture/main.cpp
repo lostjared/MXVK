@@ -141,7 +141,7 @@ namespace example {
     class Math3DTextureWindow : public mxvk::VK_Window {
       public:
         Math3DTextureWindow(const Arguments &args, const std::string &title)
-            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION),
+            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
               texture(load_texture(resolve_texture_path(args))),
               fallback_width(args.width),
               fallback_height(args.height) {

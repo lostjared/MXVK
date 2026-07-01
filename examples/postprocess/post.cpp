@@ -30,8 +30,8 @@ namespace example {
 
     class PostprocessWindow : public mxvk::VK_Window {
       public:
-        PostprocessWindow(const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("MXVK Postprocess Chain", width, height, fullscreen, MXVK_VALIDATION),
+        PostprocessWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("MXVK Postprocess Chain", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(postprocess_ASSET_DIR) : path) {
             resizeCanvas(width, height);
             sprite = createSprite(canvas.get());
@@ -181,7 +181,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::PostprocessWindow window(args.path, args.width, args.height, args.fullscreen);
+        example::PostprocessWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (const mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

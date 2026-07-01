@@ -208,8 +208,8 @@ namespace {
 
     class PuzzleDropWindow final : public mxvk::VK_Window {
       public:
-        PuzzleDropWindow(const std::string &path, int width, int height, bool fullscreen)
-            : mxvk::VK_Window("-[ MXVK 3D PuzzleDrop ]-", width, height, fullscreen, MXVK_VALIDATION),
+        PuzzleDropWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window("-[ MXVK 3D PuzzleDrop ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(puzzle_drop_ASSET_DIR) : path),
               data_root(asset_root + "/data"),
               tetris_data_root(puzzle_drop_TETRIS_DATA_DIR) {
@@ -1262,7 +1262,7 @@ namespace {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        PuzzleDropWindow window(args.path, args.width, args.height, args.fullscreen);
+        PuzzleDropWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (const mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

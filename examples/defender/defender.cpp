@@ -11,7 +11,7 @@
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        defender::DefenderWindow window(args.path, args.width, args.height, args.fullscreen);
+        defender::DefenderWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
 
     } catch (const mxvk::Exception &e) {
