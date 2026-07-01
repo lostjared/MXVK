@@ -377,6 +377,7 @@ set(mxvk_SPRITE3D_VERTEX_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite3d.vert)
 set(mxvk_SPRITE3D_FRAGMENT_SHADER ${mxvk_SHADER_SOURCE_DIR}/sprite3d.frag)
 set(mxvk_SPRITE3D_VERTEX_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite3d.vert.spv)
 set(mxvk_SPRITE3D_FRAGMENT_SPV ${mxvk_SHADER_OUTPUT_DIR}/sprite3d.frag.spv)
+set(mxvk_DEFAULT_FONT ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/data/default.ttf)
 
 add_custom_command(
     OUTPUT ${mxvk_VERTEX_SPV}
@@ -541,6 +542,7 @@ target_compile_definitions(mxvk PUBLIC
     MXVK_SPRITE_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
     MXVK_TEXT_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
     MXVK_SPRITE3D_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
+    MXVK_DEFAULT_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mxvk/data"
 )
 if(CV OR MXVK_CUDA_ENABLED)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
@@ -635,6 +637,15 @@ if(EXAMPLES)
         mxvk_configure_mingw_target(opencv_model)
     endif()
 
+    file(GLOB mxvk_example_cmake_files "${CMAKE_CURRENT_SOURCE_DIR}/examples/*/CMakeLists.txt")
+    foreach(mxvk_example_cmake_file IN LISTS mxvk_example_cmake_files)
+        get_filename_component(mxvk_example_source_dir ${mxvk_example_cmake_file} DIRECTORY)
+        file(RELATIVE_PATH mxvk_example_relative_dir "${CMAKE_CURRENT_SOURCE_DIR}/examples" ${mxvk_example_source_dir})
+        set(mxvk_example_font_output_dir "${CMAKE_CURRENT_BINARY_DIR}/examples/${mxvk_example_relative_dir}/data")
+        file(MAKE_DIRECTORY ${mxvk_example_font_output_dir})
+        configure_file(${mxvk_DEFAULT_FONT} ${mxvk_example_font_output_dir}/default.ttf COPYONLY)
+    endforeach()
+
     function(mxvk_copy_runtime_shaders target_name)
         if(NOT TARGET ${target_name})
             return()
@@ -643,6 +654,11 @@ if(EXAMPLES)
         get_target_property(target_runtime_dir ${target_name} RUNTIME_OUTPUT_DIRECTORY)
         if(NOT target_runtime_dir)
             get_target_property(target_runtime_dir ${target_name} BINARY_DIR)
+        endif()
+
+        if(NOT target_runtime_dir MATCHES "\\$<")
+            file(MAKE_DIRECTORY ${target_runtime_dir}/data)
+            configure_file(${mxvk_DEFAULT_FONT} ${target_runtime_dir}/data/default.ttf COPYONLY)
         endif()
 
         string(MAKE_C_IDENTIFIER "${target_name}" target_name_id)
@@ -680,6 +696,9 @@ if(EXAMPLES)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${mxvk_SPRITE3D_FRAGMENT_SPV}
                 ${target_runtime_dir}/data/sprite3d.frag.spv
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${mxvk_DEFAULT_FONT}
+                ${target_runtime_dir}/data/default.ttf
         )
 
         get_target_property(target_source_dir ${target_name} SOURCE_DIR)
@@ -722,6 +741,8 @@ if(EXAMPLES)
     endfunction()
 
     set(mxvk_example_targets
+        skeleton
+        surface
         hello_world
         static_example
         sprite_example
@@ -730,17 +751,25 @@ if(EXAMPLES)
         math3d_texture
         sprite3d_example
         text_example
+        rain
         model_example
         dark
+        moon
+        starship
         planet
         tux_example
         glitch_cube
         asteroids
         asteroids3d
+        defender
         pong
+        tetris
+        puzzle_drop
         tictactoe
         puzzle
         Pool3D
+        masterpiece
+        math3d_masterpiece
         console_demo
         postprocess
         cfg_example

@@ -410,6 +410,10 @@ namespace mxvk {
         void destroyTextPipeline();
         void maybeTrimMemory();
         [[nodiscard]] bool isPostProcessSprite(const VK_Sprite *sprite) const;
+        [[nodiscard]] std::string resolveDefaultFontPath() const;
+        void ensureTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize);
+        void toggleFpsCounter();
+        void updateFpsCounter();
 
       protected:
         // Protected state allows subclasses to implement custom rendering paths.
@@ -495,6 +499,12 @@ namespace mxvk {
         bool font_configured = false;
         std::string font_path{};
         int font_size = 24;
+        bool fps_counter_enabled = false;
+        bool fps_counter_font_ready = false;
+        Font fps_counter_font{};
+        std::chrono::steady_clock::time_point fps_counter_sample_time{};
+        uint32_t fps_counter_frame_count = 0;
+        std::string fps_counter_text = "FPS: --";
         VkClearColorValue clear_color{{0.0f, 0.0f, 0.0f, 1.0f}};
         std::vector<VkSwapchainKHR> retired_swapchains;
     };

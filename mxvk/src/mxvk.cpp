@@ -24,6 +24,10 @@
 #define MXVK_TEXT_SHADER_DIR "."
 #endif
 
+#ifndef MXVK_DEFAULT_FONT_DIR
+#define MXVK_DEFAULT_FONT_DIR "."
+#endif
+
 namespace mxvk {
     VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data) {
         const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
@@ -607,6 +611,11 @@ namespace mxvk {
                         framebuffer_resized = true;
                         last_resize_event_ms = SDL_GetTicks();
                         force_swapchain_recreate = false;
+                    }
+                    break;
+                case SDL_EVENT_KEY_DOWN:
+                    if ((e.key.key == SDLK_F12 || e.key.scancode == SDL_SCANCODE_F12) && !e.key.repeat) {
+                        toggleFpsCounter();
                     }
                     break;
                 default:
@@ -1791,6 +1800,10 @@ namespace mxvk {
             sprite_state_dirty = false;
         }
 
+        if (fps_counter_enabled) {
+            updateFpsCounter();
+        }
+
         if (text_state_dirty && text_renderer && swapchain_format != VK_FORMAT_UNDEFINED) {
             text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
             try {
@@ -2447,11 +2460,10 @@ namespace mxvk {
             throw mxvk::Exception("printText requires a non-null TTF_Font");
         }
 
-        if (!font_configured) {
-            throw mxvk::Exception("printText with an explicit font still requires setFont() to initialize the text renderer");
+        ensureTextRenderer(resolveDefaultFontPath(), font_size);
+        if (!text_renderer) {
+            throw mxvk::Exception("printText with an explicit font could not initialize the text renderer");
         }
-
-        ensureTextRenderer();
         text_renderer->printTextG_Solid(text, x, y, col, font);
     }
 
@@ -2488,13 +2500,7 @@ namespace mxvk {
             return false;
         }
 
-        if (!font_configured) {
-            throw mxvk::Exception("getTextDimensions with an explicit font still requires setFont() to initialize the text renderer");
-        }
-
-        if (!text_renderer) {
-            ensureTextRenderer();
-        }
+        ensureTextRenderer(resolveDefaultFontPath(), font_size);
         if (!text_renderer) {
             width = 0;
             height = 0;
@@ -2533,6 +2539,119 @@ namespace mxvk {
         text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, font_path, font_size);
         text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
         text_state_dirty = true;
+    }
+
+    void VK_Window::ensureTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize) {
+        if (text_renderer) {
+            return;
+        }
+
+        if (device == VK_NULL_HANDLE) {
+            return;
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            return;
+        }
+
+        const std::string renderer_font_path = font_configured ? font_path : fallbackFontPath;
+        const int renderer_font_size = font_configured ? font_size : fallbackFontSize;
+        if (renderer_font_path.empty() || renderer_font_size <= 0) {
+            return;
+        }
+
+        if (text_descriptor_set_layout == VK_NULL_HANDLE) {
+            createTextDescriptorSetLayout();
+        }
+
+        text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, renderer_font_path, renderer_font_size);
+        text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
+        text_state_dirty = true;
+    }
+
+    std::string VK_Window::resolveDefaultFontPath() const {
+        std::vector<std::filesystem::path> candidates{};
+
+        if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
+            const std::filesystem::path executableDir(basePath);
+            candidates.push_back(executableDir / "data" / "default.ttf");
+            candidates.push_back(executableDir / "default.ttf");
+        }
+
+        candidates.push_back(std::filesystem::path("data") / "default.ttf");
+
+        if (!font_path.empty()) {
+            const std::filesystem::path configured_font_path(font_path);
+            if (configured_font_path.has_parent_path()) {
+                candidates.push_back(configured_font_path.parent_path() / "default.ttf");
+            }
+        }
+
+        candidates.push_back(std::filesystem::path(MXVK_DEFAULT_FONT_DIR) / "default.ttf");
+
+        std::error_code exists_error{};
+        for (const std::filesystem::path &candidate : candidates) {
+            if (std::filesystem::exists(candidate, exists_error)) {
+                return candidate.string();
+            }
+            exists_error.clear();
+        }
+
+        return {};
+    }
+
+    void VK_Window::toggleFpsCounter() {
+        fps_counter_enabled = !fps_counter_enabled;
+        fps_counter_frame_count = 0;
+        fps_counter_sample_time = std::chrono::steady_clock::now();
+        fps_counter_text = "FPS: --";
+        std::cout << std::format("mxvk: FPS counter {}\n", fps_counter_enabled ? "enabled" : "disabled");
+
+        if (!fps_counter_enabled) {
+            return;
+        }
+
+        if (!fps_counter_font_ready) {
+            const std::string default_font_path = resolveDefaultFontPath();
+            if (default_font_path.empty()) {
+                std::cerr << "mxvk: F12 FPS counter could not locate data/default.ttf\n";
+                fps_counter_enabled = false;
+                return;
+            }
+            fps_counter_font.reset(default_font_path, 18);
+            fps_counter_font_ready = true;
+        }
+    }
+
+    void VK_Window::updateFpsCounter() {
+        if (!fps_counter_enabled) {
+            return;
+        }
+
+        if (!fps_counter_font_ready) {
+            const std::string default_font_path = resolveDefaultFontPath();
+            if (default_font_path.empty()) {
+                std::cerr << "mxvk: F12 FPS counter could not locate data/default.ttf\n";
+                fps_counter_enabled = false;
+                return;
+            }
+            fps_counter_font.reset(default_font_path, 18);
+            fps_counter_font_ready = true;
+        }
+
+        ++fps_counter_frame_count;
+        const auto now = std::chrono::steady_clock::now();
+        const double elapsed = std::chrono::duration<double>(now - fps_counter_sample_time).count();
+        if (elapsed >= 0.5) {
+            const double fps = static_cast<double>(fps_counter_frame_count) / elapsed;
+            fps_counter_frame_count = 0;
+            fps_counter_sample_time = now;
+            fps_counter_text = std::format("FPS: {:.1f}", fps);
+        }
+
+        printText(fps_counter_text, 12, 10, SDL_Color{255, 255, 255, 255}, fps_counter_font);
     }
 
     void VK_Window::createTextDescriptorSetLayout() {
