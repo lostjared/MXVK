@@ -25,12 +25,16 @@
 #define _ARGZ_HPP_X
 
 #include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <ranges>
 #include <string>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -702,6 +706,7 @@ struct Arguments {
     bool binary = false;               ///< Use binary glyphs only (@c --binary).
     bool enable_crt = false;           ///< Enable CRT post-processing at startup (@c --enable-crt).
     bool enable_vsync = false;         ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
+    double fps = 0.0;                  ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                ///< Matrix rain font size in pixels (@c --font-size).
     std::string font_path;             ///< Optional font file path (@c --font-path).
     std::string color;                 ///< Optional rain RGB tint (@c --color).
@@ -714,6 +719,28 @@ struct Arguments {
     std::string resource;              ///< Resource file
     std::string resource_path;         ///< Resource path
 };
+
+[[nodiscard]] inline int parse_arg_int(const std::string &text, const std::string &option_name) {
+    int value = 0;
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    const std::from_chars_result result = std::from_chars(begin, end, value);
+    if (result.ec != std::errc{} || result.ptr != end) {
+        throw ArgException<std::string>("Invalid numeric value for " + option_name + ": " + text);
+    }
+    return value;
+}
+
+[[nodiscard]] inline double parse_arg_double(const std::string &text, const std::string &option_name) {
+    double value = 0.0;
+    const char *begin = text.data();
+    const char *end = begin + text.size();
+    const std::from_chars_result result = std::from_chars(begin, end, value);
+    if (result.ec != std::errc{} || result.ptr != end || !std::isfinite(value)) {
+        throw ArgException<std::string>("Invalid numeric value for " + option_name + ": " + text);
+    }
+    return value;
+}
 
 /**
  * @brief Parse standard libmx2 command-line options from main()'s argv.
@@ -738,6 +765,7 @@ struct Arguments {
  * |      | --binary           | Use binary glyphs only                        |
  * |      | --enable-crt       | Enable CRT post-processing at startup         |
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
+ * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
  * | -C   | --color            | Matrix rain RGB tint (\#RRGGBB or R,G,B)      |
@@ -777,6 +805,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(315, "binary", "use binary glyphs only")
         .addOptionDouble(319, "enable-crt", "enable CRT post-processing at startup")
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
+        .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
         .addOptionSingleValue('j', "matrix rain font file path")
@@ -813,6 +842,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool binary = false;
     bool enable_crt = false;
     bool enable_vsync = false;
+    double fps = 0.0;
     int font_size = 22;
     std::string font_path;
     std::string color;
@@ -870,9 +900,18 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 320:
             enable_vsync = true;
             break;
+        case 321:
+            fps = parse_arg_double(arg.arg_value, "--fps");
+            if (fps <= 0.0) {
+                throw ArgException<std::string>("Invalid numeric value for --fps: " + arg.arg_value);
+            }
+            break;
         case 'z':
         case 316:
-            font_size = atoi(arg.arg_value.c_str());
+            font_size = parse_arg_int(arg.arg_value, "--font-size");
+            if (font_size <= 0) {
+                throw ArgException<std::string>("Invalid numeric value for --font-size: " + arg.arg_value);
+            }
             break;
         case 'j':
         case 317:
@@ -905,15 +944,16 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 'R': {
             auto pos = arg.arg_value.find("x");
             if (pos == std::string::npos) {
-                std::cerr << "Error invalid resolution use WidthxHeight\n";
-                std::cerr.flush();
-                exit(EXIT_FAILURE);
+                throw ArgException<std::string>("Invalid resolution for --resolution, expected WidthxHeight: " + arg.arg_value);
             }
             std::string left, right;
             left = arg.arg_value.substr(0, pos);
             right = arg.arg_value.substr(pos + 1);
-            tw = atoi(left.c_str());
-            th = atoi(right.c_str());
+            tw = parse_arg_int(left, "--resolution width");
+            th = parse_arg_int(right, "--resolution height");
+            if (tw <= 0 || th <= 0) {
+                throw ArgException<std::string>("Invalid numeric value for --resolution: " + arg.arg_value);
+            }
             resolutionSpecified = true;
         } break;
         case 'f':
@@ -924,14 +964,14 @@ inline Arguments proc_args(int &argc, char **argv) {
             fast = true;
             break;
         case 300:
-            camera_index = atoi(arg.arg_value.c_str());
+            camera_index = parse_arg_int(arg.arg_value, "--camera");
             break;
         case 'i':
         case 311:
-            index = atoi(arg.arg_value.c_str());
+            index = parse_arg_int(arg.arg_value, "--index");
             break;
         case 312:
-            shader_index = atoi(arg.arg_value.c_str());
+            shader_index = parse_arg_int(arg.arg_value, "--shader-index");
             break;
         }
     }
@@ -957,6 +997,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.binary = binary;
     args.enable_crt = enable_crt;
     args.enable_vsync = enable_vsync;
+    args.fps = fps;
     args.font_size = font_size;
     args.font_path = font_path;
     args.color = color;

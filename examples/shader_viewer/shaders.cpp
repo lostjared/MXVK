@@ -75,6 +75,7 @@ namespace example {
         std::vector<std::string> shader_files;
         int current_shader_index = 0;
         double fps = 60.0f;
+        double requested_fps = 0.0;
         int camera_index = 0;
         bool using_file = false;
         bool shader_list_requested = false;
@@ -179,6 +180,12 @@ namespace example {
         }
 
         [[nodiscard]] double configureCameraFps() {
+            if (requested_fps > 0.0) {
+                capture.set(cv::CAP_PROP_FPS, requested_fps);
+                const double reportedFps = capture.get(cv::CAP_PROP_FPS);
+                return (reportedFps > 0.0) ? reportedFps : requested_fps;
+            }
+
             static constexpr std::array<double, 3> fpsChoices = {60.0, 30.0, 24.0};
 
             for (const double requestedFps : fpsChoices) {
@@ -304,6 +311,7 @@ namespace example {
             setFont(font_path, 20);
             input_filename = args.filename;
             camera_index = args.camera_index;
+            requested_fps = args.fps;
             using_file = !input_filename.empty();
             if (!openCaptureSource()) {
                 if (using_file) {
