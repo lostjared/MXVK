@@ -171,6 +171,9 @@ Supported options:
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`
 	- Shader SPIR-V folder path.
+	- For `shader_viewer`, this path must contain `index.txt`. The index may list compiled `.spv` fragment shaders directly, or `.glsl` source names when matching compiled files exist under a `spv/` subdirectory. Download a precompiled SPIR-V shader pack from https://lostsidedead.biz/packs/vk.shaders.2026.02.17.zip.
+- `--shader-index <index>`
+	- Initial shader entry for examples that browse shader lists, such as `shader_viewer`.
 - `--camera <index>`
 	- Camera index for OpenCV capture examples.
 
@@ -215,6 +218,7 @@ Examples:
 ./run.pl 3dmath_masterpiece
 ./run.pl compute_shader --camera 0
 ./run.pl opencv_example --camera 0 -r 1280x720
+./run.pl shader_viewer --camera 0 --shader-path /path/to/shaders --shader-index 0
 ./run.pl opencv_model --filename ./models/torus.mxmod.z --camera 0
 ```
 
@@ -320,6 +324,7 @@ These programs are not intended as standalone applications. They are small visua
 ### Camera And Video Workflows
 
 - `compute_shader` - OpenCV capture or video-file playback through selectable Vulkan compute shaders. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--filename`, `--output`, `--crf`, `--shader-path`, and compute-related options. **Controls:** `Up` / `Down` switch shaders, `Left` / `Right` change the `acidcam_filters` selector, `Escape` quits.
+- `shader_viewer` - OpenCV camera viewer that applies sprite-compatible fragment shaders from a shader index. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--shader-path`, and `--shader-index`. `--shader-path` should point at a folder containing `index.txt`; entries may be `.spv` files or `.glsl` source names with matching compiled files in `spv/`. A precompiled SPIR-V pack is available at https://lostsidedead.biz/packs/vk.shaders.2026.02.17.zip. **Controls:** `Up` / `Down` switch shaders, mouse position and left-button state are passed to shader uniforms, `Escape` quits.
 - `opencv_example` - displays camera or video frames on a sprite in real time. **Inputs:** requires `-DCV=ON`; accepts `--camera` and `--filename`. **Controls:** `Escape` quits.
 - `opencv_model` - maps a live camera feed onto a textured 3D model. **Inputs:** requires `-DCV=ON`; accepts `--camera`, `--filename`, and standard example arguments. **Controls:** left mouse drag orbits, mouse wheel zooms, arrow keys rotate the model, `Escape` quits.
 
