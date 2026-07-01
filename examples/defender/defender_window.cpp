@@ -455,6 +455,7 @@ namespace defender {
         console.draw();
     }
 
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
     void DefenderWindow::ensure_background_music_playing() {
         if (!background_music || background_music_track < 0) {
             return;
@@ -472,5 +473,6 @@ namespace defender {
         }
         background_music->playWav(sound_id);
     }
+#endif
 
 } // namespace defender

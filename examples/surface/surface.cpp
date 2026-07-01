@@ -21,10 +21,10 @@ namespace surface {
     class SurfaceWindow : public mxvk::VK_Window {
 
     public:
-        SurfaceWindow(int width, int height, bool full) : mxvk::VK_Window(" -[ MXVK Skeleton ] - ", width, height, full, MXVK_VALIDATION) {
-            std::cout << "skeleton: started example.\n";
+        SurfaceWindow(std::string shader_path, int width, int height, bool full) : mxvk::VK_Window(" -[ MXVK Skeleton ] - ", width, height, full, MXVK_VALIDATION) {
+            std::cout << "surface: started example.\n";
             resize_canvas(width, height);
-            surf = createSprite(bg.get(), "", "");
+            surf = createSprite(bg.get(), "", shader_path);
         }
         void event(SDL_Event &e) override {
             switch (e.type) {
@@ -95,7 +95,7 @@ namespace surface {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        surface::SurfaceWindow window(args.width, args.height, args.fullscreen);
+        surface::SurfaceWindow window(args.filename, args.width, args.height, args.fullscreen);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
