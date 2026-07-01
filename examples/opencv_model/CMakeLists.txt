@@ -43,7 +43,7 @@ add_custom_target(opencv_model_shaders
 add_dependencies(opencv_model opencv_model_shaders)
 target_compile_definitions(opencv_model PRIVATE
     opencv_model_SHADER_DIR="${opencv_model_SHADER_OUTPUT_DIR}"
-    opencv_model_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    opencv_model_ASSET_DIR="$<TARGET_FILE_DIR:opencv_model>"
 )
 
 set(opencv_model_DATA_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/data)

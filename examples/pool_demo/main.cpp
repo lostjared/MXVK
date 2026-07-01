@@ -678,8 +678,8 @@ namespace demo {
         void loadModel(mxvk::VKAbstractModel &model, const std::string &path, float scale = 1.0f) {
             model.load(this, path, "", assetRoot + "/data", scale);
             model.setShaders(this,
-                             std::string(POOL_DEMO_SHADER_DIR) + "/model.vert.spv",
-                             std::string(POOL_DEMO_SHADER_DIR) + "/model.frag.spv");
+                             assetRoot + "/data/model.vert.spv",
+                             assetRoot + "/data/model.frag.spv");
         }
 
         void drawModel(mxvk::VKAbstractModel &model,

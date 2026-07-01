@@ -25,8 +25,8 @@ namespace defender {
         hud_font.reset(asset_root + "/data/font.ttf", HUD_FONT_SIZE);
         countdown_font.reset(asset_root + "/data/font.ttf", COUNTDOWN_FONT_SIZE);
 
-        const std::string model_vert = std::string(DEFENDER_SHADER_DIR) + "/model.vert.spv";
-        const std::string model_frag = std::string(DEFENDER_SHADER_DIR) + "/model.frag.spv";
+        const std::string model_vert = asset_root + "/data/model.vert.spv";
+        const std::string model_frag = asset_root + "/data/model.frag.spv";
         ship_model.load(this, asset_root + "/data/starship.obj", asset_root + "/data/starship.mtl", asset_root + "/data", 1.0f);
         ship_model.setShaders(this, model_vert, model_frag);
         for (auto &asteroid_model : asteroid_models) {
@@ -37,15 +37,15 @@ namespace defender {
         intro_sprite = createSprite(
             asset_root + "/data/intro.png",
             std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-            std::string(DEFENDER_SHADER_DIR) + "/intro.frag.spv");
+            asset_root + "/data/intro.frag.spv");
         fade_overlay_sprite = createSprite(
             1,
             1,
             std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-            std::string(DEFENDER_SHADER_DIR) + "/fade_overlay.frag.spv");
+            asset_root + "/data/fade_overlay.frag.spv");
         const uint32_t black_pixel = 0xFF000000u;
         fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
-        attachPostProcessingShader(std::string(DEFENDER_SHADER_DIR) + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
+        attachPostProcessingShader(asset_root + "/data/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
         setPostProcessingShaderTimeEnabled(true);
         matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
         intro_rain_config.color = "#ff0000";

@@ -227,14 +227,18 @@ add_custom_target(walk_example_shaders
 add_dependencies(walk_example walk_example_shaders)
 target_compile_definitions(walk_example PRIVATE
     WALK_SHADER_DIR="${WALK_SHADER_OUTPUT_DIR}"
-    WALK_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-    WALK_MODELS_DIR="${CMAKE_SOURCE_DIR}/models"
+    WALK_ASSET_DIR="$<TARGET_FILE_DIR:walk_example>"
+    WALK_MODELS_DIR="$<TARGET_FILE_DIR:walk_example>/data"
 )
 
 add_custom_command(TARGET walk_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:walk_example>/data
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:walk_example>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/models/cube.mxmod.z
+        ${CMAKE_SOURCE_DIR}/models/sphere.mxmod.z
         $<TARGET_FILE_DIR:walk_example>/data
     COMMENT "Copying walk assets to runtime output directory"
 )

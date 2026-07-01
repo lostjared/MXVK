@@ -371,9 +371,9 @@ class ComputeWindow : public mxvk::VK_Window {
     int currentSpvIndex = 0;
 
     void loadSPV() {
-        std::ifstream file(assetRoot + "/index.txt");
+        std::ifstream file(assetRoot + "/data/index.txt");
         if (!file.is_open()) {
-            throw mxvk::Exception("Cannot open: " + assetRoot + "/index.txt");
+            throw mxvk::Exception("Cannot open: " + assetRoot + "/data/index.txt");
         }
 
         std::string line;
@@ -807,7 +807,7 @@ class ComputeWindow : public mxvk::VK_Window {
             if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
                 createDevice();
             }
-            setFont(assetRoot + "/font.ttf", 20);
+            setFont(assetRoot + "/data/font.ttf", 20);
 
             if (usingFile) {
                 if (!openVideoSource()) {
@@ -861,7 +861,7 @@ class ComputeWindow : public mxvk::VK_Window {
             configureRecordingDefaults();
             recordingEnabled = true;
             openVideoWriter();
-            fpsFont.reset(assetRoot + "/font.ttf", overlayFontSizeForCanvas());
+            fpsFont.reset(assetRoot + "/data/font.ttf", overlayFontSizeForCanvas());
             playbackStartTime = std::chrono::steady_clock::now();
             maybeResizeWindowToSource();
 
@@ -1394,7 +1394,7 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void buildComputePipeline() {
-        const std::string spvPath = assetRoot + "/" + spvFiles[currentSpvIndex];
+        const std::string spvPath = assetRoot + "/data/" + spvFiles[currentSpvIndex];
         std::ifstream spvFile(spvPath, std::ios::binary | std::ios::ate);
         if (!spvFile.is_open()) {
             throw mxvk::Exception("Cannot open compute SPIR-V: " + spvPath);

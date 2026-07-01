@@ -60,8 +60,8 @@ namespace example {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/saturn.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/saturn.tex";
             const std::string textureBasePath = assetRoot + "/data";
-            const std::string vertPath = std::string(PLANET_SHADER_DIR) + "/model.vert.spv";
-            const std::string fragPath = std::string(PLANET_SHADER_DIR) + "/model.frag.spv";
+            const std::string vertPath = assetRoot + "/data/model.vert.spv";
+            const std::string fragPath = assetRoot + "/data/model.frag.spv";
 
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setBackfaceCulling(false);

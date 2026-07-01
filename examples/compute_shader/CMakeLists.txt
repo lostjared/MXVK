@@ -84,26 +84,27 @@ target_compile_definitions(compute_shader PRIVATE
 )
 
 add_custom_command(TARGET compute_shader POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:compute_shader>/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_INDEX_SOURCE}
-        $<TARGET_FILE_DIR:compute_shader>/index.txt
+        $<TARGET_FILE_DIR:compute_shader>/data/index.txt
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_FONT_SOURCE}
-        $<TARGET_FILE_DIR:compute_shader>/font.ttf
+        $<TARGET_FILE_DIR:compute_shader>/data/font.ttf
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_COMPUTE_SPV}
-        $<TARGET_FILE_DIR:compute_shader>/compute.spv
+        $<TARGET_FILE_DIR:compute_shader>/data/compute.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_XORBLEND_SPV}
-        $<TARGET_FILE_DIR:compute_shader>/xorblend.spv
+        $<TARGET_FILE_DIR:compute_shader>/data/xorblend.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_MEDIAN_SPV}
-        $<TARGET_FILE_DIR:compute_shader>/metalmedianblend.spv
+        $<TARGET_FILE_DIR:compute_shader>/data/metalmedianblend.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_SQUARE_SPV}
-        $<TARGET_FILE_DIR:compute_shader>/square_block_resize_dir.spv
+        $<TARGET_FILE_DIR:compute_shader>/data/square_block_resize_dir.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${compute_shader_ACIDCAM_SPV}
-        $<TARGET_FILE_DIR:compute_shader>/acidcam_filters.spv
+        $<TARGET_FILE_DIR:compute_shader>/data/acidcam_filters.spv
     COMMENT "Copying compute_shader runtime assets"
 )

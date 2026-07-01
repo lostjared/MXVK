@@ -41,7 +41,6 @@ add_custom_target(planet_shaders
 
 add_dependencies(planet planet_shaders)
 target_compile_definitions(planet PRIVATE
-    PLANET_SHADER_DIR="${PLANET_SHADER_OUTPUT_DIR}"
     PLANET_ASSET_DIR="$<TARGET_FILE_DIR:planet>"
 )
 
@@ -75,5 +74,11 @@ add_custom_command(TARGET planet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/data/binary.ttf
         $<TARGET_FILE_DIR:planet>/data/binary.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${PLANET_VERTEX_SPV}
+        $<TARGET_FILE_DIR:planet>/data/model.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${PLANET_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:planet>/data/model.frag.spv
     COMMENT "Copying planet example assets to runtime output directory"
 )

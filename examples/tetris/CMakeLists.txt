@@ -115,8 +115,8 @@ add_custom_target(tetris_shaders
 add_dependencies(tetris tetris_shaders)
 
 target_compile_definitions(tetris PRIVATE
-    tetris_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
-    tetris_FONT_PATH="${CMAKE_SOURCE_DIR}/examples/tictactoe/data/font.ttf"
+    tetris_ASSET_DIR="$<TARGET_FILE_DIR:tetris>"
+    tetris_FONT_PATH="$<TARGET_FILE_DIR:tetris>/data/font.ttf"
     tetris_SHADER_DIR="${TETRIS_SHADER_OUTPUT_DIR}"
 )
 

@@ -10,6 +10,7 @@ endif()
 
 set(HELLO_WORLD_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(HELLO_WORLD_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
+set(HELLO_WORLD_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
 
 set(HELLO_WORLD_VERTEX_SHADER ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.vert)
 set(HELLO_WORLD_FRAGMENT_SHADER ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.frag)
@@ -35,18 +36,22 @@ add_custom_command(
 )
 
 add_custom_target(hello_world_shaders
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        ${HELLO_WORLD_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${HELLO_WORLD_VERTEX_SPV}
-        ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.vert.spv
+        ${HELLO_WORLD_RUNTIME_DATA_DIR}/triangle.vert.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${HELLO_WORLD_FRAGMENT_SPV}
-        ${HELLO_WORLD_SHADER_SOURCE_DIR}/triangle.frag.spv
+        ${HELLO_WORLD_RUNTIME_DATA_DIR}/triangle.frag.spv
     DEPENDS
         ${HELLO_WORLD_VERTEX_SPV}
         ${HELLO_WORLD_FRAGMENT_SPV}
-    COMMENT "Copying hello_world SPIR-V shaders to local shaders directory"
+    COMMENT "Copying hello_world SPIR-V shaders to runtime data directory"
     VERBATIM
 )
 
 add_dependencies(hello_world hello_world_shaders)
-target_compile_definitions(hello_world PRIVATE HELLO_WORLD_SHADER_DIR="${HELLO_WORLD_SHADER_OUTPUT_DIR}")
+target_compile_definitions(hello_world PRIVATE
+    HELLO_WORLD_ASSET_DIR="$<TARGET_FILE_DIR:hello_world>"
+)

@@ -72,8 +72,8 @@ namespace example {
       public:
         StarshipWindow(const std::string filename, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
-            const std::string modelVertPath = std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
-            const std::string modelFragPath = std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/model.frag.spv";
+            const std::string modelVertPath = std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/model.vert.spv";
+            const std::string modelFragPath = std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/model.frag.spv";
 
             model.load(this, filename, "", "", 1.0f);
             model.setShaders(this, modelVertPath, modelFragPath);
@@ -503,8 +503,8 @@ namespace example {
         }
 
         void createStarPipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/star.vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/star.frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/star.vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/star.frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;
@@ -878,8 +878,8 @@ namespace example {
         }
 
         void createFlamePipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/flame.vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_SHADER_DIR) + "/flame.frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/flame.vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/flame.frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;

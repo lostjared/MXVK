@@ -8,4 +8,4 @@ blue1.png
 blue2.png
 blue3.png
 red3.png
-../../tetris/data/block_gray.png
+block_gray.png

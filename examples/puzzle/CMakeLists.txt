@@ -5,7 +5,7 @@ add_executable(puzzle
 target_link_libraries(puzzle PRIVATE mxvk::mxvk)
 
 target_compile_definitions(puzzle PRIVATE
-    puzzle_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    puzzle_ASSET_DIR="$<TARGET_FILE_DIR:puzzle>"
 )
 
 add_custom_command(TARGET puzzle POST_BUILD

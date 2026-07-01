@@ -50,8 +50,8 @@ namespace example {
             const std::string textureManifestPath = resource.empty() && usingDefaultModel ? assetRoot + "/data/texture_manifest.txt" : resource;
             const bool useDefaultTextureBase = resource_path.empty() && (usingDefaultModel || !resource.empty());
             const std::string textureBasePath = resource_path.empty() ? (useDefaultTextureBase ? assetRoot + "/data" : "") : resource_path;
-            const std::string vertPath = std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.vert.spv";
-            const std::string fragPath = fragmentShaderPath.empty() ? (std::string(MODEL_EXAMPLE_SHADER_DIR) + "/model.frag.spv") : fragmentShaderPath;
+            const std::string vertPath = assetRoot + "/data/model.vert.spv";
+            const std::string fragPath = fragmentShaderPath.empty() ? (assetRoot + "/data/model.frag.spv") : fragmentShaderPath;
             if (!texture_path.empty())
                 background = createSprite(texture_path, "", "");
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);

@@ -53,7 +53,6 @@ add_custom_target(moon_shaders
 
 add_dependencies(moon moon_shaders)
 target_compile_definitions(moon PRIVATE
-    MOON_SHADER_DIR="${MOON_SHADER_OUTPUT_DIR}"
     MOON_ASSET_DIR="$<TARGET_FILE_DIR:moon>"
 )
 

@@ -43,7 +43,7 @@ add_custom_target(text_example_shaders
 add_dependencies(text_example text_example_shaders)
 target_compile_definitions(text_example PRIVATE
     text_example_SHADER_DIR="${text_example_SHADER_OUTPUT_DIR}"
-    text_example_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    text_example_ASSET_DIR="$<TARGET_FILE_DIR:text_example>"
 )
 
 set(text_example_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/font.ttf)

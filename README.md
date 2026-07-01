@@ -203,6 +203,17 @@ For the full core demo sweep, use `./run.pl --all`. It runs the example list
 sequentially by delegating to `testapps.pl`, forwards any extra arguments to
 each `run.pl` invocation, and stops on the first failure or `Ctrl-C`.
 
+For automated smoke testing of windowed examples, add `--timeout`. This launches
+each example, lets it run for 5 seconds, closes it, and continues through the
+whole list. Unlike the default `--all` mode, timeout mode collects failures and
+prints a summary after every example has been attempted. You can override the
+timeout with `--timeout=<seconds>`.
+
+```bash
+./run.pl --all --timeout
+./run.pl --all --timeout=3
+```
+
 Examples:
 ```bash
 ./run.pl sprite_example -r 1920x1080 -f

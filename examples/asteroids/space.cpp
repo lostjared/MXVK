@@ -504,7 +504,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         fontSize = std::max(14, std::min(128, fontSize));
         if (fontSize != lastFontSize) {
             lastFontSize = fontSize;
-            setFont(current_path + "/font.ttf", fontSize);
+            setFont(current_path + "/data/font.ttf", fontSize);
             clearTextQueue();
         }
     }

@@ -102,8 +102,8 @@ namespace example {
               asset_root(path.empty() ? std::string(MOON_ASSET_DIR) : path) {
             const std::string model_path = filename.empty() ? (asset_root + "/data/moon.obj") : filename;
             const std::string texture_base_path = asset_root + "/data";
-            const std::string vert_path = std::string(MOON_SHADER_DIR) + "/model.vert.spv";
-            const std::string frag_path = fragment_path.empty() ? (std::string(MOON_SHADER_DIR) + "/model.frag.spv") : fragment_path;
+            const std::string vert_path = asset_root + "/data/model.vert.spv";
+            const std::string frag_path = fragment_path.empty() ? (asset_root + "/data/model.frag.spv") : fragment_path;
 
             model.load(this, model_path, "", texture_base_path, 1.0f);
             model.setShaders(this, vert_path, frag_path);

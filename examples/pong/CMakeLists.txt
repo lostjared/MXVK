@@ -43,7 +43,7 @@ add_custom_target(pong_shaders
 add_dependencies(pong pong_shaders)
 
 target_compile_definitions(pong PRIVATE
-    pong_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    pong_ASSET_DIR="$<TARGET_FILE_DIR:pong>"
     pong_SHADER_DIR="${PONG_SHADER_OUTPUT_DIR}"
 )
 

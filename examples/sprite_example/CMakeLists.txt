@@ -66,5 +66,8 @@ add_custom_command(TARGET sprite_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${sprite_example_VERTEX_SPV}
         $<TARGET_FILE_DIR:sprite_example>/data/sprite_vert.spv
-    COMMENT "Copying sprite example font.ttf to runtime output directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${sprite_example_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:sprite_example>/data/fragment.frag.spv
+    COMMENT "Copying sprite example assets to runtime output directory"
 )

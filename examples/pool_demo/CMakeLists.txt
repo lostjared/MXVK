@@ -70,7 +70,6 @@ add_dependencies(Pool3D pool_demo_shaders)
 
 target_compile_definitions(Pool3D PRIVATE
     POOL_DEMO_ASSET_DIR="${CMAKE_CURRENT_BINARY_DIR}"
-    POOL_DEMO_SHADER_DIR="${POOL_DEMO_SHADER_OUTPUT_DIR}"
 )
 
 target_link_libraries(Pool3D PRIVATE
@@ -90,6 +89,12 @@ add_custom_command(TARGET Pool3D POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${POOL_DEMO_SPRITE_VERTEX_SPV}
         "${CMAKE_CURRENT_BINARY_DIR}/data/sprite_vert.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${POOL_DEMO_VERTEX_SPV}
+        "${CMAKE_CURRENT_BINARY_DIR}/data/model.vert.spv"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${POOL_DEMO_FRAGMENT_SPV}
+        "${CMAKE_CURRENT_BINARY_DIR}/data/model.frag.spv"
     COMMENT "Copying data/ assets to pool_demo build directory"
 )
 

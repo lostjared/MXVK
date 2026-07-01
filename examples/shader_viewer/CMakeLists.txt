@@ -43,5 +43,13 @@ add_custom_target(shader_viewer_shaders
 add_dependencies(shader_viewer shader_viewer_shaders)
 target_compile_definitions(shader_viewer PRIVATE
     shader_viewer_SHADER_DIR="${shader_viewer_SHADER_OUTPUT_DIR}"
-    shader_viewer_ASSET_DIR="${CMAKE_SOURCE_DIR}/examples/opencv_example"
+    shader_viewer_ASSET_DIR="$<TARGET_FILE_DIR:shader_viewer>"
+)
+
+add_custom_command(TARGET shader_viewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:shader_viewer>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/examples/opencv_example/data
+        $<TARGET_FILE_DIR:shader_viewer>/data
+    COMMENT "Copying shader_viewer data directory to runtime output directory"
 )

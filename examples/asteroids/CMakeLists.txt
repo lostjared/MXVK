@@ -4,7 +4,7 @@ add_executable(asteroids
 target_link_libraries(asteroids PRIVATE mxvk::mxvk)
 
 target_compile_definitions(asteroids PRIVATE
-    asteroids_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    asteroids_ASSET_DIR="$<TARGET_FILE_DIR:asteroids>"
 )
 
 add_custom_command(TARGET asteroids POST_BUILD
@@ -14,7 +14,6 @@ add_custom_command(TARGET asteroids POST_BUILD
         $<TARGET_FILE_DIR:asteroids>/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/font.ttf
-        $<TARGET_FILE_DIR:asteroids>/font.ttf
+        $<TARGET_FILE_DIR:asteroids>/data/font.ttf
     COMMENT "Copying asteroids assets to runtime output directory"
 ) 
-

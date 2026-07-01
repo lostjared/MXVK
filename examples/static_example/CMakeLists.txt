@@ -10,6 +10,7 @@ endif()
 
 set(static_example_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 set(static_example_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
+set(static_example_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
 
 set(static_example_VERTEX_SHADER ${static_example_SHADER_SOURCE_DIR}/triangle.vert)
 set(static_example_FRAGMENT_SHADER ${static_example_SHADER_SOURCE_DIR}/triangle.frag)
@@ -35,18 +36,22 @@ add_custom_command(
 )
 
 add_custom_target(static_example_shaders
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        ${static_example_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${static_example_VERTEX_SPV}
-        ${static_example_SHADER_SOURCE_DIR}/triangle.vert.spv
+        ${static_example_RUNTIME_DATA_DIR}/triangle.vert.spv
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${static_example_FRAGMENT_SPV}
-        ${static_example_SHADER_SOURCE_DIR}/triangle.frag.spv
+        ${static_example_RUNTIME_DATA_DIR}/triangle.frag.spv
     DEPENDS
         ${static_example_VERTEX_SPV}
         ${static_example_FRAGMENT_SPV}
-    COMMENT "Copying static_example SPIR-V shaders to local shaders directory"
+    COMMENT "Copying static_example SPIR-V shaders to runtime data directory"
     VERBATIM
 )
 
 add_dependencies(static_example static_example_shaders)
-target_compile_definitions(static_example PRIVATE static_example_SHADER_DIR="${static_example_SHADER_OUTPUT_DIR}")
+target_compile_definitions(static_example PRIVATE
+    static_example_ASSET_DIR="$<TARGET_FILE_DIR:static_example>"
+)

@@ -20,7 +20,7 @@ namespace example {
       public:
         ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root(path.empty() ? std::string(HELLO_WORLD_SHADER_DIR) : path + "/shaders") {
+              shader_root((path.empty() ? std::string(HELLO_WORLD_ASSET_DIR) : path) + "/data") {
             setClearColor(0.02f, 0.03f, 0.06f, 1.0f);
         }
 

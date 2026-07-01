@@ -99,8 +99,8 @@ namespace defender {
     void DefenderWindow::create_flame_pipeline() {
         cleanup_flame_swapchain_resources();
 
-        const std::vector<char> vert_shader_code = loadSpv(std::string(DEFENDER_SHADER_DIR) + "/flame.vert.spv");
-        const std::vector<char> frag_shader_code = loadSpv(std::string(DEFENDER_SHADER_DIR) + "/flame.frag.spv");
+        const std::vector<char> vert_shader_code = loadSpv(asset_root + "/data/flame.vert.spv");
+        const std::vector<char> frag_shader_code = loadSpv(asset_root + "/data/flame.frag.spv");
 
         VkShaderModule vert_shader_module = createShaderModule(device, vert_shader_code);
         VkShaderModule frag_shader_module = VK_NULL_HANDLE;

@@ -90,7 +90,6 @@ add_custom_target(starship_shaders
 
 add_dependencies(starship starship_shaders)
 target_compile_definitions(starship PRIVATE
-    STARSHIP_EXAMPLE_SHADER_DIR="${STARSHIP_EXAMPLE_SHADER_OUTPUT_DIR}"
     STARSHIP_EXAMPLE_ASSET_DIR="$<TARGET_FILE_DIR:starship>"
     STARSHIP_EXAMPLE_RUNTIME_DATA_DIR="$<TARGET_FILE_DIR:starship>/data"
 )
@@ -136,5 +135,23 @@ add_custom_command(TARGET starship POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${STARSHIP_EXAMPLE_TEXTURE_SOURCES}
         ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_VERTEX_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/model.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_FRAGMENT_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/model.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_STAR_VERTEX_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/star.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_STAR_FRAGMENT_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/star.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_FLAME_VERTEX_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/flame.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${STARSHIP_EXAMPLE_FLAME_FRAGMENT_SPV}
+        ${STARSHIP_EXAMPLE_RUNTIME_DATA_OUTPUT_DIR}/flame.frag.spv
     COMMENT "Copying starship example assets to runtime output directory"
 )

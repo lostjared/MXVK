@@ -24,7 +24,7 @@ namespace example {
             fallback_height = height;
             const std::string image_path = current_path + "/data/intro.png";
             const std::string vertex_shader = current_path + "/data/sprite.vert.spv";
-            const std::string fragment_shader = std::string(sprite_example_SHADER_DIR) + "/fragment.frag.spv";
+            const std::string fragment_shader = current_path + "/data/fragment.frag.spv";
             sprite = createSprite(image_path, vertex_shader, fragment_shader);
         }
 

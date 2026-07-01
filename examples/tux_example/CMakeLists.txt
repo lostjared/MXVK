@@ -79,7 +79,7 @@ add_custom_target(tux_example_shaders
 add_dependencies(tux_example tux_example_shaders)
 target_compile_definitions(tux_example PRIVATE
     tux_example_SHADER_DIR="${tux_example_SHADER_OUTPUT_DIR}"
-    tux_example_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    tux_example_ASSET_DIR="$<TARGET_FILE_DIR:tux_example>"
 )
 
 set(tux_example_FONT_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/font.ttf)

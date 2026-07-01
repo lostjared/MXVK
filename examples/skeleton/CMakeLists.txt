@@ -3,6 +3,5 @@ add_executable(skeleton
 )
 target_link_libraries(skeleton PRIVATE mxvk::mxvk)
 target_compile_definitions(skeleton PRIVATE
-    skeleton_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    skeleton_ASSET_DIR="$<TARGET_FILE_DIR:skeleton>"
 )
-

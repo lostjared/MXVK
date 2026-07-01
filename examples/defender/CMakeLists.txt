@@ -114,7 +114,6 @@ add_custom_target(defender_shaders
 
 add_dependencies(defender defender_shaders)
 target_compile_definitions(defender PRIVATE
-    DEFENDER_SHADER_DIR="${DEFENDER_SHADER_OUTPUT_DIR}"
     DEFENDER_ASSET_DIR="$<TARGET_FILE_DIR:defender>"
 )
 
@@ -188,5 +187,26 @@ add_custom_command(TARGET defender POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${DEFENDER_REQUIRED_ASSETS}
         $<TARGET_FILE_DIR:defender>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_MODEL_VERTEX_SPV}
+        $<TARGET_FILE_DIR:defender>/data/model.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_MODEL_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:defender>/data/model.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_FLAME_VERTEX_SPV}
+        $<TARGET_FILE_DIR:defender>/data/flame.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_FLAME_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:defender>/data/flame.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_INTRO_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:defender>/data/intro.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_FADE_OVERLAY_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:defender>/data/fade_overlay.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DEFENDER_CRT_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:defender>/data/crt.frag.spv
     COMMENT "Copying defender assets"
 )

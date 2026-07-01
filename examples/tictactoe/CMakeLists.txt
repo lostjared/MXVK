@@ -4,8 +4,8 @@ add_executable(tictactoe
 target_link_libraries(tictactoe PRIVATE mxvk::mxvk)
 
 target_compile_definitions(tictactoe PRIVATE
-    tictactoe_ASSET_DIR="${CMAKE_SOURCE_DIR}/examples/tictactoe"
-    tictactoe_FONT_PATH="${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf"
+    tictactoe_ASSET_DIR="$<TARGET_FILE_DIR:tictactoe>"
+    tictactoe_FONT_PATH="$<TARGET_FILE_DIR:tictactoe>/data/font.ttf"
 )
 
 add_custom_command(TARGET tictactoe POST_BUILD

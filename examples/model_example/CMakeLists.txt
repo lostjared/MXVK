@@ -78,8 +78,7 @@ add_custom_target(model_example_shaders
 
 add_dependencies(model_example model_example_shaders)
 target_compile_definitions(model_example PRIVATE
-    MODEL_EXAMPLE_SHADER_DIR="${MODEL_EXAMPLE_SHADER_OUTPUT_DIR}"
-    MODEL_EXAMPLE_ASSET_DIR="${CMAKE_CURRENT_BINARY_DIR}"
+    MODEL_EXAMPLE_ASSET_DIR="$<TARGET_FILE_DIR:model_example>"
 )
 
 set(MODEL_EXAMPLE_MODEL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj)
@@ -179,5 +178,11 @@ add_custom_command(TARGET model_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${MODEL_EXAMPLE_MANIFEST_DRAW}
 	${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/draw.txt
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${MODEL_EXAMPLE_VERTEX_SPV}
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/model.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${MODEL_EXAMPLE_FRAGMENT_SPV}
+        ${MODEL_EXAMPLE_RUNTIME_DATA_DIR}/model.frag.spv
     COMMENT "Copying model example assets to runtime output directory"
 )

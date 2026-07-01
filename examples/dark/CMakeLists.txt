@@ -67,7 +67,7 @@ add_custom_target(dark_shaders
 add_dependencies(dark dark_shaders)
 target_compile_definitions(dark PRIVATE
     DARK_SHADER_DIR="${DARK_SHADER_OUTPUT_DIR}"
-    DARK_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+    DARK_ASSET_DIR="$<TARGET_FILE_DIR:dark>"
 )
 
 foreach(_asset
