@@ -150,6 +150,9 @@ namespace mxvk {
         /** @brief Get the command pool used for graphics/upload work. */
         [[nodiscard]] VkCommandPool getCommandPool() const noexcept { return command_pool; }
 
+        /** @brief Get the persistent Vulkan pipeline cache used by framework pipelines. */
+        [[nodiscard]] VkPipelineCache getPipelineCache() const noexcept { return pipeline_cache; }
+
         /** @brief Get the swapchain color format. */
         [[nodiscard]] VkFormat getSwapchainFormat() const noexcept { return swapchain_format; }
 
@@ -391,6 +394,10 @@ namespace mxvk {
         void cleanupSwapchain(bool preserveCommandPool = true);
         void recreateSwapchain();
         void drawFrame();
+        [[nodiscard]] std::string pipelineCachePath() const;
+        void createPipelineCache();
+        void savePipelineCache() const;
+        void destroyPipelineCache();
         [[nodiscard]] std::string resolveRuntimeShaderPath(const std::string &shaderFileName, const char *fallbackDir) const;
         void createSpriteDescriptorSetLayout();
         void createSpritePipeline();
@@ -425,6 +432,7 @@ namespace mxvk {
         uint32_t present_queue_family = invalid_queue_index;
         VkQueue graphics_queue = VK_NULL_HANDLE;
         VkQueue present_queue = VK_NULL_HANDLE;
+        VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
 
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkFormat swapchain_format = VK_FORMAT_UNDEFINED;

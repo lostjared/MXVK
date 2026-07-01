@@ -1807,7 +1807,7 @@ namespace mxvk {
             pipelineInfo.renderPass = VK_NULL_HANDLE;
             pipelineInfo.subpass = 0;
 
-            if (vkCreateGraphicsPipelines(windowPtr->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipelineFill) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(windowPtr->getDevice(), windowPtr->getPipelineCache(), 1, &pipelineInfo, nullptr, &pipelineFill) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create fill pipeline");
             }
 

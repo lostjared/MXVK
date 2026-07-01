@@ -60,6 +60,7 @@ namespace mxvk {
         physicalDevice = window->getPhysicalDevice();
         graphicsQueue = window->getGraphicsQueue();
         commandPool = window->getCommandPool();
+        pipelineCache = window->getPipelineCache();
         colorAttachmentFormat = window->getSwapchainFormat();
         depthAttachmentFormat = window->getDepthFormat();
         imageCount = window->getSwapchainImageCount();
@@ -535,7 +536,7 @@ namespace mxvk {
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.layout = pipelineLayout;
         pipelineInfo.renderPass = VK_NULL_HANDLE;
-        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline));
+        VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline));
 
         vkDestroyShaderModule(device, fragModule, nullptr);
         vkDestroyShaderModule(device, vertModule, nullptr);

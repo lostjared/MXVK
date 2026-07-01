@@ -203,6 +203,8 @@ namespace mxvk {
          * Any in-flight upload resources tied to the previous pool are released first.
          */
         void setCommandPool(VkCommandPool pool);
+        /** @brief Use the shared pipeline cache for custom/instanced pipeline creation. */
+        void setPipelineCache(VkPipelineCache cache) { pipelineCache = cache; }
         /**
          * @brief Release upload/staging resources tied to the current command pool.
          *
@@ -278,6 +280,7 @@ namespace mxvk {
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         VkQueue graphicsQueue = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
+        VkPipelineCache pipelineCache = VK_NULL_HANDLE;
         VkImage spriteImage = VK_NULL_HANDLE;
         VkDeviceMemory spriteImageMemory = VK_NULL_HANDLE;
         VkImageView spriteImageView = VK_NULL_HANDLE;

@@ -9,9 +9,11 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <sstream>
 #include <vector>
 
 #ifndef MXVK_SPRITE_SHADER_DIR
@@ -271,6 +273,8 @@ namespace mxvk {
         }
 
         if (device != VK_NULL_HANDLE) {
+            savePipelineCache();
+            destroyPipelineCache();
             std::cout << "vk: destroying logical device\n";
             vkDestroyDevice(device, nullptr);
             device = VK_NULL_HANDLE;
@@ -446,11 +450,129 @@ namespace mxvk {
             std::cerr << "mxvk: Failed to create Vulkan logical device\n";
             return false;
         }
+        createPipelineCache();
 
         std::cout << "mxvk: deferring swapchain/render/sync resource creation until first frame\n";
 
         std::cout << "mxvk: initVulkan complete\n";
         return true;
+    }
+
+    std::string VK_Window::pipelineCachePath() const {
+        if (physical_device == VK_NULL_HANDLE) {
+            return {};
+        }
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physical_device, &properties);
+
+        char *pref_path = SDL_GetPrefPath("mxvk", "MXVK");
+        std::filesystem::path base_path;
+        if (pref_path != nullptr) {
+            base_path = pref_path;
+            SDL_free(pref_path);
+        } else {
+            base_path = std::filesystem::current_path();
+        }
+
+        std::error_code ec;
+        std::filesystem::create_directories(base_path, ec);
+        if (ec) {
+            return {};
+        }
+
+        std::ostringstream filename;
+        filename << "pipeline_cache_"
+                 << std::hex << std::setfill('0')
+                 << properties.vendorID << '_'
+                 << properties.deviceID << '_'
+                 << properties.driverVersion << '_';
+        for (uint8_t byte : properties.pipelineCacheUUID) {
+            filename << std::setw(2) << static_cast<unsigned>(byte);
+        }
+        filename << ".bin";
+
+        return (base_path / filename.str()).string();
+    }
+
+    void VK_Window::createPipelineCache() {
+        if (device == VK_NULL_HANDLE || pipeline_cache != VK_NULL_HANDLE) {
+            return;
+        }
+
+        const std::string cache_path = pipelineCachePath();
+        std::vector<char> initial_data{};
+        if (!cache_path.empty() && std::filesystem::exists(cache_path)) {
+            std::ifstream file(cache_path, std::ios::binary);
+            if (file) {
+                initial_data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+            }
+        }
+
+        VkPipelineCacheCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+        create_info.initialDataSize = initial_data.size();
+        create_info.pInitialData = initial_data.empty() ? nullptr : initial_data.data();
+
+        VkResult result = vkCreatePipelineCache(device, &create_info, nullptr, &pipeline_cache);
+        if (result != VK_SUCCESS && !initial_data.empty()) {
+            std::cerr << "vk: cached pipeline data rejected; creating an empty pipeline cache\n";
+            create_info.initialDataSize = 0;
+            create_info.pInitialData = nullptr;
+            result = vkCreatePipelineCache(device, &create_info, nullptr, &pipeline_cache);
+        }
+
+        if (result != VK_SUCCESS) {
+            pipeline_cache = VK_NULL_HANDLE;
+            std::cerr << std::format("vk: failed to create pipeline cache ({})\n", static_cast<int>(result));
+            return;
+        }
+
+        if (!initial_data.empty()) {
+            std::cout << std::format("vk: loaded pipeline cache: {} bytes\n", initial_data.size());
+        }
+    }
+
+    void VK_Window::savePipelineCache() const {
+        if (device == VK_NULL_HANDLE || pipeline_cache == VK_NULL_HANDLE) {
+            return;
+        }
+
+        size_t data_size = 0;
+        VkResult result = vkGetPipelineCacheData(device, pipeline_cache, &data_size, nullptr);
+        if (result != VK_SUCCESS || data_size == 0) {
+            return;
+        }
+
+        std::vector<char> data(data_size);
+        result = vkGetPipelineCacheData(device, pipeline_cache, &data_size, data.data());
+        if (result != VK_SUCCESS || data_size == 0) {
+            return;
+        }
+        data.resize(data_size);
+
+        const std::string cache_path = pipelineCachePath();
+        if (cache_path.empty()) {
+            return;
+        }
+
+        std::ofstream file(cache_path, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            std::cerr << std::format("vk: failed to open pipeline cache for writing: {}\n", cache_path);
+            return;
+        }
+
+        file.write(data.data(), static_cast<std::streamsize>(data.size()));
+        if (file) {
+            std::cout << std::format("vk: saved pipeline cache: {} bytes\n", data.size());
+        }
+    }
+
+    void VK_Window::destroyPipelineCache() {
+        if (device != VK_NULL_HANDLE && pipeline_cache != VK_NULL_HANDLE) {
+            vkDestroyPipelineCache(device, pipeline_cache, nullptr);
+        }
+        pipeline_cache = VK_NULL_HANDLE;
     }
 
     void VK_Window::event(SDL_Event &e) {
@@ -2610,7 +2732,7 @@ namespace mxvk {
             pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
             pipeline_info.basePipelineIndex = -1;
 
-            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &text_pipeline) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(device, pipeline_cache, 1, &pipeline_info, nullptr, &text_pipeline) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create text graphics pipeline");
             }
         } catch (...) {
@@ -2649,6 +2771,7 @@ namespace mxvk {
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setPipelineCache(pipeline_cache);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
@@ -2684,6 +2807,7 @@ namespace mxvk {
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setPipelineCache(pipeline_cache);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
@@ -2719,6 +2843,7 @@ namespace mxvk {
         }
 
         auto sprite = std::make_unique<VK_Sprite>(device, physical_device, graphics_queue, command_pool);
+        sprite->setPipelineCache(pipeline_cache);
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
@@ -2992,7 +3117,7 @@ namespace mxvk {
             pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
             pipeline_info.basePipelineIndex = -1;
 
-            if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &sprite_pipeline) != VK_SUCCESS) {
+            if (vkCreateGraphicsPipelines(device, pipeline_cache, 1, &pipeline_info, nullptr, &sprite_pipeline) != VK_SUCCESS) {
                 throw mxvk::Exception("Failed to create sprite graphics pipeline");
             }
         } catch (...) {

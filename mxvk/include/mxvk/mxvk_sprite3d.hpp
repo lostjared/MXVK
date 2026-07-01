@@ -165,6 +165,7 @@ namespace mxvk {
         VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
         VkQueue graphicsQueue = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
+        VkPipelineCache pipelineCache = VK_NULL_HANDLE;
         VkFormat colorAttachmentFormat = VK_FORMAT_UNDEFINED;
         VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         size_t imageCount = 0;

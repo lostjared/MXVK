@@ -208,6 +208,7 @@ Examples:
 ./run.pl console_demo -r 1280x720
 ./run.pl matrix
 ./run.pl glitch_cube -r 1280x720
+./run.pl postprocess
 ./run.pl starship
 ./run.pl defender
 ./run.pl walk
@@ -221,7 +222,11 @@ Examples:
 
 ## VK_Window Post-Processing
 
-`mxvk::VK_Window` can render the normal scene into an offscreen color target and then draw that image through an optional full-screen fragment shader before presenting. Attach a sprite-compatible fragment shader with `attachPostProcessingShader(...)`, pass effect parameters with `setPostProcessingShaderParams(...)`, enable automatic elapsed-time updates for parameter 1 with `setPostProcessingShaderTimeEnabled(true)`, and toggle the pass at runtime with `setPostProcessingEnabled(...)`.
+`mxvk::VK_Window` can render the normal scene into an offscreen color target and then draw that image through one or more full-screen fragment shaders before presenting. Attach one shader with `attachPostProcessingShader(...)` or attach a chain with `attachPostProcessingShaders(...)`. Each effect can use its own parameter vector and optional elapsed-time update, and the full chain can be toggled at runtime with `setPostProcessingEnabled(...)`.
+
+The multi-effect path uses intermediate render targets between passes, so post-processing no longer has to sample directly from the swapchain image. This allows effects such as invert, scanline, blur, CRT, color grading, or other sprite-compatible full-screen shaders to be composed in sequence.
+
+The `postprocess` example demonstrates this flow. It reads `examples/postprocess/data/shaders.txt`, loads each listed SPIR-V fragment shader, and attaches the resulting list as a post-processing chain. The example currently ships with `invert.frag` and `scanline.frag`.
 
 `defender` and `asteroids3d` use this path for the CRT shader. In both examples, press `F8` to toggle the CRT post-processing effect on or off.
 
@@ -285,6 +290,7 @@ These programs are not intended as standalone applications. They are small visua
 - `matrix` - Matrix-style digital rain rendered from `SDL_ttf` glyphs and a sprite-backed framebuffer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the streams, `Escape` quits.
 - `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the rain, arrow keys orbit the camera, `Page Up` / `Page Down` zoom, `Escape` quits.
 - `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel zoom, drag pan, `W` / `A` / `S` / `D` or arrow keys pan, `Z` / `X` continuous zoom, `1` / `2` / `3` presets, `+` / `=` and `-` iteration count, `[` / `]` palette, `R` reset, `Escape` quit.
+- `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
 - `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
 
@@ -324,6 +330,10 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 ## Recent Optimizations
 
 - Sprite and 3D sprite paths now keep more GPU state alive across frames, track dirty state, and support instanced sprite batches. This reduces repeated descriptor/pipeline work in sprite-heavy demos such as `binary_matrix`, `defender`, `starship`, and `pong`.
+- Sprite texture uploads use a resizable persistent staging buffer instead of a fixed-size staging allocation, so larger textures can grow the upload path without requiring a hardcoded staging limit.
+- Sprite descriptor pools grow on demand and track which pool owns each descriptor set. Model descriptor sets are reused and updated in place where possible, with pool recreation/retry only when capacity is actually exhausted.
+- `VK_Window` owns a persistent Vulkan pipeline cache. Framework sprite, text, 3D sprite, and model pipelines load cache data on startup and save updated cache data on shutdown, reducing repeated driver pipeline compilation work on later runs.
+- `VK_Window` post-processing now supports a vector of effects and uses intermediate render targets for multi-pass chains instead of sampling only from the swapchain image.
 - Text rendering caches uploaded glyph/text textures and evicts old entries instead of recreating Vulkan images for repeated strings every frame. HUD-heavy examples use this path for steadier frame times.
 - `compute_shader` now presents the Vulkan compute output through a full-screen sampled draw, avoiding a readback or sprite upload for display. When CUDA interop is available, GPU capture frames can be copied directly into the Vulkan compute input image; otherwise the CPU fallback path remains available.
 - `fractal_zoom` uses cached adaptive reference-orbit data, throttled rebuilds while the view is changing, and a direct shader path while coordinates are still safe for f32. Deep zooms switch to perturbation data only when needed.
