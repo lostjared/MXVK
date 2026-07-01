@@ -21,6 +21,7 @@ my @tests = qw(
     planet
     masterpiece
     console_demo
+    postprocess
     fractal_zoom
     model_example
     starship 

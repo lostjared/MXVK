@@ -614,6 +614,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(math3d_masterpiece)
     add_subdirectory(examples/console_demo)
     mxvk_configure_mingw_target(console_demo)
+    add_subdirectory(examples/postprocess)
+    mxvk_configure_mingw_target(postprocess)
     add_subdirectory(examples/cfg_example)
     mxvk_configure_mingw_target(cfg_example)
     add_subdirectory(examples/matrix)
@@ -738,6 +740,7 @@ if(EXAMPLES)
         puzzle
         Pool3D
         console_demo
+        postprocess
         cfg_example
         matrix
         binary_matrix

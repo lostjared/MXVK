@@ -216,6 +216,12 @@ namespace mxvk {
          */
         VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
+        struct PostProcessingEffect {
+            std::string fragmentShaderPath{};
+            std::array<float, 4> params{};
+            bool timeEnabled = false;
+        };
+
         /**
          * @brief Attach a full-screen post-processing fragment shader.
          *
@@ -231,15 +237,18 @@ namespace mxvk {
          * @return Non-owning pointer to the internal post-process sprite for advanced setup.
          */
         VK_Sprite *attachPostProcessingShader(const std::string &fragmentShaderPath, float p1 = 0.0f, float p2 = 0.0f, float p3 = 0.0f, float p4 = 0.0f);
+        std::vector<VK_Sprite *> attachPostProcessingShaders(const std::vector<PostProcessingEffect> &effects);
 
         /** @brief Detach the current post-processing shader and return to direct swapchain rendering. */
         void detachPostProcessingShader();
 
         /** @brief Set the post-processing shader params passed as a vec4 push constant. */
         void setPostProcessingShaderParams(float p1 = 0.0f, float p2 = 0.0f, float p3 = 0.0f, float p4 = 0.0f);
+        void setPostProcessingShaderParams(size_t effectIndex, float p1 = 0.0f, float p2 = 0.0f, float p3 = 0.0f, float p4 = 0.0f);
 
         /** @brief Keep shader param 1 updated with elapsed render time in seconds. */
         void setPostProcessingShaderTimeEnabled(bool enabled);
+        void setPostProcessingShaderTimeEnabled(size_t effectIndex, bool enabled);
 
         void enablePostProcessing(VK_Sprite *sprite);
 
@@ -393,6 +402,7 @@ namespace mxvk {
         void createTextPipeline();
         void destroyTextPipeline();
         void maybeTrimMemory();
+        [[nodiscard]] bool isPostProcessSprite(const VK_Sprite *sprite) const;
 
       protected:
         // Protected state allows subclasses to implement custom rendering paths.
@@ -459,10 +469,15 @@ namespace mxvk {
         bool post_process_time_enabled = false;
         std::array<float, 4> post_process_params{};
         std::chrono::steady_clock::time_point post_process_start_time = std::chrono::steady_clock::now();
-        std::vector<VkImage> post_process_images{};
-        std::vector<VkDeviceMemory> post_process_memories{};
-        std::vector<VkImageView> post_process_views{};
-        std::vector<bool> post_process_initialized{};
+        std::vector<VK_Sprite *> post_process_sprites{};
+        std::vector<VK_Sprite *> owned_post_process_sprites{};
+        std::vector<std::array<float, 4>> post_process_effect_params{};
+        std::vector<bool> post_process_effect_time_enabled{};
+        std::vector<std::chrono::steady_clock::time_point> post_process_effect_start_times{};
+        std::vector<std::vector<VkImage>> post_process_images{};
+        std::vector<std::vector<VkDeviceMemory>> post_process_memories{};
+        std::vector<std::vector<VkImageView>> post_process_views{};
+        std::vector<std::vector<bool>> post_process_initialized{};
 
         std::unique_ptr<VK_Text> text_renderer{};
         VkDescriptorSetLayout text_descriptor_set_layout = VK_NULL_HANDLE;

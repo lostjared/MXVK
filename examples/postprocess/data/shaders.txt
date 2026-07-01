@@ -1,0 +1,4 @@
+# Post-processing shaders are applied in order.
+# Paths are relative to this data directory unless absolute.
+invert.frag.spv
+scanline.frag.spv
