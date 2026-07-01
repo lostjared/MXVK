@@ -169,6 +169,15 @@ namespace mxvk {
         bool ensureRenderResources();
 
         /**
+         * @brief Return transient Vulkan command-pool allocations to the driver when supported.
+         *
+         * MXVK currently uses direct Vulkan memory allocations rather than VMA, so VMA
+         * defragmentation is not applicable. This hook schedules the available Vulkan
+         * memory maintenance operation and is safe to call during idle/loading points.
+         */
+        void trimMemory();
+
+        /**
          * @brief Measure text dimensions in pixels.
          * @param text Text string to measure.
          * @param width Output width in pixels.
@@ -383,6 +392,7 @@ namespace mxvk {
         void createTextDescriptorSetLayout();
         void createTextPipeline();
         void destroyTextPipeline();
+        void maybeTrimMemory();
 
       protected:
         // Protected state allows subclasses to implement custom rendering paths.
@@ -434,6 +444,8 @@ namespace mxvk {
         bool force_swapchain_recreate = false;
         uint64_t last_resize_event_ms = 0;
         static constexpr uint64_t resize_settle_delay_ms = 150;
+        std::chrono::steady_clock::time_point last_memory_trim_time = std::chrono::steady_clock::now();
+        static constexpr std::chrono::seconds MEMORY_TRIM_INTERVAL{30};
 
         std::vector<std::unique_ptr<VK_Sprite>> sprites{};
         std::vector<std::unique_ptr<VK_Sprite3D>> sprites3d{};

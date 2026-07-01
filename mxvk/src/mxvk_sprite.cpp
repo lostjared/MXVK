@@ -5,7 +5,9 @@
 #include "mxvk/mxvk_sprite.hpp"
 #include "mxvk/mxvk_opencv_compat.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include <algorithm>
 #include <filesystem>
+#include <limits>
 #ifdef MXVK_CUDA
 #include <unistd.h>
 #endif
@@ -51,10 +53,7 @@ namespace mxvk {
             vkFreeMemory(device, quadIndexBufferMemory, nullptr);
         }
 
-        if (descriptorPool != VK_NULL_HANDLE) {
-            std::cout << "vk: destroying sprite descriptor pool\n";
-            vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-        }
+        destroyDescriptorPools();
 
         if (spriteSampler != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite sampler\n";
@@ -96,11 +95,7 @@ namespace mxvk {
         destroyCudaInterop();
 #endif
 
-        if (descriptorPool != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-            descriptorPool = VK_NULL_HANDLE;
-            descriptorSet = VK_NULL_HANDLE;
-        }
+        destroyDescriptorPools();
 
         // Extended descriptor set references spriteImageView/spriteSampler,
         // so it must be invalidated when those are destroyed.
@@ -313,19 +308,28 @@ namespace mxvk {
         extendedUBOEnabled = false;
     }
 
+    VkDeviceSize VK_Sprite::stagingAllocationSize(VkDeviceSize requiredSize) const {
+        VkDeviceSize allocationSize = 1;
+        while (allocationSize < requiredSize && allocationSize <= (std::numeric_limits<VkDeviceSize>::max() / 2)) {
+            allocationSize *= 2;
+        }
+        return std::max(allocationSize, requiredSize);
+    }
+
     void VK_Sprite::createStagingResources(VkDeviceSize size) {
+        const VkDeviceSize allocationSize = stagingAllocationSize(size);
         if (stagingResourcesCreated && persistentStagingSize >= size) {
             return;
         }
         destroyStagingResources();
 
-        createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        createBuffer(allocationSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      persistentStagingBuffer, persistentStagingMemory);
 
         try {
-            VK_CHECK_RESULT(vkMapMemory(device, persistentStagingMemory, 0, size, 0, &persistentStagingMapped));
-            persistentStagingSize = size;
+            VK_CHECK_RESULT(vkMapMemory(device, persistentStagingMemory, 0, allocationSize, 0, &persistentStagingMapped));
+            persistentStagingSize = allocationSize;
             VkCommandBufferAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
             allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -969,11 +973,7 @@ namespace mxvk {
             spriteWidth = rgbaSurface->w;
             spriteHeight = rgbaSurface->h;
             createSpriteTexture(rgbaSurface);
-            if (descriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-                descriptorPool = VK_NULL_HANDLE;
-                descriptorSet = VK_NULL_HANDLE;
-            }
+            destroyDescriptorPools();
             if (extendedDescriptorPool != VK_NULL_HANDLE) {
                 vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
                 extendedDescriptorPool = VK_NULL_HANDLE;
@@ -1054,11 +1054,7 @@ namespace mxvk {
             }
             createSpriteTexture(tmpSurface);
             SDL_DestroySurface(tmpSurface);
-            if (descriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-                descriptorPool = VK_NULL_HANDLE;
-                descriptorSet = VK_NULL_HANDLE;
-            }
+            destroyDescriptorPools();
             if (extendedDescriptorPool != VK_NULL_HANDLE) {
                 vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
                 extendedDescriptorPool = VK_NULL_HANDLE;
@@ -1432,11 +1428,7 @@ namespace mxvk {
                 return false;
             }
 
-            if (descriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, descriptorPool, nullptr);
-                descriptorPool = VK_NULL_HANDLE;
-                descriptorSet = VK_NULL_HANDLE;
-            }
+            destroyDescriptorPools();
             if (extendedDescriptorPool != VK_NULL_HANDLE) {
                 vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
                 extendedDescriptorPool = VK_NULL_HANDLE;
@@ -1629,9 +1621,10 @@ namespace mxvk {
         if (image_view == VK_NULL_HANDLE || width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::setExternalTexture received an invalid image view");
         }
-        if (descriptorSet != VK_NULL_HANDLE) {
-            vkFreeDescriptorSets(device, descriptorPool, 1, &descriptorSet);
+        if (descriptorSet != VK_NULL_HANDLE && descriptorSetPool != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(device, descriptorSetPool, 1, &descriptorSet);
             descriptorSet = VK_NULL_HANDLE;
+            descriptorSetPool = VK_NULL_HANDLE;
         }
         if (!externalTexture && spriteImageView != VK_NULL_HANDLE) {
             vkDestroyImageView(device, spriteImageView, nullptr);
@@ -1753,16 +1746,33 @@ namespace mxvk {
     void VK_Sprite::createDescriptorPool() {
         VkDescriptorPoolSize poolSize{};
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = 100;
+        poolSize.descriptorCount = nextDescriptorPoolSets;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = &poolSize;
-        poolInfo.maxSets = 100;
+        poolInfo.maxSets = nextDescriptorPoolSets;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
         VK_CHECK_RESULT(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
+        descriptorPools.push_back(descriptorPool);
+        if (nextDescriptorPoolSets <= (std::numeric_limits<uint32_t>::max() / 2U)) {
+            nextDescriptorPoolSets *= 2U;
+        }
+    }
+
+    void VK_Sprite::destroyDescriptorPools() {
+        for (VkDescriptorPool pool : descriptorPools) {
+            if (pool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(device, pool, nullptr);
+            }
+        }
+        descriptorPools.clear();
+        descriptorPool = VK_NULL_HANDLE;
+        descriptorSetPool = VK_NULL_HANDLE;
+        descriptorSet = VK_NULL_HANDLE;
+        nextDescriptorPoolSets = 16;
     }
 
     VkDescriptorSet VK_Sprite::createDescriptorSet(VkImageView imageView) {
@@ -1780,8 +1790,17 @@ namespace mxvk {
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &descriptorSetLayout;
 
-        VkDescriptorSet descSet;
-        VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &descSet));
+        VkDescriptorSet descSet = VK_NULL_HANDLE;
+        VkResult allocateResult = vkAllocateDescriptorSets(device, &allocInfo, &descSet);
+        if (allocateResult == VK_ERROR_OUT_OF_POOL_MEMORY || allocateResult == VK_ERROR_FRAGMENTED_POOL) {
+            createDescriptorPool();
+            allocInfo.descriptorPool = descriptorPool;
+            allocateResult = vkAllocateDescriptorSets(device, &allocInfo, &descSet);
+        }
+        if (allocateResult != VK_SUCCESS) {
+            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(allocateResult), __FILE__, __LINE__));
+        }
+        descriptorSetPool = allocInfo.descriptorPool;
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

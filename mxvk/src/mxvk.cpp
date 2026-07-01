@@ -501,6 +501,7 @@ namespace mxvk {
             }
             proc();
             render();
+            maybeTrimMemory();
             SDL_Delay(1);
         }
     }
@@ -510,6 +511,24 @@ namespace mxvk {
     }
 
     void VK_Window::proc() {
+    }
+
+    void VK_Window::trimMemory() {
+        if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || vkTrimCommandPool == nullptr) {
+            return;
+        }
+
+        vkTrimCommandPool(device, command_pool, 0);
+    }
+
+    void VK_Window::maybeTrimMemory() {
+        const auto now = std::chrono::steady_clock::now();
+        if ((now - last_memory_trim_time) < MEMORY_TRIM_INTERVAL) {
+            return;
+        }
+
+        trimMemory();
+        last_memory_trim_time = now;
     }
 
     bool VK_Window::initWindow(const std::string &title, int width, int height, SDL_WindowFlags flags) {

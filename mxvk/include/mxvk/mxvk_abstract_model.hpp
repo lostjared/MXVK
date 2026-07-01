@@ -196,6 +196,7 @@ namespace mxvk {
 
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        uint32_t descriptorPoolSetCapacity = 0;
         std::vector<VkDescriptorSet> descriptorSets{};
 
         VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;

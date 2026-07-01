@@ -261,9 +261,7 @@ namespace mxvk {
 
         if (textures.empty()) {
             createFallbackTexture();
-            if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
-                createDescriptorSets();
-            }
+            createDescriptorSets();
         }
 
         TextureEntry &texture = textures[0];
@@ -299,11 +297,7 @@ namespace mxvk {
             texture.height = uploadHeight;
             recreatedTexture = true;
 
-            if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
-                vkResetDescriptorPool(windowPtr->getDevice(), descriptorPool, 0);
-                descriptorSets.clear();
-                createDescriptorSets();
-            }
+            createDescriptorSets();
         }
 
 #ifdef MXVK_CUDA
@@ -1239,11 +1233,7 @@ namespace mxvk {
         createCudaExportableImage(width, height, texture);
         texture.view = createImageView(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        if (descriptorPool != VK_NULL_HANDLE && !descriptorSets.empty()) {
-            vkResetDescriptorPool(windowPtr->getDevice(), descriptorPool, 0);
-            descriptorSets.clear();
-            createDescriptorSets();
-        }
+        createDescriptorSets();
     }
 
     bool VKAbstractModel::updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels,
@@ -1542,7 +1532,8 @@ namespace mxvk {
     void VKAbstractModel::createDescriptorPool() {
         const uint32_t textureCount = std::max<uint32_t>(1U, static_cast<uint32_t>(textures.size()));
         const uint32_t frameCount = static_cast<uint32_t>(windowPtr->getSwapchainImageCount());
-        const uint32_t setCount = textureCount * frameCount;
+        const uint32_t requiredSetCount = textureCount * frameCount;
+        const uint32_t setCount = std::max(requiredSetCount, descriptorPoolSetCapacity);
 
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1555,10 +1546,12 @@ namespace mxvk {
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = setCount;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
         if (vkCreateDescriptorPool(windowPtr->getDevice(), &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw mxvk::Exception("VKAbstractModel failed to create descriptor pool");
         }
+        descriptorPoolSetCapacity = setCount;
     }
 
     void VKAbstractModel::createDescriptorSets() {
@@ -1566,22 +1559,50 @@ namespace mxvk {
         const size_t frameCount = windowPtr->getSwapchainImageCount();
         const size_t setCount = textureCount * frameCount;
 
-        if (descriptorPool == VK_NULL_HANDLE || descriptorSetLayout == VK_NULL_HANDLE ||
-            frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty()) {
+        if (descriptorSetLayout == VK_NULL_HANDLE || frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty()) {
             return;
         }
 
-        std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout);
+        if (descriptorPool == VK_NULL_HANDLE || descriptorPoolSetCapacity < setCount) {
+            descriptorSets.clear();
+            if (descriptorPool != VK_NULL_HANDLE) {
+                vkDestroyDescriptorPool(windowPtr->getDevice(), descriptorPool, nullptr);
+                descriptorPool = VK_NULL_HANDLE;
+                descriptorPoolSetCapacity = 0;
+            }
+            createDescriptorPool();
+        }
 
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(setCount);
-        allocInfo.pSetLayouts = layouts.data();
+        const bool needsAllocation = descriptorSets.size() != setCount ||
+                                     std::any_of(descriptorSets.begin(), descriptorSets.end(), [](VkDescriptorSet set) {
+                                         return set == VK_NULL_HANDLE;
+                                     });
 
-        descriptorSets.resize(setCount, VK_NULL_HANDLE);
-        if (vkAllocateDescriptorSets(windowPtr->getDevice(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-            throw mxvk::Exception("VKAbstractModel failed to allocate descriptor sets");
+        if (needsAllocation) {
+            std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout);
+
+            VkDescriptorSetAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            allocInfo.descriptorPool = descriptorPool;
+            allocInfo.descriptorSetCount = static_cast<uint32_t>(setCount);
+            allocInfo.pSetLayouts = layouts.data();
+
+            descriptorSets.assign(setCount, VK_NULL_HANDLE);
+            const VkResult allocateResult = vkAllocateDescriptorSets(windowPtr->getDevice(), &allocInfo, descriptorSets.data());
+            if (allocateResult == VK_ERROR_OUT_OF_POOL_MEMORY || allocateResult == VK_ERROR_FRAGMENTED_POOL) {
+                vkDestroyDescriptorPool(windowPtr->getDevice(), descriptorPool, nullptr);
+                descriptorPool = VK_NULL_HANDLE;
+                descriptorPoolSetCapacity = static_cast<uint32_t>(std::max<size_t>(setCount * 2U, 1U));
+                descriptorSets.clear();
+                createDescriptorPool();
+                allocInfo.descriptorPool = descriptorPool;
+                descriptorSets.assign(setCount, VK_NULL_HANDLE);
+                if (vkAllocateDescriptorSets(windowPtr->getDevice(), &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+                    throw mxvk::Exception("VKAbstractModel failed to allocate descriptor sets");
+                }
+            } else if (allocateResult != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to allocate descriptor sets");
+            }
         }
 
         for (size_t frame = 0; frame < frameCount; ++frame) {

@@ -307,9 +307,13 @@ namespace mxvk {
         void createQuadBuffer();
 
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorPool> descriptorPools{};
+        VkDescriptorPool descriptorSetPool = VK_NULL_HANDLE;
+        uint32_t nextDescriptorPoolSets = 16;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         void createDescriptorPool();
+        void destroyDescriptorPools();
         VkDescriptorSet createDescriptorSet(VkImageView imageView);
         void destroySpriteResources();
 
@@ -320,6 +324,7 @@ namespace mxvk {
         VkFence uploadFence = VK_NULL_HANDLE;
         VkCommandBuffer uploadCmdBuffer = VK_NULL_HANDLE;
         bool stagingResourcesCreated = false;
+        [[nodiscard]] VkDeviceSize stagingAllocationSize(VkDeviceSize requiredSize) const;
         void createStagingResources(VkDeviceSize size);
         void destroyStagingResources();
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
