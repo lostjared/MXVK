@@ -3,15 +3,19 @@
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <array>
+#include <atomic>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <opencv2/videoio.hpp>
 #include <string>
+#include <thread>
 #include <vector>
 
 #ifndef shader_viewer_ASSET_DIR
@@ -81,11 +85,19 @@ namespace example {
         bool shader_list_requested = false;
         mxvk::VK_Capture capture{};
         mxvk::VK_Sprite *camera_sprite = nullptr;
+        std::thread capture_thread{};
+        std::atomic_bool capture_thread_active{false};
+        std::mutex capture_mutex{};
+        cv::Mat latest_capture_frame{};
+        bool latest_capture_frame_available = false;
         int fallback_width = 1280;
         int fallback_height = 720;
         double current_fps = 0.0;
+        double current_capture_fps = 0.0;
         uint32_t fps_frame_count = 0;
+        uint32_t capture_fps_frame_count = 0;
         std::chrono::steady_clock::time_point fps_sample_time{std::chrono::steady_clock::now()};
+        std::chrono::steady_clock::time_point capture_fps_sample_time{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point shader_start_time{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point previous_shader_frame_time{shader_start_time};
         uint32_t shader_frame_count = 0;
@@ -179,10 +191,73 @@ namespace example {
             camera_sprite->setUniform2(static_cast<float>(shader_frame_count), elapsed_seconds, 48000.0f, 0.0f);
         }
 
+        void updateCaptureFpsSample() {
+            ++capture_fps_frame_count;
+            const auto now = std::chrono::steady_clock::now();
+            const double elapsed = std::chrono::duration<double>(now - capture_fps_sample_time).count();
+            if (elapsed < 0.5) {
+                return;
+            }
+
+            std::lock_guard<std::mutex> lock(capture_mutex);
+            current_capture_fps = static_cast<double>(capture_fps_frame_count) / elapsed;
+            capture_fps_frame_count = 0;
+            capture_fps_sample_time = now;
+        }
+
+        void startCaptureThread() {
+            if (using_file || capture_thread_active.load()) {
+                return;
+            }
+
+            capture_thread_active = true;
+            capture_fps_sample_time = std::chrono::steady_clock::now();
+            capture_thread = std::thread([this]() {
+                while (capture_thread_active.load()) {
+                    cv::Mat frame;
+                    if (!capture.read(frame) || frame.empty()) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        continue;
+                    }
+
+                    {
+                        std::lock_guard<std::mutex> lock(capture_mutex);
+                        latest_capture_frame = frame.clone();
+                        latest_capture_frame_available = true;
+                    }
+                    updateCaptureFpsSample();
+                }
+            });
+        }
+
+        void stopCaptureThread() {
+            capture_thread_active = false;
+            if (capture_thread.joinable()) {
+                capture_thread.join();
+            }
+        }
+
+        [[nodiscard]] bool consumeLatestCaptureFrame() {
+            cv::Mat frame;
+            {
+                std::lock_guard<std::mutex> lock(capture_mutex);
+                if (!latest_capture_frame_available) {
+                    return false;
+                }
+                frame = latest_capture_frame.clone();
+                latest_capture_frame_available = false;
+            }
+
+            return uploadFrameToSprite(frame);
+        }
+
         [[nodiscard]] double configureCameraFps() {
             if (requested_fps > 0.0) {
                 capture.set(cv::CAP_PROP_FPS, requested_fps);
                 const double reportedFps = capture.get(cv::CAP_PROP_FPS);
+                if (reportedFps > 0.0 && std::abs(reportedFps - requested_fps) > 0.5) {
+                    std::cerr << std::format("shader_viewer: requested {:.1f} capture fps, backend reports {:.1f} fps\n", requested_fps, reportedFps);
+                }
                 return (reportedFps > 0.0) ? reportedFps : requested_fps;
             }
 
@@ -277,7 +352,11 @@ namespace example {
                 throw mxvk::Exception("shader_viewer: failed to create capture sprite");
             }
 
-            if (camera_sprite != nullptr && !capture.readToSprite(*camera_sprite)) {
+            if (!using_file && consumeLatestCaptureFrame()) {
+                return;
+            }
+
+            if (using_file && camera_sprite != nullptr && !capture.readToSprite(*camera_sprite)) {
                 std::cerr << "shader_viewer: failed to upload initial camera frame\n";
             }
         }
@@ -290,7 +369,20 @@ namespace example {
                 current_fps = static_cast<double>(fps_frame_count) / elapsed;
                 fps_frame_count = 0;
                 fps_sample_time = now;
-                fps_text = std::format("FPS: {:.1f}", current_fps);
+                if (using_file) {
+                    fps_text = std::format("FPS: {:.1f}", current_fps);
+                } else {
+                    double capture_fps = 0.0;
+                    {
+                        std::lock_guard<std::mutex> lock(capture_mutex);
+                        capture_fps = current_capture_fps;
+                    }
+                    if (requested_fps > 0.0) {
+                        fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}/{:.1f}", current_fps, capture_fps, requested_fps);
+                    } else {
+                        fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}", current_fps, capture_fps);
+                    }
+                }
             }
 
             printText(fps_text, 15, 15, SDL_Color{255, 255, 255, 255});
@@ -326,16 +418,17 @@ namespace example {
                 capture.set(cv::CAP_PROP_FRAME_HEIGHT, fallback_height);
                 fallback_width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
                 fallback_height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
-                fallback_height = args.height;
                 fps = configureCameraFps();
             } else {
                 fps = capture.get(cv::CAP_PROP_FPS);
             }
             std::cout << "mxvk_cv: Capture opened at: " << fallback_width << "x" << fallback_height << " @ " << fps << " fps\n";
             initializeCameraRendering();
+            startCaptureThread();
         }
 
         ~ExampleWindow() override {
+            stopCaptureThread();
             capture.close();
         }
 
@@ -365,7 +458,9 @@ namespace example {
         }
 
         void proc() override {
-            if (camera_sprite == nullptr || !capture.readToSprite(*camera_sprite)) {
+            if (!using_file) {
+                [[maybe_unused]] const bool frame_uploaded = consumeLatestCaptureFrame();
+            } else if (camera_sprite == nullptr || !capture.readToSprite(*camera_sprite)) {
                 if (using_file) {
                     capture.close();
                     if (openCaptureSource()) {
@@ -376,7 +471,6 @@ namespace example {
                 } else {
                     fps = configureCameraFps();
                 }
-                return;
             }
 
             int target_w = fallback_width;
