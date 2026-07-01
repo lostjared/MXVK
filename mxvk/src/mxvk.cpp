@@ -629,7 +629,6 @@ namespace mxvk {
             proc();
             render();
             maybeTrimMemory();
-            SDL_Delay(1);
         }
     }
 

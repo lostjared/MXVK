@@ -1621,6 +1621,12 @@ namespace mxvk {
         if (image_view == VK_NULL_HANDLE || width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::setExternalTexture received an invalid image view");
         }
+        if (externalTexture && spriteImageView == image_view) {
+            spriteWidth = width;
+            spriteHeight = height;
+            spriteLoaded = true;
+            return;
+        }
         if (descriptorSet != VK_NULL_HANDLE && descriptorSetPool != VK_NULL_HANDLE) {
             vkFreeDescriptorSets(device, descriptorSetPool, 1, &descriptorSet);
             descriptorSet = VK_NULL_HANDLE;
