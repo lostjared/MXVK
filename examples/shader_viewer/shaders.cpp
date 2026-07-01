@@ -45,6 +45,29 @@ namespace example {
         return (std::filesystem::path(base) / file_path).string();
     }
 
+    [[nodiscard]] std::string resolveShaderEntry(const std::string &shader_path, const std::string &entry) {
+        const std::filesystem::path entry_path(entry);
+        if (entry_path.extension() == ".spv") {
+            return joinPath(shader_path, entry);
+        }
+
+        std::filesystem::path spv_entry = entry_path.parent_path() / "spv" / entry_path.stem();
+        spv_entry.replace_extension(".spv");
+        const std::filesystem::path spv_path = std::filesystem::path(shader_path) / spv_entry;
+        if (std::filesystem::exists(spv_path)) {
+            return spv_path.string();
+        }
+
+        std::filesystem::path sibling_entry = entry_path;
+        sibling_entry.replace_extension(".spv");
+        const std::filesystem::path sibling_spv_path = std::filesystem::path(shader_path) / sibling_entry;
+        if (std::filesystem::exists(sibling_spv_path)) {
+            return sibling_spv_path.string();
+        }
+
+        return joinPath(shader_path, entry);
+    }
+
     class ExampleWindow : public mxvk::VK_Window {
         std::string current_path = ".";
         std::string shader_path;
@@ -96,7 +119,12 @@ namespace example {
                 if (entry.empty() || entry.front() == '#') {
                     continue;
                 }
-                shader_files.push_back(joinPath(shader_path, entry));
+                const std::string shader_file = resolveShaderEntry(shader_path, entry);
+                if (std::filesystem::path(shader_file).extension() != ".spv") {
+                    std::cerr << std::format("shader_viewer: skipping non-SPIR-V shader entry '{}'\n", entry);
+                    continue;
+                }
+                shader_files.push_back(shader_file);
             }
 
             if (shader_list_requested && shader_files.empty()) {
