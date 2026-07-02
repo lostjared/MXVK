@@ -6,6 +6,8 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
+Current development is on version `0.13.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, a dedicated `starfield` example, and expanded Doxygen coverage for the public rendering helpers.
+
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
 ## Contents
@@ -13,6 +15,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [What This Project Is](#what-this-project-is)
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
+- [Documentation](#documentation)
 - [Command Line Arguments](#command-line-arguments)
 - [VK_Window Post-Processing](#vk-window-post-processing)
 - [Debugging Examples](#debugging-examples)
@@ -37,6 +40,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 	- engine math, projection, and software 3D raster tests
 	- Matrix-style digital rain rendering
 	- reusable Matrix rain texture generation
+	- reusable point-sprite particle/starfield rendering
 	- model rendering
 	- game loops and input handling
 	- controller input, console overlays, post-processing, and audio-enabled gameplay when optional features are present
@@ -127,6 +131,18 @@ cmake -S . -B build -DFRACTAL_ZOOM=ON
 # Library-only build (faster CI/package build)
 cmake -S . -B build -DEXAMPLES=OFF
 ```
+
+<a id="documentation"></a>
+
+## Documentation
+
+The repository includes a Doxygen configuration for the core framework. The generated output is written under `docs/doxygen`.
+
+```bash
+doxygen Doxyfile
+```
+
+The current Doxygen project version is `0.13.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
 
 
 <a id="command-line-arguments"></a>
@@ -232,10 +248,13 @@ Examples:
 ./run.pl 3dmath_texture --filename ./examples/sprite_example/data/intro.png
 ./run.pl model_example
 ./run.pl planet
+./run.pl surface
+./run.pl starfield
 ./run.pl pong
 ./run.pl breakout
 ./run.pl tictactoe
 ./run.pl pool_demo
+./run.pl puzzle_drop
 ./run.pl fractal_zoom
 ./run.pl console_demo -r 1280x720
 ./run.pl matrix
@@ -305,6 +324,7 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 - `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `skeleton` - smallest practical subclass of `mxvk::VK_Window`, intended as a copyable starting point for new examples. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `surface` - SDL surface upload smoke test that fills a CPU-side surface with random pixels, uploads it to an MXVK sprite each frame, and redraws it after resize. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
 - `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
 - `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `rain` - static helper library used by Matrix-style examples to render configurable glyph rain into an SDL surface and MXVK sprite texture. It is not launched directly through `run.pl`.
@@ -326,6 +346,7 @@ These programs are not intended as standalone applications. They are small visua
 - `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
 - `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
+- `starfield` - dedicated point-sprite stress/demo scene using `mxvk::VK_PointSpriteBatch` to render 50,000 layered, twinkling stars with additive blending. **Inputs:** common `-p`, `-r`, `-f`, `--enable-vsync`. **Controls:** hold `Up` for a forward-speed boost, `Escape` quits.
 
 ### 3D Viewers
 
@@ -348,6 +369,7 @@ These programs are not intended as standalone applications. They are small visua
 - `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `W` / `A` / `S` / `D` move, mouse or right stick look, `Left Shift` sprint, `Left Ctrl` crouch, `Space` jump, left click or right shoulder fire, `F` toggles the FPS overlay, `Escape` releases the mouse or quits.
 - `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Enter`, `Space`, `Escape`, and `Back`; in-game controls include arrow keys, `Space` to charge a shot, `Enter` to confirm cue-ball placement, mouse drag for aiming, right mouse drag to rotate the camera, and wheel or pinch to zoom.
 - `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Up` / `Down` navigate menus, `Left` / `Right` move blocks, `Space` rotates, `P` pauses, `Escape` backs out or quits, and text entry uses `Backspace` / `Enter`.
+- `puzzle_drop` - 3D Acid Drop-style block puzzle with an intro, Matrix-rain backdrop, textured cube pieces, selectable difficulty, keyboard controls, and gamepad support. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` / `Space` skips the intro, `1` / `2` / `3` starts difficulty levels, `Left` / `Right` move, `Down` soft drops, `Up` cycles piece blocks, `Z` / `X` rotate, `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Escape` quits.
 - `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menu navigation uses `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `A` or `Up` rotate forward, `S` rotate backward, `P` pause, `Escape` return to menu, with typed input for high-score entry.
 - `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `Up` rotate, `Z` hard drop, `R` restart, `Escape` menu, camera controls use `W` / `A` / `S` / `D`, `Q` / `E`, `Page Up` / `Page Down`, and multiplayer uses `H` to host and `J` / `Enter` to join.
 
@@ -364,6 +386,10 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 2, 2026: the project version moved to `0.13.0`, and `Doxyfile` now reports the same version for generated API documentation.
+- July 2, 2026: `mxvk_resource.hpp` / `mxvk_resource.cpp` provide reusable Vulkan buffer, image, texture upload, image-view, memory-type, layout-transition, and one-shot command helpers. These utilities centralize common allocation/upload code for new renderer components.
+- July 2, 2026: `mxvk::VK_PointSpriteBatch` was added as a reusable point-list renderer for particle effects. It owns a persistently mapped vertex buffer, sampled point texture, per-swapchain MVP uniform buffers, descriptors, dynamic-rendering pipeline, pipeline-cache integration, resize handling, additive or alpha blending, and optional depth testing/writes.
+- July 2, 2026: the new `starfield` example demonstrates `VK_PointSpriteBatch` with 50,000 layered stars, per-star color/twinkle/size variation, additive blending, and a hold-`Up` speed boost.
 - July 2, 2026: `proc_args(...)` now exposes `Arguments::enable_screenshot` and `Arguments::executable_name`. Passing `--enable-screenshot` enables `F10` screenshot capture in `VK_Window`, saving PNG files to `~/Pictures` with names like `puzzle_drop.screenshot.2026.07.02.08.24.45.1280x720-0.png`.
 - July 2, 2026: example runtime shader-copy targets now wait for example-specific runtime-data targets when both write the same `data` directory. This fixes a parallel CMake build race seen in `masterpiece` and `3dmath_masterpiece`.
 - Sprite and 3D sprite paths now keep more GPU state alive across frames, track dirty state, and support instanced sprite batches. This reduces repeated descriptor/pipeline work in sprite-heavy demos such as `binary_matrix`, `defender`, `starship`, and `pong`.
