@@ -1,6 +1,9 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXWRITE_ENABLED)
+#include "mxwrite.hpp"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -10,6 +13,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -17,8 +21,11 @@
 #include <filesystem>
 #include <format>
 #include <iostream>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -53,6 +60,9 @@ namespace example {
         }
 
         ~FractalWindow() override {
+#if defined(MXWRITE_ENABLED)
+            closeVideoWriter();
+#endif
             if (device != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
             }
@@ -63,6 +73,14 @@ namespace example {
             if (e.type == SDL_EVENT_KEY_DOWN) {
                 if ((e.key.key == SDLK_F10 || e.key.scancode == SDL_SCANCODE_F10) && !e.key.repeat) {
                     saveFractalSnapshot();
+                    return;
+                }
+                if ((e.key.key == SDLK_P || e.key.scancode == SDL_SCANCODE_P) && !e.key.repeat) {
+#if defined(MXWRITE_ENABLED)
+                    toggleVideoRecording();
+#else
+                    std::cout << "fractal_zoom: MXWrite is unavailable; video recording disabled\n";
+#endif
                     return;
                 }
                 handleKey(e.key.key);
@@ -106,7 +124,23 @@ namespace example {
             updateKeyboardNavigation();
         }
 
+        void render() override {
+#if defined(MXWRITE_ENABLED)
+            serviceRecordingReadbacks();
+#endif
+            mxvk::VK_Window::render();
+#if defined(MXWRITE_ENABLED)
+            recordPresentedFrame();
+#endif
+        }
+
         void onSwapchainAboutToRecreate() override {
+#if defined(MXWRITE_ENABLED)
+            if (video_writer.is_open()) {
+                std::cerr << "fractal_zoom: swapchain is changing; closing current video recording\n";
+                closeVideoWriter();
+            }
+#endif
             destroyFractalResources();
         }
 
@@ -225,6 +259,481 @@ namespace example {
                 break;
             }
         }
+
+#if defined(MXWRITE_ENABLED)
+        void toggleVideoRecording() {
+            if (video_writer.is_open()) {
+                closeVideoWriter();
+                return;
+            }
+
+            const VkExtent2D extent = getSwapchainExtent();
+            if (extent.width == 0U || extent.height == 0U) {
+                std::cerr << "fractal_zoom: cannot start video recording before the swapchain is ready\n";
+                return;
+            }
+
+            constexpr float video_fps = 60.0F;
+            video_writer.set_block_when_full(false);
+            if (!video_writer.open(video_output_path,
+                                   static_cast<int>(extent.width),
+                                   static_cast<int>(extent.height),
+                                   video_fps,
+                                   "18")) {
+                std::cerr << "fractal_zoom: failed to open MXWrite output file: " << video_output_path << "\n";
+                return;
+            }
+
+            video_record_width = extent.width;
+            video_record_height = extent.height;
+            try {
+                createRecordingReadbacks(extent);
+            } catch (const std::exception &ex) {
+                std::cerr << "fractal_zoom: failed to create async recording readback resources: " << ex.what() << "\n";
+                video_writer.close();
+                video_record_width = 0;
+                video_record_height = 0;
+                return;
+            }
+            std::cout << std::format("fractal_zoom: recording video to {} at {}x{} 60 FPS\n",
+                                     video_output_path,
+                                     video_record_width,
+                                     video_record_height);
+        }
+
+        void closeVideoWriter() {
+            if (!video_writer.is_open()) {
+                return;
+            }
+
+            destroyRecordingReadbacks(true);
+            video_writer.close();
+            std::cout << "fractal_zoom: saved video: " << video_output_path << "\n";
+            video_record_width = 0;
+            video_record_height = 0;
+        }
+
+        void serviceRecordingReadbacks() {
+            if (!video_writer.is_open()) {
+                return;
+            }
+
+            try {
+                pumpCompletedRecordingReadbacks(false);
+                submitPendingRecordingReadbacks();
+            } catch (const std::exception &ex) {
+                std::cerr << "fractal_zoom: failed to service recording readback: " << ex.what() << "\n";
+                closeVideoWriter();
+            }
+        }
+
+        void recordPresentedFrame() {
+            if (!video_writer.is_open()) {
+                return;
+            }
+
+            try {
+                const VkExtent2D extent = getSwapchainExtent();
+                if (extent.width != video_record_width || extent.height != video_record_height) {
+                    std::cerr << "fractal_zoom: swapchain size changed; closing current video recording\n";
+                    closeVideoWriter();
+                    return;
+                }
+                const auto now = std::chrono::steady_clock::now();
+                if (now < next_recording_frame_time) {
+                    return;
+                }
+                next_recording_frame_time += recording_frame_interval;
+                if (next_recording_frame_time <= now) {
+                    next_recording_frame_time = now + recording_frame_interval;
+                }
+                if (last_presented_image_index < recording_pending_images.size()) {
+                    recording_pending_images[last_presented_image_index] = true;
+                }
+                pumpCompletedRecordingReadbacks(false);
+                submitPendingRecordingReadbacks();
+            } catch (const std::exception &ex) {
+                std::cerr << "fractal_zoom: failed to record video frame: " << ex.what() << "\n";
+                closeVideoWriter();
+            }
+        }
+
+        struct RecordingReadbackSlot {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+            VkFence fence = VK_NULL_HANDLE;
+            std::vector<std::uint8_t> pixels{};
+            uint32_t image_index = std::numeric_limits<uint32_t>::max();
+            bool in_flight = false;
+            bool queued = false;
+        };
+
+        void createRecordingReadbacks(VkExtent2D extent) {
+            destroyRecordingReadbacks(false);
+            if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
+                throw mxvk::Exception("recording requires initialized Vulkan render resources");
+            }
+            if (!swapchain_supports_transfer_src) {
+                throw mxvk::Exception("recording requires swapchain transfer-source support");
+            }
+
+            recording_format_is_bgra =
+                swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
+                swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
+            const bool format_is_rgba =
+                swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
+                swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
+            if (!recording_format_is_bgra && !format_is_rgba) {
+                throw mxvk::Exception(std::format("unsupported recording swapchain format: {}", static_cast<int>(swapchain_format)));
+            }
+
+            recording_row_bytes = static_cast<VkDeviceSize>(extent.width) * 4U;
+            recording_image_bytes = recording_row_bytes * static_cast<VkDeviceSize>(extent.height);
+            recording_readbacks.resize(recording_readback_slot_count);
+            recording_pending_images.assign(swapchain_images.size(), false);
+            next_recording_frame_time = std::chrono::steady_clock::now();
+
+            VkCommandBufferAllocateInfo command_info{};
+            command_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            command_info.commandPool = command_pool;
+            command_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            command_info.commandBufferCount = recording_readback_slot_count;
+
+            std::array<VkCommandBuffer, recording_readback_slot_count> command_buffers{};
+            if (vkAllocateCommandBuffers(device, &command_info, command_buffers.data()) != VK_SUCCESS) {
+                destroyRecordingReadbacks(false);
+                throw mxvk::Exception("failed to allocate recording readback command buffers");
+            }
+
+            VkFenceCreateInfo fence_info{};
+            fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+            for (size_t i = 0; i < recording_readbacks.size(); ++i) {
+                RecordingReadbackSlot &slot = recording_readbacks[i];
+                slot.command_buffer = command_buffers[i];
+                createBuffer(
+                    recording_image_bytes,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    slot.buffer,
+                    slot.memory);
+                if (vkCreateFence(device, &fence_info, nullptr, &slot.fence) != VK_SUCCESS) {
+                    destroyRecordingReadbacks(false);
+                    throw mxvk::Exception("failed to create recording readback fence");
+                }
+                slot.pixels.resize(static_cast<size_t>(recording_image_bytes));
+            }
+
+            recording_worker_stop = false;
+            recording_worker = std::jthread([this](std::stop_token stop_token) {
+                recordingWorkerLoop(stop_token);
+            });
+            recording_readbacks_ready = true;
+        }
+
+        void destroyRecordingReadbacks(bool drain) {
+            if (!recording_readbacks_ready && recording_readbacks.empty()) {
+                return;
+            }
+
+            if (drain) {
+                drainRecordingReadbacks();
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(recording_mutex);
+                recording_worker_stop = true;
+            }
+            recording_cv.notify_all();
+            if (recording_worker.joinable()) {
+                recording_worker.request_stop();
+                recording_worker.join();
+            }
+
+            if (device != VK_NULL_HANDLE) {
+                for (RecordingReadbackSlot &slot : recording_readbacks) {
+                    if (slot.in_flight && slot.fence != VK_NULL_HANDLE) {
+                        vkWaitForFences(device, 1, &slot.fence, VK_TRUE, UINT64_MAX);
+                    }
+                    if (slot.image_index < image_fences.size() && image_fences[slot.image_index] == slot.fence) {
+                        image_fences[slot.image_index] = VK_NULL_HANDLE;
+                    }
+                    if (slot.command_buffer != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE) {
+                        vkFreeCommandBuffers(device, command_pool, 1, &slot.command_buffer);
+                        slot.command_buffer = VK_NULL_HANDLE;
+                    }
+                    if (slot.fence != VK_NULL_HANDLE) {
+                        vkDestroyFence(device, slot.fence, nullptr);
+                        slot.fence = VK_NULL_HANDLE;
+                    }
+                    if (slot.buffer != VK_NULL_HANDLE) {
+                        vkDestroyBuffer(device, slot.buffer, nullptr);
+                        slot.buffer = VK_NULL_HANDLE;
+                    }
+                    if (slot.memory != VK_NULL_HANDLE) {
+                        vkFreeMemory(device, slot.memory, nullptr);
+                        slot.memory = VK_NULL_HANDLE;
+                    }
+                }
+            }
+
+            recording_readbacks.clear();
+            recording_pending_images.clear();
+            {
+                std::lock_guard<std::mutex> lock(recording_mutex);
+                std::queue<size_t> empty_queue;
+                recording_ready_slots.swap(empty_queue);
+                recording_worker_stop = false;
+            }
+            recording_readbacks_ready = false;
+            recording_row_bytes = 0;
+            recording_image_bytes = 0;
+            recording_format_is_bgra = false;
+        }
+
+        void submitPendingRecordingReadbacks() {
+            for (uint32_t image_index = 0; image_index < recording_pending_images.size(); ++image_index) {
+                if (!recording_pending_images[image_index]) {
+                    continue;
+                }
+                if (submitRecordingReadback(image_index)) {
+                    recording_pending_images[image_index] = false;
+                }
+            }
+        }
+
+        void drainRecordingReadbacks() {
+            while (true) {
+                pumpCompletedRecordingReadbacks(true);
+                std::unique_lock<std::mutex> lock(recording_mutex);
+                const bool idle = std::ranges::all_of(recording_readbacks, [](const RecordingReadbackSlot &slot) {
+                    return !slot.in_flight && !slot.queued;
+                });
+                if (idle) {
+                    return;
+                }
+                recording_idle_cv.wait(lock);
+            }
+        }
+
+        void pumpCompletedRecordingReadbacks(bool wait_for_copy) {
+            for (size_t i = 0; i < recording_readbacks.size(); ++i) {
+                RecordingReadbackSlot &slot = recording_readbacks[i];
+                VkFence slot_fence = VK_NULL_HANDLE;
+                {
+                    std::lock_guard<std::mutex> lock(recording_mutex);
+                    if (!slot.in_flight || slot.queued || slot.fence == VK_NULL_HANDLE) {
+                        continue;
+                    }
+                    slot_fence = slot.fence;
+                }
+
+                VkResult fence_result = VK_SUCCESS;
+                if (wait_for_copy) {
+                    fence_result = vkWaitForFences(device, 1, &slot_fence, VK_TRUE, UINT64_MAX);
+                } else {
+                    fence_result = vkGetFenceStatus(device, slot_fence);
+                }
+
+                if (fence_result == VK_NOT_READY) {
+                    continue;
+                }
+                if (fence_result != VK_SUCCESS) {
+                    throw mxvk::Exception(std::format("recording readback fence failed: {}", static_cast<int>(fence_result)));
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(recording_mutex);
+                    if (!slot.in_flight || slot.queued || slot.fence != slot_fence) {
+                        continue;
+                    }
+                    if (slot.image_index < image_fences.size() && image_fences[slot.image_index] == slot.fence) {
+                        image_fences[slot.image_index] = VK_NULL_HANDLE;
+                    }
+                    slot.queued = true;
+                    recording_ready_slots.push(i);
+                }
+                recording_cv.notify_one();
+            }
+        }
+
+        bool submitRecordingReadback(uint32_t image_index) {
+            if (!recording_readbacks_ready || image_index == std::numeric_limits<uint32_t>::max()) {
+                return false;
+            }
+            if (image_index >= swapchain_images.size() || image_index >= image_fences.size()) {
+                return false;
+            }
+
+            VkFence source_fence = image_fences[image_index];
+            if (source_fence != VK_NULL_HANDLE && vkGetFenceStatus(device, source_fence) == VK_NOT_READY) {
+                return false;
+            }
+
+            RecordingReadbackSlot *free_slot = nullptr;
+            {
+                std::lock_guard<std::mutex> lock(recording_mutex);
+                for (size_t i = 0; i < recording_readbacks.size(); ++i) {
+                    if (!recording_readbacks[i].in_flight && !recording_readbacks[i].queued) {
+                        free_slot = &recording_readbacks[i];
+                        break;
+                    }
+                }
+            }
+            if (free_slot == nullptr) {
+                ++recording_dropped_frames;
+                if (recording_dropped_frames % 60U == 0U) {
+                    std::cerr << "fractal_zoom: dropped " << recording_dropped_frames << " recording frames (readback queue full)\n";
+                }
+                return true;
+            }
+
+            RecordingReadbackSlot &slot = *free_slot;
+            VK_CHECK_RESULT(vkResetFences(device, 1, &slot.fence));
+            VK_CHECK_RESULT(vkResetCommandBuffer(slot.command_buffer, 0));
+
+            VkCommandBufferBeginInfo begin_info{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            VK_CHECK_RESULT(vkBeginCommandBuffer(slot.command_buffer, &begin_info));
+
+            VkImageMemoryBarrier2 to_transfer_barrier{};
+            to_transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_transfer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+            to_transfer_barrier.srcAccessMask = VK_ACCESS_2_NONE;
+            to_transfer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            to_transfer_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            to_transfer_barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_transfer_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            to_transfer_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_transfer_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_transfer_barrier.image = swapchain_images[image_index];
+            to_transfer_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            to_transfer_barrier.subresourceRange.baseMipLevel = 0;
+            to_transfer_barrier.subresourceRange.levelCount = 1;
+            to_transfer_barrier.subresourceRange.baseArrayLayer = 0;
+            to_transfer_barrier.subresourceRange.layerCount = 1;
+
+            VkDependencyInfo to_transfer_dependency{};
+            to_transfer_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_transfer_dependency.imageMemoryBarrierCount = 1;
+            to_transfer_dependency.pImageMemoryBarriers = &to_transfer_barrier;
+            vkCmdPipelineBarrier2(slot.command_buffer, &to_transfer_dependency);
+
+            VkBufferImageCopy copy_region{};
+            copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy_region.imageSubresource.mipLevel = 0;
+            copy_region.imageSubresource.baseArrayLayer = 0;
+            copy_region.imageSubresource.layerCount = 1;
+            copy_region.imageExtent = {video_record_width, video_record_height, 1};
+            vkCmdCopyImageToBuffer(
+                slot.command_buffer,
+                swapchain_images[image_index],
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                slot.buffer,
+                1,
+                &copy_region);
+
+            VkImageMemoryBarrier2 to_present_barrier{};
+            to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            to_present_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+            to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
+            to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_present_barrier.image = swapchain_images[image_index];
+            to_present_barrier.subresourceRange = to_transfer_barrier.subresourceRange;
+
+            VkDependencyInfo to_present_dependency{};
+            to_present_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_present_dependency.imageMemoryBarrierCount = 1;
+            to_present_dependency.pImageMemoryBarriers = &to_present_barrier;
+            vkCmdPipelineBarrier2(slot.command_buffer, &to_present_dependency);
+
+            VK_CHECK_RESULT(vkEndCommandBuffer(slot.command_buffer));
+
+            VkCommandBufferSubmitInfo command_submit_info{};
+            command_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            command_submit_info.commandBuffer = slot.command_buffer;
+
+            VkSubmitInfo2 submit_info{};
+            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submit_info.commandBufferInfoCount = 1;
+            submit_info.pCommandBufferInfos = &command_submit_info;
+
+            slot.image_index = image_index;
+            const VkResult submit_result = vkQueueSubmit2(graphics_queue, 1, &submit_info, slot.fence);
+            if (submit_result != VK_SUCCESS) {
+                throw mxvk::Exception(std::format("failed to submit recording readback: {}", static_cast<int>(submit_result)));
+            }
+            {
+                std::lock_guard<std::mutex> lock(recording_mutex);
+                slot.in_flight = true;
+                slot.queued = false;
+            }
+            image_fences[slot.image_index] = slot.fence;
+            return true;
+        }
+
+        void recordingWorkerLoop(std::stop_token stop_token) {
+            std::vector<std::uint8_t> frame_pixels;
+            while (true) {
+                size_t slot_index = 0;
+                {
+                    std::unique_lock<std::mutex> lock(recording_mutex);
+                    recording_cv.wait(lock, [this, &stop_token] {
+                        return recording_worker_stop || stop_token.stop_requested() || !recording_ready_slots.empty();
+                    });
+                    if ((recording_worker_stop || stop_token.stop_requested()) && recording_ready_slots.empty()) {
+                        break;
+                    }
+                    slot_index = recording_ready_slots.front();
+                    recording_ready_slots.pop();
+                }
+
+                if (slot_index >= recording_readbacks.size()) {
+                    continue;
+                }
+                RecordingReadbackSlot &slot = recording_readbacks[slot_index];
+                void *mapped = nullptr;
+                if (vkMapMemory(device, slot.memory, 0, recording_image_bytes, 0, &mapped) == VK_SUCCESS) {
+                    const auto *src = static_cast<const std::uint8_t *>(mapped);
+                    frame_pixels.resize(static_cast<size_t>(recording_image_bytes));
+                    if (recording_format_is_bgra) {
+                        for (size_t i = 0; i < frame_pixels.size(); i += 4U) {
+                            frame_pixels[i + 0U] = src[i + 2U];
+                            frame_pixels[i + 1U] = src[i + 1U];
+                            frame_pixels[i + 2U] = src[i + 0U];
+                            frame_pixels[i + 3U] = src[i + 3U];
+                        }
+                    } else {
+                        std::memcpy(frame_pixels.data(), src, frame_pixels.size());
+                    }
+                    vkUnmapMemory(device, slot.memory);
+                } else {
+                    std::cerr << "fractal_zoom: failed to map recording readback memory\n";
+                    frame_pixels.clear();
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(recording_mutex);
+                    slot.in_flight = false;
+                    slot.queued = false;
+                    slot.image_index = std::numeric_limits<uint32_t>::max();
+                }
+                recording_idle_cv.notify_all();
+
+                if (!frame_pixels.empty()) {
+                    video_writer.write(frame_pixels.data());
+                }
+            }
+        }
+#endif
 
         void saveFractalSnapshot() {
             const char *home = std::getenv("HOME");
@@ -1071,6 +1580,28 @@ namespace example {
         std::chrono::steady_clock::time_point start_time{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_tick{std::chrono::steady_clock::now()};
         uint32_t snapshot_index = 0;
+#if defined(MXWRITE_ENABLED)
+        Writer video_writer{};
+        uint32_t video_record_width = 0;
+        uint32_t video_record_height = 0;
+        std::string video_output_path = "output.mp4";
+        static constexpr uint32_t recording_readback_slot_count = 4;
+        std::vector<RecordingReadbackSlot> recording_readbacks{};
+        std::vector<bool> recording_pending_images{};
+        VkDeviceSize recording_row_bytes = 0;
+        VkDeviceSize recording_image_bytes = 0;
+        std::chrono::steady_clock::time_point next_recording_frame_time{};
+        std::chrono::steady_clock::duration recording_frame_interval = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(1.0 / 60.0));
+        bool recording_readbacks_ready = false;
+        bool recording_format_is_bgra = false;
+        uint64_t recording_dropped_frames = 0;
+        std::jthread recording_worker{};
+        std::mutex recording_mutex{};
+        std::condition_variable recording_cv{};
+        std::condition_variable recording_idle_cv{};
+        std::queue<size_t> recording_ready_slots{};
+        bool recording_worker_stop = false;
+#endif
     };
 
 } // namespace example

@@ -375,6 +375,13 @@ namespace mxvk {
 
       protected:
         /**
+         * @brief Capture the most recently presented swapchain image as tightly packed RGBA8 pixels.
+         *
+         * This performs a synchronous GPU readback and may briefly stall rendering.
+         */
+        void captureSnapshotPixels(std::vector<std::uint8_t> &rgba_pixels, uint32_t &width, uint32_t &height);
+
+        /**
          * @brief Render one standalone sprite using the window's shared sprite pipeline.
          *
          * This is intended for derived classes that want to draw a sprite before or after

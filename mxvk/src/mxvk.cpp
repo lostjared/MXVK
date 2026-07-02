@@ -657,19 +657,34 @@ namespace mxvk {
         if (path.empty()) {
             throw mxvk::Exception("saveSnapshot requires a non-empty output path");
         }
+
+        std::vector<std::uint8_t> rgba{};
+        uint32_t width = 0;
+        uint32_t height = 0;
+        captureSnapshotPixels(rgba, width, height);
+
+        if (!mxvk::SavePNG_RGBA(path.c_str(),
+                                rgba.data(),
+                                static_cast<int>(width),
+                                static_cast<int>(height))) {
+            throw mxvk::Exception("saveSnapshot failed to write PNG: " + path);
+        }
+    }
+
+    void VK_Window::captureSnapshotPixels(std::vector<std::uint8_t> &rgba_pixels, uint32_t &width, uint32_t &height) {
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
-            throw mxvk::Exception("saveSnapshot called before Vulkan render resources are ready");
+            throw mxvk::Exception("captureSnapshotPixels called before Vulkan render resources are ready");
         }
         if (!swapchain_supports_transfer_src) {
-            throw mxvk::Exception("saveSnapshot requires swapchain transfer-source support");
+            throw mxvk::Exception("captureSnapshotPixels requires swapchain transfer-source support");
         }
         if (last_presented_image_index == invalid_queue_index ||
             last_presented_image_index >= swapchain_images.size() ||
             last_presented_image_index >= image_fences.size()) {
-            throw mxvk::Exception("saveSnapshot called before a frame has been presented");
+            throw mxvk::Exception("captureSnapshotPixels called before a frame has been presented");
         }
         if (swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
-            throw mxvk::Exception("saveSnapshot cannot capture an empty swapchain extent");
+            throw mxvk::Exception("captureSnapshotPixels cannot capture an empty swapchain extent");
         }
 
         const bool format_is_bgra =
@@ -679,7 +694,7 @@ namespace mxvk {
             swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
             swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
         if (!format_is_bgra && !format_is_rgba) {
-            throw mxvk::Exception(std::format("saveSnapshot unsupported swapchain format: {}", static_cast<int>(swapchain_format)));
+            throw mxvk::Exception(std::format("captureSnapshotPixels unsupported swapchain format: {}", static_cast<int>(swapchain_format)));
         }
 
         const VkDeviceSize row_bytes = static_cast<VkDeviceSize>(swapchain_extent.width) * 4U;
@@ -712,7 +727,7 @@ namespace mxvk {
             buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
             buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             if (vkCreateBuffer(device, &buffer_info, nullptr, &readback_buffer) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to create readback buffer");
+                throw mxvk::Exception("captureSnapshotPixels failed to create readback buffer");
             }
 
             VkMemoryRequirements memory_requirements{};
@@ -733,7 +748,7 @@ namespace mxvk {
                 }
             }
             if (memory_type_index == invalid_queue_index) {
-                throw mxvk::Exception("saveSnapshot failed to find host-visible coherent memory");
+                throw mxvk::Exception("captureSnapshotPixels failed to find host-visible coherent memory");
             }
 
             VkMemoryAllocateInfo allocation_info{};
@@ -741,10 +756,10 @@ namespace mxvk {
             allocation_info.allocationSize = memory_requirements.size;
             allocation_info.memoryTypeIndex = memory_type_index;
             if (vkAllocateMemory(device, &allocation_info, nullptr, &readback_memory) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to allocate readback memory");
+                throw mxvk::Exception("captureSnapshotPixels failed to allocate readback memory");
             }
             if (vkBindBufferMemory(device, readback_buffer, readback_memory, 0) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to bind readback memory");
+                throw mxvk::Exception("captureSnapshotPixels failed to bind readback memory");
             }
 
             VkCommandBufferAllocateInfo command_buffer_info{};
@@ -753,33 +768,33 @@ namespace mxvk {
             command_buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             command_buffer_info.commandBufferCount = 1;
             if (vkAllocateCommandBuffers(device, &command_buffer_info, &command_buffer) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to allocate command buffer");
+                throw mxvk::Exception("captureSnapshotPixels failed to allocate command buffer");
             }
 
             VkFenceCreateInfo fence_info{};
             fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             if (vkCreateFence(device, &fence_info, nullptr, &copy_fence) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to create copy fence");
+                throw mxvk::Exception("captureSnapshotPixels failed to create copy fence");
             }
 
             VkFence source_fence = image_fences[last_presented_image_index];
             if (source_fence != VK_NULL_HANDLE) {
                 const VkResult wait_result = vkWaitForFences(device, 1, &source_fence, VK_TRUE, UINT64_MAX);
                 if (wait_result != VK_SUCCESS) {
-                    throw mxvk::Exception(std::format("saveSnapshot failed waiting for rendered frame: {}", static_cast<int>(wait_result)));
+                    throw mxvk::Exception(std::format("captureSnapshotPixels failed waiting for rendered frame: {}", static_cast<int>(wait_result)));
                 }
             }
 
             const VkResult idle_result = vkDeviceWaitIdle(device);
             if (idle_result != VK_SUCCESS) {
-                throw mxvk::Exception(std::format("saveSnapshot failed waiting for device idle: {}", static_cast<int>(idle_result)));
+                throw mxvk::Exception(std::format("captureSnapshotPixels failed waiting for device idle: {}", static_cast<int>(idle_result)));
             }
 
             VkCommandBufferBeginInfo begin_info{};
             begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
             if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to begin copy command buffer");
+                throw mxvk::Exception("captureSnapshotPixels failed to begin copy command buffer");
             }
 
             VkImageMemoryBarrier2 to_transfer_barrier{};
@@ -842,7 +857,7 @@ namespace mxvk {
             vkCmdPipelineBarrier2(command_buffer, &to_present_dependency);
 
             if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to end copy command buffer");
+                throw mxvk::Exception("captureSnapshotPixels failed to end copy command buffer");
             }
 
             VkCommandBufferSubmitInfo command_submit_info{};
@@ -856,41 +871,36 @@ namespace mxvk {
 
             const VkResult submit_result = vkQueueSubmit2(graphics_queue, 1, &submit_info, copy_fence);
             if (submit_result != VK_SUCCESS) {
-                throw mxvk::Exception(std::format("saveSnapshot failed to submit copy command: {}", static_cast<int>(submit_result)));
+                throw mxvk::Exception(std::format("captureSnapshotPixels failed to submit copy command: {}", static_cast<int>(submit_result)));
             }
             const VkResult copy_wait_result = vkWaitForFences(device, 1, &copy_fence, VK_TRUE, UINT64_MAX);
             if (copy_wait_result != VK_SUCCESS) {
-                throw mxvk::Exception(std::format("saveSnapshot failed waiting for copy: {}", static_cast<int>(copy_wait_result)));
+                throw mxvk::Exception(std::format("captureSnapshotPixels failed waiting for copy: {}", static_cast<int>(copy_wait_result)));
             }
 
             void *mapped = nullptr;
             if (vkMapMemory(device, readback_memory, 0, image_bytes, 0, &mapped) != VK_SUCCESS) {
-                throw mxvk::Exception("saveSnapshot failed to map readback memory");
+                throw mxvk::Exception("captureSnapshotPixels failed to map readback memory");
             }
 
             const auto *src = static_cast<const std::uint8_t *>(mapped);
-            std::vector<std::uint8_t> rgba(static_cast<std::size_t>(image_bytes));
-            for (std::size_t i = 0; i < rgba.size(); i += 4U) {
+            rgba_pixels.resize(static_cast<std::size_t>(image_bytes));
+            for (std::size_t i = 0; i < rgba_pixels.size(); i += 4U) {
                 if (format_is_bgra) {
-                    rgba[i + 0U] = src[i + 2U];
-                    rgba[i + 1U] = src[i + 1U];
-                    rgba[i + 2U] = src[i + 0U];
-                    rgba[i + 3U] = src[i + 3U];
+                    rgba_pixels[i + 0U] = src[i + 2U];
+                    rgba_pixels[i + 1U] = src[i + 1U];
+                    rgba_pixels[i + 2U] = src[i + 0U];
+                    rgba_pixels[i + 3U] = src[i + 3U];
                 } else {
-                    rgba[i + 0U] = src[i + 0U];
-                    rgba[i + 1U] = src[i + 1U];
-                    rgba[i + 2U] = src[i + 2U];
-                    rgba[i + 3U] = src[i + 3U];
+                    rgba_pixels[i + 0U] = src[i + 0U];
+                    rgba_pixels[i + 1U] = src[i + 1U];
+                    rgba_pixels[i + 2U] = src[i + 2U];
+                    rgba_pixels[i + 3U] = src[i + 3U];
                 }
             }
             vkUnmapMemory(device, readback_memory);
-
-            if (!mxvk::SavePNG_RGBA(path.c_str(),
-                                    rgba.data(),
-                                    static_cast<int>(swapchain_extent.width),
-                                    static_cast<int>(swapchain_extent.height))) {
-                throw mxvk::Exception("saveSnapshot failed to write PNG: " + path);
-            }
+            width = swapchain_extent.width;
+            height = swapchain_extent.height;
         } catch (...) {
             cleanup();
             throw;

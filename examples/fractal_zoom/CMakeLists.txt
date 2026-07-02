@@ -3,6 +3,9 @@ add_executable(fractal_zoom
 )
 
 target_link_libraries(fractal_zoom PRIVATE mxvk::mxvk)
+if(TARGET mxwrite)
+    target_link_libraries(fractal_zoom PRIVATE mxwrite)
+endif()
 if(TARGET Boost::headers)
     target_link_libraries(fractal_zoom PRIVATE Boost::headers)
 elseif(TARGET Boost::boost)
