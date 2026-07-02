@@ -133,6 +133,10 @@ namespace example {
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
+            } else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_UP) {
+                boost_requested = true;
+            } else if (e.type == SDL_EVENT_KEY_UP && e.key.key == SDLK_UP) {
+                boost_requested = false;
             }
         }
 
@@ -152,6 +156,7 @@ namespace example {
                 delta_time = 0.1f;
             }
             global_time += delta_time;
+            update_boost(delta_time);
 
             update_particles(delta_time);
             point_batch.upload_vertices(vertices.data(), vertices.size());
@@ -211,12 +216,27 @@ namespace example {
             particle.base_size = random_float(12.0f, 28.0f) * cfg.size_multiplier * type_multiplier;
         }
 
+        void update_boost(float delta_time) {
+            const float target = boost_requested ? 1.0f : 0.0f;
+            const float rate = boost_requested ? 4.0f : 2.5f;
+            if (boost_amount < target) {
+                boost_amount = std::min(target, boost_amount + delta_time * rate);
+            } else if (boost_amount > target) {
+                boost_amount = std::max(target, boost_amount - delta_time * rate);
+            }
+        }
+
         void update_particles(float delta_time) {
+            const float speed_multiplier = 1.0f + boost_amount * 10.0f;
+            const float forward_boost = boost_amount * 2.85f;
+            const float brightness_boost = 1.0f + boost_amount * 1.15f;
+            const float size_boost = 1.0f + boost_amount * 0.85f;
+
             for (int i = 0; i < NUM_PARTICLES; ++i) {
                 auto &particle = particles[static_cast<size_t>(i)];
                 particle.x += particle.vx * delta_time;
                 particle.y += particle.vy * delta_time;
-                particle.z += particle.vz * delta_time;
+                particle.z += (particle.vz * speed_multiplier + forward_boost) * delta_time;
 
                 if (particle.z > 0.0f) {
                     init_particle(particle, particle.layer);
@@ -243,10 +263,10 @@ namespace example {
                 float depth_factor = 1.0f - (particle.z / cfg.z_min);
                 depth_factor = glm::clamp(depth_factor, 0.3f, 1.0f);
 
-                const float brightness = particle.life * twinkle_factor * depth_factor;
+                const float brightness = particle.life * twinkle_factor * depth_factor * brightness_boost;
                 const glm::vec4 color = star_color(particle.type, brightness);
                 const float size_pulse = 1.0f + 0.2f * std::sin(global_time * particle.pulse_speed + particle.twinkle_phase);
-                const float size = particle.base_size * size_pulse * depth_factor;
+                const float size = particle.base_size * size_pulse * depth_factor * size_boost;
                 const float alpha = particle.life * glm::clamp(depth_factor + 0.2f, 0.0f, 1.0f);
                 auto &vertex = vertices[static_cast<size_t>(i)];
                 vertex.position[0] = particle.x;
@@ -282,6 +302,8 @@ namespace example {
         float camera_rotation = 356.0f;
         float global_time = 0.0f;
         Uint32 last_update_time = 0;
+        bool boost_requested = false;
+        float boost_amount = 0.0f;
     };
 
 } // namespace example
