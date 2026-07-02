@@ -234,6 +234,8 @@ namespace mxvk {
 
     void VK_Window::release() {
         std::cout << "mxvk: starting resource teardown\n";
+        stopScreenshotWorker();
+
         if (device != VK_NULL_HANDLE) {
             std::cout << "vk: waiting for device idle before teardown\n";
             vkDeviceWaitIdle(device);
@@ -668,8 +670,86 @@ namespace mxvk {
 
     void VK_Window::saveScreenshot() {
         const std::string path = makeScreenshotPath();
-        saveSnapshot(path);
-        std::cout << std::format("mxvk: screenshot saved: {}\n", path);
+        std::vector<std::uint8_t> rgba{};
+        uint32_t width = 0;
+        uint32_t height = 0;
+        captureSnapshotPixels(rgba, width, height);
+        enqueueScreenshotSave(path, std::move(rgba), width, height);
+        std::cout << std::format("mxvk: screenshot queued: {}\n", path);
+    }
+
+    void VK_Window::enqueueScreenshotSave(std::string path, std::vector<std::uint8_t> rgba, uint32_t width, uint32_t height) {
+        if (path.empty()) {
+            throw mxvk::Exception("enqueueScreenshotSave requires a non-empty output path");
+        }
+        if (rgba.empty() || width == 0U || height == 0U) {
+            throw mxvk::Exception("enqueueScreenshotSave requires non-empty pixel data");
+        }
+
+        startScreenshotWorker();
+
+        {
+            std::lock_guard<std::mutex> lock(screenshot_queue_mutex);
+            screenshot_save_queue.push_back(ScreenshotSaveTask{
+                .path = std::move(path),
+                .rgba = std::move(rgba),
+                .width = width,
+                .height = height,
+            });
+        }
+        screenshot_queue_cv.notify_one();
+    }
+
+    void VK_Window::startScreenshotWorker() {
+        std::lock_guard<std::mutex> lock(screenshot_queue_mutex);
+        if (screenshot_worker.joinable()) {
+            return;
+        }
+
+        screenshot_worker_stop = false;
+        screenshot_worker = std::thread(&VK_Window::screenshotWorkerLoop, this);
+    }
+
+    void VK_Window::stopScreenshotWorker() {
+        {
+            std::lock_guard<std::mutex> lock(screenshot_queue_mutex);
+            screenshot_worker_stop = true;
+        }
+        screenshot_queue_cv.notify_one();
+
+        if (screenshot_worker.joinable()) {
+            screenshot_worker.join();
+        }
+
+        screenshot_worker_stop = false;
+    }
+
+    void VK_Window::screenshotWorkerLoop() {
+        while (true) {
+            ScreenshotSaveTask task{};
+            {
+                std::unique_lock<std::mutex> lock(screenshot_queue_mutex);
+                screenshot_queue_cv.wait(lock, [&]() {
+                    return screenshot_worker_stop || !screenshot_save_queue.empty();
+                });
+
+                if (screenshot_worker_stop && screenshot_save_queue.empty()) {
+                    return;
+                }
+
+                task = std::move(screenshot_save_queue.front());
+                screenshot_save_queue.pop_front();
+            }
+
+            if (!mxvk::SavePNG_RGBA(task.path.c_str(),
+                                    task.rgba.data(),
+                                    static_cast<int>(task.width),
+                                    static_cast<int>(task.height))) {
+                std::cerr << std::format("mxvk: screenshot failed to write PNG: {}\n", task.path);
+                continue;
+            }
+            std::cout << std::format("mxvk: screenshot saved: {}\n", task.path);
+        }
     }
 
     std::string VK_Window::makeScreenshotPath() {

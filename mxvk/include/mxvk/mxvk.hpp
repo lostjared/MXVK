@@ -8,12 +8,16 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <mxvk/mxvk_version.hpp>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 #include <volk/volk.h>
 
@@ -440,6 +444,10 @@ namespace mxvk {
         void maybeTrimMemory();
         void saveScreenshot();
         [[nodiscard]] std::string makeScreenshotPath();
+        void enqueueScreenshotSave(std::string path, std::vector<std::uint8_t> rgba, uint32_t width, uint32_t height);
+        void startScreenshotWorker();
+        void stopScreenshotWorker();
+        void screenshotWorkerLoop();
         [[nodiscard]] bool isPostProcessSprite(const VK_Sprite *sprite) const;
         [[nodiscard]] std::string resolveDefaultFontPath() const;
         void ensureTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize);
@@ -497,6 +505,17 @@ namespace mxvk {
         bool screenshot_enabled = defaultEnableScreenshot();
         std::string screenshot_prefix = defaultExecutableName();
         uint32_t screenshot_index = 0;
+        struct ScreenshotSaveTask {
+            std::string path;
+            std::vector<std::uint8_t> rgba;
+            uint32_t width = 0;
+            uint32_t height = 0;
+        };
+        std::mutex screenshot_queue_mutex;
+        std::condition_variable screenshot_queue_cv;
+        std::deque<ScreenshotSaveTask> screenshot_save_queue;
+        std::thread screenshot_worker;
+        bool screenshot_worker_stop = false;
         bool validation_enabled = false;
         PresentModePreference present_mode_preference = PresentModePreference::LowLatency;
         bool framebuffer_resized = false;
