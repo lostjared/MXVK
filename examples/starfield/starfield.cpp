@@ -883,12 +883,16 @@ namespace example {
                 throw mxvk::Exception("starfield: failed to end command buffer");
             }
 
-            VkSubmitInfo submit_info{};
-            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            submit_info.commandBufferCount = 1;
-            submit_info.pCommandBuffers = &command_buffer;
+            VkCommandBufferSubmitInfo command_buffer_info{};
+            command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            command_buffer_info.commandBuffer = command_buffer;
 
-            if (vkQueueSubmit(graphics_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
+            VkSubmitInfo2 submit_info{};
+            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submit_info.commandBufferInfoCount = 1;
+            submit_info.pCommandBufferInfos = &command_buffer_info;
+
+            if (vkQueueSubmit2(graphics_queue, 1, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS) {
                 vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
                 throw mxvk::Exception("starfield: failed to submit command buffer");
             }
@@ -971,8 +975,8 @@ namespace example {
         void transitionImageLayout(VkImage image, VkImageLayout old_layout, VkImageLayout new_layout) const {
             VkCommandBuffer command_buffer = beginSingleTimeCommands();
 
-            VkImageMemoryBarrier barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             barrier.oldLayout = old_layout;
             barrier.newLayout = new_layout;
             barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -984,35 +988,27 @@ namespace example {
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
-            VkPipelineStageFlags source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            VkPipelineStageFlags destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
             if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-                barrier.srcAccessMask = 0;
-                barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-                destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+                barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+                barrier.srcAccessMask = VK_ACCESS_2_NONE;
+                barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+                barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
             } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-                barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-                source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-                destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+                barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+                barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
             } else {
                 vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
                 throw mxvk::Exception("starfield: unsupported image layout transition");
             }
 
-            vkCmdPipelineBarrier(
-                command_buffer,
-                source_stage,
-                destination_stage,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                1,
-                &barrier);
+            VkDependencyInfo dependency{};
+            dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dependency.imageMemoryBarrierCount = 1;
+            dependency.pImageMemoryBarriers = &barrier;
+
+            vkCmdPipelineBarrier2(command_buffer, &dependency);
 
             endSingleTimeCommands(command_buffer);
         }
@@ -1020,7 +1016,8 @@ namespace example {
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const {
             VkCommandBuffer command_buffer = beginSingleTimeCommands();
 
-            VkBufferImageCopy region{};
+            VkBufferImageCopy2 region{};
+            region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
             region.bufferOffset = 0;
             region.bufferRowLength = 0;
             region.bufferImageHeight = 0;
@@ -1031,7 +1028,15 @@ namespace example {
             region.imageOffset = {0, 0, 0};
             region.imageExtent = {width, height, 1};
 
-            vkCmdCopyBufferToImage(command_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+            VkCopyBufferToImageInfo2 copy_info{};
+            copy_info.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2;
+            copy_info.srcBuffer = buffer;
+            copy_info.dstImage = image;
+            copy_info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            copy_info.regionCount = 1;
+            copy_info.pRegions = &region;
+
+            vkCmdCopyBufferToImage2(command_buffer, &copy_info);
             endSingleTimeCommands(command_buffer);
         }
 
