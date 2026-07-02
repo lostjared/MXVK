@@ -170,6 +170,12 @@ Supported options:
 - `--enable-vsync`
 	- Request FIFO swapchain present mode instead of the default low-latency MAILBOX preference.
 	- Example: `./run.pl hello_world --enable-vsync`.
+- `--enable-screenshot`
+	- Enable framework screenshot capture for examples based on `mxvk::VK_Window`.
+	- Press `F10` after the first frame has presented to save a PNG under `~/Pictures`.
+	- Filenames use the executable basename from `argv[0]`, a dotted local date/time stamp, the current swapchain resolution, and a per-run index:
+	  `breakout.screenshot.2026.07.02.08.30.37.1280x720-0.png`.
+	- A trailing `.exe` or `.EXE` suffix is stripped from the executable name before it is used.
 - `--texture <file>`
 	- Optional texture filename.
 - `-S <path>`, `--shader-path <path>`
@@ -198,6 +204,10 @@ passes the example's asset directory with `-p` automatically.
 All examples based on `mxvk::VK_Window` also support `F12` to toggle the
 framework FPS counter. The overlay is disabled by default and uses the copied
 `data/default.ttf` font from the example's build output directory.
+
+When `--enable-screenshot` is provided, those same window-based examples also
+support `F10` screenshots. The capture path uses the most recently presented
+swapchain image and writes a PNG to `~/Pictures`.
 
 For the full core demo sweep, use `./run.pl --all`. It runs the example list
 sequentially by delegating to `testapps.pl`, forwards any extra arguments to
@@ -354,6 +364,8 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 2, 2026: `proc_args(...)` now exposes `Arguments::enable_screenshot` and `Arguments::executable_name`. Passing `--enable-screenshot` enables `F10` screenshot capture in `VK_Window`, saving PNG files to `~/Pictures` with names like `puzzle_drop.screenshot.2026.07.02.08.24.45.1280x720-0.png`.
+- July 2, 2026: example runtime shader-copy targets now wait for example-specific runtime-data targets when both write the same `data` directory. This fixes a parallel CMake build race seen in `masterpiece` and `3dmath_masterpiece`.
 - Sprite and 3D sprite paths now keep more GPU state alive across frames, track dirty state, and support instanced sprite batches. This reduces repeated descriptor/pipeline work in sprite-heavy demos such as `binary_matrix`, `defender`, `starship`, and `pong`.
 - Sprite texture uploads use a resizable persistent staging buffer instead of a fixed-size staging allocation, so larger textures can grow the upload path without requiring a hardcoded staging limit.
 - Sprite descriptor pools grow on demand and track which pool owns each descriptor set. Model descriptor sets are reused and updated in place where possible, with pool recreation/retry only when capacity is actually exhausted.

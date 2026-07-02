@@ -709,6 +709,9 @@ if(EXAMPLES)
             VERBATIM
         )
         add_dependencies(${copy_target} mxvk_shaders)
+        if(TARGET ${target_name}_runtime_data)
+            add_dependencies(${copy_target} ${target_name}_runtime_data)
+        endif()
         add_dependencies(${target_name} ${copy_target})
     endfunction()
 

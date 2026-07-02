@@ -6,7 +6,10 @@
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -198,6 +201,8 @@ namespace mxvk {
     }
 
     VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, PresentModePreference presentModePreference) : present_mode_preference(presentModePreference) {
+        setEnableScreenshot(defaultEnableScreenshot());
+        screenshot_prefix = defaultExecutableName();
         std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={})\n", title, width, height, full, validiation);
         SDL_WindowFlags flags = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (full) {
@@ -625,6 +630,18 @@ namespace mxvk {
                     if ((e.key.key == SDLK_F12 || e.key.scancode == SDL_SCANCODE_F12) && !e.key.repeat) {
                         toggleFpsCounter();
                     }
+                    if (screenshot_enabled &&
+                        (e.key.key == SDLK_F10 || e.key.scancode == SDL_SCANCODE_F10) &&
+                        !e.key.repeat) {
+                        try {
+                            saveScreenshot();
+                        } catch (const mxvk::Exception &ex) {
+                            std::cerr << std::format("mxvk: screenshot failed: {}\n", ex.text());
+                        } catch (const std::exception &ex) {
+                            std::cerr << std::format("mxvk: screenshot failed: {}\n", ex.what());
+                        }
+                        continue;
+                    }
                     break;
                 default:
                     break;
@@ -647,6 +664,50 @@ namespace mxvk {
             render();
             maybeTrimMemory();
         }
+    }
+
+    void VK_Window::saveScreenshot() {
+        const std::string path = makeScreenshotPath();
+        saveSnapshot(path);
+        std::cout << std::format("mxvk: screenshot saved: {}\n", path);
+    }
+
+    std::string VK_Window::makeScreenshotPath() {
+        const char *home = std::getenv("HOME");
+        std::filesystem::path pictures_dir = (home != nullptr && home[0] != '\0')
+                                                 ? std::filesystem::path(home) / "Pictures"
+                                                 : std::filesystem::path("Pictures");
+        std::filesystem::create_directories(pictures_dir);
+
+        const std::time_t now = std::time(nullptr);
+        std::tm local_time{};
+#if defined(_WIN32)
+        localtime_s(&local_time, &now);
+#else
+        localtime_r(&now, &local_time);
+#endif
+
+        std::ostringstream date_stream;
+        date_stream << std::put_time(&local_time, "%Y.%m.%d");
+        std::ostringstream time_stream;
+        time_stream << std::put_time(&local_time, "%H.%M.%S");
+
+        const std::string prefix = std::format("{}.screenshot.{}.{}.{}x{}-",
+                                               screenshot_prefix.empty() ? "mxvk" : screenshot_prefix,
+                                               date_stream.str(),
+                                               time_stream.str(),
+                                               swapchain_extent.width,
+                                               swapchain_extent.height);
+
+        for (uint32_t attempt = 0; attempt < 10000U; ++attempt) {
+            const uint32_t index = screenshot_index++;
+            std::filesystem::path path = pictures_dir / std::format("{}{}.png", prefix, index);
+            if (!std::filesystem::exists(path)) {
+                return path.string();
+            }
+        }
+
+        return (pictures_dir / std::format("{}{}.png", prefix, screenshot_index++)).string();
     }
 
     void VK_Window::render() {
@@ -3307,10 +3368,10 @@ namespace mxvk {
     }
 
     void VK_Window::showCursor(bool on) {
-	    if(on)
-		    SDL_ShowCursor();
-	    else
-		    SDL_HideCursor();
+        if (on)
+            SDL_ShowCursor();
+        else
+            SDL_HideCursor();
     }
 
     void VK_Window::createSpriteDescriptorSetLayout() {

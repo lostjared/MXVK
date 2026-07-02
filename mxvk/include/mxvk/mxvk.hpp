@@ -1,6 +1,7 @@
 #ifndef _MXVK_MXVK_H_
 #define _MXVK_MXVK_H_
 
+#include "mxvk_runtime_options.hpp"
 #include "mxvk_sprite.hpp"
 #include "mxvk_sprite3d.hpp"
 #include "mxvk_text.hpp"
@@ -150,6 +151,12 @@ namespace mxvk {
          */
         void setClearColor(float r, float g, float b, float a = 1.0f);
 
+        /** @brief Enable or disable F10 screenshot capture. */
+        void setEnableScreenshot(bool enabled) noexcept { screenshot_enabled = enabled; }
+
+        /** @brief Check whether F10 screenshot capture is enabled. */
+        [[nodiscard]] bool screenshotEnabled() const noexcept { return screenshot_enabled; }
+
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
 
@@ -298,7 +305,7 @@ namespace mxvk {
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data);
 
-	void showCursor(bool on);
+        void showCursor(bool on);
 
       protected:
         /**
@@ -431,6 +438,8 @@ namespace mxvk {
         void createTextPipeline();
         void destroyTextPipeline();
         void maybeTrimMemory();
+        void saveScreenshot();
+        [[nodiscard]] std::string makeScreenshotPath();
         [[nodiscard]] bool isPostProcessSprite(const VK_Sprite *sprite) const;
         [[nodiscard]] std::string resolveDefaultFontPath() const;
         void ensureTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize);
@@ -485,6 +494,9 @@ namespace mxvk {
 
         bool sdl_initialized = false;
         bool active = false;
+        bool screenshot_enabled = defaultEnableScreenshot();
+        std::string screenshot_prefix = defaultExecutableName();
+        uint32_t screenshot_index = 0;
         bool validation_enabled = false;
         PresentModePreference present_mode_preference = PresentModePreference::LowLatency;
         bool framebuffer_resized = false;

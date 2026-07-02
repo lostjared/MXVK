@@ -24,9 +24,12 @@
 #ifndef _ARGZ_HPP_X
 #define _ARGZ_HPP_X
 
+#include "mxvk_runtime_options.hpp"
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <iomanip>
@@ -34,6 +37,7 @@
 #include <iterator>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <type_traits>
 #include <unordered_map>
@@ -688,36 +692,38 @@ class Argz {
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
 struct Arguments {
-    int width = 1280;                  ///< Viewport width in pixels (default: 1280).
-    int height = 720;                  ///< Viewport height in pixels (default: 720).
-    bool resolutionSpecified = false;  ///< Whether -r/--resolution was provided.
-    std::string path = ".";            ///< Asset search path (default: ".").
-    bool fullscreen = false;           ///< Whether fullscreen mode was requested.
-    bool fast = false;                 ///< Whether fast mode was requested (@c --fast).
-    std::string filename;              ///< Optional input filename (@c --filename).
-    std::string output;                ///< Optional output filename (@c --output).
-    std::string crf;                   ///< Optional CRF value (@c --crf).
-    std::string encodePreset;          ///< Optional encoder preset (@c --encode-preset).
-    std::string encodeTune;            ///< Optional encoder tune (@c --encode-tune).
-    std::string encodeCodec;           ///< Optional encoder codec policy (@c --encode-codec).
-    bool encodeRealtime = false;       ///< Enable low-latency encoder settings (@c --encode-realtime).
-    bool mxwriteBlockWhenFull = false; ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
-    bool repeat = false;               ///< Repeat video playback when a file reaches EOF.
-    bool binary = false;               ///< Use binary glyphs only (@c --binary).
-    bool enable_crt = false;           ///< Enable CRT post-processing at startup (@c --enable-crt).
-    bool enable_vsync = false;         ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
-    double fps = 0.0;                  ///< Optional FPS override (@c --fps); non-positive means unspecified.
-    int font_size = 22;                ///< Matrix rain font size in pixels (@c --font-size).
-    std::string font_path;             ///< Optional font file path (@c --font-path).
-    std::string color;                 ///< Optional rain RGB tint (@c --color).
-    std::string texture;               ///< Optional texture file path (@c --texture).
-    std::string shaderPath;            ///< Optional SPV shader folder path (@c -S / @c --shader-path).
-    std::string fragmentPath;          ///< Optional fragment shader SPV path (@c --fragment).
-    int camera_index = 0;              ///< Optional camera index
-    int index = 0;                     ///< Optional acidcam filter mode index.
-    int shader_index = 0;              ///< Optional initial shader entry index.
-    std::string resource;              ///< Resource file
-    std::string resource_path;         ///< Resource path
+    std::string executable_name = "mxvk"; ///< Executable basename derived from argv[0].
+    int width = 1280;                     ///< Viewport width in pixels (default: 1280).
+    int height = 720;                     ///< Viewport height in pixels (default: 720).
+    bool resolutionSpecified = false;     ///< Whether -r/--resolution was provided.
+    std::string path = ".";               ///< Asset search path (default: ".").
+    bool fullscreen = false;              ///< Whether fullscreen mode was requested.
+    bool fast = false;                    ///< Whether fast mode was requested (@c --fast).
+    std::string filename;                 ///< Optional input filename (@c --filename).
+    std::string output;                   ///< Optional output filename (@c --output).
+    std::string crf;                      ///< Optional CRF value (@c --crf).
+    std::string encodePreset;             ///< Optional encoder preset (@c --encode-preset).
+    std::string encodeTune;               ///< Optional encoder tune (@c --encode-tune).
+    std::string encodeCodec;              ///< Optional encoder codec policy (@c --encode-codec).
+    bool encodeRealtime = false;          ///< Enable low-latency encoder settings (@c --encode-realtime).
+    bool mxwriteBlockWhenFull = false;    ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
+    bool repeat = false;                  ///< Repeat video playback when a file reaches EOF.
+    bool binary = false;                  ///< Use binary glyphs only (@c --binary).
+    bool enable_crt = false;              ///< Enable CRT post-processing at startup (@c --enable-crt).
+    bool enable_vsync = false;            ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
+    bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
+    double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
+    int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
+    std::string font_path;                ///< Optional font file path (@c --font-path).
+    std::string color;                    ///< Optional rain RGB tint (@c --color).
+    std::string texture;                  ///< Optional texture file path (@c --texture).
+    std::string shaderPath;               ///< Optional SPV shader folder path (@c -S / @c --shader-path).
+    std::string fragmentPath;             ///< Optional fragment shader SPV path (@c --fragment).
+    int camera_index = 0;                 ///< Optional camera index
+    int index = 0;                        ///< Optional acidcam filter mode index.
+    int shader_index = 0;                 ///< Optional initial shader entry index.
+    std::string resource;                 ///< Resource file
+    std::string resource_path;            ///< Resource path
 };
 
 [[nodiscard]] inline int parse_arg_int(const std::string &text, const std::string &option_name) {
@@ -740,6 +746,35 @@ struct Arguments {
         throw ArgException<std::string>("Invalid numeric value for " + option_name + ": " + text);
     }
     return value;
+}
+
+[[nodiscard]] inline std::string parse_executable_name(const char *argv0) {
+    if (argv0 == nullptr || argv0[0] == '\0') {
+        return "mxvk";
+    }
+
+    std::string name = argv0;
+    const std::string::size_type separator = name.find_last_of("/\\");
+    if (separator != std::string::npos) {
+        name.erase(0, separator + 1);
+    }
+
+    constexpr std::string_view exe_extension = ".exe";
+    if (name.size() >= exe_extension.size()) {
+        const std::string::size_type extension_pos = name.size() - exe_extension.size();
+        const bool has_exe_extension = std::ranges::equal(name.begin() + static_cast<std::ptrdiff_t>(extension_pos),
+                                                          name.end(),
+                                                          exe_extension.begin(),
+                                                          exe_extension.end(),
+                                                          [](char left, char right) {
+                                                              return std::tolower(static_cast<unsigned char>(left)) == std::tolower(static_cast<unsigned char>(right));
+                                                          });
+        if (has_exe_extension) {
+            name.erase(extension_pos);
+        }
+    }
+
+    return name.empty() ? "mxvk" : name;
 }
 
 /**
@@ -765,6 +800,7 @@ struct Arguments {
  * |      | --binary           | Use binary glyphs only                        |
  * |      | --enable-crt       | Enable CRT post-processing at startup         |
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
+ * |      | --enable-screenshot| Enable F10 screenshot capture                 |
  * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
@@ -781,6 +817,7 @@ struct Arguments {
  */
 inline Arguments proc_args(int &argc, char **argv) {
     Arguments args;
+    const std::string executable_name = parse_executable_name(argc > 0 ? argv[0] : nullptr);
     Argz<std::string> parser(argc, argv);
     parser.addOptionSingle('h', "Display help message")
         .addOptionSingle('v', "Print version")
@@ -805,6 +842,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(315, "binary", "use binary glyphs only")
         .addOptionDouble(319, "enable-crt", "enable CRT post-processing at startup")
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
+        .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
         .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
@@ -842,6 +880,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool binary = false;
     bool enable_crt = false;
     bool enable_vsync = false;
+    bool enable_screenshot = false;
     double fps = 0.0;
     int font_size = 22;
     std::string font_path;
@@ -899,6 +938,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 320:
             enable_vsync = true;
+            break;
+        case 322:
+            enable_screenshot = true;
             break;
         case 321:
             fps = parse_arg_double(arg.arg_value, "--fps");
@@ -979,6 +1021,8 @@ inline Arguments proc_args(int &argc, char **argv) {
         std::cerr << "mx: No path provided trying default current directory.\n";
         path = ".";
     }
+    args.executable_name = executable_name;
+    mxvk::setDefaultExecutableName(executable_name);
     args.width = tw;
     args.height = th;
     args.resolutionSpecified = resolutionSpecified;
@@ -997,6 +1041,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.binary = binary;
     args.enable_crt = enable_crt;
     args.enable_vsync = enable_vsync;
+    args.enable_screenshot = enable_screenshot;
+    mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;
     args.font_size = font_size;
     args.font_path = font_path;
