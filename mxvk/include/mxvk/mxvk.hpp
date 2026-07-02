@@ -96,6 +96,14 @@ namespace mxvk {
         virtual void render();
 
         /**
+         * @brief Save the most recently rendered window contents as a PNG file.
+         * @param path Destination PNG path.
+         *
+         * This performs a synchronous GPU readback and may briefly stall rendering.
+         */
+        void saveSnapshot(const std::string &path);
+
+        /**
          * @brief Record resource transitions that must happen before dynamic rendering begins.
          *
          * This callback is invoked after the command buffer begins recording and before
@@ -465,6 +473,8 @@ namespace mxvk {
         std::array<VkFence, max_frames_in_flight> in_flight_fences{};
         std::vector<VkFence> image_fences{};
         uint32_t current_frame = 0;
+        uint32_t last_presented_image_index = invalid_queue_index;
+        bool swapchain_supports_transfer_src = false;
 
         bool sdl_initialized = false;
         bool active = false;

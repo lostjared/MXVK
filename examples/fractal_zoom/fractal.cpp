@@ -13,9 +13,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -58,6 +61,10 @@ namespace example {
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN) {
+                if ((e.key.key == SDLK_F10 || e.key.scancode == SDL_SCANCODE_F10) && !e.key.repeat) {
+                    saveFractalSnapshot();
+                    return;
+                }
                 handleKey(e.key.key);
                 return;
             }
@@ -216,6 +223,50 @@ namespace example {
                 break;
             default:
                 break;
+            }
+        }
+
+        void saveFractalSnapshot() {
+            const char *home = std::getenv("HOME");
+            if (home == nullptr || std::strlen(home) == 0U) {
+                std::cerr << "fractal_zoom: HOME is not set; cannot save snapshot\n";
+                return;
+            }
+
+            std::filesystem::path snapshot_dir = std::filesystem::path(home) / "Pictures";
+            std::error_code error;
+            std::filesystem::create_directories(snapshot_dir, error);
+            if (error) {
+                std::cerr << std::format("fractal_zoom: failed to create snapshot directory '{}': {}\n",
+                                         snapshot_dir.string(),
+                                         error.message());
+                return;
+            }
+
+            const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            std::tm local_time{};
+#if defined(_WIN32)
+            localtime_s(&local_time, &now);
+#else
+            localtime_r(&now, &local_time);
+#endif
+
+            const std::string filename = std::format(
+                "fractal_zoom_snapshot.{:04d}-{:02d}-{:02d}.{:02d}-{:02d}-{:02d}-{:04d}.png",
+                local_time.tm_year + 1900,
+                local_time.tm_mon + 1,
+                local_time.tm_mday,
+                local_time.tm_hour,
+                local_time.tm_min,
+                local_time.tm_sec,
+                snapshot_index++);
+
+            const std::filesystem::path snapshot_path = snapshot_dir / filename;
+            try {
+                saveSnapshot(snapshot_path.string());
+                std::cout << "fractal_zoom: saved snapshot: " << snapshot_path.string() << "\n";
+            } catch (const std::exception &ex) {
+                std::cerr << "fractal_zoom: failed to save snapshot: " << ex.what() << "\n";
             }
         }
 
@@ -1019,6 +1070,7 @@ namespace example {
 
         std::chrono::steady_clock::time_point start_time{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_tick{std::chrono::steady_clock::now()};
+        uint32_t snapshot_index = 0;
     };
 
 } // namespace example

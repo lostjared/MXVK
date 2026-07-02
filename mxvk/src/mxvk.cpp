@@ -1,5 +1,6 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_png.hpp"
 #include <SDL3/SDL_oldnames.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_vulkan.h>
@@ -652,6 +653,252 @@ namespace mxvk {
         drawFrame();
     }
 
+    void VK_Window::saveSnapshot(const std::string &path) {
+        if (path.empty()) {
+            throw mxvk::Exception("saveSnapshot requires a non-empty output path");
+        }
+        if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
+            throw mxvk::Exception("saveSnapshot called before Vulkan render resources are ready");
+        }
+        if (!swapchain_supports_transfer_src) {
+            throw mxvk::Exception("saveSnapshot requires swapchain transfer-source support");
+        }
+        if (last_presented_image_index == invalid_queue_index ||
+            last_presented_image_index >= swapchain_images.size() ||
+            last_presented_image_index >= image_fences.size()) {
+            throw mxvk::Exception("saveSnapshot called before a frame has been presented");
+        }
+        if (swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
+            throw mxvk::Exception("saveSnapshot cannot capture an empty swapchain extent");
+        }
+
+        const bool format_is_bgra =
+            swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
+            swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
+        const bool format_is_rgba =
+            swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
+            swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
+        if (!format_is_bgra && !format_is_rgba) {
+            throw mxvk::Exception(std::format("saveSnapshot unsupported swapchain format: {}", static_cast<int>(swapchain_format)));
+        }
+
+        const VkDeviceSize row_bytes = static_cast<VkDeviceSize>(swapchain_extent.width) * 4U;
+        const VkDeviceSize image_bytes = row_bytes * static_cast<VkDeviceSize>(swapchain_extent.height);
+
+        VkBuffer readback_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory readback_memory = VK_NULL_HANDLE;
+        VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+        VkFence copy_fence = VK_NULL_HANDLE;
+
+        auto cleanup = [&]() {
+            if (copy_fence != VK_NULL_HANDLE) {
+                vkDestroyFence(device, copy_fence, nullptr);
+            }
+            if (command_buffer != VK_NULL_HANDLE) {
+                vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+            }
+            if (readback_buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, readback_buffer, nullptr);
+            }
+            if (readback_memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, readback_memory, nullptr);
+            }
+        };
+
+        try {
+            VkBufferCreateInfo buffer_info{};
+            buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buffer_info.size = image_bytes;
+            buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            if (vkCreateBuffer(device, &buffer_info, nullptr, &readback_buffer) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to create readback buffer");
+            }
+
+            VkMemoryRequirements memory_requirements{};
+            vkGetBufferMemoryRequirements(device, readback_buffer, &memory_requirements);
+
+            VkPhysicalDeviceMemoryProperties memory_properties{};
+            vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+            uint32_t memory_type_index = invalid_queue_index;
+            constexpr VkMemoryPropertyFlags required_properties =
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
+                const bool type_matches = (memory_requirements.memoryTypeBits & (1U << i)) != 0U;
+                const bool properties_match =
+                    (memory_properties.memoryTypes[i].propertyFlags & required_properties) == required_properties;
+                if (type_matches && properties_match) {
+                    memory_type_index = i;
+                    break;
+                }
+            }
+            if (memory_type_index == invalid_queue_index) {
+                throw mxvk::Exception("saveSnapshot failed to find host-visible coherent memory");
+            }
+
+            VkMemoryAllocateInfo allocation_info{};
+            allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocation_info.allocationSize = memory_requirements.size;
+            allocation_info.memoryTypeIndex = memory_type_index;
+            if (vkAllocateMemory(device, &allocation_info, nullptr, &readback_memory) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to allocate readback memory");
+            }
+            if (vkBindBufferMemory(device, readback_buffer, readback_memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to bind readback memory");
+            }
+
+            VkCommandBufferAllocateInfo command_buffer_info{};
+            command_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            command_buffer_info.commandPool = command_pool;
+            command_buffer_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            command_buffer_info.commandBufferCount = 1;
+            if (vkAllocateCommandBuffers(device, &command_buffer_info, &command_buffer) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to allocate command buffer");
+            }
+
+            VkFenceCreateInfo fence_info{};
+            fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            if (vkCreateFence(device, &fence_info, nullptr, &copy_fence) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to create copy fence");
+            }
+
+            VkFence source_fence = image_fences[last_presented_image_index];
+            if (source_fence != VK_NULL_HANDLE) {
+                const VkResult wait_result = vkWaitForFences(device, 1, &source_fence, VK_TRUE, UINT64_MAX);
+                if (wait_result != VK_SUCCESS) {
+                    throw mxvk::Exception(std::format("saveSnapshot failed waiting for rendered frame: {}", static_cast<int>(wait_result)));
+                }
+            }
+
+            const VkResult idle_result = vkDeviceWaitIdle(device);
+            if (idle_result != VK_SUCCESS) {
+                throw mxvk::Exception(std::format("saveSnapshot failed waiting for device idle: {}", static_cast<int>(idle_result)));
+            }
+
+            VkCommandBufferBeginInfo begin_info{};
+            begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+            if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to begin copy command buffer");
+            }
+
+            VkImageMemoryBarrier2 to_transfer_barrier{};
+            to_transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_transfer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+            to_transfer_barrier.srcAccessMask = VK_ACCESS_2_NONE;
+            to_transfer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            to_transfer_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            to_transfer_barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_transfer_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            to_transfer_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_transfer_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_transfer_barrier.image = swapchain_images[last_presented_image_index];
+            to_transfer_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            to_transfer_barrier.subresourceRange.baseMipLevel = 0;
+            to_transfer_barrier.subresourceRange.levelCount = 1;
+            to_transfer_barrier.subresourceRange.baseArrayLayer = 0;
+            to_transfer_barrier.subresourceRange.layerCount = 1;
+
+            VkDependencyInfo to_transfer_dependency{};
+            to_transfer_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_transfer_dependency.imageMemoryBarrierCount = 1;
+            to_transfer_dependency.pImageMemoryBarriers = &to_transfer_barrier;
+            vkCmdPipelineBarrier2(command_buffer, &to_transfer_dependency);
+
+            VkBufferImageCopy copy_region{};
+            copy_region.bufferOffset = 0;
+            copy_region.bufferRowLength = 0;
+            copy_region.bufferImageHeight = 0;
+            copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy_region.imageSubresource.mipLevel = 0;
+            copy_region.imageSubresource.baseArrayLayer = 0;
+            copy_region.imageSubresource.layerCount = 1;
+            copy_region.imageOffset = {0, 0, 0};
+            copy_region.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
+            vkCmdCopyImageToBuffer(command_buffer,
+                                   swapchain_images[last_presented_image_index],
+                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                   readback_buffer,
+                                   1,
+                                   &copy_region);
+
+            VkImageMemoryBarrier2 to_present_barrier{};
+            to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            to_present_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+            to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
+            to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_present_barrier.image = swapchain_images[last_presented_image_index];
+            to_present_barrier.subresourceRange = to_transfer_barrier.subresourceRange;
+
+            VkDependencyInfo to_present_dependency{};
+            to_present_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_present_dependency.imageMemoryBarrierCount = 1;
+            to_present_dependency.pImageMemoryBarriers = &to_present_barrier;
+            vkCmdPipelineBarrier2(command_buffer, &to_present_dependency);
+
+            if (vkEndCommandBuffer(command_buffer) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to end copy command buffer");
+            }
+
+            VkCommandBufferSubmitInfo command_submit_info{};
+            command_submit_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            command_submit_info.commandBuffer = command_buffer;
+
+            VkSubmitInfo2 submit_info{};
+            submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submit_info.commandBufferInfoCount = 1;
+            submit_info.pCommandBufferInfos = &command_submit_info;
+
+            const VkResult submit_result = vkQueueSubmit2(graphics_queue, 1, &submit_info, copy_fence);
+            if (submit_result != VK_SUCCESS) {
+                throw mxvk::Exception(std::format("saveSnapshot failed to submit copy command: {}", static_cast<int>(submit_result)));
+            }
+            const VkResult copy_wait_result = vkWaitForFences(device, 1, &copy_fence, VK_TRUE, UINT64_MAX);
+            if (copy_wait_result != VK_SUCCESS) {
+                throw mxvk::Exception(std::format("saveSnapshot failed waiting for copy: {}", static_cast<int>(copy_wait_result)));
+            }
+
+            void *mapped = nullptr;
+            if (vkMapMemory(device, readback_memory, 0, image_bytes, 0, &mapped) != VK_SUCCESS) {
+                throw mxvk::Exception("saveSnapshot failed to map readback memory");
+            }
+
+            const auto *src = static_cast<const std::uint8_t *>(mapped);
+            std::vector<std::uint8_t> rgba(static_cast<std::size_t>(image_bytes));
+            for (std::size_t i = 0; i < rgba.size(); i += 4U) {
+                if (format_is_bgra) {
+                    rgba[i + 0U] = src[i + 2U];
+                    rgba[i + 1U] = src[i + 1U];
+                    rgba[i + 2U] = src[i + 0U];
+                    rgba[i + 3U] = src[i + 3U];
+                } else {
+                    rgba[i + 0U] = src[i + 0U];
+                    rgba[i + 1U] = src[i + 1U];
+                    rgba[i + 2U] = src[i + 2U];
+                    rgba[i + 3U] = src[i + 3U];
+                }
+            }
+            vkUnmapMemory(device, readback_memory);
+
+            if (!mxvk::SavePNG_RGBA(path.c_str(),
+                                    rgba.data(),
+                                    static_cast<int>(swapchain_extent.width),
+                                    static_cast<int>(swapchain_extent.height))) {
+                throw mxvk::Exception("saveSnapshot failed to write PNG: " + path);
+            }
+        } catch (...) {
+            cleanup();
+            throw;
+        }
+
+        cleanup();
+    }
+
     void VK_Window::proc() {
     }
 
@@ -1281,6 +1528,12 @@ namespace mxvk {
         create_info.imageExtent = extent;
         create_info.imageArrayLayers = 1;
         create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        swapchain_supports_transfer_src = (support.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0U;
+        if (swapchain_supports_transfer_src) {
+            create_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        } else {
+            std::cerr << "mxvk: swapchain does not support transfer-source usage; saveSnapshot is unavailable\n";
+        }
 
         const uint32_t queue_family_indices[] = {graphics_queue_family, present_queue_family};
         if (graphics_queue_family != present_queue_family) {
@@ -1313,6 +1566,7 @@ namespace mxvk {
 
         swapchain_format = surface_format.format;
         swapchain_extent = extent;
+        last_presented_image_index = invalid_queue_index;
 
         swapchain_image_views.resize(swapchain_images.size());
         for (size_t i = 0; i < swapchain_images.size(); ++i) {
@@ -1737,6 +1991,8 @@ namespace mxvk {
 
         swapchain_images.clear();
         swapchain_image_initialized.clear();
+        last_presented_image_index = invalid_queue_index;
+        swapchain_supports_transfer_src = false;
         depth_format = VK_FORMAT_UNDEFINED;
 
         // This guard prevents destroying the active swapchain during a live resize
@@ -2308,6 +2564,10 @@ namespace mxvk {
         present_info.pImageIndices = &image_index;
 
         const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
+        if (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR) {
+            last_presented_image_index = image_index;
+        }
+
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
             force_swapchain_recreate = true;
             last_resize_event_ms = SDL_GetTicks();

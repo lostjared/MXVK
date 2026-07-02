@@ -58,7 +58,7 @@ The root CMake configuration checks for and uses:
 - SDL3
 - SDL3_ttf
 - optional: SDL3_mixer (use -DMIXER=ON)
-- Vulkan 1.4+
+- Vulkan 1.3+
 - PNG
 - ZLIB
 - optional: JPEG (use -DJPEG=ON)
