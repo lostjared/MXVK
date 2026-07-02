@@ -258,6 +258,7 @@ namespace mxvk {
             throw mxvk::Exception("failed to wait for one-time command completion");
         }
 
+        // Upload command buffers are transient; callers only observe completion.
         vkFreeCommandBuffers(context.device, context.command_pool, 1, &command_buffer);
     }
 
@@ -279,6 +280,7 @@ namespace mxvk {
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.layerCount = 1;
 
+        // MXVK requires Vulkan 1.3 synchronization2, so uploads use stage/access2 masks.
         if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
             barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
             barrier.srcAccessMask = VK_ACCESS_2_NONE;
@@ -342,6 +344,7 @@ namespace mxvk {
         const VkDeviceSize image_size = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
         std::vector<std::byte> tight_pixels(static_cast<size_t>(image_size));
 
+        // SDL surfaces may have padded rows; Vulkan buffer-image copies use tight rows here.
         const auto *src = static_cast<const std::byte *>(surface->pixels);
         auto *dst = tight_pixels.data();
         const size_t tight_row_bytes = static_cast<size_t>(width) * 4U;
