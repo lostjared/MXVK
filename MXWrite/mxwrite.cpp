@@ -559,6 +559,7 @@ bool Writer::openInternal(const std::string &filename, int w, int h, float fps, 
     stop_requested = false;
     frame_count = 0;
     last_duration = 0.0;
+    block_when_full.store(opts.block_when_full, std::memory_order_relaxed);
 
     while (!encode_queue.empty()) {
         releaseFrame(encode_queue.front());

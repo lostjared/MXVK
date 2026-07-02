@@ -49,6 +49,8 @@ struct Frame_Data {
  *         "nvenc" (force NVENC; falls back to x264 if NVENC unavailable).
  * realtime: when true, applies low-latency settings (tune=zerolatency for x264,
  *           tune=ll + zerolatency=1 for NVENC). Overrides tune value.
+ * block_when_full: when true, producer threads block if the encoder queue is
+ *                  full instead of dropping frames.
  */
 struct EncodeOptions {
     std::string preset = "medium"; ///< Encoder preset name.
@@ -56,6 +58,7 @@ struct EncodeOptions {
     int crf = 18;                   ///< Constant Rate Factor.
     std::string codec = "auto";     ///< Encoder selection policy.
     bool realtime = false;          ///< Enable low-latency settings.
+    bool block_when_full = false;   ///< Block producer threads instead of dropping when the encoder queue is full.
 
     /**
      * @brief HDR output options.

@@ -273,13 +273,18 @@ namespace example {
                 return;
             }
 
-            constexpr float video_fps = 60.0F;
-            video_writer.set_block_when_full(false);
+            constexpr float video_fps = 60.0f;
+            EncodeOptions encode_options{};
+            encode_options.crf = 24;
+            encode_options.preset = "ultrafast";
+            encode_options.tune = "zerolatency";
+            encode_options.realtime = true;
+            encode_options.block_when_full = false;
             if (!video_writer.open(video_output_path,
                                    static_cast<int>(extent.width),
                                    static_cast<int>(extent.height),
                                    video_fps,
-                                   "18")) {
+                                   encode_options)) {
                 std::cerr << "fractal_zoom: failed to open MXWrite output file: " << video_output_path << "\n";
                 return;
             }

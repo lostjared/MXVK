@@ -588,8 +588,8 @@ class ComputeWindow : public mxvk::VK_Window {
             encodeOptions.codec = encodeCodec;
         }
         encodeOptions.realtime = encodeRealtime;
+        encodeOptions.block_when_full = mxwriteBlockWhenFull;
 
-        videoWriter.set_block_when_full(mxwriteBlockWhenFull);
         if (!videoWriter.open(outputFilename, recordWidth, recordHeight, static_cast<float>(sourceFps), encodeOptions)) {
             throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
         }
