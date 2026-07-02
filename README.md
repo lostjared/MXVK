@@ -223,6 +223,7 @@ Examples:
 ./run.pl model_example
 ./run.pl planet
 ./run.pl pong
+./run.pl breakout
 ./run.pl tictactoe
 ./run.pl pool_demo
 ./run.pl fractal_zoom
@@ -330,6 +331,7 @@ These programs are not intended as standalone applications. They are small visua
 
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
 - `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
+- `breakout` - 3D Breakout game with a model-rendered paddle, ball, block field, animated crystal backgrounds, touch/gamepad support, and optional SDL3_mixer sound effects. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter`, `Space`, click, tap, or gamepad start begins play; `Left` / `Right` or `H` / `L` move the paddle; `Space`, `Enter`, click, double tap, or gamepad south launches the ball; `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Q` resets the view, `R` restarts, `Backspace` returns to intro, and `Escape` quits.
 - `defender` - side-scrolling 3D starfield shooter with model-based ship and asteroids, animated UFO sprites, radar/HUD, controller support, console commands, Matrix-rain intro, CRT post-processing, and optional SDL3_mixer audio. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` or `Space` starts, `Z` thrusts, `D` boosts, `X` reverses, `W` / `Up` and `Down` move vertically, `A` / `S` roll, `Space` fires, `F3` toggles the console, `F4` toggles FPS, `F8` toggles CRT, `Escape` quits.
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
 - `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.
