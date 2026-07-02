@@ -102,9 +102,11 @@ namespace {
             ball_model = load_model("texture_manifest.txt");
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             mixer = std::make_unique<mxvk::VK_Mixer>();
+            background_music = mixer->loadMusic(data_root + "/breakout.ogg");
             ping_sound = mixer->loadWav(data_root + "/ping.wav");
             clear_sound = mixer->loadWav(data_root + "/pop.wav");
             die_sound = mixer->loadWav(data_root + "/die.wav");
+            ensure_background_music_playing();
 #endif
             open_controller();
             reset_game();
@@ -224,6 +226,7 @@ namespace {
             delta_seconds = std::min(delta_seconds, 0.05f);
             last_frame = now;
             background_time += delta_seconds;
+            ensure_background_music_playing();
 
             const int width = screen_width();
             if (screen == Screen::Intro) {
@@ -310,11 +313,27 @@ namespace {
         std::chrono::steady_clock::time_point last_frame{std::chrono::steady_clock::now()};
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> mixer{};
+        int background_music = -1;
         int ping_sound = -1;
         int clear_sound = -1;
         int die_sound = -1;
 #endif
         static constexpr Uint64 DOUBLE_TAP_THRESHOLD_MS = 300;
+
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        void ensure_background_music_playing() {
+            if (!mixer || background_music < 0) {
+                return;
+            }
+            if (!mixer->isMusicPlaying(background_music)) {
+                if (mixer->playMusic(background_music, -1) != 0) {
+                    throw mxvk::Exception("Could not start Breakout background music");
+                }
+            }
+        }
+#else
+        void ensure_background_music_playing() {}
+#endif
 
         void reset_game() {
             score = 0;
