@@ -39,7 +39,11 @@ namespace {
     constexpr float GAME_BOTTOM = -3.75f;
     constexpr float PADDLE_SPEED = 5.0f;
     constexpr float BALL_SPEED = 4.0f;
+    constexpr float BALL_RADIUS = 0.25f;
     constexpr float MODEL_SCALE = 1.0f;
+    constexpr float BALL_MODEL_SCALE = 0.05f;
+    constexpr float PI = 3.14159265358979323846f;
+    constexpr float BALL_ROLL_DEGREES_PER_UNIT = 360.0f / (2.0f * PI * BALL_RADIUS);
     constexpr float ROTATION_SPEED = 50.0f;
     constexpr float DEFAULT_ZOOM = 0.8f;
     constexpr float MIN_ZOOM = 0.45f;
@@ -99,7 +103,7 @@ namespace {
             game_background = createSprite(data_root + "/bg.png", sprite_vertex, background_fragment);
             intro_model = load_model("intro_manifest.txt");
             paddle_model = load_model("texture_manifest.txt");
-            ball_model = load_model("texture_manifest.txt");
+            ball_model = load_model("better_sphere.obj", "moon_manifest.txt");
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
             mixer = std::make_unique<mxvk::VK_Mixer>();
             background_music = mixer->loadMusic(data_root + "/breakout.ogg");
@@ -170,7 +174,7 @@ namespace {
 
             if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
                 if (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN) {
-                    ball.stuck = false;
+                    launch_ball();
                 } else if (e.key.key == SDLK_R) {
                     reset_game();
                     screen = Screen::Game;
@@ -191,7 +195,7 @@ namespace {
             if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
                 const auto button = static_cast<SDL_GamepadButton>(e.gbutton.button);
                 if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
-                    ball.stuck = false;
+                    launch_ball();
                 } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
                     reset_game();
                     screen = Screen::Game;
@@ -205,13 +209,13 @@ namespace {
             }
 
             if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
-                ball.stuck = false;
+                launch_ball();
             }
 
             if (e.type == SDL_EVENT_FINGER_DOWN) {
                 const Uint64 current_tap_time = SDL_GetTicks();
                 if (current_tap_time - last_tap_time <= DOUBLE_TAP_THRESHOLD_MS) {
-                    ball.stuck = false;
+                    launch_ball();
                 }
                 last_tap_time = current_tap_time;
             } else if (e.type == SDL_EVENT_FINGER_MOTION) {
@@ -268,7 +272,7 @@ namespace {
             Box paddle_draw = paddle;
             paddle_draw.rotation = paddle_current_rotation;
             draw_model(cmd, image_index, *paddle_model, paddle_draw, view, proj, glm::vec3(1.0f));
-            draw_model(cmd, image_index, *ball_model, ball.box, view, proj, glm::vec3(1.0f));
+            draw_model(cmd, image_index, *ball_model, ball.box, view, proj, glm::vec3(1.0f), BALL_MODEL_SCALE);
             for (const Block &block : blocks) {
                 if (block.destroyed) {
                     continue;
@@ -358,11 +362,12 @@ namespace {
         }
 
         void reset_ball() {
-            ball.radius = 0.25f;
+            ball.radius = BALL_RADIUS;
             ball.stuck = true;
             ball.box.size = glm::vec3(ball.radius * 2.0f);
             ball.box.position = paddle.position + glm::vec3(0.0f, 0.5f, 0.0f);
             ball.box.velocity = glm::vec3(2.5f, 2.5f, 0.0f);
+            ball.box.rotation = 0.0f;
         }
 
         void update_game(float delta) {
@@ -447,7 +452,12 @@ namespace {
         }
 
         void move_ball(float delta) {
-            ball.box.position += ball.box.velocity * delta;
+            const glm::vec3 distance = ball.box.velocity * delta;
+            ball.box.position += distance;
+            ball.box.rotation = std::fmod(ball.box.rotation + distance.y * BALL_ROLL_DEGREES_PER_UNIT, 360.0f);
+            if (ball.box.rotation < 0.0f) {
+                ball.box.rotation += 360.0f;
+            }
             if (ball.box.position.x <= GAME_LEFT + ball.radius) {
                 ball.box.position.x = GAME_LEFT + ball.radius;
                 ball.box.velocity.x = std::abs(ball.box.velocity.x);
@@ -501,6 +511,13 @@ namespace {
                 }
                 reset_ball();
             }
+        }
+
+        void launch_ball() {
+            if (!ball.stuck) {
+                return;
+            }
+            ball.stuck = false;
         }
 
         void normalize_ball_velocity() {
@@ -583,11 +600,12 @@ namespace {
                         const Box &box,
                         const glm::mat4 &view,
                         const glm::mat4 &proj,
-                        const glm::vec3 &tint) {
+                        const glm::vec3 &tint,
+                        float model_scale = MODEL_SCALE) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::translate(glm::mat4(1.0f), box.position);
             ubo.model = glm::rotate(ubo.model, glm::radians(box.rotation), glm::vec3(1.0f, 0.0f, 0.0f));
-            ubo.model = glm::scale(ubo.model, box.size * MODEL_SCALE);
+            ubo.model = glm::scale(ubo.model, box.size * model_scale);
             ubo.view = view;
             ubo.proj = proj;
             ubo.fx = glm::vec4(tint, 1.0f);
@@ -634,8 +652,12 @@ namespace {
         }
 
         [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_model(std::string_view manifest) {
+            return load_model("cube.mxmod.z", manifest);
+        }
+
+        [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_model(std::string_view model_path, std::string_view manifest) {
             auto model = std::make_unique<mxvk::VKAbstractModel>();
-            model->load(this, data_root + "/cube.mxmod.z", data_root + "/" + std::string(manifest), data_root, 1.0f);
+            model->load(this, data_root + "/" + std::string(model_path), data_root + "/" + std::string(manifest), data_root, 1.0f);
             model->setShaders(this,
                               std::string(breakout_SHADER_DIR) + "/breakout_model.vert.spv",
                               std::string(breakout_SHADER_DIR) + "/breakout_model.frag.spv");
