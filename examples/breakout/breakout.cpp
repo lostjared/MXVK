@@ -95,8 +95,8 @@ namespace {
 
             const std::string sprite_vertex = std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv";
             const std::string background_fragment = std::string(breakout_SHADER_DIR) + "/breakout_background.frag.spv";
-            background = createSprite(data_root + "/bluecrystal.png", sprite_vertex, background_fragment);
-            game_background = createSprite(data_root + "/crystal1.png", sprite_vertex, background_fragment);
+            background = createSprite(data_root + "/intro.png", sprite_vertex, background_fragment);
+            game_background = createSprite(data_root + "/bg.png", sprite_vertex, background_fragment);
             intro_model = load_model("intro_manifest.txt");
             paddle_model = load_model("texture_manifest.txt");
             ball_model = load_model("texture_manifest.txt");
