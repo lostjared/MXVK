@@ -45,6 +45,7 @@ my @tests = qw(
     model_example
     starship 
     moon
+    breakout
     asteroids
     asteroids3d
     defender
