@@ -522,4 +522,6 @@ For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`,
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/bde0541a-3c5e-47f3-9ab0-e62757d524a9" />
 
+<img width="1280" height="720" alt="breakout720" src="https://github.com/user-attachments/assets/fc9c26ad-b3a7-450b-b3b9-366b93bbc80f" />
+
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
