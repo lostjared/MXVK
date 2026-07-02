@@ -1,5 +1,7 @@
 # MXVK 3D Breakout
 
+<img width="1280" height="720" alt="breakout720" src="https://github.com/user-attachments/assets/c48de7a7-3a18-4fd2-9932-92cef3c98d9b" />
+
 MXVK 3D Breakout is a Vulkan and SDL3 version of classic Breakout. A 3D paddle keeps the ball in play while you clear a wall of textured cube blocks. The game uses model rendering for the paddle, ball, intro cube, and blocks, with animated crystal backgrounds and optional SDL3_mixer sound effects when MXVK is built with mixer support.
 
 ## How To Play
