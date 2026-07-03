@@ -806,6 +806,7 @@ struct Arguments {
  * | -j   | --font-path        | Matrix rain font file path                    |
  * | -C   | --color            | Matrix rain RGB tint (\#RRGGBB or R,G,B)      |
  * |      | --texture          | Texture file                                 |
+ * |      | --textures         | Texture file alias                           |
  * | -S   | --shader-path      | SPV shader folder (must contain index.txt)   |
  * |      | --fragment         | Fragment shader SPV path                     |
  * | -i   | --index            | Acidcam filter mode index                    |
@@ -853,6 +854,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(302, "resource", "resource file")
         .addOptionDoubleValue(303, "resource_path", "resource data path")
         .addOptionDoubleValue(257, "texture", "texture file (.png or .tex)")
+        .addOptionDoubleValue(323, "textures", "texture file (.png or .tex)")
         .addOptionSingleValue('S', "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(258, "shader-path", "shader SPV folder path (contains index.txt)")
         .addOptionDoubleValue(313, "fragment", "fragment shader SPV path")
@@ -964,6 +966,7 @@ inline Arguments proc_args(int &argc, char **argv) {
             color = arg.arg_value;
             break;
         case 257:
+        case 323:
             texture = arg.arg_value;
             break;
         case 'S':

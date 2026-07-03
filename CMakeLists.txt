@@ -578,6 +578,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(rain)
     add_subdirectory(examples/model_example)
     mxvk_configure_mingw_target(model_example)
+    add_subdirectory(examples/viewer)
+    mxvk_configure_mingw_target(viewer)
     add_subdirectory(examples/dark)
     mxvk_configure_mingw_target(dark)
     add_subdirectory(examples/moon)
@@ -732,6 +734,7 @@ if(EXAMPLES)
         text_example
         rain
         model_example
+        viewer
         dark
         moon
         starship
