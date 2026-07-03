@@ -55,6 +55,7 @@ namespace {
 
     constexpr int NUM_PARTICLES = 50000;
     constexpr int NUM_LAYERS = 3;
+    constexpr int WARP_TRAIL_SEGMENTS = 5;
 
     constexpr std::array<LayerConfig, NUM_LAYERS> LAYERS{{
         {-12.0f, -6.0f, 0.2f, 0.6f, 28000},
@@ -117,7 +118,7 @@ namespace example {
             : mxvk::VK_Window("MXVK Starfield", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               data_root(data_root),
               particles(NUM_PARTICLES),
-              vertices(NUM_PARTICLES) {
+              vertices(NUM_PARTICLES * WARP_TRAIL_SEGMENTS) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             init_particles();
             last_update_time = SDL_GetTicks();
@@ -133,9 +134,9 @@ namespace example {
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
-            } else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_UP) {
+            } else if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE) {
                 boost_requested = true;
-            } else if (e.type == SDL_EVENT_KEY_UP && e.key.key == SDLK_UP) {
+            } else if (e.type == SDL_EVENT_KEY_UP && e.key.key == SDLK_SPACE) {
                 boost_requested = false;
             }
         }
@@ -158,8 +159,8 @@ namespace example {
             global_time += delta_time;
             update_boost(delta_time);
 
-            update_particles(delta_time);
-            point_batch.upload_vertices(vertices.data(), vertices.size());
+            const size_t active_vertices = update_particles(delta_time);
+            point_batch.upload_vertices(vertices.data(), active_vertices);
             point_batch.update_mvp(image_index, make_mvp());
             point_batch.render(cmd, image_index);
         }
@@ -226,11 +227,13 @@ namespace example {
             }
         }
 
-        void update_particles(float delta_time) {
+        [[nodiscard]] size_t update_particles(float delta_time) {
             const float speed_multiplier = 1.0f + boost_amount * 10.0f;
             const float forward_boost = boost_amount * 2.85f;
             const float brightness_boost = 1.0f + boost_amount * 1.15f;
             const float size_boost = 1.0f + boost_amount * 0.85f;
+            const float warp_trail_amount = glm::smoothstep(0.05f, 1.0f, boost_amount);
+            size_t vertex_count = 0;
 
             for (int i = 0; i < NUM_PARTICLES; ++i) {
                 auto &particle = particles[static_cast<size_t>(i)];
@@ -268,16 +271,45 @@ namespace example {
                 const float size_pulse = 1.0f + 0.2f * std::sin(global_time * particle.pulse_speed + particle.twinkle_phase);
                 const float size = particle.base_size * size_pulse * depth_factor * size_boost;
                 const float alpha = particle.life * glm::clamp(depth_factor + 0.2f, 0.0f, 1.0f);
-                auto &vertex = vertices[static_cast<size_t>(i)];
-                vertex.position[0] = particle.x;
-                vertex.position[1] = particle.y;
-                vertex.position[2] = particle.z;
-                vertex.size = size;
-                vertex.color[0] = color.r;
-                vertex.color[1] = color.g;
-                vertex.color[2] = color.b;
-                vertex.color[3] = alpha;
+
+                const float radial_distance = std::sqrt(particle.x * particle.x + particle.y * particle.y);
+                const float radial_factor = radial_distance > 0.0001f ? 1.0f / radial_distance : 0.0f;
+                const float direction_x = particle.x * radial_factor;
+                const float direction_y = particle.y * radial_factor;
+                const float warp_spread = 1.0f + warp_trail_amount * (0.35f + depth_factor * 1.8f);
+                const float display_x = particle.x * warp_spread;
+                const float display_y = particle.y * warp_spread;
+
+                write_vertex(vertex_count++, display_x, display_y, particle.z, size, color, alpha);
+
+                if (warp_trail_amount > 0.0f) {
+                    const int trail_segments = 1 + static_cast<int>(warp_trail_amount * static_cast<float>(WARP_TRAIL_SEGMENTS - 1));
+                    const float trail_spacing = warp_trail_amount * (0.05f + depth_factor * 0.18f);
+                    for (int trail = 1; trail < trail_segments; ++trail) {
+                        const float trail_step = static_cast<float>(trail) / static_cast<float>(WARP_TRAIL_SEGMENTS - 1);
+                        const float trail_alpha = alpha * warp_trail_amount * (1.0f - trail_step) * 0.55f;
+                        const float trail_size = size * (1.0f + warp_trail_amount * (0.9f - trail_step * 0.45f));
+                        const float trail_x = display_x - direction_x * trail_spacing * static_cast<float>(trail);
+                        const float trail_y = display_y - direction_y * trail_spacing * static_cast<float>(trail);
+                        const float trail_z = particle.z - warp_trail_amount * 0.02f * static_cast<float>(trail);
+                        write_vertex(vertex_count++, trail_x, trail_y, trail_z, trail_size, color, trail_alpha);
+                    }
+                }
             }
+
+            return vertex_count;
+        }
+
+        void write_vertex(size_t index, float x, float y, float z, float size, const glm::vec4 &color, float alpha) {
+            auto &vertex = vertices[index];
+            vertex.position[0] = x;
+            vertex.position[1] = y;
+            vertex.position[2] = z;
+            vertex.size = size;
+            vertex.color[0] = color.r;
+            vertex.color[1] = color.g;
+            vertex.color[2] = color.b;
+            vertex.color[3] = alpha;
         }
 
         [[nodiscard]] glm::mat4 make_mvp() const {
