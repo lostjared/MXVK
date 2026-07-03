@@ -19,6 +19,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Command Line Arguments](#command-line-arguments)
 - [VK_Window Post-Processing](#vk-window-post-processing)
 - [Debugging Examples](#debugging-examples)
+- [Model Viewer Tools](#model-viewer-tools)
 - [Examples](#examples)
 - [Recent Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
@@ -247,6 +248,7 @@ Examples:
 ./run.pl 3dmath_cube
 ./run.pl 3dmath_texture --filename ./examples/sprite_example/data/intro.png
 ./run.pl model_example
+./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl planet
 ./run.pl surface
 ./run.pl starfield
@@ -312,6 +314,32 @@ Examples:
 ./debug.pl opencv_example --camera 0 -r 1280x720
 ```
 
+<a id="model-viewer-tools"></a>
+
+## Model Viewer Tools
+
+MXVK includes two related model inspection tools:
+
+- `examples/viewer` builds the `viewer` executable. It is the direct Vulkan renderer for loading and inspecting `.obj`, `.mxmod`, and `.mxmod.z` model files from the command line. It uses `VKAbstractModel`, the viewer-specific model shaders, and the shared MXVK window/input path. Use this when you want a lightweight renderer, a quick model smoke test, or a backend that can be launched by another tool.
+- `model_viewer` is a Qt6 desktop front end for the `viewer` executable. It provides file pickers, drag-and-drop, recent files, resolution presets, persistent settings, and a live process console. It does not replace the renderer; it launches `viewer` with the selected model, texture manifest, texture directory, and resolution.
+
+Build `viewer` through the normal root build:
+
+```bash
+cmake -S . -B build
+cmake --build build -j
+./run.pl viewer --filename ./models/moon.mxmod.z
+```
+
+Build the Qt front end from its own directory after the root `viewer` target is available:
+
+```bash
+cmake -S model_viewer -B model_viewer/build
+cmake --build model_viewer/build -j
+```
+
+If `model_viewer` cannot find `viewer` automatically, set the renderer path from its settings dialog.
+
 <a id="examples"></a>
 
 ## Examples
@@ -350,6 +378,7 @@ These programs are not intended as standalone applications. They are small visua
 
 ### 3D Viewers
 
+- `viewer` - general-purpose model inspection renderer for OBJ, MXMOD, and compressed MXMOD assets. It defaults to `cube.mxmod.z`, accepts `--filename`, `--texture`, `--resource_path`, `--shader-path`, and common window arguments, and is the backend launched by the Qt `model_viewer` app. **Controls:** left mouse drag or arrow keys rotate, mouse wheel / `+` / `-` / `A` / `S` zoom, `W` toggles wireframe, `R` or `P` toggles auto-rotate, `H` or `Space` toggles help, `Home` resets the view, `Escape` quits.
 - `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. By default it loads `data/pyramid.obj` from the example asset directory. `--filename` overrides the model file, `--resource` can point at a texture manifest, `--resource_path` can override the texture lookup directory, and `--binary` replaces the model's texture with animated Matrix-style green rain while also enabling the skybox toggle. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, `--resource_path`, and `--binary`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Enter` toggles skybox mode when `--binary` is enabled, `W/A/S/D` look around inside the skybox view, `Escape` quits.
 - `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging. **Inputs:** common `-p`, `-r`, `-f`, `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
 - `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
@@ -518,6 +547,10 @@ For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`,
 	- Engine source, headers, built-in shaders, and the `mxvk/mxvk_math.h` math helpers used by the 3D math tests.
 - `examples/`
 	- Runnable examples and sample assets.
+- `examples/viewer/`
+	- Command-line Vulkan model viewer backend for OBJ and MXMOD model inspection.
+- `model_viewer/`
+	- Qt6 desktop launcher for the `viewer` renderer with file selection, recent files, and process output.
 - `models/`
 	- Model assets used by model-based examples.
 - `volk/`

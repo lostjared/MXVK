@@ -1,43 +1,54 @@
-# MXMOD Model Viewer
+# Model Viewer
 
-A Qt6-based GUI front end for viewing 3D mesh and model files with the MXVK **viewer** application.
+A Qt6 desktop front end for launching the MXVK `viewer` renderer with selected model, texture, and resolution options.
 
 <img width="1923" height="1206" alt="Screenshot" src="https://github.com/user-attachments/assets/5f410902-a5c5-4eca-ba6f-1fdd45c0e13c" />
 
 ## Overview
 
-MXMOD Model Viewer provides a desktop application for loading, inspecting, and rendering 3D models stored in `.mxmod`, `.mxmod.z` (compressed), and `.obj` formats. The viewer launches the MXVK `viewer` renderer and displays its output in a built-in console.
+`model_viewer` is the GUI companion to `examples/viewer`. It does not render models itself; it starts the repository `viewer` executable as a child process and passes the selected model path, optional texture manifest, optional texture directory, and resolution.
+
+Use this application when you want file dialogs, drag-and-drop, recent files, persistent settings, and a live stdout/stderr console around the lower-level Vulkan renderer.
 
 ## Features
 
-- **MXVK viewer backend** — launches the repository `viewer` executable
-- **Supported model formats** — `.mxmod`, `.mxmod.z` (zlib-compressed), and Wavefront `.obj`
-- **Texture support** — optionally load `.tex`, `.png`, `.jpg`, `.bmp`, and `.mtl` texture files; texture directory can override relative lookup paths
-- **Resolution presets** — 720p, 1080p, 1440p, and 4K launch sizes
-- **Drag and drop** — drop model or texture files directly onto the window
-- **Recent files** — quick access to previously opened models
-- **Real-time console** — timestamped stdout/stderr from the renderer with color-coded errors
-- **Persistent settings** — window size, position, paths, and preferences are saved between sessions
-- **Custom stylesheet** — ships with a dark theme via `stylesheet.qss`
+- MXVK `viewer` backend launched as a separate process.
+- Model selection for `.mxmod`, `.mxmod.z`, and Wavefront `.obj` files.
+- Optional texture or material selection for `.tex`, `.png`, `.jpg`, `.bmp`, and `.mtl` files.
+- Optional texture directory override for relative resource lookup.
+- Resolution presets for 720p, 1080p, 1440p, and 4K.
+- Drag-and-drop support for model and texture files.
+- Recent-model list with per-entry removal.
+- Real-time process console for renderer stdout and stderr.
+- Persistent settings for window geometry, paths, and preferences.
+- Bundled dark stylesheet through `stylesheet.qss`.
 
 ## Prerequisites
 
-- **Qt 6** (Core, Gui, Widgets)
-- **CMake 3.16+**
-- **C++20** compatible compiler
-- The MXVK `viewer` executable built from this repository, available next to `model_viewer` or on your `PATH`
+- Qt 6 Core, Gui, and Widgets.
+- CMake 3.16+.
+- A C++20 compatible compiler.
+- The MXVK `viewer` executable built from this repository.
 
 ## Building
 
+First build the root project so the `viewer` renderer exists:
+
 ```bash
-mkdir build && cd build
-cmake ..
-make
+cmake -S . -B build
+cmake --build build -j
 ```
 
-The build will automatically copy the `data/` directory (models, textures, shaders, fonts) alongside the executable.
+Then build this Qt front end:
 
-Alternatively, open `model_viewer.pro` in Qt Creator for a qmake-based workflow.
+```bash
+cmake -S model_viewer -B model_viewer/build
+cmake --build model_viewer/build -j
+```
+
+The build copies this directory's `data/` folder next to the `model_viewer` executable.
+
+The application looks for the `viewer` renderer automatically. If it is not found next to `model_viewer` or on `PATH`, open **Help -> Settings** and set the renderer executable path manually, usually to `build/examples/viewer/viewer`.
 
 ## Usage
 
@@ -62,16 +73,23 @@ The renderer's output streams into the console pane in real time. Use **Stop** t
 
 ### Settings
 
-Go to **Help → Settings** to configure a custom path to the renderer executable if auto-detection or your system `PATH` is not sufficient.
+Go to **Help -> Settings** to configure a custom path to the renderer executable if auto-detection or your system `PATH` is not sufficient.
+
+## Relationship To `viewer`
+
+- `examples/viewer` is the Vulkan renderer and can be run directly with `./run.pl viewer`.
+- `model_viewer` is the Qt launcher that gathers model options and starts `viewer`.
+- Rendering behavior, model support, shader use, and camera controls belong to `viewer`; this GUI focuses on process launch, file selection, and output display.
 
 ## Included Data
 
-The `data/` directory ships with a collection of sample models and textures:
+The `data/` directory contains the GUI stylesheet copied next to the executable at build time.
 
-- Various `.mxmod` models (UFOs, ships, trees, planets, geometric shapes, etc.)
-- Texture files in `.tex` and `.png` formats
-- Pre-compiled SPIR-V shaders (`.spv`) and GLSL sources for the Vulkan backend
-- A TrueType font for in-viewer text rendering
+Sample models and renderer shaders live outside this directory:
+
+- Model assets are in the repository `models/` directory.
+- The Vulkan renderer source and shaders are in `examples/viewer/`.
+- Runtime shader outputs are generated by the root build when the `viewer` target is built.
 
 ## WebAssembly Build
 
