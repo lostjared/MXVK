@@ -1,8 +1,8 @@
 # Model Viewer
 
-A Qt6 desktop front end for launching the MXVK `viewer` renderer with selected model, texture, and resolution options.
+<img width="1280" height="720" alt="viewer" src="https://github.com/user-attachments/assets/df3f29a2-fa0b-4c15-97c8-2dbb5194aa13" />
 
-<img width="1923" height="1206" alt="Screenshot" src="https://github.com/user-attachments/assets/5f410902-a5c5-4eca-ba6f-1fdd45c0e13c" />
+A Qt6 desktop front end for launching the MXVK `viewer` renderer with selected model, texture, and resolution options.
 
 ## Overview
 
