@@ -1,4 +1,9 @@
 
+/**
+ * @file model_view.cpp
+ * @brief Implements the Qt launcher window for the MXVK command-line viewer.
+ */
+
 #include "model_view.hpp"
 #include <QCoreApplication>
 #include <QDateTime>
@@ -398,6 +403,7 @@ void MainWindow::openModelViewer() {
     consoleOutput->appendPlainText(QString("[%1] Starting model viewer...")
                                        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
 
+    // Mirror renderer stdout into the GUI console with wall-clock timestamps.
     connect(process, &QProcess::readyReadStandardOutput, [this, process]() {
         QByteArray output = process->readAllStandardOutput();
         QString text = QString::fromLocal8Bit(output).trimmed();
@@ -410,6 +416,7 @@ void MainWindow::openModelViewer() {
         scrollBar->setValue(scrollBar->maximum());
     });
 
+    // Keep stderr visible in the same console so launch failures are not hidden.
     connect(process, &QProcess::readyReadStandardError, [this, process]() {
         QByteArray error = process->readAllStandardError();
         QString text = QString::fromLocal8Bit(error).trimmed();
@@ -428,6 +435,7 @@ void MainWindow::openModelViewer() {
         scrollBar->setValue(scrollBar->maximum());
     });
 
+    // QProcess owns the renderer lifetime from launch until finished/error cleanup.
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             [this, process](int exitCode, QProcess::ExitStatus) {
                 QString exitMsg;
