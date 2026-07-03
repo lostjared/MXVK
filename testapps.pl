@@ -31,6 +31,7 @@ my @tests = qw(
     sprite3d_example
     static_example
     surface
+    pointsprite
     3dmath
     3dmath_cube 
     3dmath_masterpiece
