@@ -584,3 +584,12 @@ For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`,
 <img width="1280" height="720" alt="breakout720" src="https://github.com/user-attachments/assets/fc9c26ad-b3a7-450b-b3b9-366b93bbc80f" />
 
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
+
+  ## Model Viewer
+
+  <img width="1280" height="720" alt="viewer" src="https://github.com/user-attachments/assets/53ade4cc-5d05-4265-9c8d-fd606a239c87" />
+  
+
+
+  
+  
