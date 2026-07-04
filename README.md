@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.13.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, a dedicated `starfield` example, and expanded Doxygen coverage for the public rendering helpers.
+Current development is on version `0.15.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, a dedicated `starfield` example, expanded Doxygen coverage for the public rendering helpers, and a fuller Mutatris demo with shader effects and optional music.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -143,7 +143,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.13.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
+The current Doxygen project version is `0.15.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
 
 
 <a id="command-line-arguments"></a>
@@ -400,7 +400,7 @@ These programs are not intended as standalone applications. They are small visua
 - `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Enter`, `Space`, `Escape`, and `Back`; in-game controls include arrow keys, `Space` to charge a shot, `Enter` to confirm cue-ball placement, mouse drag for aiming, right mouse drag to rotate the camera, and wheel or pinch to zoom.
 - `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Up` / `Down` navigate menus, `Left` / `Right` move blocks, `Space` rotates, `P` pauses, `Escape` backs out or quits, and text entry uses `Backspace` / `Enter`.
 - `puzzle_drop` - 3D Acid Drop-style block puzzle with an intro, Matrix-rain backdrop, textured cube pieces, selectable difficulty, keyboard controls, and gamepad support. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` / `Space` skips the intro, `1` / `2` / `3` starts difficulty levels, `Left` / `Right` move, `Down` soft drops, `Up` cycles piece blocks, `Z` / `X` rotate, `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Escape` quits.
-- `mutatris` - four-sided falling-block puzzle game with rotating board focus, selectable difficulty, animated backgrounds, startup/title/game-over screens, and keyboard, mouse/touch, and gamepad input. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter`, `Space`, click, tap, or gamepad start advances menus; `Left` / `Right` select difficulty; in game, arrows move relative to the active side, `W` or the active side's color-cycle arrow shifts piece colors, `A` / `Space` rotates, `S` hard drops, and `Escape` quits.
+- `mutatris` - four-sided falling-block puzzle game with rotating board focus, selectable difficulty, animated backgrounds, randomized shader effects that change by level, startup/title/game-over screens, optional SDL3_mixer music and sound effects, and keyboard, mouse/touch, gamepad, and console input. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter`, `Space`, click, tap, or gamepad start advances menus; `Left` / `Right` select difficulty; in game, arrows move relative to the active side, `W` or the active side's color-cycle arrow shifts piece colors, `A` / `Space` rotates, `S` hard drops, `F3` toggles the console, and `Escape` quits.
 - `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menu navigation uses `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `A` or `Up` rotate forward, `S` rotate backward, `P` pause, `Escape` return to menu, with typed input for high-score entry.
 - `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `Up` rotate, `Z` hard drop, `R` restart, `Escape` menu, camera controls use `W` / `A` / `S` / `D`, `Q` / `E`, `Page Up` / `Page Down`, and multiplayer uses `H` to host and `J` / `Enter` to join.
 
@@ -417,6 +417,11 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 4, 2026: `testapps.pl` now supports timeout smoke testing. Pass `--timeout` or `--timeout=<seconds>` to run each example briefly, terminate it, continue through the list, and print a collected success/failure summary.
+- July 4, 2026: `mutatris` now compiles a shader effect pack from `examples/mutatris/shaders/effects`, chooses a new background/effect combination as levels advance, and exposes a console `switch_shader` command for manually selecting another random effect.
+- July 4, 2026: `mutatris` gained optional SDL3_mixer playback for `music.ogg`, `line.wav`, and `open.wav` when built with `-DMIXER=ON`.
+- July 4, 2026: `mutatris` clearing now uses fixed-duration block-clear animation frames and visual matching across the top/bottom board layout, including seam matches that span the divider.
+- July 3, 2026: the project version moved to `0.15.0`, and `Doxyfile` now reports the same version for generated API documentation.
 - July 2, 2026: the project version moved to `0.13.0`, and `Doxyfile` now reports the same version for generated API documentation.
 - July 2, 2026: `mxvk_resource.hpp` / `mxvk_resource.cpp` provide reusable Vulkan buffer, image, texture upload, image-view, memory-type, layout-transition, and one-shot command helpers. These utilities centralize common allocation/upload code for new renderer components.
 - July 2, 2026: `mxvk::VK_PointSpriteBatch` was added as a reusable point-list renderer for particle effects. It owns a persistently mapped vertex buffer, sampled point texture, per-swapchain MVP uniform buffers, descriptors, dynamic-rendering pipeline, pipeline-cache integration, resize handling, additive or alpha blending, and optional depth testing/writes.
