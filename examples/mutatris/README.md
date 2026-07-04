@@ -1,5 +1,7 @@
 # Mutatris
 
+<img width="1280" height="720" alt="vlcsnap-2026-07-03-20h52m25s796" src="https://github.com/user-attachments/assets/60e1cc26-32de-4160-96ec-c25155c3e23d" />
+
 Mutatris is a four-sided falling-block puzzle game built with MXVK, Vulkan, and SDL3. Three-block pieces enter one side of the playfield at a time, then the active side rotates around the board after a piece locks. The game includes startup logos, a title screen, Easy/Medium/Hard difficulty selection, animated backgrounds, and game-over or high-score presentation screens.
 
 ## How To Play
