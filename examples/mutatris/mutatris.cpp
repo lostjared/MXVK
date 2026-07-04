@@ -15,6 +15,7 @@
 
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
+#include "mxvk/mxvk_console.hpp"
 #include "mxvk/mxvk_exception.hpp"
 
 #ifndef mutatris_ASSET_DIR
@@ -371,12 +372,25 @@ namespace {
               shaderRoot(mutatris_SHADER_DIR) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             setFont(mutatris_FONT_PATH, 24);
+            configureConsole();
             loadSprites();
             startupStartTick = SDL_GetTicks();
+            logMutatris(std::format("Mutatris ready. {} shader effect(s) available.", effectShaders.size()));
         }
 
         void event(SDL_Event &e) override {
+            const bool wasConsoleVisible = console.isVisible();
+            const bool consoleToggle = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F3;
+            console.handleEvent(e);
+            if (consoleToggle) {
+                logMutatris(console.isVisible() ? "Console opened." : "Console closed.");
+                return;
+            }
+            if (wasConsoleVisible) {
+                return;
+            }
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
+                logMutatris("Exit requested.");
                 exit();
                 return;
             }
@@ -411,6 +425,7 @@ namespace {
                 drawGameOver();
                 break;
             }
+            console.draw();
         }
 
       private:
@@ -420,6 +435,7 @@ namespace {
         std::array<mxvk::VK_Sprite *, 8> blocks{};
         std::array<mxvk::VK_Sprite *, 11> backgrounds{};
         std::vector<std::string> effectShaders;
+        mxvk::VK_Console console;
         mxvk::VK_Sprite *intro = nullptr;
         mxvk::VK_Sprite *start = nullptr;
         mxvk::VK_Sprite *lostLogo = nullptr;
@@ -446,6 +462,110 @@ namespace {
         std::mt19937 shaderRandom{std::random_device{}()};
         int shaderLevel = -1;
         int shaderIndex = -1;
+
+        void configureConsole() {
+            console.attach(*this, mutatris_FONT_PATH, 24);
+            console.setSpriteYOriginTopLeft(true);
+            console.setPrompt("mutatris> ");
+            console.printLine("Press F3 to open/close the console.");
+            console.printLine("Type 'help' for commands.");
+            console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
+                if (args.empty()) {
+                    return true;
+                }
+
+                if (args[0] == "help") {
+                    out << "Commands:\n"
+                        << "  help            Show this help message\n"
+                        << "  clear           Clear the console output\n"
+                        << "  echo <text>     Print text to the console\n"
+                        << "  switch_shader   Pick a random background shader\n"
+                        << "  about           Show app information\n"
+                        << "  quit | exit     Close Mutatris";
+                    return true;
+                }
+
+                if (args[0] == "echo") {
+                    for (std::size_t i = 1; i < args.size(); ++i) {
+                        if (i > 1) {
+                            out << ' ';
+                        }
+                        out << args[i];
+                    }
+                    return true;
+                }
+
+                if (args[0] == "switch_shader") {
+                    const std::string shaderName = switchBackgroundShader(true);
+                    if (shaderName.empty()) {
+                        out << "No shader effects are available.";
+                    } else {
+                        logMutatris(std::format("Console command switch_shader selected {}", shaderName));
+                        out << std::format("Switched shader to {}", shaderName);
+                    }
+                    return true;
+                }
+
+                if (args[0] == "about") {
+                    out << "Mutatris: rotating-grid puzzle game built with MXVK.";
+                    return true;
+                }
+
+                if (args[0] == "quit" || args[0] == "exit") {
+                    out << "Closing Mutatris...";
+                    logMutatris("Exit requested from console.");
+                    exit();
+                    return true;
+                }
+
+                return false;
+            });
+        }
+
+        void logMutatris(const std::string &message) {
+            std::cout << std::format("mutatris: {}\n", message);
+            console.printLine(message, SDL_Color{180, 220, 255, 255});
+        }
+
+        [[nodiscard]] const char *screenName(Screen value) const {
+            switch (value) {
+            case Screen::Startup:
+                return "Startup";
+            case Screen::Title:
+                return "Title";
+            case Screen::Difficulty:
+                return "Difficulty";
+            case Screen::Playing:
+                return "Playing";
+            case Screen::GameOver:
+                return "GameOver";
+            }
+            return "Unknown";
+        }
+
+        [[nodiscard]] const char *focusName(int value) const {
+            switch (value) {
+            case 0:
+                return "Top";
+            case 1:
+                return "Left";
+            case 2:
+                return "Bottom";
+            case 3:
+                return "Right";
+            default:
+                return "Unknown";
+            }
+        }
+
+        void setScreen(Screen nextScreen, const std::string &reason) {
+            if (screen == nextScreen) {
+                return;
+            }
+            const Screen previousScreen = screen;
+            screen = nextScreen;
+            logMutatris(std::format("Screen changed {} -> {} ({})", screenName(previousScreen), screenName(nextScreen), reason));
+        }
 
         void loadSprites() {
             const std::string backgroundVertexShader = shaderRoot + "/background.vert.spv";
@@ -489,29 +609,32 @@ namespace {
                 }
             }
             std::sort(effectShaders.begin(), effectShaders.end());
+            std::cout << std::format("mutatris: loaded {} shader effect(s)\n", effectShaders.size());
         }
 
         void handleKey(SDL_Keycode key) {
             if (screen == Screen::Startup) {
-                screen = Screen::Title;
+                setScreen(Screen::Title, "startup confirmed");
                 return;
             }
             if (screen == Screen::Title && (key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_SPACE)) {
-                screen = Screen::Difficulty;
+                setScreen(Screen::Difficulty, "difficulty select opened");
                 return;
             }
             if (screen == Screen::Difficulty) {
                 if (key == SDLK_LEFT && difficulty > 0) {
                     --difficulty;
+                    logMutatris(std::format("Difficulty changed to {}", difficulty));
                 } else if (key == SDLK_RIGHT && difficulty < 2) {
                     ++difficulty;
+                    logMutatris(std::format("Difficulty changed to {}", difficulty));
                 } else if (key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_SPACE) {
                     startGame();
                 }
                 return;
             }
             if (screen == Screen::GameOver && (key == SDLK_SPACE || key == SDLK_RETURN || key == SDLK_KP_ENTER)) {
-                screen = Screen::Title;
+                setScreen(Screen::Title, "returned from game over");
                 return;
             }
             if (screen != Screen::Playing || game == nullptr) {
@@ -537,6 +660,7 @@ namespace {
 
         void handleGamepad(Uint8 button) {
             if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                logMutatris("Exit requested.");
                 exit();
                 return;
             }
@@ -545,8 +669,10 @@ namespace {
                     handleConfirm();
                 } else if (screen == Screen::Difficulty && button == SDL_GAMEPAD_BUTTON_DPAD_LEFT && difficulty > 0) {
                     --difficulty;
+                    logMutatris(std::format("Difficulty changed to {}", difficulty));
                 } else if (screen == Screen::Difficulty && button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT && difficulty < 2) {
                     ++difficulty;
+                    logMutatris(std::format("Difficulty changed to {}", difficulty));
                 }
                 return;
             }
@@ -575,13 +701,13 @@ namespace {
 
         void handleConfirm() {
             if (screen == Screen::Startup) {
-                screen = Screen::Title;
+                setScreen(Screen::Title, "startup confirmed");
             } else if (screen == Screen::Title) {
-                screen = Screen::Difficulty;
+                setScreen(Screen::Difficulty, "difficulty select opened");
             } else if (screen == Screen::Difficulty) {
                 startGame();
             } else if (screen == Screen::GameOver) {
-                screen = Screen::Title;
+                setScreen(Screen::Title, "returned from game over");
             }
         }
 
@@ -654,12 +780,28 @@ namespace {
             if (game == nullptr) {
                 return;
             }
+            const int previousScore = game->score;
+            const int previousClears = game->clears;
+            const int previousLevel = game->level;
+            const unsigned int previousTimeout = game->timeout;
             for (int i = 0; i < 4; ++i) {
                 game->procBlocks();
+            }
+            if (game->score != previousScore || game->clears != previousClears || game->level != previousLevel || game->timeout != previousTimeout) {
+                logMutatris(std::format("Grid processed. score {} -> {}, clears {} -> {}, level {} -> {}, timeout {} -> {}",
+                                        previousScore,
+                                        game->score,
+                                        previousClears,
+                                        game->clears,
+                                        previousLevel + 1,
+                                        game->level + 1,
+                                        previousTimeout,
+                                        game->timeout));
             }
         }
 
         void advanceFocus() {
+            const int previousFocus = focus;
             if (focus == 0) {
                 focus = 3;
             } else if (focus == 3) {
@@ -670,6 +812,7 @@ namespace {
                 focus = 0;
             }
             lastDropTick = SDL_GetTicks();
+            logMutatris(std::format("Focus advanced {} -> {}.", focusName(previousFocus), focusName(focus)));
         }
 
         void startGame() {
@@ -678,7 +821,8 @@ namespace {
             lastDropTick = SDL_GetTicks();
             shaderLevel = -1;
             shaderIndex = -1;
-            screen = Screen::Playing;
+            setScreen(Screen::Playing, "new game");
+            logMutatris(std::format("New game started. difficulty={} timeout={}", difficulty, game->timeout));
         }
 
         void drawStartup() {
@@ -708,7 +852,7 @@ namespace {
                 const Uint32 phaseElapsed = elapsed - SECOND_FADE_OUT_END;
                 drawTitleWithAlpha(static_cast<float>(phaseElapsed) / static_cast<float>(STARTUP_FADE_MS));
             } else {
-                screen = Screen::Title;
+                setScreen(Screen::Title, "startup sequence complete");
             }
         }
 
@@ -766,15 +910,18 @@ namespace {
             drawGrid(1);
             drawGrid(2);
             drawGrid(3);
-            printScaledText("Level: " + std::to_string(game->level + 1) + "  Timeout: " + std::to_string(game->timeout), 25, 25, {255, 255, 255, 255});
-            printScaledText("Score: " + std::to_string(game->score), 25, 55, {255, 255, 255, 255});
-            printScaledText("Direction: " + std::to_string(focus), 25, 85, {255, 255, 255, 255});
-            printScaledText("Arrows move  W shift  A rotate  S drop", 25, 670, {220, 220, 220, 255});
+            if (!console.isVisible()) {
+                printScaledText("Level: " + std::to_string(game->level + 1) + "  Timeout: " + std::to_string(game->timeout), 25, 25, {255, 255, 255, 255});
+                printScaledText("Score: " + std::to_string(game->score), 25, 55, {255, 255, 255, 255});
+                printScaledText("Direction: " + std::to_string(focus), 25, 85, {255, 255, 255, 255});
+                printScaledText("Arrows move  W shift  A rotate  S drop", 25, 670, {220, 220, 220, 255});
+            }
 
             const Uint32 now = SDL_GetTicks();
             if (now - lastDropTick >= game->timeout) {
                 if (game->grid[focus].canMoveDown()) {
                     if (game->grid[focus].gamePiece.moveDown()) {
+                        logMutatris(std::format("Timer drop advanced piece on {} grid.", focusName(focus)));
                         processGrid();
                         advanceFocus();
                     }
@@ -782,17 +929,27 @@ namespace {
                 } else {
                     finalScore = game->score;
                     finalClears = game->clears;
-                    screen = Screen::GameOver;
+                    setScreen(Screen::GameOver, "active grid blocked");
+                    logMutatris(std::format("Game over. score={} clears={}", finalScore, finalClears));
                 }
             }
         }
 
         void updateBackgroundShaderForLevel() {
-            if (game == nullptr || effectShaders.empty() || game->level == shaderLevel) {
+            if (game == nullptr || game->level == shaderLevel) {
                 return;
             }
             shaderLevel = game->level;
+            const std::string shaderName = switchBackgroundShader(false);
+            if (!shaderName.empty()) {
+                logMutatris(std::format("Level {} selected shader {}", game->level + 1, shaderName));
+            }
+        }
 
+        std::string switchBackgroundShader(bool force) {
+            if (effectShaders.empty()) {
+                return {};
+            }
             std::uniform_int_distribution<int> shaderDistribution(0, static_cast<int>(effectShaders.size()) - 1);
             int nextShaderIndex = shaderDistribution(shaderRandom);
             if (effectShaders.size() > 1U) {
@@ -802,11 +959,16 @@ namespace {
             }
             shaderIndex = nextShaderIndex;
 
-            const int backgroundIndex = std::clamp(game->level, 0, static_cast<int>(backgrounds.size()) - 1);
+            const int targetLevel = game != nullptr ? game->level : 0;
+            const int backgroundIndex = std::clamp(targetLevel, 0, static_cast<int>(backgrounds.size()) - 1);
             mxvk::VK_Sprite *background = backgrounds[static_cast<std::size_t>(backgroundIndex)];
             if (background != nullptr) {
                 background->setFragmentShaderPath(effectShaders[static_cast<std::size_t>(shaderIndex)]);
             }
+            if (force) {
+                shaderLevel = targetLevel;
+            }
+            return std::filesystem::path(effectShaders[static_cast<std::size_t>(shaderIndex)]).filename().string();
         }
 
         void drawGameOver() {
