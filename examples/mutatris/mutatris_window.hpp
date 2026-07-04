@@ -89,6 +89,7 @@ namespace mutatris {
         void handleKey(SDL_Keycode key);
         void handleGamepad(Uint8 button);
         void handleConfirm();
+        [[nodiscard]] bool isStartupTitleFullyVisible() const;
         void handleDirectionalKey(SDL_Keycode key);
         void processGrid();
         void advanceFocus();

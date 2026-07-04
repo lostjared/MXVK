@@ -273,7 +273,11 @@ namespace mutatris {
 
     void MutatrisWindow::handleKey(SDL_Keycode key) {
         if (screen == Screen::Startup) {
-            setScreen(Screen::Title, "startup confirmed");
+            if ((key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_SPACE) && isStartupTitleFullyVisible()) {
+                setScreen(Screen::Difficulty, "difficulty select opened");
+            } else {
+                setScreen(Screen::Title, "startup confirmed");
+            }
             return;
         }
         if (screen == Screen::Title && (key == SDLK_RETURN || key == SDLK_KP_ENTER || key == SDLK_SPACE)) {
@@ -360,7 +364,11 @@ namespace mutatris {
 
     void MutatrisWindow::handleConfirm() {
         if (screen == Screen::Startup) {
-            setScreen(Screen::Title, "startup confirmed");
+            if (isStartupTitleFullyVisible()) {
+                setScreen(Screen::Difficulty, "difficulty select opened");
+            } else {
+                setScreen(Screen::Title, "startup confirmed");
+            }
         } else if (screen == Screen::Title) {
             setScreen(Screen::Difficulty, "difficulty select opened");
         } else if (screen == Screen::Difficulty) {
@@ -368,6 +376,17 @@ namespace mutatris {
         } else if (screen == Screen::GameOver) {
             setScreen(Screen::Title, "returned from game over");
         }
+    }
+
+    bool MutatrisWindow::isStartupTitleFullyVisible() const {
+        const Uint32 elapsed = SDL_GetTicks() - startupStartTick;
+        constexpr Uint32 FIRST_FADE_IN_END = STARTUP_FADE_MS;
+        constexpr Uint32 FIRST_FADE_OUT_END = FIRST_FADE_IN_END + STARTUP_FADE_MS;
+        constexpr Uint32 SECOND_FADE_IN_END = FIRST_FADE_OUT_END + STARTUP_FADE_MS;
+        constexpr Uint32 SECOND_HOLD_END = SECOND_FADE_IN_END + STARTUP_HOLD_MS;
+        constexpr Uint32 SECOND_FADE_OUT_END = SECOND_HOLD_END + STARTUP_FADE_MS;
+
+        return elapsed >= SECOND_FADE_OUT_END;
     }
 
     void MutatrisWindow::handleDirectionalKey(SDL_Keycode key) {
