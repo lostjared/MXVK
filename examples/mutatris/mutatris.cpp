@@ -7,6 +7,7 @@
 #include <ctime>
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -17,6 +18,9 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_console.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+#include "mxvk/mxvk_sound.hpp"
+#endif
 
 #ifndef mutatris_ASSET_DIR
 #define mutatris_ASSET_DIR "."
@@ -62,7 +66,6 @@ namespace {
     };
 
     class GameGrid;
-    using SwitchCallback = void (*)();
 
     class Piece {
       public:
@@ -246,7 +249,8 @@ namespace {
 
     class PuzzleGame {
       public:
-        explicit PuzzleGame(int difficulty) {
+        explicit PuzzleGame(int difficulty, std::function<void()> lineSoundCallback)
+            : playLineSound(std::move(lineSoundCallback)) {
             newGame(difficulty);
         }
 
@@ -304,6 +308,7 @@ namespace {
             if (blocks[3] != nullptr && blocks[3]->color == blocks[0]->color) {
                 markClearing(*blocks[3]);
                 score += 10;
+                playClearSound();
             }
             markClearing(*blocks[0]);
             markClearing(*blocks[1]);
@@ -313,6 +318,7 @@ namespace {
             if ((clears % 4) == 0 && timeout > 125) {
                 timeout -= 25;
             }
+            playClearSound();
             return true;
         }
 
@@ -339,6 +345,7 @@ namespace {
             if (blocks[3] != nullptr && blocks[3]->color == blocks[0]->color) {
                 markClearing(*blocks[3]);
                 score += 10;
+                playClearSound();
             }
             markClearing(*blocks[0]);
             markClearing(*blocks[1]);
@@ -348,6 +355,7 @@ namespace {
             if ((clears % 4) == 0 && timeout > 125) {
                 timeout -= 25;
             }
+            playClearSound();
             return true;
         }
 
@@ -370,6 +378,14 @@ namespace {
             block.color = -1;
             block.clearElapsedMs = 0;
         }
+
+        void playClearSound() {
+            if (playLineSound) {
+                playLineSound();
+            }
+        }
+
+        std::function<void()> playLineSound;
     };
 
     class MutatrisWindow final : public mxvk::VK_Window {
@@ -383,6 +399,8 @@ namespace {
             setFont(mutatris_FONT_PATH, 24);
             configureConsole();
             loadSprites();
+            loadSoundEffects();
+            playSound(openSound);
             startupStartTick = SDL_GetTicks();
             logMutatris(std::format("Mutatris ready. {} shader effect(s) available.", effectShaders.size()));
         }
@@ -417,6 +435,7 @@ namespace {
             width = extent.width > 0U ? static_cast<int>(extent.width) : DESIGN_WIDTH;
             height = extent.height > 0U ? static_cast<int>(extent.height) : DESIGN_HEIGHT;
 
+            ensureMusicPlaying();
             switch (screen) {
             case Screen::Startup:
                 drawStartup();
@@ -472,6 +491,12 @@ namespace {
         std::mt19937 shaderRandom{std::random_device{}()};
         int shaderLevel = -1;
         int shaderIndex = -1;
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::unique_ptr<mxvk::VK_Mixer> soundEffects{};
+#endif
+        int musicTrack = -1;
+        int lineSound = -1;
+        int openSound = -1;
 
         void configureConsole() {
             console.attach(*this, mutatris_FONT_PATH, 24);
@@ -620,6 +645,39 @@ namespace {
             }
             std::sort(effectShaders.begin(), effectShaders.end());
             std::cout << std::format("mutatris: loaded {} shader effect(s)\n", effectShaders.size());
+        }
+
+        void loadSoundEffects() {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            soundEffects = std::make_unique<mxvk::VK_Mixer>();
+            musicTrack = soundEffects->loadMusic(dataRoot + "/music.ogg");
+            lineSound = soundEffects->loadWav(dataRoot + "/line.wav");
+            openSound = soundEffects->loadWav(dataRoot + "/open.wav");
+            logMutatris("Loaded original Mutatris sound effects.");
+            ensureMusicPlaying();
+#endif
+        }
+
+        void playSound(int soundId) {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (soundEffects == nullptr || soundId < 0) {
+                return;
+            }
+            soundEffects->playWav(soundId);
+#else
+            (void)soundId;
+#endif
+        }
+
+        void ensureMusicPlaying() {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (soundEffects == nullptr || musicTrack < 0 || soundEffects->isMusicPlaying(musicTrack)) {
+                return;
+            }
+            if (soundEffects->playMusic(musicTrack, -1) != 0) {
+                throw mxvk::Exception("Could not start Mutatris background music");
+            }
+#endif
         }
 
         void handleKey(SDL_Keycode key) {
@@ -826,7 +884,9 @@ namespace {
         }
 
         void startGame() {
-            game = std::make_unique<PuzzleGame>(difficulty);
+            game = std::make_unique<PuzzleGame>(difficulty, [this]() {
+                playSound(lineSound);
+            });
             focus = 0;
             lastDropTick = SDL_GetTicks();
             lastClearAnimationTick = lastDropTick;
