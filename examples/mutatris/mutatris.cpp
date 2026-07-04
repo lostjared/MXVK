@@ -51,6 +51,9 @@ namespace {
     constexpr Uint32 KEY_REPEAT_MS = 120;
     constexpr Uint32 CLEAR_ANIMATION_MS = 400;
     constexpr int CLEAR_ANIMATION_FRAMES = 24;
+    constexpr int CLEARS_PER_LEVEL = 8;
+    constexpr int LEVEL_TIMEOUT_STEP_MS = 100;
+    constexpr unsigned int MIN_DROP_TIMEOUT_MS = 125;
 
     enum class Screen {
         Startup,
@@ -429,10 +432,7 @@ namespace {
                                 }
                             }
                             ++score;
-                            ++clears;
-                            if ((clears % 4) == 0 && timeout > 125) {
-                                timeout -= 25;
-                            }
+                            recordClear();
                             playClearSound();
                             return true;
                         }
@@ -474,10 +474,7 @@ namespace {
                 markClearing(*block);
             }
             ++score;
-            ++clears;
-            if ((clears % 4) == 0 && timeout > 125) {
-                timeout -= 25;
-            }
+            recordClear();
             playClearSound();
             return true;
         }
@@ -511,10 +508,7 @@ namespace {
             markClearing(*blocks[1]);
             markClearing(*blocks[2]);
             ++score;
-            ++clears;
-            if ((clears % 4) == 0 && timeout > 125) {
-                timeout -= 25;
-            }
+            recordClear();
             playClearSound();
             return true;
         }
@@ -537,6 +531,13 @@ namespace {
         static void markClearing(Block &block) {
             block.color = -1;
             block.clearElapsedMs = 0;
+        }
+
+        void recordClear() {
+            ++clears;
+            if ((clears % CLEARS_PER_LEVEL) == 0 && timeout > MIN_DROP_TIMEOUT_MS) {
+                timeout = static_cast<unsigned int>(std::max(static_cast<int>(MIN_DROP_TIMEOUT_MS), static_cast<int>(timeout) - LEVEL_TIMEOUT_STEP_MS));
+            }
         }
 
         void playClearSound() {
@@ -651,6 +652,7 @@ namespace {
         std::mt19937 shaderRandom{std::random_device{}()};
         int shaderLevel = -1;
         int shaderIndex = -1;
+        int backgroundIndex = -1;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> soundEffects{};
 #endif
@@ -674,7 +676,7 @@ namespace {
                         << "  help            Show this help message\n"
                         << "  clear           Clear the console output\n"
                         << "  echo <text>     Print text to the console\n"
-                        << "  switch_shader   Pick a random background shader\n"
+                        << "  switch_shader   Pick a random background and shader\n"
                         << "  about           Show app information\n"
                         << "  quit | exit     Close Mutatris";
                     return true;
@@ -695,8 +697,8 @@ namespace {
                     if (shaderName.empty()) {
                         out << "No shader effects are available.";
                     } else {
-                        logMutatris(std::format("Console command switch_shader selected {}", shaderName));
-                        out << std::format("Switched shader to {}", shaderName);
+                        logMutatris(std::format("Console command switch_shader selected {} with shader {}", backgroundName(backgroundIndex), shaderName));
+                        out << std::format("Switched to {} with shader {}", backgroundName(backgroundIndex), shaderName);
                     }
                     return true;
                 }
@@ -1052,6 +1054,7 @@ namespace {
             lastClearAnimationTick = lastDropTick;
             shaderLevel = -1;
             shaderIndex = -1;
+            backgroundIndex = -1;
             setScreen(Screen::Playing, "new game");
             logMutatris(std::format("New game started. difficulty={} timeout={}", difficulty, game->timeout));
         }
@@ -1131,7 +1134,7 @@ namespace {
             }
             processGrid();
             updateBackgroundShaderForLevel();
-            mxvk::VK_Sprite *background = backgrounds[static_cast<std::size_t>(std::clamp(game->level, 0, static_cast<int>(backgrounds.size()) - 1))];
+            mxvk::VK_Sprite *background = currentBackground();
             if (background != nullptr) {
                 background->setShaderParams(static_cast<float>(SDL_GetTicks()) / 1000.0f, 0.0f, 0.0f, 0.0f);
                 background->drawSpriteRect(0, 0, width, height);
@@ -1173,11 +1176,12 @@ namespace {
             shaderLevel = game->level;
             const std::string shaderName = switchBackgroundShader(false);
             if (!shaderName.empty()) {
-                logMutatris(std::format("Level {} selected shader {}", game->level + 1, shaderName));
+                logMutatris(std::format("Level {} selected {} with shader {}", game->level + 1, backgroundName(backgroundIndex), shaderName));
             }
         }
 
         std::string switchBackgroundShader(bool force) {
+            selectRandomBackground();
             if (effectShaders.empty()) {
                 return {};
             }
@@ -1191,8 +1195,7 @@ namespace {
             shaderIndex = nextShaderIndex;
 
             const int targetLevel = game != nullptr ? game->level : 0;
-            const int backgroundIndex = std::clamp(targetLevel, 0, static_cast<int>(backgrounds.size()) - 1);
-            mxvk::VK_Sprite *background = backgrounds[static_cast<std::size_t>(backgroundIndex)];
+            mxvk::VK_Sprite *background = currentBackground();
             if (background != nullptr) {
                 background->setFragmentShaderPath(effectShaders[static_cast<std::size_t>(shaderIndex)]);
             }
@@ -1200,6 +1203,31 @@ namespace {
                 shaderLevel = targetLevel;
             }
             return std::filesystem::path(effectShaders[static_cast<std::size_t>(shaderIndex)]).filename().string();
+        }
+
+        void selectRandomBackground() {
+            std::uniform_int_distribution<int> backgroundDistribution(0, static_cast<int>(backgrounds.size()) - 1);
+            int nextBackgroundIndex = backgroundDistribution(shaderRandom);
+            if (backgrounds.size() > 1U) {
+                while (nextBackgroundIndex == backgroundIndex) {
+                    nextBackgroundIndex = backgroundDistribution(shaderRandom);
+                }
+            }
+            backgroundIndex = nextBackgroundIndex;
+        }
+
+        [[nodiscard]] mxvk::VK_Sprite *currentBackground() {
+            if (backgroundIndex < 0) {
+                selectRandomBackground();
+            }
+            return backgrounds[static_cast<std::size_t>(std::clamp(backgroundIndex, 0, static_cast<int>(backgrounds.size()) - 1))];
+        }
+
+        [[nodiscard]] static std::string backgroundName(int index) {
+            if (index <= 0) {
+                return "blocks.png";
+            }
+            return std::format("blocks{}.png", index);
         }
 
         void drawGameOver() {
@@ -1293,9 +1321,15 @@ namespace {
             const int boardW = sideGrid ? rows * BLOCK_HEIGHT : GRID_WIDTH * BLOCK_WIDTH;
             const int boardH = sideGrid ? GRID_WIDTH * BLOCK_WIDTH : rows * BLOCK_HEIGHT;
             const int thickness = selected ? 4 : 2;
+            const bool drawTop = layout.gridIndex != 2;
+            const bool drawBottom = layout.gridIndex != 0;
             mxvk::VK_Sprite *pixel = blocks[0];
-            pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y - thickness), scaleX(boardW + thickness * 2), scaleY(thickness));
-            pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y + boardH), scaleX(boardW + thickness * 2), scaleY(thickness));
+            if (drawTop) {
+                pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y - thickness), scaleX(boardW + thickness * 2), scaleY(thickness));
+            }
+            if (drawBottom) {
+                pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y + boardH), scaleX(boardW + thickness * 2), scaleY(thickness));
+            }
             pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y), scaleX(thickness), scaleY(boardH));
             pixel->drawSpriteRect(scaleX(layout.x + boardW), scaleY(layout.y), scaleX(thickness), scaleY(boardH));
         }
