@@ -40,6 +40,7 @@ my @tests = qw(
     binary_matrix
     planet
     masterpiece
+    mutatris
     console_demo
     postprocess
     fractal_zoom
