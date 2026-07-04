@@ -257,6 +257,7 @@ Examples:
 ./run.pl tictactoe
 ./run.pl pool_demo
 ./run.pl puzzle_drop
+./run.pl mutatris
 ./run.pl fractal_zoom
 ./run.pl console_demo -r 1280x720
 ./run.pl matrix
@@ -399,6 +400,7 @@ These programs are not intended as standalone applications. They are small visua
 - `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Enter`, `Space`, `Escape`, and `Back`; in-game controls include arrow keys, `Space` to charge a shot, `Enter` to confirm cue-ball placement, mouse drag for aiming, right mouse drag to rotate the camera, and wheel or pinch to zoom.
 - `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Up` / `Down` navigate menus, `Left` / `Right` move blocks, `Space` rotates, `P` pauses, `Escape` backs out or quits, and text entry uses `Backspace` / `Enter`.
 - `puzzle_drop` - 3D Acid Drop-style block puzzle with an intro, Matrix-rain backdrop, textured cube pieces, selectable difficulty, keyboard controls, and gamepad support. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` / `Space` skips the intro, `1` / `2` / `3` starts difficulty levels, `Left` / `Right` move, `Down` soft drops, `Up` cycles piece blocks, `Z` / `X` rotate, `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Escape` quits.
+- `mutatris` - four-sided falling-block puzzle game with rotating board focus, selectable difficulty, animated backgrounds, startup/title/game-over screens, and keyboard, mouse/touch, and gamepad input. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter`, `Space`, click, tap, or gamepad start advances menus; `Left` / `Right` select difficulty; in game, arrows move relative to the active side, `W` or the active side's color-cycle arrow shifts piece colors, `A` / `Space` rotates, `S` hard drops, and `Escape` quits.
 - `masterpiece` (`MasterPiece`) - port of the original `MasterPiece.SDL` block puzzle game with updated assets. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menu navigation uses `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `A` or `Up` rotate forward, `S` rotate backward, `P` pause, `Escape` return to menu, with typed input for high-score entry.
 - `tetris` - 3D Tetris with a title flow, high scores, credits, and optional network multiplayer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Up` / `Down` / `Enter` / `Escape`; in game use `Left` / `Right` move, `Down` soft drop, `Up` rotate, `Z` hard drop, `R` restart, `Escape` menu, camera controls use `W` / `A` / `S` / `D`, `Q` / `E`, `Page Up` / `Page Down`, and multiplayer uses `H` to host and `J` / `Enter` to join.
 
