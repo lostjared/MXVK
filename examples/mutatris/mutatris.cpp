@@ -45,6 +45,8 @@ namespace {
     constexpr Uint32 STARTUP_FADE_MS = 2520;
     constexpr Uint32 STARTUP_HOLD_MS = 900;
     constexpr Uint32 KEY_REPEAT_MS = 120;
+    constexpr Uint32 CLEAR_ANIMATION_MS = 400;
+    constexpr int CLEAR_ANIMATION_FRAMES = 24;
 
     enum class Screen {
         Startup,
@@ -56,6 +58,7 @@ namespace {
 
     struct Block {
         int color = 0;
+        Uint32 clearElapsedMs = 0;
     };
 
     class GameGrid;
@@ -235,6 +238,7 @@ namespace {
                 return false;
             }
             target[i]->color = blocks[i].color;
+            target[i]->clearElapsedMs = 0;
         }
         reset();
         return true;
@@ -298,12 +302,12 @@ namespace {
                 return false;
             }
             if (blocks[3] != nullptr && blocks[3]->color == blocks[0]->color) {
-                blocks[3]->color = -1;
+                markClearing(*blocks[3]);
                 score += 10;
             }
-            blocks[0]->color = -1;
-            blocks[1]->color = -1;
-            blocks[2]->color = -1;
+            markClearing(*blocks[0]);
+            markClearing(*blocks[1]);
+            markClearing(*blocks[2]);
             ++score;
             ++clears;
             if ((clears % 4) == 0 && timeout > 125) {
@@ -333,12 +337,12 @@ namespace {
                 return false;
             }
             if (blocks[3] != nullptr && blocks[3]->color == blocks[0]->color) {
-                blocks[3]->color = -1;
+                markClearing(*blocks[3]);
                 score += 10;
             }
-            blocks[0]->color = -1;
-            blocks[1]->color = -1;
-            blocks[2]->color = -1;
+            markClearing(*blocks[0]);
+            markClearing(*blocks[1]);
+            markClearing(*blocks[2]);
             ++score;
             ++clears;
             if ((clears % 4) == 0 && timeout > 125) {
@@ -360,6 +364,11 @@ namespace {
                     }
                 }
             }
+        }
+
+        static void markClearing(Block &block) {
+            block.color = -1;
+            block.clearElapsedMs = 0;
         }
     };
 
@@ -455,6 +464,7 @@ namespace {
         int introFontSize = 0;
         Uint32 lastDropTick = 0;
         Uint32 lastInputTick = 0;
+        Uint32 lastClearAnimationTick = 0;
         int finalScore = 0;
         int finalClears = 0;
         int width = DESIGN_WIDTH;
@@ -819,6 +829,7 @@ namespace {
             game = std::make_unique<PuzzleGame>(difficulty);
             focus = 0;
             lastDropTick = SDL_GetTicks();
+            lastClearAnimationTick = lastDropTick;
             shaderLevel = -1;
             shaderIndex = -1;
             setScreen(Screen::Playing, "new game");
@@ -981,14 +992,21 @@ namespace {
         }
 
         void twistClearedBlocks() {
+            const Uint32 now = SDL_GetTicks();
+            const Uint32 elapsed = lastClearAnimationTick == 0U ? 0U : now - lastClearAnimationTick;
+            lastClearAnimationTick = now;
             for (GameGrid &focusGrid : game->grid) {
                 for (int y = 0; y < focusGrid.height(); ++y) {
                     for (int x = 0; x < focusGrid.width(); ++x) {
                         Block *block = focusGrid.at(x, y);
                         if (block != nullptr && block->color < 0) {
-                            --block->color;
-                            if (block->color < -24) {
+                            block->clearElapsedMs += elapsed;
+                            if (block->clearElapsedMs >= CLEAR_ANIMATION_MS) {
                                 block->color = 0;
+                                block->clearElapsedMs = 0;
+                            } else {
+                                const Uint32 frame = std::min<Uint32>((block->clearElapsedMs * CLEAR_ANIMATION_FRAMES) / CLEAR_ANIMATION_MS, CLEAR_ANIMATION_FRAMES - 1U);
+                                block->color = -static_cast<int>(frame + 1U);
                             }
                         }
                     }
