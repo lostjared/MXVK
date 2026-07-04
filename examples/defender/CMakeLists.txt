@@ -10,7 +10,6 @@ add_executable(defender
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/ship.cpp
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d/starfield.cpp
 )
-target_link_libraries(defender PRIVATE mxvk::mxvk)
 target_link_libraries(defender PRIVATE rain)
 target_include_directories(defender PRIVATE
     ${CMAKE_SOURCE_DIR}/examples/asteroids3d

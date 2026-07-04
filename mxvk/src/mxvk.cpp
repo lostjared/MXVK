@@ -1513,7 +1513,7 @@ namespace mxvk {
             vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, device_extensions.data());
         }
 
-        const auto has_device_extension = [&device_extensions](const char *extension_name) {
+        [[maybe_unused]] const auto has_device_extension = [&device_extensions](const char *extension_name) {
             return std::ranges::any_of(
                 device_extensions,
                 [extension_name](const VkExtensionProperties &ext) {

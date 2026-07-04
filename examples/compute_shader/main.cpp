@@ -354,7 +354,7 @@ class ComputeWindow : public mxvk::VK_Window {
     std::string fpsText = "FPS: --";
     uint64_t processedVideoFrames = 0;
     bool recordingEnabled = false;
-    bool recordingWarningLogged = false;
+    [[maybe_unused]] bool recordingWarningLogged = false;
     bool processedRecordPathLogged = false;
     std::vector<uint8_t> recordScratch{};
 #ifdef MXVK_CUDA

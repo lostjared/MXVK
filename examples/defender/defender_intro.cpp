@@ -409,7 +409,7 @@ namespace defender {
             const float normalized = 0.5f + wrapped_delta_x(world_x, camera_center_x) / WORLD_WIDTH;
             return inner_x + std::clamp(static_cast<int>(normalized * static_cast<float>(inner_width - 1)), 0, inner_width - 1);
         };
-        const auto y_for = [inner_y, inner_height, this](float world_y) {
+        const auto y_for = [this](float world_y) {
             const float normalized = (playable_world_top - std::clamp(world_y, WORLD_BOTTOM, playable_world_top)) / (playable_world_top - WORLD_BOTTOM);
             return inner_y + std::clamp(static_cast<int>(normalized * static_cast<float>(inner_height - 1)), 0, inner_height - 1);
         };
