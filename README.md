@@ -585,6 +585,8 @@ For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`,
 
 <img width="1280" height="720" alt="breakout720" src="https://github.com/user-attachments/assets/fc9c26ad-b3a7-450b-b3b9-366b93bbc80f" />
 
+<img width="1280" height="720" alt="vlcsnap-2026-07-03-20h52m25s796" src="https://github.com/user-attachments/assets/60e1cc26-32de-4160-96ec-c25155c3e23d" />
+
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
 
   ## Model Viewer
