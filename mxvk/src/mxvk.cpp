@@ -3225,9 +3225,9 @@ namespace mxvk {
             color_blending.pAttachments = &color_attachment;
 
             VkPushConstantRange push_constant_range{};
-            push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+            push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             push_constant_range.offset = 0;
-            push_constant_range.size = sizeof(float) * 2;
+            push_constant_range.size = sizeof(float) * 4;
 
             VkPipelineLayoutCreateInfo pipeline_layout_info{};
             pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

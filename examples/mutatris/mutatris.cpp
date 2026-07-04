@@ -1081,10 +1081,12 @@ namespace {
                 drawStartupLogo(jbLogo, 1.0f);
             } else if (elapsed < SECOND_FADE_OUT_END) {
                 const Uint32 phaseElapsed = elapsed - SECOND_HOLD_END;
-                drawStartupLogo(jbLogo, 1.0f - (static_cast<float>(phaseElapsed) / static_cast<float>(STARTUP_FADE_MS)));
+                const float transitionAlpha = static_cast<float>(phaseElapsed) / static_cast<float>(STARTUP_FADE_MS);
+                const float titleAlpha = std::clamp((transitionAlpha - 0.78f) / 0.22f, 0.0f, 1.0f);
+                drawTitleWithAlpha(titleAlpha);
+                drawStartupLogo(jbLogo, 1.0f - transitionAlpha);
             } else if (elapsed < TITLE_FADE_IN_END) {
-                const Uint32 phaseElapsed = elapsed - SECOND_FADE_OUT_END;
-                drawTitleWithAlpha(static_cast<float>(phaseElapsed) / static_cast<float>(STARTUP_FADE_MS));
+                drawTitleWithAlpha(1.0f);
             } else {
                 setScreen(Screen::Title, "startup sequence complete");
             }

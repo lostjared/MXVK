@@ -190,6 +190,7 @@ namespace mxvk {
             int x, y;
             int width, height;
             SDL_Color color;
+            float alpha = 1.0f;
             std::vector<TextVertex> vertices;
             std::vector<uint16_t> indices;
             VkBuffer vertexBuffer = VK_NULL_HANDLE;
@@ -218,6 +219,7 @@ namespace mxvk {
                     width = other.width;
                     height = other.height;
                     color = other.color;
+                    alpha = other.alpha;
                     vertices = std::move(other.vertices);
                     indices = std::move(other.indices);
                     vertexBuffer = other.vertexBuffer;

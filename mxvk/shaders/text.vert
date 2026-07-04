@@ -8,6 +8,8 @@ layout(location = 0) out vec2 out_uv;
 layout(push_constant) uniform TextPushConstants {
     float screen_width;
     float screen_height;
+    float alpha;
+    float padding;
 } pc;
 
 void main() {

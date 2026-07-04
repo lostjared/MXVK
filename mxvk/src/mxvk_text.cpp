@@ -313,9 +313,12 @@ namespace mxvk {
         quad.x = x;
         quad.y = y;
         quad.color = col;
+        quad.alpha = static_cast<float>(col.a) / 255.0f;
         quad.ownsTexture = false; // cache owns all textures
 
-        CacheKey key{text, textFont, col.r, col.g, col.b, col.a};
+        SDL_Color textureColor = col;
+        textureColor.a = 255;
+        CacheKey key{text, textFont, textureColor.r, textureColor.g, textureColor.b, textureColor.a};
         auto it = textureCache.find(key);
 
         if (it != textureCache.end()) {
@@ -330,7 +333,7 @@ namespace mxvk {
         } else {
             // Cache miss -- render with SDL_ttf and upload to GPU
             // SDL3_ttf: TTF_RenderText_Blended requires an explicit length (0 = null-terminated)
-            SDL_Surface *textSurface = TTF_RenderText_Blended(textFont, text.c_str(), 0, col);
+            SDL_Surface *textSurface = TTF_RenderText_Blended(textFont, text.c_str(), 0, textureColor);
             if (!textSurface) {
                 return;
             }
@@ -497,11 +500,13 @@ namespace mxvk {
         struct TextPushConstants {
             float screenWidth;
             float screenHeight;
-        } pc{static_cast<float>(screenWidth), static_cast<float>(screenHeight)};
-
-        vkCmdPushConstants(cmdBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(TextPushConstants), &pc);
+            float alpha;
+            float padding;
+        } pc{static_cast<float>(screenWidth), static_cast<float>(screenHeight), 1.0f, 0.0f};
 
         for (auto &quad : textQuads) {
+            pc.alpha = quad.alpha;
+            vkCmdPushConstants(cmdBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(TextPushConstants), &pc);
             VkBuffer vertexBuffers[] = {quad.vertexBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
