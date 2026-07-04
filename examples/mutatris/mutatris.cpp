@@ -269,13 +269,16 @@ namespace {
 
         void procBlocks() {
             level = std::clamp((1200 - static_cast<int>(timeout)) / 100, 0, 10);
+            if (clearVisualRun()) {
+                return;
+            }
             for (GameGrid &focusGrid : grid) {
                 for (int x = 0; x < focusGrid.width(); ++x) {
                     for (int y = 0; y < focusGrid.height(); ++y) {
-                        if (clearRun(focusGrid, std::array<Coord, 4>{{{x, y}, {x, y + 1}, {x, y + 2}, {x, y + 3}}}) ||
-                            clearRun(focusGrid, std::array<Coord, 4>{{{x, y}, {x + 1, y}, {x + 2, y}, {x + 3, y}}}) ||
-                            clearRun(focusGrid, std::array<Coord, 4>{{{x, y}, {x + 1, y + 1}, {x + 2, y + 2}, {x + 3, y + 3}}}) ||
-                            clearRun(focusGrid, std::array<Coord, 4>{{{x, y}, {x - 1, y + 1}, {x - 2, y + 2}, {x - 3, y + 3}}})) {
+                        if (clearRun(focusGrid, x, y, 0, 1) ||
+                            clearRun(focusGrid, x, y, 1, 0) ||
+                            clearRun(focusGrid, x, y, 1, 1) ||
+                            clearRun(focusGrid, x, y, -1, 1)) {
                             return;
                         }
                     }
@@ -292,27 +295,184 @@ namespace {
         int level = 0;
 
       private:
-        using Coord = std::pair<int, int>;
+        struct CellRef {
+            int gridIndex = 0;
+            int x = 0;
+            int y = 0;
+        };
 
-        bool clearRun(GameGrid &focusGrid, const std::array<Coord, 4> &coords) {
-            std::array<Block *, 4> blocks{};
-            for (std::size_t i = 0; i < coords.size(); ++i) {
-                blocks[i] = focusGrid.at(coords[i].first, coords[i].second);
+        struct CellBounds {
+            int x = 0;
+            int y = 0;
+            int width = 0;
+            int height = 0;
+        };
+
+        [[nodiscard]] Block *blockAt(const CellRef &cell) {
+            if (cell.gridIndex < 0 || cell.gridIndex >= static_cast<int>(grid.size())) {
+                return nullptr;
             }
-            if (blocks[0] == nullptr || blocks[1] == nullptr || blocks[2] == nullptr || blocks[0]->color <= 0) {
+            return grid[static_cast<std::size_t>(cell.gridIndex)].at(cell.x, cell.y);
+        }
+
+        [[nodiscard]] const Block *blockAt(const CellRef &cell) const {
+            if (cell.gridIndex < 0 || cell.gridIndex >= static_cast<int>(grid.size())) {
+                return nullptr;
+            }
+            return grid[static_cast<std::size_t>(cell.gridIndex)].at(cell.x, cell.y);
+        }
+
+        [[nodiscard]] static CellBounds cellBounds(const CellRef &cell) {
+            if (cell.gridIndex == 0) {
+                return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH, cell.y * BLOCK_HEIGHT, BLOCK_WIDTH, BLOCK_HEIGHT};
+            }
+            if (cell.gridIndex == 1) {
+                return {cell.y * BLOCK_HEIGHT, (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH};
+            }
+            if (cell.gridIndex == 2) {
+                return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH,
+                        (DESIGN_HEIGHT / 2) + 5 + (BOTTOM_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
+                        BLOCK_WIDTH,
+                        BLOCK_HEIGHT};
+            }
+            return {DESIGN_WIDTH - (SIDE_GRID_HEIGHT * BLOCK_HEIGHT) + (SIDE_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
+                    (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + (GRID_WIDTH - 1 - cell.x) * BLOCK_WIDTH,
+                    BLOCK_HEIGHT,
+                    BLOCK_WIDTH};
+        }
+
+        [[nodiscard]] bool sameCell(const CellRef &a, const CellRef &b) const {
+            return a.gridIndex == b.gridIndex && a.x == b.x && a.y == b.y;
+        }
+
+        [[nodiscard]] bool findNextVisualMatch(const CellRef &current, int color, int dx, int dy, CellRef &next) const {
+            const CellBounds currentBounds = cellBounds(current);
+            const int currentCenterX2 = currentBounds.x * 2 + currentBounds.width;
+            const int currentCenterY2 = currentBounds.y * 2 + currentBounds.height;
+            constexpr int TOLERANCE2 = BLOCK_HEIGHT + 2;
+            int bestError = TOLERANCE2 * TOLERANCE2 * 4 + 1;
+            bool found = false;
+
+            for (const int gridIndex : {0, 2}) {
+                const GameGrid &focusGrid = grid[static_cast<std::size_t>(gridIndex)];
+                for (int y = 0; y < focusGrid.height(); ++y) {
+                    for (int x = 0; x < focusGrid.width(); ++x) {
+                        const CellRef candidate{gridIndex, x, y};
+                        if (sameCell(current, candidate)) {
+                            continue;
+                        }
+                        const Block *block = blockAt(candidate);
+                        if (block == nullptr || block->color != color) {
+                            continue;
+                        }
+
+                        const CellBounds candidateBounds = cellBounds(candidate);
+                        const int candidateCenterX2 = candidateBounds.x * 2 + candidateBounds.width;
+                        const int candidateCenterY2 = candidateBounds.y * 2 + candidateBounds.height;
+                        const int expectedDeltaX2 = dx == 0 ? 0 : dx * (currentBounds.width + candidateBounds.width);
+                        const int expectedDeltaY2 = dy == 0 ? 0 : dy * (currentBounds.height + candidateBounds.height);
+                        const int errorX = std::abs((candidateCenterX2 - currentCenterX2) - expectedDeltaX2);
+                        const int errorY = std::abs((candidateCenterY2 - currentCenterY2) - expectedDeltaY2);
+                        if (errorX > TOLERANCE2 || errorY > TOLERANCE2) {
+                            continue;
+                        }
+
+                        const int error = errorX * errorX + errorY * errorY;
+                        if (error < bestError) {
+                            bestError = error;
+                            next = candidate;
+                            found = true;
+                        }
+                    }
+                }
+            }
+
+            return found;
+        }
+
+        [[nodiscard]] bool clearVisualRun() {
+            constexpr std::array<std::pair<int, int>, 4> directions{{{1, 0}, {0, 1}, {1, 1}, {-1, 1}}};
+            for (const int gridIndex : {0, 2}) {
+                GameGrid &focusGrid = grid[static_cast<std::size_t>(gridIndex)];
+                for (int y = 0; y < focusGrid.height(); ++y) {
+                    for (int x = 0; x < focusGrid.width(); ++x) {
+                        const CellRef start{gridIndex, x, y};
+                        const Block *startBlock = blockAt(start);
+                        if (startBlock == nullptr || startBlock->color <= 0) {
+                            continue;
+                        }
+
+                        for (const auto &[dx, dy] : directions) {
+                            CellRef previous{};
+                            if (findNextVisualMatch(start, startBlock->color, -dx, -dy, previous)) {
+                                continue;
+                            }
+
+                            std::vector<CellRef> run{start};
+                            CellRef current = start;
+                            while (findNextVisualMatch(current, startBlock->color, dx, dy, current)) {
+                                if (std::any_of(run.begin(), run.end(), [&](const CellRef &cell) {
+                                        return sameCell(cell, current);
+                                    })) {
+                                    break;
+                                }
+                                run.push_back(current);
+                            }
+
+                            if (run.size() < 3U) {
+                                continue;
+                            }
+
+                            for (const CellRef &cell : run) {
+                                if (Block *block = blockAt(cell)) {
+                                    markClearing(*block);
+                                }
+                            }
+                            ++score;
+                            ++clears;
+                            if ((clears % 4) == 0 && timeout > 125) {
+                                timeout -= 25;
+                            }
+                            playClearSound();
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        bool clearRun(GameGrid &focusGrid, int x, int y, int dx, int dy) {
+            Block *start = focusGrid.at(x, y);
+            if (start == nullptr || start->color <= 0) {
                 return false;
             }
-            if (blocks[0]->color != blocks[1]->color || blocks[0]->color != blocks[2]->color) {
+
+            const int color = start->color;
+            const Block *previous = focusGrid.at(x - dx, y - dy);
+            if (previous != nullptr && previous->color == color) {
                 return false;
             }
-            if (blocks[3] != nullptr && blocks[3]->color == blocks[0]->color) {
-                markClearing(*blocks[3]);
-                score += 10;
-                playClearSound();
+
+            std::vector<Block *> blocks{};
+            int cx = x;
+            int cy = y;
+            while (Block *block = focusGrid.at(cx, cy)) {
+                if (block->color != color) {
+                    break;
+                }
+                blocks.push_back(block);
+                cx += dx;
+                cy += dy;
             }
-            markClearing(*blocks[0]);
-            markClearing(*blocks[1]);
-            markClearing(*blocks[2]);
+
+            if (blocks.size() < 3U) {
+                return false;
+            }
+
+            for (Block *block : blocks) {
+                markClearing(*block);
+            }
             ++score;
             ++clears;
             if ((clears % 4) == 0 && timeout > 125) {
