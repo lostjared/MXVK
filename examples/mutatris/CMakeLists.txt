@@ -1,5 +1,9 @@
 add_executable(mutatris
+    ${CMAKE_SOURCE_DIR}/examples/mutatris/game_grid.cpp
     ${CMAKE_SOURCE_DIR}/examples/mutatris/mutatris.cpp
+    ${CMAKE_SOURCE_DIR}/examples/mutatris/mutatris_window.cpp
+    ${CMAKE_SOURCE_DIR}/examples/mutatris/piece.cpp
+    ${CMAKE_SOURCE_DIR}/examples/mutatris/puzzle_game.cpp
 )
 
 target_link_libraries(mutatris PRIVATE mxvk::mxvk)
