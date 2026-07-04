@@ -779,6 +779,40 @@ namespace mxvk {
         std::cout << "mxvk: Pipeline rebuilt\n";
     }
 
+    void VK_Sprite::setFragmentShaderPath(const std::string &path) {
+        if (path == fragmentShaderPath && fragmentShaderModule != VK_NULL_HANDLE) {
+            return;
+        }
+
+        if (customPipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device, customPipeline, nullptr);
+            customPipeline = VK_NULL_HANDLE;
+        }
+        if (customPipelineLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, customPipelineLayout, nullptr);
+            customPipelineLayout = VK_NULL_HANDLE;
+        }
+        if (fragmentShaderModule != VK_NULL_HANDLE) {
+            vkDestroyShaderModule(device, fragmentShaderModule, nullptr);
+            fragmentShaderModule = VK_NULL_HANDLE;
+        }
+
+        fragmentShaderPath = path;
+        hasCustomShader = false;
+
+        if (fragmentShaderPath.empty()) {
+            return;
+        }
+
+        const auto shaderCode = readShaderFile(fragmentShaderPath);
+        fragmentShaderModule = createShaderModule(shaderCode);
+        hasCustomShader = true;
+
+        if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
+            createCustomPipeline();
+        }
+    }
+
     void VK_Sprite::rebuildInstancedPipeline() {
         if (!instancingEnabled || instanceVertPath.empty() || instanceFragPath.empty())
             return;
@@ -849,6 +883,7 @@ namespace mxvk {
             auto shaderCode = readShaderFile(fragmentShaderPath);
             fragmentShaderModule = createShaderModule(shaderCode);
             hasCustomShader = true;
+            this->fragmentShaderPath = fragmentShaderPath;
 
             if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
                 createCustomPipeline();
@@ -921,6 +956,7 @@ namespace mxvk {
             auto shaderCode = readShaderFile(fragmentShaderPath);
             fragmentShaderModule = createShaderModule(shaderCode);
             hasCustomShader = true;
+            this->fragmentShaderPath = fragmentShaderPath;
 
             if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
                 createCustomPipeline();

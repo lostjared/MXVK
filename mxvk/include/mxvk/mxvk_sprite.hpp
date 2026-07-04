@@ -213,6 +213,8 @@ namespace mxvk {
         void releaseUploadResources();
         /** @brief Override the vertex shader path (used when rebuilding the pipeline). */
         void setVertexShaderPath(const std::string &path) { vertexShaderPath = path; }
+        /** @brief Replace the fragment shader path and rebuild the custom pipeline. */
+        void setFragmentShaderPath(const std::string &path);
 
         /** @return @c true if a custom pipeline has been built. */
         bool hasOwnPipeline() const { return customPipeline != VK_NULL_HANDLE; }
@@ -300,6 +302,7 @@ namespace mxvk {
         VkFormat colorAttachmentFormat = VK_FORMAT_UNDEFINED;
         VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         std::string vertexShaderPath;
+        std::string fragmentShaderPath;
         void createCustomPipeline();
 
         VkBuffer quadVertexBuffer = VK_NULL_HANDLE;

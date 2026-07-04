@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <memory>
@@ -418,6 +419,7 @@ namespace {
         std::string shaderRoot;
         std::array<mxvk::VK_Sprite *, 8> blocks{};
         std::array<mxvk::VK_Sprite *, 11> backgrounds{};
+        std::vector<std::string> effectShaders;
         mxvk::VK_Sprite *intro = nullptr;
         mxvk::VK_Sprite *start = nullptr;
         mxvk::VK_Sprite *lostLogo = nullptr;
@@ -441,11 +443,15 @@ namespace {
         int finalClears = 0;
         int width = DESIGN_WIDTH;
         int height = DESIGN_HEIGHT;
+        std::mt19937 shaderRandom{std::random_device{}()};
+        int shaderLevel = -1;
+        int shaderIndex = -1;
 
         void loadSprites() {
             const std::string backgroundVertexShader = shaderRoot + "/background.vert.spv";
             const std::string backgroundShader = shaderRoot + "/background.frag.spv";
             const std::string fadeShader = shaderRoot + "/fade.frag.spv";
+            loadEffectShaders();
             for (std::size_t i = 0; i < backgrounds.size(); ++i) {
                 backgrounds[i] = createSprite(dataRoot + "/blocks" + (i == 0 ? std::string("") : std::to_string(i)) + ".png", backgroundVertexShader, backgroundShader);
             }
@@ -469,6 +475,20 @@ namespace {
             for (std::size_t i = 0; i < blockFiles.size(); ++i) {
                 blocks[i] = createSprite(dataRoot + "/" + blockFiles[i]);
             }
+        }
+
+        void loadEffectShaders() {
+            effectShaders.clear();
+            const std::filesystem::path effectDir = std::filesystem::path(shaderRoot) / "effects";
+            if (!std::filesystem::exists(effectDir)) {
+                return;
+            }
+            for (const std::filesystem::directory_entry &entry : std::filesystem::directory_iterator(effectDir)) {
+                if (entry.is_regular_file() && entry.path().extension() == ".spv") {
+                    effectShaders.push_back(entry.path().string());
+                }
+            }
+            std::sort(effectShaders.begin(), effectShaders.end());
         }
 
         void handleKey(SDL_Keycode key) {
@@ -656,6 +676,8 @@ namespace {
             game = std::make_unique<PuzzleGame>(difficulty);
             focus = 0;
             lastDropTick = SDL_GetTicks();
+            shaderLevel = -1;
+            shaderIndex = -1;
             screen = Screen::Playing;
         }
 
@@ -732,12 +754,13 @@ namespace {
             if (game == nullptr) {
                 startGame();
             }
+            processGrid();
+            updateBackgroundShaderForLevel();
             mxvk::VK_Sprite *background = backgrounds[static_cast<std::size_t>(std::clamp(game->level, 0, static_cast<int>(backgrounds.size()) - 1))];
             if (background != nullptr) {
                 background->setShaderParams(static_cast<float>(SDL_GetTicks()) / 1000.0f, 0.0f, 0.0f, 0.0f);
                 background->drawSpriteRect(0, 0, width, height);
             }
-            processGrid();
             twistClearedBlocks();
             drawGrid(0);
             drawGrid(1);
@@ -761,6 +784,28 @@ namespace {
                     finalClears = game->clears;
                     screen = Screen::GameOver;
                 }
+            }
+        }
+
+        void updateBackgroundShaderForLevel() {
+            if (game == nullptr || effectShaders.empty() || game->level == shaderLevel) {
+                return;
+            }
+            shaderLevel = game->level;
+
+            std::uniform_int_distribution<int> shaderDistribution(0, static_cast<int>(effectShaders.size()) - 1);
+            int nextShaderIndex = shaderDistribution(shaderRandom);
+            if (effectShaders.size() > 1U) {
+                while (nextShaderIndex == shaderIndex) {
+                    nextShaderIndex = shaderDistribution(shaderRandom);
+                }
+            }
+            shaderIndex = nextShaderIndex;
+
+            const int backgroundIndex = std::clamp(game->level, 0, static_cast<int>(backgrounds.size()) - 1);
+            mxvk::VK_Sprite *background = backgrounds[static_cast<std::size_t>(backgroundIndex)];
+            if (background != nullptr) {
+                background->setFragmentShaderPath(effectShaders[static_cast<std::size_t>(shaderIndex)]);
             }
         }
 
