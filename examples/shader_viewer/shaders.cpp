@@ -237,6 +237,16 @@ namespace example {
             }
         }
 
+        void cleanupWindowResources() {
+            stopCaptureThread();
+            if (getDevice() != VK_NULL_HANDLE) {
+                vkDeviceWaitIdle(getDevice());
+            }
+            camera_sprite = nullptr;
+            release();
+            capture.close();
+        }
+
         [[nodiscard]] bool consumeLatestCaptureFrame() {
             cv::Mat frame;
             {
@@ -390,46 +400,50 @@ namespace example {
 
       public:
         ExampleWindow(const Arguments &args, const std::string &text) : mxvk::VK_Window(text, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync) {
-            current_path = args.path.empty() ? std::string(shader_viewer_ASSET_DIR) : args.path;
-            shader_path = args.shaderPath.empty() ? std::string(shader_viewer_SHADER_DIR) : args.shaderPath;
-            shader_list_requested = !args.shaderPath.empty();
-            setenv("MXVK_CUDA_FLIP_Y", "0", 0);
-            loadShaderIndex();
-            setInitialShaderIndex(args.shader_index);
-            std::string font_path = joinPath(current_path, "data/font.ttf");
-            if (!std::filesystem::exists(font_path)) {
-                font_path = joinPath(shader_viewer_ASSET_DIR, "data/font.ttf");
-            }
-            setFont(font_path, 20);
-            input_filename = args.filename;
-            camera_index = args.camera_index;
-            requested_fps = args.fps;
-            using_file = !input_filename.empty();
-            if (!openCaptureSource()) {
-                if (using_file) {
-                    throw mxvk::Exception(std::format("shader_viewer: failed to open video file '{}'", input_filename));
+            try {
+                current_path = args.path.empty() ? std::string(shader_viewer_ASSET_DIR) : args.path;
+                shader_path = args.shaderPath.empty() ? std::string(shader_viewer_SHADER_DIR) : args.shaderPath;
+                shader_list_requested = !args.shaderPath.empty();
+                setenv("MXVK_CUDA_FLIP_Y", "0", 0);
+                loadShaderIndex();
+                setInitialShaderIndex(args.shader_index);
+                std::string font_path = joinPath(current_path, "data/font.ttf");
+                if (!std::filesystem::exists(font_path)) {
+                    font_path = joinPath(shader_viewer_ASSET_DIR, "data/font.ttf");
                 }
-                throw mxvk::Exception(std::format("shader_viewer: failed to open camera index {}", camera_index));
+                setFont(font_path, 20);
+                input_filename = args.filename;
+                camera_index = args.camera_index;
+                requested_fps = args.fps;
+                using_file = !input_filename.empty();
+                if (!openCaptureSource()) {
+                    if (using_file) {
+                        throw mxvk::Exception(std::format("shader_viewer: failed to open video file '{}'", input_filename));
+                    }
+                    throw mxvk::Exception(std::format("shader_viewer: failed to open camera index {}", camera_index));
+                }
+                fallback_width = args.width;
+                fallback_height = args.height;
+                if (!using_file) {
+                    capture.set(cv::CAP_PROP_FRAME_WIDTH, fallback_width);
+                    capture.set(cv::CAP_PROP_FRAME_HEIGHT, fallback_height);
+                    fallback_width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
+                    fallback_height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
+                    fps = configureCameraFps();
+                } else {
+                    fps = capture.get(cv::CAP_PROP_FPS);
+                }
+                std::cout << "mxvk_cv: Capture opened at: " << fallback_width << "x" << fallback_height << " @ " << fps << " fps\n";
+                initializeCameraRendering();
+                startCaptureThread();
+            } catch (...) {
+                cleanupWindowResources();
+                throw;
             }
-            fallback_width = args.width;
-            fallback_height = args.height;
-            if (!using_file) {
-                capture.set(cv::CAP_PROP_FRAME_WIDTH, fallback_width);
-                capture.set(cv::CAP_PROP_FRAME_HEIGHT, fallback_height);
-                fallback_width = capture.get(cv::CAP_PROP_FRAME_WIDTH);
-                fallback_height = capture.get(cv::CAP_PROP_FRAME_HEIGHT);
-                fps = configureCameraFps();
-            } else {
-                fps = capture.get(cv::CAP_PROP_FPS);
-            }
-            std::cout << "mxvk_cv: Capture opened at: " << fallback_width << "x" << fallback_height << " @ " << fps << " fps\n";
-            initializeCameraRendering();
-            startCaptureThread();
         }
 
         ~ExampleWindow() override {
-            stopCaptureThread();
-            capture.close();
+            cleanupWindowResources();
         }
 
         void event(SDL_Event &e) override {
