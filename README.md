@@ -52,6 +52,10 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 
 View on YouTube: https://youtu.be/Y3PyGg3qBUA
 
+## Cloning the Repository
+
+git clone https://github.com/lostjared/MXVK.git
+
 
 <a id="core-dependencies"></a>
 
