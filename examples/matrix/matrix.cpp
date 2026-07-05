@@ -15,6 +15,11 @@
 #include <string>
 
 namespace example {
+    namespace {
+        constexpr int MATRIX_SURFACE_WIDTH = 1280;
+        constexpr int MATRIX_SURFACE_HEIGHT = 720;
+    }
+
     class MatrixWindow : public mxvk::VK_Window {
       public:
         MatrixWindow(const std::string &path,
@@ -31,6 +36,8 @@ namespace example {
               rain(std::make_unique<matrix::Rain>(
                   *this, [path, binary, font_size, font_path, color]() {
                       matrix::RainConfig config = matrix::make_matrix_rain_config(path.empty() ? std::string(matrix_ASSET_DIR) : path, binary);
+                      config.surface_width = MATRIX_SURFACE_WIDTH;
+                      config.surface_height = MATRIX_SURFACE_HEIGHT;
                       config.font_size = std::max(1, font_size);
                       if (!font_path.empty()) {
                           config.font_path = font_path;
@@ -58,12 +65,14 @@ namespace example {
 
         void proc() override {
             if (rain) {
-                rain->update_and_render(*this);
+                const VkExtent2D extent = getSwapchainExtent();
+                rain->update_and_render(*this, static_cast<int>(extent.width), static_cast<int>(extent.height));
             }
         }
 
         void onSwapchainRecreated() override {
             if (rain) {
+                rain->resize(*this);
                 rain->on_swapchain_recreated(*this);
             }
         }

@@ -19,6 +19,11 @@
 #include "rain.hpp"
 
 namespace example {
+    namespace {
+        constexpr int MATRIX_SURFACE_WIDTH = 1280;
+        constexpr int MATRIX_SURFACE_HEIGHT = 720;
+    }
+
     using Clock = std::chrono::steady_clock;
 
     class PlanetWindow;
@@ -183,6 +188,8 @@ namespace example {
                                            const std::string &color)
         : rain([&]() {
               matrix::RainConfig config = matrix::make_matrix_rain_config(assetRootPath, binaryGlyphMode);
+              config.surface_width = MATRIX_SURFACE_WIDTH;
+              config.surface_height = MATRIX_SURFACE_HEIGHT;
               if (binaryGlyphMode && fontPath.empty()) {
                   config.font_path = assetRootPath + "/data/binary.ttf";
               }
@@ -220,7 +227,8 @@ namespace example {
 
         rain->resize(window);
         rain->update(dt);
-        rain->render();
+        const VkExtent2D extent = window.getSwapchainExtent();
+        rain->render(static_cast<int>(extent.width), static_cast<int>(extent.height));
         if (rain->sprite() != nullptr) {
             window.renderBackgroundSprite(*rain->sprite(), cmd);
             rain->sprite()->clearQueue();
