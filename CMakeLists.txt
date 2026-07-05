@@ -640,6 +640,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(binary_matrix)
     add_subdirectory(examples/walk)
     mxvk_configure_mingw_target(walk_example)
+    add_subdirectory(examples/walk_post)
+    mxvk_configure_mingw_target(walk_post)
     if(CV)
         add_subdirectory(examples/compute_shader)
         mxvk_configure_mingw_target(compute_shader)
@@ -766,6 +768,7 @@ if(EXAMPLES)
         matrix
         binary_matrix
         walk_example
+        walk_post
     )
     if(FRACTAL_ZOOM)
         list(APPEND mxvk_example_targets fractal_zoom)

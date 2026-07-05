@@ -1,0 +1,13 @@
+# Blender 5.1.2 MTL File: 'blaster.blend'
+# www.blender.org
+
+newmtl BlasterMetal
+Ka 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+map_Kd blaster_metal.png
+map_Ks blaster_metal.png
+map_Ns blaster_metal_roughness.png
+map_Bump -bm 0.650000 blaster_metal_normal.png

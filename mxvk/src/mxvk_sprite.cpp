@@ -1668,6 +1668,11 @@ namespace mxvk {
             descriptorSet = VK_NULL_HANDLE;
             descriptorSetPool = VK_NULL_HANDLE;
         }
+        if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
+            extendedDescriptorPool = VK_NULL_HANDLE;
+            extendedDescriptorSet = VK_NULL_HANDLE;
+        }
         if (!externalTexture && spriteImageView != VK_NULL_HANDLE) {
             vkDestroyImageView(device, spriteImageView, nullptr);
         }
