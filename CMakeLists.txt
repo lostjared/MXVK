@@ -590,6 +590,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(starfield)
     add_subdirectory(examples/pointsprite)
     mxvk_configure_mingw_target(pointsprite)
+    add_subdirectory(examples/fireworks)
+    mxvk_configure_mingw_target(fireworks)
     add_subdirectory(examples/planet)
     mxvk_configure_mingw_target(planet)
     add_subdirectory(examples/tux_example)
@@ -743,6 +745,7 @@ if(EXAMPLES)
         moon
         starship
         pointsprite
+        fireworks
         planet
         tux_example
         glitch_cube
