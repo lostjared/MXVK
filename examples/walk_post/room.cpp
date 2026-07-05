@@ -3211,6 +3211,19 @@ namespace walk {
                 return;
             }
 
+            if (postProcessingSprite != nullptr) {
+                postProcessingSprite->setFragmentShaderPath(currentPostProcessingShader());
+                postProcessingFrameCount = 0;
+                postProcessingStartTime = std::chrono::steady_clock::now();
+                previousPostProcessingTime = postProcessingStartTime;
+                setPostProcessingEnabled(true);
+                logEnv(std::format("post-processing shader {} of {}: {}",
+                                   postProcessingShaderIndex + 1,
+                                   postProcessingShaders.size(),
+                                   currentPostProcessingShader()));
+                return;
+            }
+
             postProcessingSprite = attachPostProcessingShader(currentPostProcessingShader(), 1.0f, 1.0f, 1.0f, 0.0f);
             if (postProcessingSprite != nullptr) {
                 postProcessingSprite->enableExtendedUBO();
@@ -3256,7 +3269,7 @@ namespace walk {
 
             setPostProcessingShaderParams(1.0f, 1.0f, 1.0f, elapsed);
             postProcessingSprite->setMouseState(mouseX, mouseY, mousePressed, mousePressed);
-            postProcessingSprite->setUniform0(1.0f, 1.0f, 0.0f, 0.0f);
+            postProcessingSprite->setUniform0(1.0f, 1.0f, 1.0f, 0.0f);
             postProcessingSprite->setUniform1(frameDelta, 0.0f, 0.0f, frameRate);
             postProcessingSprite->setUniform2(static_cast<float>(postProcessingFrameCount), elapsed, 48000.0f, 0.0f);
             postProcessingSprite->setUniform3(0.0f, 0.0f, 0.0f, 0.0f);
