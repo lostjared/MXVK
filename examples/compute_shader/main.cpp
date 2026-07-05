@@ -819,8 +819,8 @@ class ComputeWindow : public mxvk::VK_Window {
             }
 
             if (!usingFile) {
-                capture.set(cv::CAP_PROP_FRAME_WIDTH, 1920.0);
-                capture.set(cv::CAP_PROP_FRAME_HEIGHT, 1080.0);
+                capture.set(cv::CAP_PROP_FRAME_WIDTH, recordWidth);
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT,recordHeight);
                 const double selectedFps = configureCameraFps();
                 sourceFps = selectedFps;
                 std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "

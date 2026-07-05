@@ -704,7 +704,7 @@ struct Arguments {
     std::string crf;                      ///< Optional CRF value (@c --crf).
     std::string encodePreset;             ///< Optional encoder preset (@c --encode-preset).
     std::string encodeTune;               ///< Optional encoder tune (@c --encode-tune).
-    std::string encodeCodec;              ///< Optional encoder codec policy (@c --encode-codec).
+    std::string encodeCodec;              ///< Optional encoder codec policy/name (@c --encode-codec).
     bool encodeRealtime = false;          ///< Enable low-latency encoder settings (@c --encode-realtime).
     bool mxwriteBlockWhenFull = false;    ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
     bool repeat = false;                  ///< Repeat video playback when a file reaches EOF.
@@ -793,7 +793,7 @@ struct Arguments {
  * | -c   | --crf              | Constant Rate Factor                         |
  * |      | --encode-preset    | Encoder preset                               |
  * |      | --encode-tune      | Encoder tune                                 |
- * |      | --encode-codec     | Encoder codec policy                         |
+ * |      | --encode-codec     | Encoder codec policy or name                 |
  * |      | --encode-realtime  | Enable realtime/low-latency encoding         |
  * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
  * |      | --repeat           | Repeat video playback at EOF                 |
@@ -836,7 +836,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(305, "crf", "crf value")
         .addOptionDoubleValue(306, "encode-preset", "encoder preset")
         .addOptionDoubleValue(307, "encode-tune", "encoder tune")
-        .addOptionDoubleValue(308, "encode-codec", "encoder codec policy")
+        .addOptionDoubleValue(308, "encode-codec", "encoder codec policy or name")
         .addOptionDouble(309, "encode-realtime", "encoder realtime mode")
         .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
         .addOptionDouble(310, "repeat", "repeat video playback")

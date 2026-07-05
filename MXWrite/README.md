@@ -114,7 +114,7 @@ Use `Writer::open_ts(...)` and `write_ts(...)` when frames arrive at irregular i
 @anchor key-implementation-details
 
 - `Writer` can accept host RGBA buffers and, when CUDA support is enabled, device buffers for direct ingestion.
-- `EncodeOptions` centralizes preset, tune, codec selection, CRF, realtime mode, queue backpressure, and HDR metadata.
+- `EncodeOptions` centralizes preset, tune, codec selection, CRF, realtime mode, queue backpressure, and HDR metadata. `codec` accepts `auto`, `software`, `nvenc`, `h264_nvenc`, and `hevc_nvenc`.
 - The header is intended to be included directly by consumer code that links against the `mxwrite` target.
 
 ## License

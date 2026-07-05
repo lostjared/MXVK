@@ -45,8 +45,9 @@ struct Frame_Data {
  * crf:    Constant Rate Factor, 0 (lossless) .. 51 (worst). 18 is visually
  *         near-lossless; 23 is default for x264; 28 is typical "small file".
  *         For NVENC this is forwarded as `cq`.
- * codec:  "auto" (NVENC if available, else x264), "software" (force x264),
- *         "nvenc" (force NVENC; falls back to x264 if NVENC unavailable).
+ * codec:  "auto" (NVENC if available, else software), "software" (force software),
+ *         "nvenc" (force resolution-selected NVENC), "h264_nvenc", or
+ *         "hevc_nvenc". NVENC requests fall back to the matching software codec.
  * realtime: when true, applies low-latency settings (tune=zerolatency for x264,
  *           tune=ll + zerolatency=1 for NVENC). Overrides tune value.
  * block_when_full: when true, producer threads block if the encoder queue is
@@ -56,7 +57,7 @@ struct EncodeOptions {
     std::string preset = "medium"; ///< Encoder preset name.
     std::string tune = "";         ///< Optional tuning mode.
     int crf = 18;                   ///< Constant Rate Factor.
-    std::string codec = "auto";     ///< Encoder selection policy.
+    std::string codec = "auto";     ///< Encoder selection policy or concrete NVENC codec.
     bool realtime = false;          ///< Enable low-latency settings.
     bool block_when_full = false;   ///< Block producer threads instead of dropping when the encoder queue is full.
 

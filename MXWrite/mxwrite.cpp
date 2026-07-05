@@ -461,6 +461,13 @@ bool is_valid_x264_preset(const std::string &p) {
     return false;
 }
 
+std::string lowercase_ascii(std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return text;
+}
+
 } // namespace
 
 bool Writer::open(const std::string &filename, int w, int h, float fps, const char *crf) {
@@ -749,22 +756,26 @@ bool Writer::openInternal(const std::string &filename, int w, int h, float fps, 
     // ---- End HDR path -----------------------------------------------------
 
     const bool is_high_res = (width > 3840 || height > 2160);
-    const char *hw_codec_name = is_high_res ? "hevc_nvenc" : "h264_nvenc";
-    const AVCodecID sw_codec_id = is_high_res ? AV_CODEC_ID_HEVC : AV_CODEC_ID_H264;
+    const std::string codec_pref = lowercase_ascii(opts.codec);
+    const bool explicit_hevc_nvenc = (codec_pref == "hevc_nvenc" || codec_pref == "h265_nvenc");
+    const bool explicit_h264_nvenc = (codec_pref == "h264_nvenc");
+    const bool use_hevc_codec = explicit_hevc_nvenc || (!explicit_h264_nvenc && is_high_res);
+    const char *hw_codec_name = use_hevc_codec ? "hevc_nvenc" : "h264_nvenc";
+    const AVCodecID sw_codec_id = use_hevc_codec ? AV_CODEC_ID_HEVC : AV_CODEC_ID_H264;
 
     // Codec selection based on user preference.
     const AVCodec *codec = nullptr;
     bool wants_hw = false;
-    const std::string &codec_pref = opts.codec;
     if (codec_pref == "software" || codec_pref == "x264" || codec_pref == "cpu") {
         codec = avcodec_find_encoder(sw_codec_id);
         wants_hw = false;
     } else {
-        // "auto" or "nvenc" or anything else => try NVENC first.
+        // "auto" or "nvenc" keeps the resolution-based default; concrete
+        // names like "hevc_nvenc" and "h264_nvenc" select that NVENC codec.
         codec = avcodec_find_encoder_by_name(hw_codec_name);
         wants_hw = (codec != nullptr);
         if (!codec) {
-            if (codec_pref == "nvenc") {
+            if (codec_pref == "nvenc" || explicit_hevc_nvenc || explicit_h264_nvenc) {
                 std::cerr << "MXWrite: NVENC requested but " << hw_codec_name
                           << " not available; falling back to software.\n";
             }
@@ -773,7 +784,7 @@ bool Writer::openInternal(const std::string &filename, int w, int h, float fps, 
     }
 
     if (!codec) {
-        std::cerr << "Could not find " << (is_high_res ? "H.265" : "H.264") << " encoder.\n";
+        std::cerr << "Could not find " << (use_hevc_codec ? "H.265" : "H.264") << " encoder.\n";
         avformat_free_context(format_ctx);
         format_ctx = nullptr;
         return false;
@@ -843,7 +854,7 @@ bool Writer::openInternal(const std::string &filename, int w, int h, float fps, 
         if (opts.realtime) {
             av_opt_set(codec_ctx->priv_data, "zerolatency", "1", 0);
         }
-        if (is_high_res) {
+        if (use_hevc_codec) {
             av_opt_set(codec_ctx->priv_data, "tier", "high", 0);
         }
 
@@ -902,7 +913,7 @@ bool Writer::openInternal(const std::string &filename, int w, int h, float fps, 
             av_opt_set(codec_ctx->priv_data, "tune", tune.c_str(), 0);
         }
         av_opt_set(codec_ctx->priv_data, "crf", crf_str.c_str(), 0);
-        if (opts.realtime) {
+        if (opts.realtime && sw_codec_id == AV_CODEC_ID_H264) {
             // Legacy low-latency parameters kept for realtime path to avoid
             // pipeline stalls during live capture.
             av_opt_set(codec_ctx->priv_data, "x264-params", "bframes=0:ref=1:me=dia:subme=0", 0);

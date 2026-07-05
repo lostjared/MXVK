@@ -180,8 +180,8 @@ Supported options:
 	- Optional MXWrite encoder preset. For software x264 use values such as `ultrafast`, `superfast`, `veryfast`, `fast`, `medium`, `slow`, or `veryslow`; for NVENC these map to NVENC preset levels.
 - `--encode-tune <tune>`
 	- Optional MXWrite encoder tune, such as `film`, `animation`, `grain`, `stillimage`, `fastdecode`, or `zerolatency`.
-- `--encode-codec <auto|software|nvenc>`
-	- Optional MXWrite encoder backend policy. `auto` prefers NVENC when available, `software` forces x264, and `nvenc` requests NVENC with fallback handled by MXWrite.
+- `--encode-codec <auto|software|nvenc|h264_nvenc|hevc_nvenc>`
+	- Optional MXWrite encoder selection. `auto` prefers NVENC when available, `software` forces the software encoder, `nvenc` requests the resolution-selected NVENC codec, and `h264_nvenc` or `hevc_nvenc` request that concrete NVENC encoder with fallback handled by MXWrite.
 - `--encode-realtime`
 	- Enable MXWrite low-latency/realtime encoder settings.
 - `--mxwrite-block`
