@@ -63,6 +63,16 @@ sub should_use_build_asset_path {
         || $cmake =~ /ASSET_DIR\s*=\s*"\$\{CMAKE_CURRENT_BINARY_DIR\}"/s;
 }
 
+sub resolve_program_executable_path {
+    my ($program_name) = @_;
+    my $data_path = "$source_dir/$program_name";
+    my $cmake_file = "$data_path/CMakeLists.txt";
+    my $exe_name = resolve_executable_name($cmake_file);
+
+    return undef if !$exe_name;
+    return "$build_dir/$program_name/$exe_name";
+}
+
 if (!$program) {
     print "Usage: ./run.pl <program_name> [extra args...]\n";
     print "   or: ./run.pl --all [extra args...]\n";
@@ -73,7 +83,10 @@ if (!$program) {
         opendir(my $dh, $build_dir);
         while (my $entry = readdir($dh)) {
             next if $entry =~ /^\./;
-            $progs{$entry} = 1 if -d "$build_dir/$entry";
+            next if !-d "$build_dir/$entry";
+
+            my $exe_path = resolve_program_executable_path($entry);
+            $progs{$entry} = 1 if defined $exe_path && -x $exe_path;
         }
         closedir($dh);
     }
