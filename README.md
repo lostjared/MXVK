@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.15.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, a dedicated `starfield` example, expanded Doxygen coverage for the public rendering helpers, and a fuller Mutatris demo with shader effects and optional music.
+Current development is on version `0.16.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, and a `walk_post` first-person sample for browsing full-screen post-processing shaders.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -62,8 +62,8 @@ The root CMake configuration checks for and uses:
 - C++20 compiler
 - SDL3
 - SDL3_ttf
-- optional: SDL3_mixer (use -DMIXER=ON)
-- Vulkan 1.3+
+- optional: SDL3_mixer (use `-DWITH_MIXER=AUTO|ON|OFF`)
+- Vulkan 1.4+
 - PNG
 - ZLIB
 - optional: JPEG (use -DJPEG=ON)
@@ -108,7 +108,7 @@ Useful CMake options:
 - `-DWITH_CUDA=AUTO|ON|OFF` controls CUDA acceleration/interop. The default is `AUTO`, which enables CUDA when the toolkit is detected; `ON` requires CUDA; `OFF` disables it.
 - `-DWITH_MXWRITE=AUTO|ON|OFF` controls the MXWrite FFmpeg video writer build. The default is `AUTO`, which builds MXWrite when FFmpeg is detected; `ON` requires FFmpeg; `OFF` skips MXWrite.
 - `-DCV=ON` enables OpenCV-based examples and capture support.
-- `-DMIXER=ON` enables SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`).
+- `-DWITH_MIXER=AUTO|ON|OFF` controls SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`). The default is `AUTO`, which enables audio when SDL3_mixer is detected; `ON` requires SDL3_mixer; `OFF` disables it.
 - `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
 - `-DFRACTAL_ZOOM=ON` enables the `fractal_zoom` example and its Boost dependency.
 - `-DEXAMPLES=OFF` builds/install only the `mxvk` library and skips all examples.
@@ -124,7 +124,7 @@ Additional configure examples:
 
 ```bash
 # Build library + examples with audio and JPEG support
-cmake -S . -B build -DMIXER=ON -DJPEG=ON
+cmake -S . -B build -DWITH_MIXER=ON -DJPEG=ON
 
 # Build the fractal_zoom example and its Boost dependency
 cmake -S . -B build -DFRACTAL_ZOOM=ON
@@ -143,7 +143,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.15.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
+The current Doxygen project version is `0.16.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
 
 
 <a id="command-line-arguments"></a>
@@ -251,6 +251,8 @@ Examples:
 ./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl planet
 ./run.pl surface
+./run.pl pointsprite
+./run.pl fireworks
 ./run.pl starfield
 ./run.pl pong
 ./run.pl breakout
@@ -266,6 +268,7 @@ Examples:
 ./run.pl starship
 ./run.pl defender
 ./run.pl walk
+./run.pl walk_post --shader-path /path/to/post_fx --shader-index 0
 ./run.pl 3dmath_masterpiece
 ./run.pl compute_shader --camera 0
 ./run.pl opencv_example --camera 0 -r 1280x720
@@ -282,6 +285,8 @@ Examples:
 The multi-effect path uses intermediate render targets between passes, so post-processing no longer has to sample directly from the swapchain image. This allows effects such as invert, scanline, blur, CRT, color grading, or other sprite-compatible full-screen shaders to be composed in sequence.
 
 The `postprocess` example demonstrates this flow. It reads `examples/postprocess/data/shaders.txt`, loads each listed SPIR-V fragment shader, and attaches the resulting list as a post-processing chain. The example currently ships with `invert.frag` and `scanline.frag`.
+
+`walk_post` is an interactive post-processing browser built from the `walk` first-person sample. Pass `--shader-path <dir>` to a directory containing `index.txt`, optionally select the starting shader with `--shader-index <index>`, then press `R` and `T` while running to switch to the previous or next full-screen effect. Its post-processing sprite uses extended uniforms for elapsed time, frame timing, frame count, resolution, and mouse state.
 
 `defender` and `asteroids3d` use this path for the CRT shader. In both examples, press `F8` to toggle the CRT post-processing effect on or off.
 
@@ -375,6 +380,8 @@ These programs are not intended as standalone applications. They are small visua
 - `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
 - `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
+- `pointsprite` - direct `mxvk::VK_PointSpriteBatch` sample that renders many Tux sprites as point primitives and grows the active point count at runtime. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** hold `Space` to add sprites, `Enter` resets to the default count and size, `Page Up` / `Page Down` adjust sprite size, `Escape` quits.
+- `fireworks` - point-sprite particle burst demo using `VK_PointSpriteBatch`, additive blending, and a star texture. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` triggers a new explosion, `Escape` quits.
 - `starfield` - dedicated point-sprite stress/demo scene using `mxvk::VK_PointSpriteBatch` to render 50,000 layered, twinkling stars with additive blending. **Inputs:** common `-p`, `-r`, `-f`, `--enable-vsync`. **Controls:** hold `Space` for a warp-speed boost, `Escape` quits.
 
 ### 3D Viewers
@@ -397,6 +404,7 @@ These programs are not intended as standalone applications. They are small visua
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
 - `tictactoe` - mouse-driven tic-tac-toe against a simple computer opponent. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse click places a mark, `R` resets, `Escape` quits.
 - `walk` - first-person maze and exploration sample with procedural generation, collision, collectibles, and combat. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `W` / `A` / `S` / `D` move, mouse or right stick look, `Left Shift` sprint, `Left Ctrl` crouch, `Space` jump, left click or right shoulder fire, `F` toggles the FPS overlay, `Escape` releases the mouse or quits.
+- `walk_post` - `walk`-style first-person maze that adds selectable full-screen post-processing through `--shader-path` and `--shader-index`, plus hot-swappable scene shaders from the console. **Inputs:** common `-p`, `-r`, `-f`, `--shader-path`, `--shader-index`. **Controls:** same movement/combat controls as `walk`, plus `R` / `T` select previous/next post-processing shader and `F3` toggles the console.
 - `pool_demo` (`Pool3D`) - 3D billiards game with menus, high scores, cue-ball placement, and shot logic. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** menus use `Enter`, `Space`, `Escape`, and `Back`; in-game controls include arrow keys, `Space` to charge a shot, `Enter` to confirm cue-ball placement, mouse drag for aiming, right mouse drag to rotate the camera, and wheel or pinch to zoom.
 - `puzzle` - Acid Drop, a falling-block puzzle with menus, scores, options, credits, and name entry. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Up` / `Down` navigate menus, `Left` / `Right` move blocks, `Space` rotates, `P` pauses, `Escape` backs out or quits, and text entry uses `Backspace` / `Enter`.
 - `puzzle_drop` - 3D Acid Drop-style block puzzle with an intro, Matrix-rain backdrop, textured cube pieces, selectable difficulty, keyboard controls, and gamepad support. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` / `Space` skips the intro, `1` / `2` / `3` starts difficulty levels, `Left` / `Right` move, `Down` soft drops, `Up` cycles piece blocks, `Z` / `X` rotate, `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Escape` quits.
@@ -417,9 +425,12 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 5, 2026: the project version moved to `0.16.0`, and `Doxyfile` now reports the same version for generated API documentation.
+- July 5, 2026: `walk_post` was added as a first-person post-processing browser. It loads a shader index from `--shader-path`, supports `--shader-index`, cycles effects with `R` / `T`, updates extended sprite uniforms for shader-style effects, and keeps the `walk` debug console shader-reload commands.
+- July 5, 2026: `pointsprite` and `fireworks` examples were added to exercise `mxvk::VK_PointSpriteBatch` outside the `starfield` stress scene.
 - July 4, 2026: `testapps.pl` now supports timeout smoke testing. Pass `--timeout` or `--timeout=<seconds>` to run each example briefly, terminate it, continue through the list, and print a collected success/failure summary.
 - July 4, 2026: `mutatris` now compiles a shader effect pack from `examples/mutatris/shaders/effects`, chooses a new background/effect combination as levels advance, and exposes a console `switch_shader` command for manually selecting another random effect.
-- July 4, 2026: `mutatris` gained optional SDL3_mixer playback for `music.ogg`, `line.wav`, and `open.wav` when built with `-DMIXER=ON`.
+- July 4, 2026: `mutatris` gained optional SDL3_mixer playback for `music.ogg`, `line.wav`, and `open.wav` when built with `-DWITH_MIXER=ON`.
 - July 4, 2026: `mutatris` clearing now uses fixed-duration block-clear animation frames and visual matching across the top/bottom board layout, including seam matches that span the divider.
 - July 3, 2026: the project version moved to `0.15.0`, and `Doxyfile` now reports the same version for generated API documentation.
 - July 2, 2026: the project version moved to `0.13.0`, and `Doxyfile` now reports the same version for generated API documentation.
