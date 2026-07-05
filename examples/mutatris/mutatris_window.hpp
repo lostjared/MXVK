@@ -11,6 +11,7 @@
 
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_console.hpp"
+#include "mxvk/mxvk_controller.hpp"
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
 #include "mxvk/mxvk_sound.hpp"
 #endif
@@ -41,6 +42,7 @@ namespace mutatris {
         std::array<mxvk::VK_Sprite *, 11> backgrounds{};
         std::vector<std::string> effectShaders;
         mxvk::VK_Console console;
+        mxvk::VK_Controller controller{};
         mxvk::VK_Sprite *intro = nullptr;
         mxvk::VK_Sprite *start = nullptr;
         mxvk::VK_Sprite *lostLogo = nullptr;
@@ -88,9 +90,13 @@ namespace mutatris {
         void ensureMusicPlaying();
         void handleKey(SDL_Keycode key);
         void handleGamepad(Uint8 button);
+        void handleGamepadDpad(Uint8 button);
         void handleConfirm();
         [[nodiscard]] bool isStartupTitleFullyVisible() const;
         void handleDirectionalKey(SDL_Keycode key);
+        void softDropActivePiece();
+        bool openController();
+        void syncControllerConnection();
         void processGrid();
         void advanceFocus();
         void startGame();

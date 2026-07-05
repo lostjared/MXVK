@@ -23,9 +23,9 @@ The HUD shows the current level, drop timeout, score, active direction, and a sh
 
 ### Menus
 
-- Any key, mouse click, tap, `South`, or `Start` - skip startup logos
+- Any key, mouse click, tap, `A` / `South`, or `Start` - skip startup logos
 - `Enter` / `Space` - advance from title to difficulty selection
-- Mouse click, tap, `South`, or `Start` - confirm the current menu screen
+- Mouse click, tap, `A` / `South`, or `Start` - confirm the current menu screen
 - `Left` / `Right` - choose Easy, Medium, or Hard on the difficulty screen
 - `Enter` / `Space` - start the selected difficulty
 - `Escape` - quit
@@ -50,11 +50,11 @@ Because the active side rotates after each locked piece, the arrow mapping chang
 
 ### Gamepad
 
-- `Start` / `South` - advance menus or start the selected difficulty
+- `A` / `South` or `Start` - advance menus or start the selected difficulty
 - D-pad left/right - choose difficulty on the difficulty screen
-- D-pad - move, soft-drop, or cycle colors relative to the active side
-- `South` - cycle colors
-- `East` - rotate the active piece
+- D-pad - move or soft-drop relative to the active side
+- `A` / `South` - cycle colors
+- `B` / `East` - rotate the active piece
 - `North` - hard drop the active piece
 - `Back` - quit
 

@@ -33,12 +33,26 @@ namespace mutatris {
         configureConsole();
         loadSprites();
         loadSoundEffects();
+        syncControllerConnection();
         playSound(openSound);
         startupStartTick = SDL_GetTicks();
         logMutatris(std::format("Mutatris ready. {} shader effect(s) available.", effectShaders.size()));
     }
 
     void MutatrisWindow::event(SDL_Event &e) {
+        if (e.type == SDL_EVENT_GAMEPAD_ADDED) {
+            if (!controller.active()) {
+                controller.connectEvent(e);
+            }
+            syncControllerConnection();
+            return;
+        }
+        if (e.type == SDL_EVENT_GAMEPAD_REMOVED) {
+            controller.connectEvent(e);
+            syncControllerConnection();
+            return;
+        }
+
         const bool wasConsoleVisible = console.isVisible();
         const bool consoleToggle = e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F3;
         console.handleEvent(e);
@@ -352,13 +366,71 @@ namespace mutatris {
                 advanceFocus();
             }
         } else if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
-            handleDirectionalKey(SDLK_LEFT);
+            handleGamepadDpad(button);
         } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
-            handleDirectionalKey(SDLK_RIGHT);
+            handleGamepadDpad(button);
         } else if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
-            handleDirectionalKey(SDLK_UP);
+            handleGamepadDpad(button);
         } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
-            handleDirectionalKey(SDLK_DOWN);
+            handleGamepadDpad(button);
+        }
+    }
+
+    void MutatrisWindow::handleGamepadDpad(Uint8 button) {
+        if (game == nullptr) {
+            return;
+        }
+        const Uint32 now = SDL_GetTicks();
+        if (now - lastInputTick < KEY_REPEAT_MS) {
+            return;
+        }
+
+        Piece &piece = game->grid[focus].gamePiece;
+        bool handled = true;
+        if (focus == 0) {
+            if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
+                piece.moveLeft();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
+                piece.moveRight();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                softDropActivePiece();
+            } else {
+                handled = false;
+            }
+        } else if (focus == 1) {
+            if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                piece.moveLeft();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                piece.moveRight();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
+                softDropActivePiece();
+            } else {
+                handled = false;
+            }
+        } else if (focus == 2) {
+            if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
+                piece.moveLeft();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
+                piece.moveRight();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                softDropActivePiece();
+            } else {
+                handled = false;
+            }
+        } else if (focus == 3) {
+            if (button == SDL_GAMEPAD_BUTTON_DPAD_DOWN) {
+                piece.moveLeft();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_UP) {
+                piece.moveRight();
+            } else if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
+                softDropActivePiece();
+            } else {
+                handled = false;
+            }
+        }
+
+        if (handled) {
+            lastInputTick = now;
         }
     }
 
@@ -451,6 +523,32 @@ namespace mutatris {
                     advanceFocus();
                 }
             }
+        }
+    }
+
+    void MutatrisWindow::softDropActivePiece() {
+        if (game == nullptr) {
+            return;
+        }
+        if (game->grid[focus].gamePiece.moveDown()) {
+            processGrid();
+            advanceFocus();
+        }
+    }
+
+    bool MutatrisWindow::openController() {
+        for (int index = 0; index < mxvk::VK_Controller::joysticks(); ++index) {
+            if (controller.open(index)) {
+                logMutatris("Controller connected: " + controller.name());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void MutatrisWindow::syncControllerConnection() {
+        if (!controller.active()) {
+            openController();
         }
     }
 
