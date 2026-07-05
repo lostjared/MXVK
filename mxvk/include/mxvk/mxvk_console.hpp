@@ -37,7 +37,7 @@ namespace mxvk {
 
         VK_Console() = default;
 
-        /** @brief Attach this console to a window and configure font rendering. */
+        /** @brief Attach this console to a window and configure console font rendering. */
         void attach(VK_Window &window, const std::string &fontPath, int fontSize = 18);
 
         /** @brief Change only the console font, leaving the window default font unchanged. */

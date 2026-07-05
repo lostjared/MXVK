@@ -23,6 +23,7 @@ namespace example {
             const std::string shader_path = base_path + "/data/background_pulse.frag.spv";
 
             background = createSprite(base_path + "/data/background.png", sprite_vert_path, shader_path);
+            setFont(base_path + "/data/font.ttf", 20);
             console.attach(*this, base_path + "/data/font.ttf", 20);
             console.setSpriteYOriginTopLeft(true);
             console.setPrompt("mxvk> ");

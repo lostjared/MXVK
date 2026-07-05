@@ -17,7 +17,6 @@ namespace mxvk {
 
     void VK_Console::attach(VK_Window &window, const std::string &fontPath, const int fontSize) {
         windowPtr = &window;
-        windowPtr->setFont(fontPath, fontSize);
         setFont(fontPath, fontSize);
         panel_sprite = nullptr;
         cursor_sprite = nullptr;

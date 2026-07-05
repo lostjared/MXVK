@@ -2886,7 +2886,19 @@ namespace mxvk {
     }
 
     void VK_Window::printText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font) {
-        printText(text, x, y, col, font.get());
+        if (text.empty()) {
+            return;
+        }
+
+        if (!font) {
+            throw mxvk::Exception("printText requires a valid mxvk::Font");
+        }
+
+        ensureTextRenderer(font.path(), font.size());
+        if (!text_renderer) {
+            throw mxvk::Exception("printText with an explicit font could not initialize the text renderer");
+        }
+        text_renderer->printTextG_Solid(text, x, y, col, font);
     }
 
     void VK_Window::clearTextQueue() {
@@ -2928,7 +2940,19 @@ namespace mxvk {
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height, const Font &font) {
-        return getTextDimensions(text, width, height, font.get());
+        if (!font) {
+            width = 0;
+            height = 0;
+            return false;
+        }
+
+        ensureTextRenderer(font.path(), font.size());
+        if (!text_renderer) {
+            width = 0;
+            height = 0;
+            return false;
+        }
+        return text_renderer->getTextDimensions(text, width, height, font);
     }
 
     void VK_Window::ensureTextRenderer() {

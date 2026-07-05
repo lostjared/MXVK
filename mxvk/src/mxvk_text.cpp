@@ -17,12 +17,16 @@ namespace mxvk {
 
     Font::Font(Font &&other) noexcept
         : font(std::exchange(other.font, nullptr)),
+          font_path(std::move(other.font_path)),
+          font_size(std::exchange(other.font_size, 0)),
           ownsTtfInit(std::exchange(other.ownsTtfInit, false)) {}
 
     Font &Font::operator=(Font &&other) noexcept {
         if (this != &other) {
             reset();
             font = std::exchange(other.font, nullptr);
+            font_path = std::move(other.font_path);
+            font_size = std::exchange(other.font_size, 0);
             ownsTtfInit = std::exchange(other.ownsTtfInit, false);
         }
         return *this;
@@ -33,6 +37,8 @@ namespace mxvk {
             TTF_CloseFont(font);
             font = nullptr;
         }
+        font_path.clear();
+        font_size = 0;
         if (ownsTtfInit) {
             TTF_Quit();
             ownsTtfInit = false;
@@ -57,6 +63,8 @@ namespace mxvk {
         }
 
         font = newFont;
+        font_path = fontPath;
+        font_size = fontSize;
         ownsTtfInit = true;
     }
 
