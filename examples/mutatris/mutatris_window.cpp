@@ -81,6 +81,7 @@ namespace mutatris {
         const VkExtent2D extent = getSwapchainExtent();
         width = extent.width > 0U ? static_cast<int>(extent.width) : DESIGN_WIDTH;
         height = extent.height > 0U ? static_cast<int>(extent.height) : DESIGN_HEIGHT;
+        ensureUiFont();
 
         ensureMusicPlaying();
         switch (screen) {
@@ -909,8 +910,22 @@ namespace mutatris {
         sprite->drawSpriteRect(scaleX(px), scaleY(py), scaleX(pw), scaleY(ph));
     }
 
+    float MutatrisWindow::layoutScale() const {
+        return std::max(0.2f, std::min(static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH), static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT)));
+    }
+
+    void MutatrisWindow::ensureUiFont() {
+        const int scaledFontSize = std::max(1, static_cast<int>(std::lround(24.0f * layoutScale())));
+        if (scaledFontSize == uiFontSize) {
+            return;
+        }
+        uiFontSize = scaledFontSize;
+        setFont(mutatris_FONT_PATH, uiFontSize);
+        console.invalidateLayoutCache();
+    }
+
     void MutatrisWindow::ensureIntroFonts() {
-        const float scale = std::max(0.2f, std::min(static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH), static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT)));
+        const float scale = layoutScale();
         const int scaledBaseSize = std::max(1, static_cast<int>(std::lround(54.0f * scale)));
         if (scaledBaseSize == introFontSize) {
             return;

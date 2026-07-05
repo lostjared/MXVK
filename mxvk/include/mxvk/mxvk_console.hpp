@@ -81,6 +81,9 @@ namespace mxvk {
         /** @brief Set max number of lines rendered on screen. */
         void setMaxVisibleLines(std::size_t maxVisibleLines);
 
+        /** @brief Recompute cached line wrapping after font or layout metrics change. */
+        void invalidateLayoutCache();
+
         /** @brief Select whether console sprite elements use top-left Y coordinates. */
         void setSpriteYOriginTopLeft(bool enabled) noexcept { sprite_y_origin_top_left = enabled; }
 

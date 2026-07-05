@@ -102,6 +102,11 @@ namespace mxvk {
         max_visible_lines = std::max<std::size_t>(1, maxVisibleLines);
     }
 
+    void VK_Console::invalidateLayoutCache() {
+        invalidateWrappedCache();
+        scroll_offset = std::min(scroll_offset, maxScrollOffset());
+    }
+
     const std::string &VK_Console::inputBuffer() const noexcept {
         return input;
     }

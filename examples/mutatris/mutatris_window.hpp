@@ -59,6 +59,7 @@ namespace mutatris {
         int difficulty = 0;
         int focus = 0;
         Uint32 startupStartTick = 0;
+        int uiFontSize = 24;
         int introFontSize = 0;
         Uint32 lastDropTick = 0;
         Uint32 lastInputTick = 0;
@@ -117,6 +118,8 @@ namespace mutatris {
         [[nodiscard]] BoardLayout boardLayout(int gridIndex) const;
         void drawGridFrame(const BoardLayout &layout, bool selected);
         void drawCell(const BoardLayout &layout, int cellX, int cellY, int color);
+        [[nodiscard]] float layoutScale() const;
+        void ensureUiFont();
         void ensureIntroFonts();
         void resetScaledFont(mxvk::Font &font, int designSize, float scale);
         void drawTextCentered(const std::string &text, int y, SDL_Color color);
