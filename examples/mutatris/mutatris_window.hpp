@@ -23,7 +23,7 @@ namespace mutatris {
 
     class MutatrisWindow final : public mxvk::VK_Window {
       public:
-        MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync);
+        MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt);
 
         void event(SDL_Event &e) override;
         void proc() override;
@@ -72,6 +72,7 @@ namespace mutatris {
         int shaderLevel = -1;
         int shaderIndex = -1;
         int backgroundIndex = -1;
+        bool crtEnabled = false;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::unique_ptr<mxvk::VK_Mixer> soundEffects{};
 #endif

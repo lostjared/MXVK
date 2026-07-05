@@ -23,13 +23,17 @@
 
 namespace mutatris {
 
-    MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync)
+    MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt)
         : mxvk::VK_Window("Mutatris", width, height, fullscreen, MXVK_VALIDATION, enableVsync),
           assetRoot((path.empty() || path == ".") ? std::string(mutatris_ASSET_DIR) : path),
           dataRoot(assetRoot + "/data"),
-          shaderRoot(mutatris_SHADER_DIR) {
+          shaderRoot(mutatris_SHADER_DIR),
+          crtEnabled(enableCrt) {
         setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         setFont(mutatris_FONT_PATH, 24);
+        attachPostProcessingShader(shaderRoot + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
+        setPostProcessingShaderTimeEnabled(true);
+        setPostProcessingEnabled(crtEnabled);
         configureConsole();
         loadSprites();
         loadSoundEffects();
@@ -66,6 +70,12 @@ namespace mutatris {
         if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
             logMutatris("Exit requested.");
             exit();
+            return;
+        }
+        if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F8 && !e.key.repeat) {
+            crtEnabled = !crtEnabled;
+            setPostProcessingEnabled(crtEnabled);
+            logMutatris(std::string("CRT effect ") + (crtEnabled ? "enabled." : "disabled."));
             return;
         }
         if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {

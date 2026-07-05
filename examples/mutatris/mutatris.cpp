@@ -10,7 +10,7 @@
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        mutatris::MutatrisWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
+        mutatris::MutatrisWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync, args.enable_crt);
         window.loop();
     } catch (const mxvk::Exception &e) {
         std::cerr << std::format("mutatris: MXVK exception: {}\n", e.text());

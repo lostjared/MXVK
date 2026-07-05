@@ -37,6 +37,7 @@ The HUD shows the current level, drop timeout, score, active direction, and a sh
 - `A` / `Space` - rotate the active piece
 - `S` - hard drop the active piece
 - `F3` - open or close the developer console
+- `F8` - toggle the CRT post-processing shader on or off
 - `Escape` - quit
 
 Because the active side rotates after each locked piece, the arrow mapping changes with the highlighted side:
@@ -103,6 +104,12 @@ Standard example options work as well:
 
 ```bash
 ./run.pl mutatris -r 1920x1080 -f
+```
+
+Use `--enable-crt` to start with the CRT post-processing shader enabled:
+
+```bash
+./run.pl mutatris --enable-crt
 ```
 
 ## Assets
