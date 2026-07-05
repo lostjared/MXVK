@@ -53,7 +53,7 @@ namespace example {
     class FireworksWindow : public mxvk::VK_Window {
       public:
         FireworksWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("Stars - [3D Particle Effect]", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+            : mxvk::VK_Window("Fireworks - [3D Particle Effect]", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               data_root(data_root),
               vertices(MAX_PARTICLES) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -77,7 +77,9 @@ namespace example {
         }
 
         void proc() override {
-            printText("Explosion - Press Space to Trigger", 25, 25, SDL_Color{255, 64, 64, 255});
+            if (!has_active_particles()) {
+                printText("Explosion - Press Space to Trigger", 25, 25, SDL_Color{255, 64, 64, 255});
+            }
         }
 
         void onSwapchainRecreated() override {
@@ -163,6 +165,14 @@ namespace example {
 
             std::erase_if(explosions, [](const Explosion &explosion) {
                 return std::ranges::none_of(explosion.particles, [](const Particle &particle) {
+                    return particle.lifetime > 0.0f;
+                });
+            });
+        }
+
+        [[nodiscard]] bool has_active_particles() const {
+            return std::ranges::any_of(explosions, [](const Explosion &explosion) {
+                return std::ranges::any_of(explosion.particles, [](const Particle &particle) {
                     return particle.lifetime > 0.0f;
                 });
             });
