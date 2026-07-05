@@ -23,6 +23,10 @@
 
 namespace mutatris {
 
+    namespace {
+        constexpr int CONSOLE_DESIGN_FONT_SIZE = 20;
+    }
+
     MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt)
         : mxvk::VK_Window("Mutatris", width, height, fullscreen, MXVK_VALIDATION, enableVsync),
           assetRoot((path.empty() || path == ".") ? std::string(mutatris_ASSET_DIR) : path),
@@ -115,7 +119,7 @@ namespace mutatris {
     }
 
     void MutatrisWindow::configureConsole() {
-        console.attach(*this, mutatris_FONT_PATH, 24);
+        console.attach(*this, mutatris_FONT_PATH, CONSOLE_DESIGN_FONT_SIZE);
         console.setSpriteYOriginTopLeft(true);
         console.setPrompt("mutatris> ");
         console.printLine("Press F3 to open/close the console.");
@@ -931,7 +935,6 @@ namespace mutatris {
         }
         uiFontSize = scaledFontSize;
         setFont(mutatris_FONT_PATH, uiFontSize);
-        console.invalidateLayoutCache();
     }
 
     void MutatrisWindow::ensureIntroFonts() {

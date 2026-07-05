@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "mxvk_text.hpp"
+
 namespace mxvk {
 
     class VK_Window;
@@ -37,6 +39,9 @@ namespace mxvk {
 
         /** @brief Attach this console to a window and configure font rendering. */
         void attach(VK_Window &window, const std::string &fontPath, int fontSize = 18);
+
+        /** @brief Change only the console font, leaving the window default font unchanged. */
+        void setFont(const std::string &fontPath, int fontSize);
 
         /** @brief Handle keyboard/text events for the console. */
         void handleEvent(const SDL_Event &event);
@@ -172,6 +177,7 @@ namespace mxvk {
         SDL_Color text_color{220, 235, 255, 255};
         SDL_Color prompt_color{120, 220, 160, 255};
         SDL_Color info_color{170, 170, 210, 255};
+        Font console_font{};
         CommandCallback commandCallback{};
     };
 

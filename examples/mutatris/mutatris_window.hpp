@@ -59,7 +59,7 @@ namespace mutatris {
         int difficulty = 0;
         int focus = 0;
         Uint32 startupStartTick = 0;
-        int uiFontSize = 24;
+        int uiFontSize = 0;
         int introFontSize = 0;
         Uint32 lastDropTick = 0;
         Uint32 lastInputTick = 0;

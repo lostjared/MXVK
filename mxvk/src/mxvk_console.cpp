@@ -18,6 +18,7 @@ namespace mxvk {
     void VK_Console::attach(VK_Window &window, const std::string &fontPath, const int fontSize) {
         windowPtr = &window;
         windowPtr->setFont(fontPath, fontSize);
+        setFont(fontPath, fontSize);
         panel_sprite = nullptr;
         cursor_sprite = nullptr;
         scroll_track_sprite = nullptr;
@@ -35,6 +36,12 @@ namespace mxvk {
         follow_tail = true;
         scrollbar_dragging = false;
         scrollbar_drag_offset = 0;
+    }
+
+    void VK_Console::setFont(const std::string &fontPath, const int fontSize) {
+        console_font.reset(fontPath, fontSize);
+        invalidateLayoutCache();
+        refreshVisibleLineCount();
     }
 
     void VK_Console::setCommandCallback(CommandCallback callback) {
@@ -194,7 +201,7 @@ namespace mxvk {
 
         int width = 0;
         int height = 0;
-        if (!windowPtr->getTextDimensions(text, width, height)) {
+        if (!windowPtr->getTextDimensions(text, width, height, console_font)) {
             return 0;
         }
         return width;
@@ -524,7 +531,7 @@ namespace mxvk {
 
         int glyph_w = 8;
         int glyph_h = 18;
-        if (!windowPtr->getTextDimensions("M", glyph_w, glyph_h)) {
+        if (!windowPtr->getTextDimensions("M", glyph_w, glyph_h, console_font)) {
             glyph_h = 18;
         }
 
@@ -793,7 +800,7 @@ namespace mxvk {
 
         int glyph_w = 8;
         int glyph_h = 18;
-        if (!windowPtr->getTextDimensions("M", glyph_w, glyph_h)) {
+        if (!windowPtr->getTextDimensions("M", glyph_w, glyph_h, console_font)) {
             glyph_h = 18;
         }
 
@@ -803,7 +810,7 @@ namespace mxvk {
         ensureWrappedCache(text_width);
 
         int y = panel_y + padding;
-        windowPtr->printText("MXVK Console (F3 to toggle)", panel_x + padding, y, scaledColor(info_color));
+        windowPtr->printText("MXVK Console (F3 to toggle)", panel_x + padding, y, scaledColor(info_color), console_font);
         y += line_height;
 
         const int input_y = panel_y + panel_h - padding - line_height;
@@ -823,7 +830,7 @@ namespace mxvk {
         const std::size_t start = (wrapped_cache.size() > visible_lines) ? (wrapped_cache.size() - visible_lines - scroll_offset) : 0;
         const std::size_t end = std::min(wrapped_cache.size(), start + visible_lines);
         for (std::size_t i = start; i < end; ++i) {
-            windowPtr->printText(wrapped_cache[i].text, panel_x + padding, y, scaledColor(wrapped_cache[i].color));
+            windowPtr->printText(wrapped_cache[i].text, panel_x + padding, y, scaledColor(wrapped_cache[i].color), console_font);
             y += line_height;
         }
 
@@ -858,7 +865,11 @@ namespace mxvk {
         }
 
         if (scroll_offset > 0) {
-            windowPtr->printText(std::format("^ {} line(s) newer below", scroll_offset), panel_x + padding, input_y - line_height, scaledColor(info_color));
+            windowPtr->printText(std::format("^ {} line(s) newer below", scroll_offset),
+                                 panel_x + padding,
+                                 input_y - line_height,
+                                 scaledColor(info_color),
+                                 console_font);
         }
 
         const Uint64 now = SDL_GetTicksNS();
@@ -870,13 +881,13 @@ namespace mxvk {
         cursor_pos = std::min(cursor_pos, input.size());
 
         const std::string line = promptText + input;
-        windowPtr->printText(line, panel_x + padding, input_y, scaledColor(prompt_color));
+        windowPtr->printText(line, panel_x + padding, input_y, scaledColor(prompt_color), console_font);
 
         if (cursor_visible && cursor_sprite != nullptr) {
             int prefix_width = 0;
             int prefix_height = 0;
             const std::string prefix = promptText + input.substr(0, cursor_pos);
-            if (!windowPtr->getTextDimensions(prefix, prefix_width, prefix_height)) {
+            if (!windowPtr->getTextDimensions(prefix, prefix_width, prefix_height, console_font)) {
                 prefix_width = static_cast<int>((promptText.size() + cursor_pos) * static_cast<std::size_t>(glyph_w));
             }
 
