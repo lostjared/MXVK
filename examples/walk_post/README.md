@@ -1,5 +1,7 @@
 # Walk Post
 
+<img width="1280" height="720" alt="vlcsnap-2026-07-05-05h04m18s318" src="https://github.com/user-attachments/assets/a7adaf8f-182e-4862-afda-a22677b27640" />
+
 `walk_post` is a first-person maze and post-processing shader browser. It keeps the procedural walls, pillars, collectibles, projectiles, gamepad support, and debug console from the `walk` sample, then renders the scene through a selectable full-screen post-processing shader.
 
 Use it when testing fragment effects that need real scene input, mouse state, timing, frame count, and resolution uniforms instead of a static quad.
