@@ -13,48 +13,6 @@ layout(location = 4) in vec4 v_color;
 
 layout(location = 0) out vec4 outColor;
 
-float wave_height(vec2 p, vec2 dir, float steepness, float wavelength, float speed, float time) {
-    float k = 6.2831853 / wavelength;
-    float phase = k * dot(normalize(dir), p) + speed * time;
-    float a = steepness / k;
-    return a * sin(phase);
-}
-
-float area_variation(vec2 p) {
-    float a = sin(dot(p, vec2(0.073, 0.041)));
-    float b = cos(dot(p, vec2(-0.037, 0.089)));
-    float c = sin(dot(p, vec2(0.019, -0.061)) + a * 1.7);
-    return 0.78 + 0.28 * (a * 0.45 + b * 0.35 + c * 0.20);
-}
-
-vec2 warped_position(vec2 p, float time) {
-    vec2 warp;
-    warp.x = sin(dot(p, vec2(0.031, 0.047)) + time * 0.12);
-    warp.y = cos(dot(p, vec2(-0.043, 0.029)) - time * 0.08);
-    return p + warp * 2.35;
-}
-
-float combined_height(vec2 p, float time) {
-    vec2 q = warped_position(p, time);
-    float local = area_variation(p);
-    float height = 0.0;
-    height += wave_height(q, vec2(1.0, 0.25), 0.40 * local, 5.6, 1.10, time);
-    height += wave_height(q + vec2(1.8, -0.7), vec2(-0.35, 1.0), 0.29 * (1.18 - local * 0.18), 3.3, 1.55, time);
-    height += wave_height(p, vec2(0.8, -0.65), 0.18 * local, 1.7, 2.35, time);
-    height += wave_height(q, vec2(-0.9, -0.2), 0.12, 2.2, 1.95, time);
-    height += sin(dot(p, vec2(0.19, -0.13)) + sin(dot(p, vec2(-0.047, 0.062))) * 1.4 + time * 0.52) * 0.13;
-    height += sin((q.x - q.y) * 3.4 + time * 1.9) * 0.030;
-    return height;
-}
-
-vec3 smooth_wave_normal(vec2 p, float time) {
-    float e = 0.18;
-    float h0 = combined_height(p, time);
-    float hx = combined_height(p + vec2(e, 0.0), time);
-    float hz = combined_height(p + vec2(0.0, e), time);
-    return normalize(vec3(-(hx - h0) / e, 1.0, -(hz - h0) / e));
-}
-
 float wrappedDelta(float value) {
     return min(abs(value), 1.0 - abs(value));
 }
@@ -129,19 +87,32 @@ float filtered_highlight(float value, float edge, float softness) {
     return smoothstep(edge - width * 3.0, edge + width * 2.0, value);
 }
 
+float smooth_region(vec2 p) {
+    float a = sin(dot(p, vec2(0.031, 0.047)));
+    float b = cos(dot(p, vec2(-0.022, 0.064)));
+    float c = sin(dot(p, vec2(0.011, -0.018)) + a * 0.7);
+    return (a * 0.42 + b * 0.34 + c * 0.24) * 0.5 + 0.5;
+}
+
+vec3 micro_normal(vec2 p, float time, float strength) {
+    float region = smooth_region(p);
+    vec2 drift_a = vec2(time * mix(0.34, 0.52, region), -time * mix(0.14, 0.25, region));
+    vec2 drift_b = vec2(-time * mix(0.20, 0.34, region), time * mix(0.24, 0.39, region));
+    vec2 p1 = p * mix(4.8, 7.2, region) + drift_a;
+    vec2 p2 = p * mix(8.0, 12.4, 1.0 - region) + drift_b;
+    float x = sin(dot(p1, vec2(1.0, 0.36))) + cos(dot(p2, vec2(-0.42, 1.0)));
+    float z = cos(dot(p1, vec2(0.18, 1.0))) + sin(dot(p2, vec2(1.0, -0.22)));
+    return vec3(x, 0.0, z) * strength * mix(0.70, 1.35, region);
+}
+
 void main() {
     float time = pc.u_cameraTime.w;
     vec3 cameraPos = pc.u_cameraTime.xyz;
     float cameraDistance = length(cameraPos - v_worldPos);
     float nearDetail = 1.0 - smoothstep(42.0, 82.0, cameraDistance);
+    float region = smooth_region(v_worldPos.xz);
 
-    vec3 normal = smooth_wave_normal(v_worldPos.xz, time);
-    vec2 rippleUv = v_texCoord * 1.9;
-    vec2 ripple = vec2(
-        sin(rippleUv.x * 22.0 + time * 1.9) + cos((rippleUv.x + rippleUv.y) * 13.0 + time * 1.3),
-        cos(rippleUv.y * 20.0 + time * 1.5) + sin((rippleUv.x - rippleUv.y) * 16.0 + time * 1.7)
-    ) * (0.010 * nearDetail);
-    normal = normalize(normal + vec3(ripple.x, 0.0, ripple.y) + v_baseNormal * 0.02);
+    vec3 normal = normalize(v_baseNormal + micro_normal(v_worldPos.xz, time, 0.030 * nearDetail));
 
     vec3 viewDir = normalize(cameraPos - v_worldPos);
     vec3 lightDir = normalize(vec3(-0.25, 0.88, -0.40));
@@ -153,21 +124,28 @@ void main() {
     vec3 reflectedView = reflect(-viewDir, normal);
     float horizon = clamp(1.0 - reflectedView.y, 0.0, 1.0);
     vec3 skyReflection = mix(vec3(0.78, 0.91, 1.0), vec3(0.42, 0.68, 0.96), horizon);
-    vec3 deepWater = vec3(0.01, 0.16, 0.26);
-    vec3 shallowWater = vec3(0.05, 0.48, 0.58);
-    float crest = smoothstep(0.18, 0.34, v_height);
-    vec3 refraction = mix(deepWater, shallowWater, 0.42 + v_height * 0.55);
+    vec3 deepWater = mix(vec3(0.004, 0.085, 0.16), vec3(0.010, 0.13, 0.22), region);
+    vec3 midWater = mix(vec3(0.018, 0.28, 0.42), vec3(0.030, 0.37, 0.50), region);
+    vec3 shallowWater = mix(vec3(0.055, 0.50, 0.60), vec3(0.085, 0.64, 0.70), region);
+    float crest = smoothstep(0.24, 0.58, v_height);
+    float depthView = smoothstep(0.12, 0.86, ndv);
+    vec3 refraction = mix(mix(deepWater, midWater, depthView), shallowWater, crest * 0.65);
     refraction = mix(refraction, v_color.rgb, 0.18);
-    refraction += vec3(0.07, 0.16, 0.14) * crest;
+    refraction += vec3(0.08, 0.18, 0.15) * crest;
 
     float diffuse = clamp(dot(normal, lightDir), 0.0, 1.0);
+    vec3 halfVector = normalize(lightDir + viewDir);
+    float specularDot = clamp(dot(normal, halfVector), 0.0, 1.0);
     float sunDot = clamp(dot(reflectedView, lightDir), 0.0, 1.0);
     float sunVisibility = nearDetail * smoothstep(0.34, 0.64, ndv);
+    float peakMask = smoothstep(0.08, 0.58, v_height);
+    float specular = filtered_highlight(specularDot, 0.955, 0.010) * pow(specularDot, 12.0) * sunVisibility;
     float sunSheen = filtered_highlight(sunDot, 0.925, 0.010) * pow(sunDot, 5.0) * sunVisibility;
 
     vec3 color = mix(refraction, skyReflection, fresnel);
     color += vec3(0.03, 0.08, 0.10) * diffuse;
-    color += vec3(1.0, 0.92, 0.68) * sunSheen * 0.075;
+    color += vec3(0.88, 0.96, 1.0) * specular * (0.050 + fresnel * 0.10) * (0.35 + peakMask * 0.65);
+    color += vec3(1.0, 0.92, 0.68) * sunSheen * 0.065;
 
     outColor = vec4(color, 1.0);
 }
