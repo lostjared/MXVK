@@ -43,6 +43,14 @@ float softPuff(vec2 uv, vec2 center, vec2 radius) {
     return exp(-q * 1.85);
 }
 
+float smoothCloudDetail(vec2 uv, float time, float seed) {
+    vec2 p = uv + vec2(time * 0.010, time * 0.002) + seed;
+    float a = sin(dot(p, vec2(19.7, 8.3)));
+    float b = sin(dot(p + a * 0.025, vec2(-13.1, 17.9)));
+    float c = cos(dot(p + b * 0.020, vec2(27.4, -6.6)));
+    return (a * 0.45 + b * 0.35 + c * 0.20) * 0.5 + 0.5;
+}
+
 float cloudGroup(vec2 uv, vec2 center, float scale, float time, float seed) {
     float c = 0.0;
     c += softPuff(uv, center + vec2(-0.17, -0.030) * scale, vec2(0.070, 0.028) * scale) * 0.55;
@@ -53,11 +61,10 @@ float cloudGroup(vec2 uv, vec2 center, float scale, float time, float seed) {
     c += softPuff(uv, center + vec2(0.165, -0.010) * scale, vec2(0.065, 0.030) * scale) * 0.78;
     c += softPuff(uv, center + vec2(0.015, -0.032) * scale, vec2(0.170, 0.022) * scale) * 0.55;
 
-    vec2 drift = vec2(time * 0.018, time * 0.003);
-    float broad = fbm(uv * vec2(8.0, 4.2) + drift + seed);
-    float detail = fbm(uv * vec2(25.0, 12.0) + drift * 1.7 + seed * 3.0);
-    float eroded = c + broad * 0.16 + detail * 0.06 - 0.18;
-    return smoothstep(0.14, 0.72, eroded);
+    float broad = smoothCloudDetail(uv * vec2(1.8, 1.1), time, seed);
+    float detail = smoothCloudDetail(uv * vec2(4.2, 2.4) + vec2(0.07, -0.03), time * 1.3, seed * 2.1);
+    float eroded = c + broad * 0.10 + detail * 0.045 - 0.17;
+    return smoothstep(0.12, 0.70, eroded);
 }
 
 float cloudWisps(vec2 uv, float time) {
