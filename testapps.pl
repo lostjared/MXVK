@@ -60,6 +60,8 @@ my @tests = qw(
     puzzle_drop
     tux_example
     walk
+    fireworks
+    bluesky
 );
 
 my $count = 0;

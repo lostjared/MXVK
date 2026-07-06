@@ -124,17 +124,25 @@ float cloudLayer(vec2 uv, float time) {
     return clamp(c, 0.0, 1.0);
 }
 
+float filtered_highlight(float value, float edge, float softness) {
+    float width = max(fwidth(value), softness);
+    return smoothstep(edge - width * 3.0, edge + width * 2.0, value);
+}
+
 void main() {
     float time = pc.u_cameraTime.w;
+    vec3 cameraPos = pc.u_cameraTime.xyz;
+    float cameraDistance = length(cameraPos - v_worldPos);
+    float nearDetail = 1.0 - smoothstep(42.0, 82.0, cameraDistance);
+
     vec3 normal = smooth_wave_normal(v_worldPos.xz, time);
     vec2 rippleUv = v_texCoord * 1.9;
     vec2 ripple = vec2(
         sin(rippleUv.x * 22.0 + time * 1.9) + cos((rippleUv.x + rippleUv.y) * 13.0 + time * 1.3),
         cos(rippleUv.y * 20.0 + time * 1.5) + sin((rippleUv.x - rippleUv.y) * 16.0 + time * 1.7)
-    ) * 0.010;
+    ) * (0.010 * nearDetail);
     normal = normalize(normal + vec3(ripple.x, 0.0, ripple.y) + v_baseNormal * 0.02);
 
-    vec3 cameraPos = pc.u_cameraTime.xyz;
     vec3 viewDir = normalize(cameraPos - v_worldPos);
     vec3 lightDir = normalize(vec3(-0.25, 0.88, -0.40));
 
@@ -145,9 +153,6 @@ void main() {
     vec3 reflectedView = reflect(-viewDir, normal);
     float horizon = clamp(1.0 - reflectedView.y, 0.0, 1.0);
     vec3 skyReflection = mix(vec3(0.78, 0.91, 1.0), vec3(0.42, 0.68, 0.96), horizon);
-    vec2 cloudUv = reflectedView.xz * 0.18 + vec2(0.52, 0.74);
-    float clouds = cloudLayer(cloudUv, time) * smoothstep(0.22, 0.74, reflectedView.y);
-    skyReflection = mix(skyReflection, vec3(0.97, 0.985, 1.0), clouds * 0.62);
     vec3 deepWater = vec3(0.01, 0.16, 0.26);
     vec3 shallowWater = vec3(0.05, 0.48, 0.58);
     float crest = smoothstep(0.18, 0.34, v_height);
@@ -156,15 +161,13 @@ void main() {
     refraction += vec3(0.07, 0.16, 0.14) * crest;
 
     float diffuse = clamp(dot(normal, lightDir), 0.0, 1.0);
-    vec3 halfVector = normalize(lightDir + viewDir);
-    float specular = pow(clamp(dot(normal, halfVector), 0.0, 1.0), 88.0);
-    float sunGlint = pow(clamp(dot(reflectedView, lightDir), 0.0, 1.0), 180.0);
-    float sunSheen = pow(clamp(dot(reflectedView, lightDir), 0.0, 1.0), 38.0);
+    float sunDot = clamp(dot(reflectedView, lightDir), 0.0, 1.0);
+    float sunVisibility = nearDetail * smoothstep(0.34, 0.64, ndv);
+    float sunSheen = filtered_highlight(sunDot, 0.925, 0.010) * pow(sunDot, 5.0) * sunVisibility;
 
     vec3 color = mix(refraction, skyReflection, fresnel);
     color += vec3(0.03, 0.08, 0.10) * diffuse;
-    color += vec3(0.90, 0.96, 1.0) * specular * (0.36 + fresnel);
-    color += vec3(1.0, 0.89, 0.55) * (sunGlint * 2.2 + sunSheen * 0.14);
+    color += vec3(1.0, 0.92, 0.68) * sunSheen * 0.075;
 
     outColor = vec4(color, 1.0);
 }

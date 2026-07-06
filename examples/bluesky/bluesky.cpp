@@ -338,7 +338,7 @@ namespace example {
                 createPipeline("sky.vert.spv", "sky.frag.spv", false, false, false, sky_pipeline);
             }
             if (water_pipeline.pipeline == VK_NULL_HANDLE) {
-                createPipeline("water.vert.spv", "water.frag.spv", true, true, true, water_pipeline);
+                createPipeline("water.vert.spv", "water.frag.spv", true, false, true, water_pipeline);
             }
             return sky_pipeline.pipeline != VK_NULL_HANDLE && water_pipeline.pipeline != VK_NULL_HANDLE;
         }
