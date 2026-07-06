@@ -3,7 +3,6 @@
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include <array>
-#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -12,10 +11,8 @@
 #include <format>
 #include <fstream>
 #include <iostream>
-#include <mutex>
 #include <opencv2/videoio.hpp>
 #include <string>
-#include <thread>
 #include <vector>
 
 #ifndef shader_viewer_ASSET_DIR
@@ -85,11 +82,6 @@ namespace example {
         bool shader_list_requested = false;
         mxvk::VK_Capture capture{};
         mxvk::VK_Sprite *camera_sprite = nullptr;
-        std::thread capture_thread{};
-        std::atomic_bool capture_thread_active{false};
-        std::mutex capture_mutex{};
-        cv::Mat latest_capture_frame{};
-        bool latest_capture_frame_available = false;
         int fallback_width = 1280;
         int fallback_height = 720;
         double current_fps = 0.0;
@@ -199,66 +191,18 @@ namespace example {
                 return;
             }
 
-            std::lock_guard<std::mutex> lock(capture_mutex);
             current_capture_fps = static_cast<double>(capture_fps_frame_count) / elapsed;
             capture_fps_frame_count = 0;
             capture_fps_sample_time = now;
         }
 
-        void startCaptureThread() {
-            if (using_file || capture_thread_active.load()) {
-                return;
-            }
-
-            capture_thread_active = true;
-            capture_fps_sample_time = std::chrono::steady_clock::now();
-            capture_thread = std::thread([this]() {
-                while (capture_thread_active.load()) {
-                    cv::Mat frame;
-                    if (!capture.read(frame) || frame.empty()) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                        continue;
-                    }
-
-                    {
-                        std::lock_guard<std::mutex> lock(capture_mutex);
-                        latest_capture_frame = frame.clone();
-                        latest_capture_frame_available = true;
-                    }
-                    updateCaptureFpsSample();
-                }
-            });
-        }
-
-        void stopCaptureThread() {
-            capture_thread_active = false;
-            if (capture_thread.joinable()) {
-                capture_thread.join();
-            }
-        }
-
         void cleanupWindowResources() {
-            stopCaptureThread();
             if (getDevice() != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(getDevice());
             }
             camera_sprite = nullptr;
             release();
             capture.close();
-        }
-
-        [[nodiscard]] bool consumeLatestCaptureFrame() {
-            cv::Mat frame;
-            {
-                std::lock_guard<std::mutex> lock(capture_mutex);
-                if (!latest_capture_frame_available) {
-                    return false;
-                }
-                frame = latest_capture_frame.clone();
-                latest_capture_frame_available = false;
-            }
-
-            return uploadFrameToSprite(frame);
         }
 
         [[nodiscard]] double configureCameraFps() {
@@ -333,23 +277,16 @@ namespace example {
             std::cout << std::format("shader_viewer: selected shader {} of {}: {}\n", current_shader_index + 1, shader_count, currentFragmentShader());
         }
 
-        [[nodiscard]] bool uploadFrameToSprite(cv::Mat &frame) {
-            if (camera_sprite == nullptr || frame.empty()) {
+        [[nodiscard]] bool uploadCaptureFrameToSprite() {
+            if (camera_sprite == nullptr) {
                 return false;
             }
 
-            cv::Mat rgba;
-            if (frame.channels() == 4) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGRA2RGBA);
-            } else if (frame.channels() == 3) {
-                cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
-            } else if (frame.channels() == 1) {
-                cv::cvtColor(frame, rgba, cv::COLOR_GRAY2RGBA);
-            } else {
+            if (!capture.readToSprite(*camera_sprite, false)) {
                 return false;
             }
 
-            camera_sprite->updateTexture(rgba.ptr(), rgba.cols, rgba.rows, static_cast<int>(rgba.step));
+            updateCaptureFpsSample();
             return true;
         }
 
@@ -362,11 +299,7 @@ namespace example {
                 throw mxvk::Exception("shader_viewer: failed to create capture sprite");
             }
 
-            if (!using_file && consumeLatestCaptureFrame()) {
-                return;
-            }
-
-            if (using_file && camera_sprite != nullptr && !capture.readToSprite(*camera_sprite)) {
+            if (camera_sprite != nullptr && !uploadCaptureFrameToSprite()) {
                 std::cerr << "shader_viewer: failed to upload initial camera frame\n";
             }
         }
@@ -381,17 +314,10 @@ namespace example {
                 fps_sample_time = now;
                 if (using_file) {
                     fps_text = std::format("FPS: {:.1f}", current_fps);
+                } else if (requested_fps > 0.0) {
+                    fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}/{:.1f}", current_fps, current_capture_fps, requested_fps);
                 } else {
-                    double capture_fps = 0.0;
-                    {
-                        std::lock_guard<std::mutex> lock(capture_mutex);
-                        capture_fps = current_capture_fps;
-                    }
-                    if (requested_fps > 0.0) {
-                        fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}/{:.1f}", current_fps, capture_fps, requested_fps);
-                    } else {
-                        fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}", current_fps, capture_fps);
-                    }
+                    fps_text = std::format("FPS: {:.1f}  Capture: {:.1f}", current_fps, current_capture_fps);
                 }
             }
 
@@ -404,7 +330,6 @@ namespace example {
                 current_path = args.path.empty() ? std::string(shader_viewer_ASSET_DIR) : args.path;
                 shader_path = args.shaderPath.empty() ? std::string(shader_viewer_SHADER_DIR) : args.shaderPath;
                 shader_list_requested = !args.shaderPath.empty();
-                setenv("MXVK_CUDA_FLIP_Y", "0", 0);
                 loadShaderIndex();
                 setInitialShaderIndex(args.shader_index);
                 std::string font_path = joinPath(current_path, "data/font.ttf");
@@ -435,7 +360,6 @@ namespace example {
                 }
                 std::cout << "mxvk_cv: Capture opened at: " << fallback_width << "x" << fallback_height << " @ " << fps << " fps\n";
                 initializeCameraRendering();
-                startCaptureThread();
             } catch (...) {
                 cleanupWindowResources();
                 throw;
@@ -472,13 +396,11 @@ namespace example {
         }
 
         void proc() override {
-            if (!using_file) {
-                [[maybe_unused]] const bool frame_uploaded = consumeLatestCaptureFrame();
-            } else if (camera_sprite == nullptr || !capture.readToSprite(*camera_sprite)) {
+            if (!uploadCaptureFrameToSprite()) {
                 if (using_file) {
                     capture.close();
                     if (openCaptureSource()) {
-                        if (camera_sprite != nullptr && !capture.readToSprite(*camera_sprite)) {
+                        if (!uploadCaptureFrameToSprite()) {
                             std::cerr << "shader_viewer: failed to upload restarted stream frame\n";
                         }
                     }

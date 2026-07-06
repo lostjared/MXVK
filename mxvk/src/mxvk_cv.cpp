@@ -369,6 +369,15 @@ namespace mxvk {
     bool VK_Capture::readToSprite(VK_Sprite &targetSprite) {
 #ifdef MXVK_CUDA
         if (initializeCuda()) {
+            return readToSprite(targetSprite, cudaFlipYForVulkan);
+        }
+#endif
+        return readToSprite(targetSprite, false);
+    }
+
+    bool VK_Capture::readToSprite(VK_Sprite &targetSprite, bool flipY) {
+#ifdef MXVK_CUDA
+        if (initializeCuda()) {
             cv::Mat cpuFallbackFrame;
 
             try {
@@ -388,7 +397,7 @@ namespace mxvk {
                     cv::cuda::cvtColor(gpuFrame, gpuRgba, cv::COLOR_BGR2RGBA, 0, cuda_stream);
                 }
 
-                if (cudaFlipYForVulkan) {
+                if (flipY) {
                     cv::cuda::flip(gpuRgba, gpuVulkanRgba, 0, cuda_stream);
                 } else {
                     gpuVulkanRgba = gpuRgba;
@@ -398,7 +407,7 @@ namespace mxvk {
                     if (!cudaPipelineLogged) {
                         std::cout << std::format(
                             "mxvk_cv: CUDA interop active for external sprite: RGBA GpuMat -> {} -> Vulkan external-memory image\n",
-                            cudaFlipYForVulkan ? "cv::cuda::flip(Y)" : "no Y flip");
+                            flipY ? "cv::cuda::flip(Y)" : "no Y flip");
                         cudaPipelineLogged = true;
                     }
                     return true;
@@ -424,6 +433,9 @@ namespace mxvk {
                 }
                 cv::Mat rgba;
                 cv::cvtColor(cpuFallbackFrame, rgba, cv::COLOR_BGR2RGBA);
+                if (flipY) {
+                    cv::flip(rgba, rgba, 0);
+                }
                 targetSprite.updateTexture(rgba.ptr(), rgba.cols, rgba.rows, static_cast<int>(rgba.step));
                 return true;
             }
@@ -434,6 +446,9 @@ namespace mxvk {
         }
         cv::Mat rgba;
         cv::cvtColor(frame, rgba, cv::COLOR_BGR2RGBA);
+        if (flipY) {
+            cv::flip(rgba, rgba, 0);
+        }
         targetSprite.updateTexture(rgba.ptr(), rgba.cols, rgba.rows, static_cast<int>(rgba.step));
         return true;
     }

@@ -126,6 +126,7 @@ namespace mxvk {
         bool read();
         bool readRgba(cv::Mat &rgba, bool flipY = false);
         bool readToSprite(VK_Sprite &targetSprite);
+        bool readToSprite(VK_Sprite &targetSprite, bool flipY);
         bool readToModelTexture(VKAbstractModel &model, bool flipY = false);
 #ifdef MXVK_CUDA
         bool readGpuRgba(cv::cuda::GpuMat &rgba, bool flipY = false);
