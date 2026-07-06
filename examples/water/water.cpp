@@ -547,7 +547,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::WaterWindow window(args.path, "MXVK Water", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::WaterWindow window(args.path, "MXVK - Bluesky", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
