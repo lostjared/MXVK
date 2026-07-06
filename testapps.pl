@@ -35,6 +35,7 @@ my @tests = qw(
     3dmath
     3dmath_cube 
     3dmath_masterpiece
+    fire
     dark
     matrix
     binary_matrix
