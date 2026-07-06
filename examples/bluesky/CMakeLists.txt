@@ -1,7 +1,7 @@
-add_executable(water
-    ${CMAKE_SOURCE_DIR}/examples/water/water.cpp
+add_executable(bluesky
+    ${CMAKE_SOURCE_DIR}/examples/bluesky/bluesky.cpp
 )
-target_link_libraries(water PRIVATE mxvk::mxvk)
+target_link_libraries(bluesky PRIVATE mxvk::mxvk)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
@@ -57,7 +57,7 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(water_shaders
+add_custom_target(bluesky_shaders
     COMMAND ${CMAKE_COMMAND} -E make_directory ${WATER_RUNTIME_DATA_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${WATER_VERTEX_SPV}
@@ -80,7 +80,7 @@ add_custom_target(water_shaders
     VERBATIM
 )
 
-add_dependencies(water water_shaders)
-target_compile_definitions(water PRIVATE
-    WATER_ASSET_DIR="$<TARGET_FILE_DIR:water>"
+add_dependencies(bluesky bluesky_shaders)
+target_compile_definitions(bluesky PRIVATE
+    WATER_ASSET_DIR="$<TARGET_FILE_DIR:bluesky>"
 )

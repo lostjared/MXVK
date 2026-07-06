@@ -262,6 +262,31 @@ namespace mxvk {
         vkFreeCommandBuffers(context.device, context.command_pool, 1, &command_buffer);
     }
 
+    void copy_buffer(const VulkanContext &context,
+                     VkBuffer source,
+                     VkBuffer destination,
+                     VkDeviceSize size) {
+        if (size == 0) {
+            return;
+        }
+
+        VkCommandBuffer command_buffer = begin_one_time_commands(context);
+
+        VkBufferCopy2 copy_region{};
+        copy_region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+        copy_region.size = size;
+
+        VkCopyBufferInfo2 copy_info{};
+        copy_info.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+        copy_info.srcBuffer = source;
+        copy_info.dstBuffer = destination;
+        copy_info.regionCount = 1;
+        copy_info.pRegions = &copy_region;
+        vkCmdCopyBuffer2(command_buffer, &copy_info);
+
+        end_one_time_commands(context, command_buffer);
+    }
+
     void transition_image_layout(VkCommandBuffer command_buffer,
                                  VkImage image,
                                  VkImageLayout old_layout,

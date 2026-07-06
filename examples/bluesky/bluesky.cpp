@@ -1,6 +1,7 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_resource.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -35,10 +36,8 @@ namespace {
     };
 
     struct MeshResources {
-        VkBuffer vertexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-        VkBuffer indexBuffer = VK_NULL_HANDLE;
-        VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
+        mxvk::BufferResource vertexBuffer;
+        mxvk::BufferResource indexBuffer;
         uint32_t indexCount = 0;
     };
 
@@ -70,7 +69,6 @@ namespace example {
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               shader_root((path.empty() ? std::string(WATER_ASSET_DIR) : path) + "/data") {
             setClearColor(0.60f, 0.78f, 0.96f, 1.0f);
-            uploadMesh(generateWaterMesh(), water_mesh);
         }
 
         ~WaterWindow() override {
@@ -120,8 +118,17 @@ namespace example {
             destroyPipeline(water_pipeline);
         }
 
+        void onPrepareFrameRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
+            if (water_mesh_uploaded) {
+                return;
+            }
+
+            uploadMesh(generateWaterMesh(), water_mesh);
+            water_mesh_uploaded = true;
+        }
+
         void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
-            if (!ensurePipelines()) {
+            if (!water_mesh_uploaded || !ensurePipelines()) {
                 return;
             }
 
@@ -162,6 +169,7 @@ namespace example {
         MeshResources water_mesh;
         PipelineResources water_pipeline;
         PipelineResources sky_pipeline;
+        bool water_mesh_uploaded = false;
         float camera_yaw_degrees = 0.0f;
         float camera_pitch_degrees = 10.5f;
         float camera_distance = 27.5f;
@@ -226,36 +234,40 @@ namespace example {
         }
 
         void uploadMesh(const MeshData &data, MeshResources &mesh) const {
+            const mxvk::VulkanContext context{
+                device,
+                physical_device,
+                graphics_queue,
+                command_pool,
+            };
             mesh.indexCount = static_cast<uint32_t>(data.indices.size());
 
             const VkDeviceSize vertex_size = sizeof(SceneVertex) * data.vertices.size();
-            createBuffer(
+            uploadDeviceBuffer(
+                context,
+                data.vertices.data(),
                 vertex_size,
                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                mesh.vertexBuffer,
-                mesh.vertexBufferMemory);
-            uploadBuffer(mesh.vertexBufferMemory, data.vertices.data(), vertex_size);
+                mesh.vertexBuffer);
 
             const VkDeviceSize index_size = sizeof(std::uint32_t) * data.indices.size();
-            createBuffer(
+            uploadDeviceBuffer(
+                context,
+                data.indices.data(),
                 index_size,
                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                mesh.indexBuffer,
-                mesh.indexBufferMemory);
-            uploadBuffer(mesh.indexBufferMemory, data.indices.data(), index_size);
+                mesh.indexBuffer);
         }
 
         void drawMesh(VkCommandBuffer cmd, const MeshResources &mesh, const PipelineResources &pipeline, const PushConstants &push_constants) const {
-            if (mesh.vertexBuffer == VK_NULL_HANDLE || mesh.indexBuffer == VK_NULL_HANDLE || pipeline.pipeline == VK_NULL_HANDLE) {
+            if (mesh.vertexBuffer.buffer == VK_NULL_HANDLE || mesh.indexBuffer.buffer == VK_NULL_HANDLE || pipeline.pipeline == VK_NULL_HANDLE) {
                 return;
             }
 
             const VkDeviceSize offsets[] = {0};
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
-            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(cmd, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer.buffer, offsets);
+            vkCmdBindIndexBuffer(cmd, mesh.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
             vkCmdPushConstants(
                 cmd,
                 pipeline.layout,
@@ -282,68 +294,42 @@ namespace example {
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
 
-        void createBuffer(VkDeviceSize size,
-                          VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties,
-                          VkBuffer &buffer,
-                          VkDeviceMemory &buffer_memory) const {
-            VkBufferCreateInfo buffer_info{};
-            buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            buffer_info.size = size;
-            buffer_info.usage = usage;
-            buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            check_vk(vkCreateBuffer(device, &buffer_info, nullptr, &buffer), "water: failed to create buffer");
+        void uploadDeviceBuffer(const mxvk::VulkanContext &context,
+                                const void *data,
+                                VkDeviceSize size,
+                                VkBufferUsageFlags usage,
+                                mxvk::BufferResource &buffer) const {
+            mxvk::BufferResource staging;
+            mxvk::create_buffer(
+                context,
+                size,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                staging);
 
-            VkMemoryRequirements memory_requirements{};
-            vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+            try {
+                mxvk::map_buffer(device, staging);
+                std::memcpy(staging.mapped, data, static_cast<std::size_t>(size));
+                mxvk::unmap_buffer(device, staging);
 
-            VkMemoryAllocateInfo alloc_info{};
-            alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            alloc_info.allocationSize = memory_requirements.size;
-            alloc_info.memoryTypeIndex = findMemoryType(memory_requirements.memoryTypeBits, properties);
-            check_vk(vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory), "water: failed to allocate buffer memory");
-            check_vk(vkBindBufferMemory(device, buffer, buffer_memory, 0), "water: failed to bind buffer memory");
-        }
-
-        void uploadBuffer(VkDeviceMemory memory, const void *data, VkDeviceSize size) const {
-            void *mapped = nullptr;
-            check_vk(vkMapMemory(device, memory, 0, size, 0, &mapped), "water: failed to map buffer memory");
-            std::memcpy(mapped, data, static_cast<std::size_t>(size));
-            vkUnmapMemory(device, memory);
-        }
-
-        [[nodiscard]] uint32_t findMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) const {
-            VkPhysicalDeviceMemoryProperties memory_properties{};
-            vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-            for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
-                const bool type_matches = (type_filter & (1U << i)) != 0U;
-                const bool flags_match = (memory_properties.memoryTypes[i].propertyFlags & properties) == properties;
-                if (type_matches && flags_match) {
-                    return i;
-                }
+                mxvk::create_buffer(
+                    context,
+                    size,
+                    usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    buffer);
+                mxvk::copy_buffer(context, staging.buffer, buffer.buffer, size);
+            } catch (...) {
+                mxvk::destroy_buffer(device, staging);
+                throw;
             }
 
-            throw mxvk::Exception("water: failed to find suitable memory type");
+            mxvk::destroy_buffer(device, staging);
         }
 
         void destroyMesh(MeshResources &mesh) const {
-            if (mesh.vertexBuffer != VK_NULL_HANDLE) {
-                vkDestroyBuffer(device, mesh.vertexBuffer, nullptr);
-                mesh.vertexBuffer = VK_NULL_HANDLE;
-            }
-            if (mesh.vertexBufferMemory != VK_NULL_HANDLE) {
-                vkFreeMemory(device, mesh.vertexBufferMemory, nullptr);
-                mesh.vertexBufferMemory = VK_NULL_HANDLE;
-            }
-            if (mesh.indexBuffer != VK_NULL_HANDLE) {
-                vkDestroyBuffer(device, mesh.indexBuffer, nullptr);
-                mesh.indexBuffer = VK_NULL_HANDLE;
-            }
-            if (mesh.indexBufferMemory != VK_NULL_HANDLE) {
-                vkFreeMemory(device, mesh.indexBufferMemory, nullptr);
-                mesh.indexBufferMemory = VK_NULL_HANDLE;
-            }
+            mxvk::destroy_buffer(device, mesh.vertexBuffer);
+            mxvk::destroy_buffer(device, mesh.indexBuffer);
             mesh.indexCount = 0;
         }
 

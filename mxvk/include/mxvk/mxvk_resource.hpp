@@ -173,6 +173,19 @@ namespace mxvk {
     void end_one_time_commands(const VulkanContext &context, VkCommandBuffer command_buffer);
 
     /**
+     * @brief Copy one buffer into another with a one-shot Vulkan 1.3 copy command.
+     * @param context Valid upload context.
+     * @param source Source buffer.
+     * @param destination Destination buffer.
+     * @param size Bytes to copy.
+     * @throws mxvk::Exception if command allocation, submission, or completion fails.
+     */
+    void copy_buffer(const VulkanContext &context,
+                     VkBuffer source,
+                     VkBuffer destination,
+                     VkDeviceSize size);
+
+    /**
      * @brief Record a Vulkan 1.3 synchronization2 image layout transition.
      * @param command_buffer Command buffer in recording state.
      * @param image Image to transition.
