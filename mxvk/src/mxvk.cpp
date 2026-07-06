@@ -2093,7 +2093,6 @@ namespace mxvk {
     void VK_Window::cleanupSwapchain(bool destroy_swapchain_handle) {
         std::cout << "vk: entering cleanupSwapchain\n";
         if (device == VK_NULL_HANDLE) {
-            std::cout << "vk: skipping cleanupSwapchain because logical device is null\n";
             return;
         }
 
