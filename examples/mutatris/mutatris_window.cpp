@@ -861,34 +861,63 @@ namespace mutatris {
 
     MutatrisWindow::BoardLayout MutatrisWindow::boardLayout(int gridIndex) const {
         if (gridIndex == 0) {
-            return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2), 0, gridIndex};
+            return {CENTER_GRID_X, TOP_GRID_Y, gridIndex};
         }
         if (gridIndex == 1) {
-            return {0, (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2), gridIndex};
+            return {0, SIDE_GRID_Y, gridIndex};
         }
         if (gridIndex == 2) {
-            return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2), (DESIGN_HEIGHT / 2) + 5, gridIndex};
+            return {CENTER_GRID_X, BOTTOM_GRID_Y, gridIndex};
         }
-        return {DESIGN_WIDTH - (SIDE_GRID_HEIGHT * BLOCK_HEIGHT), (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2), gridIndex};
+        return {RIGHT_GRID_X, SIDE_GRID_Y, gridIndex};
     }
 
     void MutatrisWindow::drawGridFrame(const MutatrisWindow::BoardLayout &layout, bool selected) {
         const bool sideGrid = layout.gridIndex == 1 || layout.gridIndex == 3;
-        const int rows = sideGrid ? SIDE_GRID_HEIGHT : TOP_GRID_HEIGHT;
+        int rows = TOP_GRID_HEIGHT;
+        if (sideGrid) {
+            rows = SIDE_GRID_HEIGHT;
+        } else if (layout.gridIndex == 2) {
+            rows = BOTTOM_GRID_HEIGHT;
+        }
+        const int columns = sideGrid ? SIDE_GRID_WIDTH : GRID_WIDTH;
         const int boardW = sideGrid ? rows * BLOCK_HEIGHT : GRID_WIDTH * BLOCK_WIDTH;
-        const int boardH = sideGrid ? GRID_WIDTH * BLOCK_WIDTH : rows * BLOCK_HEIGHT;
+        const int boardH = sideGrid ? columns * BLOCK_WIDTH : rows * BLOCK_HEIGHT;
         const int thickness = selected ? 4 : 2;
-        const bool drawTop = layout.gridIndex != 2;
-        const bool drawBottom = layout.gridIndex != 0;
         mxvk::VK_Sprite *pixel = blocks[0];
-        if (drawTop) {
-            pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y - thickness), scaleX(boardW + thickness * 2), scaleY(thickness));
+        const auto drawHorizontal = [&](int x, int y, int w) {
+            pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(w), scaleY(thickness));
+        };
+        const auto drawVertical = [&](int x, int y, int h) {
+            pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(thickness), scaleY(h));
+        };
+
+        if (layout.gridIndex == 0) {
+            drawHorizontal(layout.x - thickness, layout.y - thickness, boardW + thickness * 2);
+            drawVertical(layout.x - thickness, layout.y, SIDE_GRID_Y - layout.y);
+            drawVertical(layout.x + boardW, layout.y, SIDE_GRID_Y - layout.y);
+            return;
         }
-        if (drawBottom) {
-            pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y + boardH), scaleX(boardW + thickness * 2), scaleY(thickness));
+
+        if (layout.gridIndex == 1) {
+            drawHorizontal(layout.x - thickness, layout.y - thickness, boardW + thickness);
+            drawHorizontal(layout.x - thickness, layout.y + boardH, boardW + thickness);
+            drawVertical(layout.x - thickness, layout.y, boardH);
+            return;
         }
-        pixel->drawSpriteRect(scaleX(layout.x - thickness), scaleY(layout.y), scaleX(thickness), scaleY(boardH));
-        pixel->drawSpriteRect(scaleX(layout.x + boardW), scaleY(layout.y), scaleX(thickness), scaleY(boardH));
+
+        if (layout.gridIndex == 2) {
+            const int exposedY = SIDE_GRID_Y + SIDE_GRID_WIDTH * BLOCK_WIDTH;
+            const int exposedH = layout.y + boardH - exposedY;
+            drawHorizontal(layout.x - thickness, layout.y + boardH, boardW + thickness * 2);
+            drawVertical(layout.x - thickness, exposedY, exposedH);
+            drawVertical(layout.x + boardW, exposedY, exposedH);
+            return;
+        }
+
+        drawHorizontal(layout.x, layout.y - thickness, boardW + thickness);
+        drawHorizontal(layout.x, layout.y + boardH, boardW + thickness);
+        drawVertical(layout.x + boardW, layout.y, boardH);
     }
 
     void MutatrisWindow::drawCell(const MutatrisWindow::BoardLayout &layout, int cellX, int cellY, int color) {
@@ -917,7 +946,7 @@ namespace mutatris {
             py = layout.y + (BOTTOM_GRID_HEIGHT - 1 - cellY) * BLOCK_HEIGHT;
         } else {
             px = layout.x + (SIDE_GRID_HEIGHT - 1 - cellY) * BLOCK_HEIGHT;
-            py = layout.y + (GRID_WIDTH - 1 - cellX) * BLOCK_WIDTH;
+            py = layout.y + (SIDE_GRID_WIDTH - 1 - cellX) * BLOCK_WIDTH;
             pw = BLOCK_DRAW_HEIGHT;
             ph = BLOCK_DRAW_WIDTH;
         }

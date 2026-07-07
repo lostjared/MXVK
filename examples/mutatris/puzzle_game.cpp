@@ -22,9 +22,9 @@ namespace mutatris {
         timeout = difficulty == 0 ? 1200U : difficulty == 1 ? 900U
                                                             : 650U;
         grid[0].initGrid(GRID_WIDTH, TOP_GRID_HEIGHT);
-        grid[1].initGrid(GRID_WIDTH, SIDE_GRID_HEIGHT);
+        grid[1].initGrid(SIDE_GRID_WIDTH, SIDE_GRID_HEIGHT);
         grid[2].initGrid(GRID_WIDTH, BOTTOM_GRID_HEIGHT);
-        grid[3].initGrid(GRID_WIDTH, SIDE_GRID_HEIGHT);
+        grid[3].initGrid(SIDE_GRID_WIDTH, SIDE_GRID_HEIGHT);
     }
 
     void PuzzleGame::procBlocks() {
@@ -64,19 +64,19 @@ namespace mutatris {
 
     PuzzleGame::CellBounds PuzzleGame::cellBounds(const CellRef &cell) {
         if (cell.gridIndex == 0) {
-            return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH, cell.y * BLOCK_HEIGHT, BLOCK_WIDTH, BLOCK_HEIGHT};
+            return {CENTER_GRID_X + cell.x * BLOCK_WIDTH, TOP_GRID_Y + cell.y * BLOCK_HEIGHT, BLOCK_WIDTH, BLOCK_HEIGHT};
         }
         if (cell.gridIndex == 1) {
-            return {cell.y * BLOCK_HEIGHT, (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH};
+            return {cell.y * BLOCK_HEIGHT, SIDE_GRID_Y + cell.x * BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH};
         }
         if (cell.gridIndex == 2) {
-            return {(DESIGN_WIDTH / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + cell.x * BLOCK_WIDTH,
-                    (DESIGN_HEIGHT / 2) + 5 + (BOTTOM_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
+            return {CENTER_GRID_X + cell.x * BLOCK_WIDTH,
+                    BOTTOM_GRID_Y + (BOTTOM_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
                     BLOCK_WIDTH,
                     BLOCK_HEIGHT};
         }
-        return {DESIGN_WIDTH - (SIDE_GRID_HEIGHT * BLOCK_HEIGHT) + (SIDE_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
-                (DESIGN_HEIGHT / 2) - ((GRID_WIDTH * BLOCK_WIDTH) / 2) + (GRID_WIDTH - 1 - cell.x) * BLOCK_WIDTH,
+        return {RIGHT_GRID_X + (SIDE_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
+                SIDE_GRID_Y + (SIDE_GRID_WIDTH - 1 - cell.x) * BLOCK_WIDTH,
                 BLOCK_HEIGHT,
                 BLOCK_WIDTH};
     }
@@ -93,7 +93,7 @@ namespace mutatris {
         int bestError = TOLERANCE2 * TOLERANCE2 * 4 + 1;
         bool found = false;
 
-        for (const int gridIndex : {0, 2}) {
+        for (int gridIndex = 0; gridIndex < static_cast<int>(grid.size()); ++gridIndex) {
             const GameGrid &focusGrid = grid[static_cast<std::size_t>(gridIndex)];
             for (int y = 0; y < focusGrid.height(); ++y) {
                 for (int x = 0; x < focusGrid.width(); ++x) {
@@ -132,7 +132,7 @@ namespace mutatris {
 
     bool PuzzleGame::clearVisualRun() {
         constexpr std::array<std::pair<int, int>, 4> directions{{{1, 0}, {0, 1}, {1, 1}, {-1, 1}}};
-        for (const int gridIndex : {0, 2}) {
+        for (int gridIndex = 0; gridIndex < static_cast<int>(grid.size()); ++gridIndex) {
             GameGrid &focusGrid = grid[static_cast<std::size_t>(gridIndex)];
             for (int y = 0; y < focusGrid.height(); ++y) {
                 for (int x = 0; x < focusGrid.width(); ++x) {
