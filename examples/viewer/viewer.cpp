@@ -37,9 +37,9 @@ namespace viewer {
                               args.height,
                               args.fullscreen,
                               MXVK_VALIDATION,
-                              args.enable_vsync),
-              assetRoot(args.path.empty() ? std::string(VIEWER_ASSET_DIR) : args.path),
-              shaderRoot(args.shaderPath.empty() ? std::string(VIEWER_SHADER_DIR) : args.shaderPath) {
+              args.enable_vsync),
+              assetRoot((args.path.empty() || args.path == ".") ? std::string(VIEWER_ASSET_DIR) : args.path),
+              shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath) {
             setClearColor(0.3f, 0.3f, 0.3f, 1.0f);
             setFont(resolveFontPath(), 18);
 

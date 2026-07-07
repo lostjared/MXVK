@@ -25,18 +25,6 @@
 #define puzzle_drop_ASSET_DIR "."
 #endif
 
-#ifndef puzzle_drop_TETRIS_DATA_DIR
-#define puzzle_drop_TETRIS_DATA_DIR "."
-#endif
-
-#ifndef puzzle_drop_FONT_PATH
-#define puzzle_drop_FONT_PATH "."
-#endif
-
-#ifndef puzzle_drop_SHADER_DIR
-#define puzzle_drop_SHADER_DIR "."
-#endif
-
 namespace {
     constexpr int BOARD_WIDTH = 20;
     constexpr int BOARD_HEIGHT = 22;
@@ -212,11 +200,12 @@ namespace {
             : mxvk::VK_Window("-[ MXVK 3D PuzzleDrop ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(puzzle_drop_ASSET_DIR) : path),
               data_root(asset_root + "/data"),
-              tetris_data_root(puzzle_drop_TETRIS_DATA_DIR) {
+              shader_root(data_root),
+              tetris_data_root(data_root) {
             std::random_device rd;
             rng.seed(rd());
             setClearColor(0.03f, 0.04f, 0.05f, 1.0f);
-            setFont(puzzle_drop_FONT_PATH, 22);
+            setFont(data_root + "/font.ttf", 22);
             std::array<std::string, LEVEL_GRAPHIC_COUNT> level_graphics{};
             for (size_t i = 0; i < level_graphics.size(); ++i) {
                 level_graphics[i] = std::format("{}/level{}.png", data_root, i + 1);
@@ -225,13 +214,13 @@ namespace {
             for (size_t i = 0; i < backgrounds.size(); ++i) {
                 backgrounds[i] = createSprite(
                     level_graphics[i],
-                    std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                    std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_background.frag.spv");
+                    shader_root + "/sprite.vert.spv",
+                    shader_root + "/puzzle_drop_background.frag.spv");
             }
             intro_sprite = createSprite(
                 std::format("{}/intro1.png", data_root),
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(puzzle_drop_SHADER_DIR) + "/intro.frag.spv");
+                shader_root + "/sprite.vert.spv",
+                shader_root + "/intro.frag.spv");
             matrix::RainConfig rain_config = matrix::make_matrix_rain_config(asset_root, false);
             rain_config.color = "#2f8dff";
             rain_config.surface_width = MATRIX_RAIN_TEXTURE_WIDTH;
@@ -401,6 +390,7 @@ namespace {
       private:
         std::string asset_root;
         std::string data_root;
+        std::string shader_root;
         std::string tetris_data_root;
         std::mt19937 rng{};
         std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
@@ -976,8 +966,8 @@ namespace {
                              data_root,
                              1.0f);
             cube_model->setShaders(this,
-                                   std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
-                                   std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
+                                   shader_root + "/puzzle_drop_piece.vert.spv",
+                                   shader_root + "/puzzle_drop_piece.frag.spv");
 
             grid_backdrop_model = std::make_unique<mxvk::VKAbstractModel>();
             grid_backdrop_model->load(this,
@@ -986,8 +976,8 @@ namespace {
                                       tetris_data_root,
                                       1.0f);
             grid_backdrop_model->setShaders(this,
-                                            std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.vert.spv",
-                                            std::string(puzzle_drop_SHADER_DIR) + "/puzzle_drop_piece.frag.spv");
+                                            shader_root + "/puzzle_drop_piece.vert.spv",
+                                            shader_root + "/puzzle_drop_piece.frag.spv");
             grid_backdrop_model->setAlphaBlending(true);
         }
 

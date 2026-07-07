@@ -116,8 +116,6 @@ add_dependencies(tetris tetris_shaders)
 
 target_compile_definitions(tetris PRIVATE
     tetris_ASSET_DIR="$<TARGET_FILE_DIR:tetris>"
-    tetris_FONT_PATH="$<TARGET_FILE_DIR:tetris>/data/font.ttf"
-    tetris_SHADER_DIR="${TETRIS_SHADER_OUTPUT_DIR}"
 )
 
 add_custom_command(TARGET tetris POST_BUILD
@@ -128,5 +126,15 @@ add_custom_command(TARGET tetris POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/tictactoe/data/font.ttf
         $<TARGET_FILE_DIR:tetris>/data/font.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${TETRIS_VERTEX_SPV}
+        ${TETRIS_FRAGMENT_SPV}
+        ${TETRIS_PIECE_VERTEX_SPV}
+        ${TETRIS_PIECE_FRAGMENT_SPV}
+        ${TETRIS_INTRO_VERTEX_SPV}
+        ${TETRIS_INTRO_FRAGMENT_SPV}
+        ${TETRIS_SCREEN_FADE_FRAGMENT_SPV}
+        ${TETRIS_BACKGROUND_TRANSITION_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:tetris>/data
     COMMENT "Copying tetris assets to runtime output directory"
 )

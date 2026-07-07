@@ -105,7 +105,6 @@ add_custom_target(asteroids3d_shaders
 
 add_dependencies(asteroids3d asteroids3d_shaders)
 target_compile_definitions(asteroids3d PRIVATE
-    ASTEROIDS3D_SHADER_DIR="${ASTEROIDS3D_SHADER_OUTPUT_DIR}"
     ASTEROIDS3D_ASSET_DIR="$<TARGET_FILE_DIR:asteroids3d>"
     ASTEROIDS3D_SOURCE_DATA_DIR="$<TARGET_FILE_DIR:asteroids3d>/data"
     ASTEROIDS3D_DEFENDER_SOUND_DIR="$<TARGET_FILE_DIR:asteroids3d>/data"
@@ -141,5 +140,14 @@ add_custom_command(TARGET asteroids3d POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/asteroid3.obj
         $<TARGET_FILE_DIR:asteroids3d>/data/asteroid3.obj
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${ASTEROIDS3D_MODEL_VERTEX_SPV}
+        ${ASTEROIDS3D_MODEL_FRAGMENT_SPV}
+        ${ASTEROIDS3D_INTRO_FRAGMENT_SPV}
+        ${ASTEROIDS3D_CRT_FRAGMENT_SPV}
+        ${ASTEROIDS3D_FADE_OVERLAY_FRAGMENT_SPV}
+        ${ASTEROIDS3D_FLAME_VERTEX_SPV}
+        ${ASTEROIDS3D_FLAME_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:asteroids3d>/data
     COMMENT "Copying asteroids3d assets to runtime output directory"
 )

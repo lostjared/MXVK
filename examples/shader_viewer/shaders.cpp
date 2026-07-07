@@ -327,8 +327,8 @@ namespace example {
       public:
         ExampleWindow(const Arguments &args, const std::string &text) : mxvk::VK_Window(text, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync) {
             try {
-                current_path = args.path.empty() ? std::string(shader_viewer_ASSET_DIR) : args.path;
-                shader_path = args.shaderPath.empty() ? std::string(shader_viewer_SHADER_DIR) : args.shaderPath;
+                current_path = (args.path.empty() || args.path == ".") ? std::string(shader_viewer_ASSET_DIR) : args.path;
+                shader_path = args.shaderPath.empty() ? current_path + "/data" : args.shaderPath;
                 shader_list_requested = !args.shaderPath.empty();
                 loadShaderIndex();
                 setInitialShaderIndex(args.shader_index);

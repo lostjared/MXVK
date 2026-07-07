@@ -2,6 +2,8 @@ add_executable(opencv_model
     ${CMAKE_SOURCE_DIR}/examples/opencv_model/main.cpp
 )
 target_link_libraries(opencv_model PRIVATE mxvk::mxvk)
+target_include_directories(opencv_model PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(opencv_model PRIVATE ${OpenCV_LIBS})
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)
@@ -42,7 +44,6 @@ add_custom_target(opencv_model_shaders
 
 add_dependencies(opencv_model opencv_model_shaders)
 target_compile_definitions(opencv_model PRIVATE
-    opencv_model_SHADER_DIR="${opencv_model_SHADER_OUTPUT_DIR}"
     opencv_model_ASSET_DIR="$<TARGET_FILE_DIR:opencv_model>"
 )
 
@@ -51,6 +52,10 @@ add_custom_command(TARGET opencv_model POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:opencv_model>/data
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${opencv_model_DATA_SOURCE_DIR}
+        $<TARGET_FILE_DIR:opencv_model>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${opencv_model_VERTEX_SPV}
+        ${opencv_model_FRAGMENT_SPV}
         $<TARGET_FILE_DIR:opencv_model>/data
     COMMENT "Copying opencv_model data directory to runtime output directory"
 )

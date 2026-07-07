@@ -56,13 +56,18 @@ add_dependencies(breakout breakout_shaders)
 
 target_compile_definitions(breakout PRIVATE
     breakout_ASSET_DIR="$<TARGET_FILE_DIR:breakout>"
-    breakout_SHADER_DIR="${BREAKOUT_SHADER_OUTPUT_DIR}"
 )
 
 add_custom_command(TARGET breakout POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:breakout>/data
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:breakout>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${BREAKOUT_VERTEX_SPV}
+        ${BREAKOUT_FRAGMENT_SPV}
+        ${BREAKOUT_BACKGROUND_FRAGMENT_SPV}
+        ${mxvk_VERTEX_SPV}
         $<TARGET_FILE_DIR:breakout>/data
     COMMENT "Copying breakout assets to runtime output directory"
 )

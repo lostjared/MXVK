@@ -29,10 +29,6 @@
 #define pong_ASSET_DIR "."
 #endif
 
-#ifndef pong_SHADER_DIR
-#define pong_SHADER_DIR "."
-#endif
-
 namespace {
 
     struct PongUniformBufferObject {
@@ -245,6 +241,7 @@ namespace {
             : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path),
               dataRoot(assetRoot + "/data"),
+              shaderRoot(dataRoot),
               paddle1(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
               paddle2(glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
               ball(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.3f, 0.0f), 0.05f),
@@ -443,6 +440,7 @@ namespace {
 
         std::string assetRoot;
         std::string dataRoot;
+        std::string shaderRoot;
 
         Paddle paddle1;
         Paddle paddle2;
@@ -521,8 +519,8 @@ namespace {
 
         void initModels() {
             const std::string modelPath = dataRoot + "/cube.mxmod";
-            const std::string shaderVert = std::string(pong_SHADER_DIR) + "/pong_model.vert.spv";
-            const std::string shaderFrag = std::string(pong_SHADER_DIR) + "/pong_model.frag.spv";
+            const std::string shaderVert = shaderRoot + "/pong_model.vert.spv";
+            const std::string shaderFrag = shaderRoot + "/pong_model.frag.spv";
             const std::string paddleManifest = dataRoot + "/paddle_texture_manifest.txt";
             const std::string ballManifest = dataRoot + "/ball_texture_manifest.txt";
 

@@ -34,14 +34,6 @@
 #define tetris_ASSET_DIR "."
 #endif
 
-#ifndef tetris_SHADER_DIR
-#define tetris_SHADER_DIR "."
-#endif
-
-#ifndef tetris_FONT_PATH
-#define tetris_FONT_PATH "."
-#endif
-
 namespace {
 
     constexpr int boardWidth = 10;
@@ -307,10 +299,11 @@ namespace {
             : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
               dataRoot(assetRoot + "/data"),
+              shaderRoot(dataRoot),
               highScores(resolveScoreFilePath()) {
             std::random_device rd;
             rng.seed(rd());
-            setFont(tetris_FONT_PATH, 22);
+            setFont(dataRoot + "/font.ttf", 22);
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             tryOpenFirstGamepad();
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
@@ -321,24 +314,24 @@ namespace {
             background = createSprite(dataRoot + "/psychedelic_background.png");
             backgroundTransitionSprite = createSprite(
                 dataRoot + "/psychedelic_background.png",
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(tetris_SHADER_DIR) + "/tetris_background_transition.frag.spv");
+                shaderRoot + "/sprite.vert.spv",
+                shaderRoot + "/tetris_background_transition.frag.spv");
             menuBackgroundSprite = createSprite(
                 dataRoot + "/start_screen.png",
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+                shaderRoot + "/sprite.vert.spv",
+                shaderRoot + "/tetris_screen_fade.frag.spv");
             highScoresBackgroundSprite = createSprite(
                 dataRoot + "/high_scores_screen.png",
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+                shaderRoot + "/sprite.vert.spv",
+                shaderRoot + "/tetris_screen_fade.frag.spv");
             creditsBackgroundSprite = createSprite(
                 dataRoot + "/credits_screen.png",
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+                shaderRoot + "/sprite.vert.spv",
+                shaderRoot + "/tetris_screen_fade.frag.spv");
             multiplayerBackgroundSprite = createSprite(
                 dataRoot + "/multiplayer_screen.png",
-                std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
-                std::string(tetris_SHADER_DIR) + "/tetris_screen_fade.frag.spv");
+                shaderRoot + "/sprite.vert.spv",
+                shaderRoot + "/tetris_screen_fade.frag.spv");
             previewBorderSprite = createSprite(1, 1);
             const uint32_t whitePixel = 0xFFFFFFFFu;
             previewBorderSprite->updateTexture(&whitePixel, 1, 1);
@@ -347,8 +340,8 @@ namespace {
             }
             gameOverSprite = createSprite(dataRoot + "/gameover.png");
             introSprite = createSprite(dataRoot + "/intro.png",
-                                       std::string(tetris_SHADER_DIR) + "/tetris_intro.vert.spv",
-                                       std::string(tetris_SHADER_DIR) + "/tetris_intro.frag.spv");
+                                       shaderRoot + "/tetris_intro.vert.spv",
+                                       shaderRoot + "/tetris_intro.frag.spv");
             introStart = std::chrono::steady_clock::now();
             initModels();
             initCreditsModel();
@@ -473,6 +466,7 @@ namespace {
       private:
         std::string assetRoot;
         std::string dataRoot;
+        std::string shaderRoot;
         std::array<std::array<Cell, boardWidth>, boardHeight> board{};
         ActivePiece active{};
         std::mt19937 rng{};
@@ -588,8 +582,8 @@ namespace {
             block.model = std::make_unique<mxvk::VKAbstractModel>();
             block.model->load(this, dataRoot + "/cube.mxmod.z", dataRoot + "/" + textureManifests[color], dataRoot, 1.0f);
             block.model->setShaders(this,
-                                    std::string(tetris_SHADER_DIR) + "/tetris_piece.vert.spv",
-                                    std::string(tetris_SHADER_DIR) + "/tetris_piece.frag.spv");
+                                    shaderRoot + "/tetris_piece.vert.spv",
+                                    shaderRoot + "/tetris_piece.frag.spv");
             return block;
         }
 
@@ -630,8 +624,8 @@ namespace {
                                   dataRoot + "/tux",
                                   0.35f);
             creditsTuxModel->setShaders(this,
-                                        std::string(tetris_SHADER_DIR) + "/tetris_model.vert.spv",
-                                        std::string(tetris_SHADER_DIR) + "/tetris_model.frag.spv");
+                                        shaderRoot + "/tetris_model.vert.spv",
+                                        shaderRoot + "/tetris_model.frag.spv");
         }
 
         void resetGame() {

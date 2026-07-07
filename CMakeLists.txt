@@ -534,6 +534,9 @@ endif()
 if(JPEG)
     target_link_libraries(mxvk PUBLIC JPEG::JPEG)
 endif()
+if(MXVK_CUDA_ENABLED)
+    target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
+endif()
 if(TARGET glm::glm)
     if(NOT (MINGW AND CMAKE_CROSSCOMPILING))
         target_link_libraries(mxvk PUBLIC glm::glm)
@@ -546,10 +549,6 @@ target_compile_definitions(mxvk PUBLIC
     MXVK_SPRITE3D_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
     MXVK_DEFAULT_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mxvk/data"
 )
-if(CV OR MXVK_CUDA_ENABLED)
-    target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
-endif()
-
 add_executable(mxmod2obj tools/mxmod2obj.cpp)
 target_link_libraries(mxmod2obj PRIVATE mxvk)
 mxvk_configure_mingw_target(mxmod2obj)

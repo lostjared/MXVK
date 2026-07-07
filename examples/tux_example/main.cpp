@@ -151,13 +151,14 @@ namespace example {
       public:
         ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(path.empty() ? std::string(tux_example_ASSET_DIR) : path) {
+              assetRoot((path.empty() || path == ".") ? std::string(tux_example_ASSET_DIR) : path) {
+            const std::string shaderRoot = assetRoot + "/data";
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/tux.obj") : filename;
-            const std::string vertPath = std::string(tux_example_SHADER_DIR) + "/model.vert.spv";
-            const std::string fragPath = std::string(tux_example_SHADER_DIR) + "/model.frag.spv";
-            const std::string backgroundVertPath = std::string(tux_example_SHADER_DIR) + "/background.vert.spv";
-            const std::string backgroundFragPath = std::string(tux_example_SHADER_DIR) + "/background.frag.spv";
-            const std::string snowflakeFragPath = std::string(tux_example_SHADER_DIR) + "/snowflake.frag.spv";
+            const std::string vertPath = shaderRoot + "/model.vert.spv";
+            const std::string fragPath = shaderRoot + "/model.frag.spv";
+            const std::string backgroundVertPath = shaderRoot + "/background.vert.spv";
+            const std::string backgroundFragPath = shaderRoot + "/background.frag.spv";
+            const std::string snowflakeFragPath = shaderRoot + "/snowflake.frag.spv";
             const std::string backgroundPath = assetRoot + "/data/ant-bg.png";
 
             setFont(assetRoot + "/data/font.ttf", 24);

@@ -78,7 +78,6 @@ add_custom_target(tux_example_shaders
 
 add_dependencies(tux_example tux_example_shaders)
 target_compile_definitions(tux_example PRIVATE
-    tux_example_SHADER_DIR="${tux_example_SHADER_OUTPUT_DIR}"
     tux_example_ASSET_DIR="$<TARGET_FILE_DIR:tux_example>"
 )
 
@@ -92,5 +91,12 @@ add_custom_command(TARGET tux_example POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${tux_example_FONT_SOURCE}
         $<TARGET_FILE_DIR:tux_example>/data/font.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${tux_example_VERTEX_SPV}
+        ${tux_example_FRAGMENT_SPV}
+        ${tux_example_BACKGROUND_VERTEX_SPV}
+        ${tux_example_BACKGROUND_FRAGMENT_SPV}
+        ${tux_example_SNOWFLAKE_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:tux_example>/data
     COMMENT "Copying tux example assets to runtime output directory"
 )

@@ -66,7 +66,6 @@ add_custom_target(dark_shaders
 
 add_dependencies(dark dark_shaders)
 target_compile_definitions(dark PRIVATE
-    DARK_SHADER_DIR="${DARK_SHADER_OUTPUT_DIR}"
     DARK_ASSET_DIR="$<TARGET_FILE_DIR:dark>"
 )
 
@@ -91,5 +90,11 @@ add_custom_command(TARGET dark POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf
         $<TARGET_FILE_DIR:dark>/data/font.ttf
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${DARK_VERTEX_SPV}
+        ${DARK_FRAGMENT_SPV}
+        ${DARK_BEAM_VERTEX_SPV}
+        ${DARK_BEAM_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:dark>/data
     COMMENT "Copying dark assets to runtime output directory"
 )

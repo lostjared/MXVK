@@ -2415,8 +2415,9 @@ namespace walk {
       public:
         WalkWindow(const Arguments &args)
             : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen, args.enable_vsync),
-              assetRoot(args.path.empty() ? std::string(WALK_ASSET_DIR) : args.path),
-              modelRoot(WALK_MODELS_DIR) {
+              assetRoot((args.path.empty() || args.path == ".") ? std::string(WALK_ASSET_DIR) : args.path),
+              shaderRoot(assetRoot + "/data"),
+              modelRoot(assetRoot + "/data") {
             logEnv(std::format("initializing window {}x{} (fullscreen={})", args.width, args.height, args.fullscreen ? "true" : "false"));
             logEnv(std::format("asset root: {}", assetRoot));
             logEnv(std::format("model root: {}", modelRoot));
@@ -2436,14 +2437,14 @@ namespace walk {
 
             setFont(assetRoot + "/data/font.ttf", 22);
 
-            const std::string vertPath = std::string(WALK_SHADER_DIR) + "/model.vert.spv";
-            const std::string wallFragPath = std::string(WALK_SHADER_DIR) + "/wall.frag.spv";
-            const std::string floorFragPath = std::string(WALK_SHADER_DIR) + "/floor.frag.spv";
-            const std::string pillarVertPath = std::string(WALK_SHADER_DIR) + "/pillar.vert.spv";
-            const std::string pillarFragPath = std::string(WALK_SHADER_DIR) + "/pillar.frag.spv";
-            const std::string objectFragPath = std::string(WALK_SHADER_DIR) + "/object.frag.spv";
-            const std::string bulletFragPath = std::string(WALK_SHADER_DIR) + "/bullet.frag.spv";
-            const std::string particleFragPath = std::string(WALK_SHADER_DIR) + "/particle.frag.spv";
+            const std::string vertPath = shaderRoot + "/model.vert.spv";
+            const std::string wallFragPath = shaderRoot + "/wall.frag.spv";
+            const std::string floorFragPath = shaderRoot + "/floor.frag.spv";
+            const std::string pillarVertPath = shaderRoot + "/pillar.vert.spv";
+            const std::string pillarFragPath = shaderRoot + "/pillar.frag.spv";
+            const std::string objectFragPath = shaderRoot + "/object.frag.spv";
+            const std::string bulletFragPath = shaderRoot + "/bullet.frag.spv";
+            const std::string particleFragPath = shaderRoot + "/particle.frag.spv";
             const std::string groundTexManifest = assetRoot + "/data/ground.tex";
 
             modelVertSpv = vertPath;
@@ -2481,8 +2482,8 @@ namespace walk {
                       assetRoot + "/data/blaster.mtl", assetRoot + "/data", vertPath, objectFragPath);
             normalizeCollectiblesToModel();
 
-            pointParticleVertSpv = std::string(WALK_SHADER_DIR) + "/particle_points.vert.spv";
-            pointParticleFragSpv = std::string(WALK_SHADER_DIR) + "/particle_points.frag.spv";
+            pointParticleVertSpv = shaderRoot + "/particle_points.vert.spv";
+            pointParticleFragSpv = shaderRoot + "/particle_points.frag.spv";
             initializePointParticles();
             logEnv("point-particle pipeline initialized");
 
@@ -3277,13 +3278,13 @@ namespace walk {
 
         /// @brief Resolve a shader SPV name to a full path.
         ///
-        /// Looks in the compiled shader output directory first; if the file is not
+        /// Looks in the runtime shader directory first; if the file is not
         /// found there, the provided @p name is returned as-is so callers can pass
         /// absolute paths directly.
         [[nodiscard]] std::string resolveShaderPath(const std::string &name) const {
-            const std::string buildPath = std::string(WALK_SHADER_DIR) + "/" + name;
-            if (std::filesystem::exists(buildPath)) {
-                return buildPath;
+            const std::string runtimePath = shaderRoot + "/" + name;
+            if (std::filesystem::exists(runtimePath)) {
+                return runtimePath;
             }
             return name;
         }
@@ -4641,6 +4642,7 @@ namespace walk {
         }
 
         std::string assetRoot;
+        std::string shaderRoot;
         std::string modelRoot;
 
         MazeWorld world{};

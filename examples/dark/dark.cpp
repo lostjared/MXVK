@@ -26,12 +26,13 @@ namespace example {
             fallbackWidth = width;
             fallbackHeight = height;
 
+            const std::string shaderRoot = assetRoot + "/data";
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/pyramid.obj") : filename;
             const std::string beamModelPath = assetRoot + "/data/beam.obj";
-            const std::string vertPath = std::string(DARK_SHADER_DIR) + "/dark.vert.spv";
-            const std::string fragPath = std::string(DARK_SHADER_DIR) + "/dark.frag.spv";
-            const std::string beamVertPath = std::string(DARK_SHADER_DIR) + "/beam3d.vert.spv";
-            const std::string beamFragPath = std::string(DARK_SHADER_DIR) + "/beam.frag.spv";
+            const std::string vertPath = shaderRoot + "/dark.vert.spv";
+            const std::string fragPath = shaderRoot + "/dark.frag.spv";
+            const std::string beamVertPath = shaderRoot + "/beam3d.vert.spv";
+            const std::string beamFragPath = shaderRoot + "/beam.frag.spv";
 
             setFont(assetRoot + "/data/font.ttf", 48);
 

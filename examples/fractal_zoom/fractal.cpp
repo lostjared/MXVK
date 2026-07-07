@@ -29,8 +29,8 @@
 #include <utility>
 #include <vector>
 
-#ifndef fractal_zoom_SHADER_DIR
-#define fractal_zoom_SHADER_DIR "."
+#ifndef fractal_zoom_ASSET_DIR
+#define fractal_zoom_ASSET_DIR "."
 #endif
 
 namespace example {
@@ -54,8 +54,9 @@ namespace example {
         };
 
       public:
-        FractalWindow([[maybe_unused]] const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+        FractalWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              shaderRoot(((path.empty() || path == ".") ? std::string(fractal_zoom_ASSET_DIR) : path) + "/data"),
               reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)) {
         }
 
@@ -949,12 +950,12 @@ namespace example {
 
             destroyFractalPipeline();
 
-            const std::string vert_path = std::string(fractal_zoom_SHADER_DIR) + "/fractal.vert.spv";
+            const std::string vert_path = shaderRoot + "/fractal.vert.spv";
             const std::string frag_path =
 #if defined(MXVK_USE_MOLTENVK)
-                std::string(fractal_zoom_SHADER_DIR) + "/fractal_float.frag.spv";
+                shaderRoot + "/fractal_float.frag.spv";
 #else
-                std::string(fractal_zoom_SHADER_DIR) + "/fractal.frag.spv";
+                shaderRoot + "/fractal.frag.spv";
 #endif
             const std::vector<char> vert_bytes = loadSpv(vert_path);
             const std::vector<char> frag_bytes = loadSpv(frag_path);
@@ -1584,6 +1585,7 @@ namespace example {
 
         std::chrono::steady_clock::time_point start_time{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_tick{std::chrono::steady_clock::now()};
+        std::string shaderRoot;
         uint32_t snapshot_index = 0;
 #if defined(MXWRITE_ENABLED)
         Writer video_writer{};

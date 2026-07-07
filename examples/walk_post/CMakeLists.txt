@@ -226,9 +226,7 @@ add_custom_target(walk_post_shaders
 
 add_dependencies(walk_post walk_post_shaders)
 target_compile_definitions(walk_post PRIVATE
-    WALK_SHADER_DIR="${WALK_SHADER_OUTPUT_DIR}"
     WALK_ASSET_DIR="$<TARGET_FILE_DIR:walk_post>"
-    WALK_MODELS_DIR="$<TARGET_FILE_DIR:walk_post>/data"
 )
 
 add_custom_command(TARGET walk_post POST_BUILD
@@ -239,6 +237,23 @@ add_custom_command(TARGET walk_post POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/models/cube.mxmod.z
         ${CMAKE_SOURCE_DIR}/models/sphere.mxmod.z
+        $<TARGET_FILE_DIR:walk_post>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${WALK_MODEL_VERTEX_SPV}
+        ${WALK_MODEL_FRAGMENT_SPV}
+        ${WALK_PILLAR_VERTEX_SPV}
+        ${WALK_WALL_FRAGMENT_SPV}
+        ${WALK_FLOOR_FRAGMENT_SPV}
+        ${WALK_PILLAR_FRAGMENT_SPV}
+        ${WALK_OBJECT_FRAGMENT_SPV}
+        ${WALK_BULLET_FRAGMENT_SPV}
+        ${WALK_PARTICLE_FRAGMENT_SPV}
+        ${WALK_POINT_PARTICLE_VERTEX_SPV}
+        ${WALK_POINT_PARTICLE_FRAGMENT_SPV}
+        ${WALK_BUBBLE_FRAGMENT_SPV}
+        ${WALK_FLOOR_KALE_FRAGMENT_SPV}
+        ${WALK_FLOOR_SWIRL_FRAGMENT_SPV}
+        ${WALK_FLOOR_TWIST_FRAGMENT_SPV}
         $<TARGET_FILE_DIR:walk_post>/data
     COMMENT "Copying walk_post assets to runtime output directory"
 )

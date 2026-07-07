@@ -47,13 +47,14 @@ namespace space {
         Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt)
             : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
+              shader_root(asset_root + "/data"),
               crt_enabled(enable_crt) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
             }
 
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-            attachPostProcessingShader(std::string(ASTEROIDS3D_SHADER_DIR) + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
+            attachPostProcessingShader(shader_root + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
             setPostProcessingShaderTimeEnabled(true);
             setPostProcessingEnabled(crt_enabled);
             load_loading_screen_resources();
@@ -385,6 +386,7 @@ namespace space {
 
       private:
         std::string asset_root;
+        std::string shader_root;
         std::chrono::steady_clock::time_point last_frame_time = std::chrono::steady_clock::now();
         float elapsed_seconds = 0.0f;
         GameMode mode = GameMode::Intro;
@@ -712,7 +714,7 @@ namespace space {
             intro_sprite = createSprite(
                 asset_root + "/data/intro.png",
                 asset_root + "/data/sprite.vert.spv",
-                std::string(ASTEROIDS3D_SHADER_DIR) + "/intro.frag.spv");
+                shader_root + "/intro.frag.spv");
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
             intro_rain_config.color = "#ff0000";
             intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
@@ -915,8 +917,8 @@ namespace space {
         }
 
         void load_next_game_resource_step() {
-            const std::string model_vert = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.vert.spv";
-            const std::string model_frag = std::string(ASTEROIDS3D_SHADER_DIR) + "/model.frag.spv";
+            const std::string model_vert = shader_root + "/model.vert.spv";
+            const std::string model_frag = shader_root + "/model.frag.spv";
 
             const int current_step = loading_step_index.load(std::memory_order_relaxed);
             if (current_step == 0) {
@@ -928,7 +930,7 @@ namespace space {
                 if (format_details == nullptr || !SDL_FillSurfaceRect(ui_surface.get(), nullptr, SDL_MapRGBA(format_details, nullptr, 255, 255, 255, 255))) {
                     throw mxvk::Exception("Failed to initialize asteroids3d UI pixel surface");
                 }
-                ui_pixel = createSprite(ui_surface.get(), "", std::string(ASTEROIDS3D_SHADER_DIR) + "/fade_overlay.frag.spv");
+                ui_pixel = createSprite(ui_surface.get(), "", shader_root + "/fade_overlay.frag.spv");
                 if (ui_pixel == nullptr) {
                     throw mxvk::Exception("Failed to create asteroids3d UI pixel sprite");
                 }
@@ -2167,8 +2169,8 @@ namespace space {
         void create_flame_pipeline() {
             cleanup_flame_swapchain_resources();
 
-            const std::vector<char> vert_shader_code = loadSpv(std::string(ASTEROIDS3D_SHADER_DIR) + "/flame.vert.spv");
-            const std::vector<char> frag_shader_code = loadSpv(std::string(ASTEROIDS3D_SHADER_DIR) + "/flame.frag.spv");
+            const std::vector<char> vert_shader_code = loadSpv(shader_root + "/flame.vert.spv");
+            const std::vector<char> frag_shader_code = loadSpv(shader_root + "/flame.frag.spv");
 
             VkShaderModule vert_shader_module = createShaderModule(device, vert_shader_code);
             VkShaderModule frag_shader_module = VK_NULL_HANDLE;

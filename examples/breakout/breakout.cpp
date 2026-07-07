@@ -28,10 +28,6 @@
 #define breakout_ASSET_DIR "."
 #endif
 
-#ifndef breakout_SHADER_DIR
-#define breakout_SHADER_DIR "."
-#endif
-
 namespace {
     constexpr float GAME_LEFT = -5.0f;
     constexpr float GAME_RIGHT = 5.0f;
@@ -93,12 +89,13 @@ namespace {
         BreakoutWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window("MXVK 3D Breakout", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(breakout_ASSET_DIR) : path),
-              data_root(asset_root + "/data") {
+              data_root(asset_root + "/data"),
+              shader_root(data_root) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             setFont(data_root + "/font.ttf", 24);
 
-            const std::string sprite_vertex = std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv";
-            const std::string background_fragment = std::string(breakout_SHADER_DIR) + "/breakout_background.frag.spv";
+            const std::string sprite_vertex = shader_root + "/sprite.vert.spv";
+            const std::string background_fragment = shader_root + "/breakout_background.frag.spv";
             background = createSprite(data_root + "/intro.png", sprite_vertex, background_fragment);
             game_background = createSprite(data_root + "/bg.png", sprite_vertex, background_fragment);
             intro_model = load_model("intro_manifest.txt");
@@ -293,6 +290,7 @@ namespace {
 
         std::string asset_root;
         std::string data_root;
+        std::string shader_root;
         Screen screen = Screen::Intro;
         mxvk::VK_Sprite *background = nullptr;
         mxvk::VK_Sprite *game_background = nullptr;
@@ -659,8 +657,8 @@ namespace {
             auto model = std::make_unique<mxvk::VKAbstractModel>();
             model->load(this, data_root + "/" + std::string(model_path), data_root + "/" + std::string(manifest), data_root, 1.0f);
             model->setShaders(this,
-                              std::string(breakout_SHADER_DIR) + "/breakout_model.vert.spv",
-                              std::string(breakout_SHADER_DIR) + "/breakout_model.frag.spv");
+                              shader_root + "/breakout_model.vert.spv",
+                              shader_root + "/breakout_model.frag.spv");
             return model;
         }
 

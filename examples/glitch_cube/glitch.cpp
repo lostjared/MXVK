@@ -18,12 +18,13 @@ namespace example {
       public:
         GlitchCubeWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(path.empty() ? std::string(GLITCH_CUBE_ASSET_DIR) : path) {
+              assetRoot((path.empty() || path == ".") ? std::string(GLITCH_CUBE_ASSET_DIR) : path) {
+            const std::string shaderRoot = assetRoot + "/data";
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/cube.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/cube.tex";
             const std::string textureBasePath = assetRoot + "/data";
-            const std::string modelVertPath = std::string(GLITCH_CUBE_SHADER_DIR) + "/model.vert.spv";
-            const std::string modelFragPath = std::string(GLITCH_CUBE_SHADER_DIR) + "/model.frag.spv";
+            const std::string modelVertPath = shaderRoot + "/model.vert.spv";
+            const std::string modelFragPath = shaderRoot + "/model.frag.spv";
             setFont(assetRoot + "/data/font.ttf", 22);
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, modelVertPath, modelFragPath);

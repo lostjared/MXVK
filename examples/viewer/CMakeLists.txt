@@ -43,6 +43,14 @@ add_custom_target(viewer_shaders
 add_dependencies(viewer viewer_shaders)
 target_compile_definitions(viewer PRIVATE
     VIEWER_ASSET_DIR="$<TARGET_FILE_DIR:viewer>"
-    VIEWER_SHADER_DIR="${VIEWER_SHADER_OUTPUT_DIR}"
     VIEWER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_custom_command(TARGET viewer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:viewer>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${VIEWER_VERTEX_SPV}
+        ${VIEWER_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:viewer>/data
+    COMMENT "Copying viewer shaders to runtime output directory"
 )

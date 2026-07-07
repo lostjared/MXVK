@@ -70,10 +70,12 @@ namespace example {
 
     class StarshipWindow : public mxvk::VK_Window {
       public:
-        StarshipWindow(const std::string filename, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
-            const std::string modelVertPath = std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/model.vert.spv";
-            const std::string modelFragPath = std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/model.frag.spv";
+        StarshipWindow(const std::string filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              assetRoot((path.empty() || path == ".") ? std::string(STARSHIP_EXAMPLE_ASSET_DIR) : path),
+              dataRoot(assetRoot + "/data") {
+            const std::string modelVertPath = dataRoot + "/model.vert.spv";
+            const std::string modelFragPath = dataRoot + "/model.frag.spv";
 
             model.load(this, filename, "", "", 1.0f);
             model.setShaders(this, modelVertPath, modelFragPath);
@@ -289,7 +291,7 @@ namespace example {
         }
 
         void createStarTexture() {
-            const std::string starTexturePath = std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/star.png";
+            const std::string starTexturePath = dataRoot + "/star.png";
             SDL_Surface *starImg = mxvk::LoadPNG(starTexturePath.c_str());
             if (starImg == nullptr) {
                 throw mxvk::Exception("Failed to load star.png texture");
@@ -503,8 +505,8 @@ namespace example {
         }
 
         void createStarPipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/star.vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/star.frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(dataRoot + "/star.vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(dataRoot + "/star.frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;
@@ -878,8 +880,8 @@ namespace example {
         }
 
         void createFlamePipeline() {
-            const std::vector<char> vertShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/flame.vert.spv");
-            const std::vector<char> fragShaderCode = loadSpv(std::string(STARSHIP_EXAMPLE_RUNTIME_DATA_DIR) + "/flame.frag.spv");
+            const std::vector<char> vertShaderCode = loadSpv(dataRoot + "/flame.vert.spv");
+            const std::vector<char> fragShaderCode = loadSpv(dataRoot + "/flame.frag.spv");
 
             VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
             VkShaderModule fragShaderModule = VK_NULL_HANDLE;
@@ -1392,6 +1394,8 @@ namespace example {
         VkPipelineLayout flamePipelineLayout = VK_NULL_HANDLE;
         uint32_t flameVertexCount = 0;
 
+        std::string assetRoot;
+        std::string dataRoot;
         mxvk::VKAbstractModel model{};
         std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
         bool mouseDragging = false;
@@ -1412,7 +1416,7 @@ int main(int argc, char **argv) {
         if (filename.empty()) {
             filename = args.path + "/data/starship.obj";
         }
-        example::StarshipWindow window(filename, "MXVK Starship Example", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::StarshipWindow window(filename, args.path, "MXVK Starship Example", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

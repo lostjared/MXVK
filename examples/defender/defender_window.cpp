@@ -36,12 +36,12 @@ namespace defender {
 
         intro_sprite = createSprite(
             asset_root + "/data/intro.png",
-            std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+            asset_root + "/data/sprite.vert.spv",
             asset_root + "/data/intro.frag.spv");
         fade_overlay_sprite = createSprite(
             1,
             1,
-            std::string(MXVK_SPRITE_SHADER_DIR) + "/sprite.vert.spv",
+            asset_root + "/data/sprite.vert.spv",
             asset_root + "/data/fade_overlay.frag.spv");
         const uint32_t black_pixel = 0xFF000000u;
         fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);

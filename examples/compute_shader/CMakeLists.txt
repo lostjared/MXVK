@@ -3,6 +3,8 @@ add_executable(compute_shader
 )
 
 target_link_libraries(compute_shader PRIVATE mxvk::mxvk)
+target_include_directories(compute_shader PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(compute_shader PRIVATE ${OpenCV_LIBS})
 if(TARGET mxwrite)
     target_link_libraries(compute_shader PRIVATE mxwrite)
 endif()

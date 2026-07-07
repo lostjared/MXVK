@@ -61,5 +61,19 @@ add_custom_target(fractal_zoom_shaders
 add_dependencies(fractal_zoom fractal_zoom_shaders)
 
 target_compile_definitions(fractal_zoom PRIVATE
-    fractal_zoom_SHADER_DIR="${fractal_zoom_SHADER_OUTPUT_DIR}"
+    fractal_zoom_ASSET_DIR="$<TARGET_FILE_DIR:fractal_zoom>"
+)
+
+add_custom_command(TARGET fractal_zoom POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:fractal_zoom>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${fractal_zoom_VERTEX_SPV}
+        $<TARGET_FILE_DIR:fractal_zoom>/data/fractal.vert.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${fractal_zoom_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:fractal_zoom>/data/fractal.frag.spv
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${fractal_zoom_APPLE_FRAGMENT_SPV}
+        $<TARGET_FILE_DIR:fractal_zoom>/data/fractal_float.frag.spv
+    COMMENT "Copying fractal_zoom shaders to runtime output directory"
 )

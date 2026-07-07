@@ -67,7 +67,6 @@ add_custom_target(glitch_cube_shaders
 
 add_dependencies(glitch_cube glitch_cube_shaders)
 target_compile_definitions(glitch_cube PRIVATE
-    GLITCH_CUBE_SHADER_DIR="${GLITCH_CUBE_SHADER_OUTPUT_DIR}"
     GLITCH_CUBE_ASSET_DIR="$<TARGET_FILE_DIR:glitch_cube>"
 )
 
@@ -75,6 +74,12 @@ add_custom_command(TARGET glitch_cube POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:glitch_cube>/data
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/data
+        $<TARGET_FILE_DIR:glitch_cube>/data
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${GLITCH_CUBE_MODEL_VERTEX_SPV}
+        ${GLITCH_CUBE_MODEL_FRAGMENT_SPV}
+        ${GLITCH_CUBE_BACKGROUND_VERTEX_SPV}
+        ${GLITCH_CUBE_BACKGROUND_FRAGMENT_SPV}
         $<TARGET_FILE_DIR:glitch_cube>/data
     COMMENT "Copying glitch_cube assets to runtime output directory"
 )
