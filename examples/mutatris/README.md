@@ -69,7 +69,7 @@ The game ends when the active grid can no longer accept the falling piece at its
 - `S` - hard drop the active piece
 - `F3` - open or close the developer console
 - `F8` - toggle the CRT post-processing shader on or off
-- `Escape` - quit
+- `Escape` - return to difficulty selection
 
 Because the active side rotates after each locked piece, the arrow mapping changes with the highlighted side:
 

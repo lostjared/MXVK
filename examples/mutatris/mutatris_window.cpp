@@ -72,8 +72,16 @@ namespace mutatris {
             return;
         }
         if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
-            logMutatris("Exit requested.");
-            exit();
+            if (e.key.repeat) {
+                return;
+            }
+            if (screen == Screen::Playing) {
+                game.reset();
+                setScreen(Screen::Difficulty, "game cancelled");
+            } else {
+                logMutatris("Exit requested.");
+                exit();
+            }
             return;
         }
         if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F8 && !e.key.repeat) {
