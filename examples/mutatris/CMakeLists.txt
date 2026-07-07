@@ -1,5 +1,7 @@
 include(GNUInstallDirs)
 
+option(MUTATRIS_INSTALL_USER_DESKTOP "Install Mutatris desktop entry and icon to the user's local data directory" ON)
+
 add_executable(mutatris
     ${CMAKE_SOURCE_DIR}/examples/mutatris/game_grid.cpp
     ${CMAKE_SOURCE_DIR}/examples/mutatris/mutatris.cpp
@@ -165,14 +167,37 @@ if(UNIX AND NOT APPLE)
         )
     endif()
 
-    install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/mutatris.desktop
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-    )
+    if(MUTATRIS_INSTALL_USER_DESKTOP)
+        install(CODE "
+            set(MUTATRIS_DESKTOP_INSTALL_HOME \"\$ENV{HOME}\")
+            set(MUTATRIS_DESKTOP_INSTALL_OWNER)
+            if(DEFINED ENV{SUDO_USER} AND DEFINED ENV{SUDO_UID} AND DEFINED ENV{SUDO_GID})
+                execute_process(
+                    COMMAND getent passwd \"\$ENV{SUDO_USER}\"
+                    OUTPUT_VARIABLE MUTATRIS_SUDO_PASSWD
+                    OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ERROR_QUIET
+                )
+                if(MUTATRIS_SUDO_PASSWD)
+                    string(REPLACE \":\" \";\" MUTATRIS_SUDO_PASSWD_FIELDS \"\${MUTATRIS_SUDO_PASSWD}\")
+                    list(GET MUTATRIS_SUDO_PASSWD_FIELDS 5 MUTATRIS_DESKTOP_INSTALL_HOME)
+                endif()
+                set(MUTATRIS_DESKTOP_INSTALL_OWNER \"\$ENV{SUDO_UID}:\$ENV{SUDO_GID}\")
+            endif()
 
-    install(FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/data/icon.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
-        RENAME mutatris.png
-    )
+            if(NOT MUTATRIS_DESKTOP_INSTALL_HOME)
+                message(WARNING \"Skipping Mutatris desktop install because HOME is not set\")
+            else()
+                set(MUTATRIS_DESKTOP_DIR \"\${MUTATRIS_DESKTOP_INSTALL_HOME}/.local/share/applications\")
+                set(MUTATRIS_ICON_DIR \"\${MUTATRIS_DESKTOP_INSTALL_HOME}/.local/share/icons/hicolor/64x64/apps\")
+
+                file(INSTALL DESTINATION \"\${MUTATRIS_DESKTOP_DIR}\" TYPE FILE FILES \"${CMAKE_CURRENT_SOURCE_DIR}/mutatris.desktop\")
+                file(INSTALL DESTINATION \"\${MUTATRIS_ICON_DIR}\" TYPE FILE RENAME \"mutatris.png\" FILES \"${CMAKE_CURRENT_SOURCE_DIR}/data/icon.png\")
+
+                if(MUTATRIS_DESKTOP_INSTALL_OWNER)
+                    execute_process(COMMAND chown \"\${MUTATRIS_DESKTOP_INSTALL_OWNER}\" \"\${MUTATRIS_DESKTOP_DIR}/mutatris.desktop\" \"\${MUTATRIS_ICON_DIR}/mutatris.png\")
+                endif()
+            endif()
+        ")
+    endif()
 endif()
