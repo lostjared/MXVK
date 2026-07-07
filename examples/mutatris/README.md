@@ -4,20 +4,50 @@
 
 Mutatris is a four-sided falling-block puzzle game built with MXVK, Vulkan, and SDL3. Three-block pieces enter one side of the playfield at a time, then the active side rotates around the board after a piece locks. The game includes startup logos, a title screen, Easy/Medium/Hard difficulty selection, animated backgrounds with runtime shader effects, optional music and sound effects, and game-over or high-score presentation screens.
 
-## How To Play
+## Gameplay
 
-Keep the board clear by placing pieces and matching runs of the same color.
+Mutatris plays like a falling-block color matcher wrapped around four separate grids. Only one side is active at a time. Place the current three-block piece, let the board resolve matches and gravity, then the active side advances clockwise to the next grid.
 
-- Each falling piece contains three colored blocks.
-- Move the active piece within the currently highlighted side of the board.
-- Rotate the piece or cycle its block colors before it locks.
-- Match three or more equal-colored blocks horizontally, vertically, diagonally, or across the top/bottom seam to clear them.
-- Matches are checked against the board's visual layout, so runs can continue across the central top/bottom divider when the cells line up on screen.
-- Clearing blocks play a fixed-duration twist animation before the cells disappear.
-- The game speeds up as you clear blocks.
-- If the active side can no longer accept the falling piece, the game ends.
+### Board Grids
 
-The HUD shows the current level, drop timeout, score, active direction, and a short controls reminder.
+The board is split into four `GameGrid` instances that share one visual playfield:
+
+| Grid | Logical Size | Screen Placement | Fall Direction |
+|------|--------------|------------------|----------------|
+| Top | 24 x 23 cells | centered along the top edge | downward toward the middle |
+| Right | 25 x 28 cells | right side of the screen | leftward toward the middle |
+| Bottom | 24 x 22 cells | centered along the bottom edge | upward toward the middle |
+| Left | 25 x 28 cells | left side of the screen | rightward toward the middle |
+
+The side grids use the same underlying cell storage as the top and bottom grids, but they are drawn rotated into the left and right sides of the board. This lets pieces move with the same local grid rules while appearing to fall inward from each edge. The side grids are one column wider than the top and bottom grids so their visible rows line up cleanly with the central playfield.
+
+### Piece Flow
+
+- Each grid owns its own active three-block piece.
+- A new game starts on the top grid.
+- After a piece locks, focus advances `Top -> Right -> Bottom -> Left -> Top`.
+- The highlighted frame shows which grid currently accepts input.
+- Arrow movement is relative to that grid, so "soft drop" always pushes the piece inward even though the physical key changes by side.
+- `W` or the side-specific color-cycle arrow rotates the three colors within the piece.
+- `A` or `Space` rotates the piece shape through vertical and horizontal orientations when the target cells are empty.
+- `S` hard drops the active piece until it locks.
+
+### Clearing And Gravity
+
+After a piece locks, Mutatris resolves the board in small steps:
+
+- Runs of three or more matching colors clear horizontally, vertically, and diagonally inside each grid.
+- Visual matches can also cross between grids when adjacent cells line up on screen, so a run can continue across the top/bottom divider or through aligned neighboring board cells.
+- Dedicated top/bottom seam checks catch matches that span the center divider. A four-block seam match gets an extra score bonus.
+- Clearing blocks play a 400 ms twist animation before their cells become empty.
+- Once cells are empty, blocks above them fall through their own grid until they settle.
+- Cascades are processed over repeated frames, so a clear can create more falling blocks and follow-up clears.
+
+### Difficulty, Level, And Game Over
+
+Easy, Medium, and Hard start with different automatic drop timeouts: 1200 ms, 900 ms, and 650 ms. Every eight clears reduces the timeout by 100 ms until it reaches the 125 ms minimum, and the level display is derived from the current timeout.
+
+The game ends when the active grid can no longer accept the falling piece at its entry position. The HUD shows the current level, drop timeout, score, active direction index, and a short controls reminder.
 
 ## Controls
 
