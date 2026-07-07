@@ -13,14 +13,6 @@
 #define mutatris_ASSET_DIR "."
 #endif
 
-#ifndef mutatris_FONT_PATH
-#define mutatris_FONT_PATH "."
-#endif
-
-#ifndef mutatris_SHADER_DIR
-#define mutatris_SHADER_DIR "."
-#endif
-
 namespace mutatris {
 
     namespace {
@@ -31,10 +23,11 @@ namespace mutatris {
         : mxvk::VK_Window("Mutatris", width, height, fullscreen, MXVK_VALIDATION, enableVsync),
           assetRoot((path.empty() || path == ".") ? std::string(mutatris_ASSET_DIR) : path),
           dataRoot(assetRoot + "/data"),
-          shaderRoot(mutatris_SHADER_DIR),
+          shaderRoot(assetRoot + "/shaders"),
+          fontPath(dataRoot + "/font.ttf"),
           crtEnabled(enableCrt) {
         setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        setFont(mutatris_FONT_PATH, 24);
+        setFont(fontPath, 24);
         attachPostProcessingShader(shaderRoot + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
         setPostProcessingShaderTimeEnabled(true);
         setPostProcessingEnabled(crtEnabled);
@@ -127,7 +120,7 @@ namespace mutatris {
     }
 
     void MutatrisWindow::configureConsole() {
-        console.attach(*this, mutatris_FONT_PATH, CONSOLE_DESIGN_FONT_SIZE);
+        console.attach(*this, fontPath, CONSOLE_DESIGN_FONT_SIZE);
         console.setSpriteYOriginTopLeft(true);
         console.setPrompt("mutatris> ");
         console.printLine("Press F3 to open/close the console.");
@@ -971,7 +964,7 @@ namespace mutatris {
             return;
         }
         uiFontSize = scaledFontSize;
-        setFont(mutatris_FONT_PATH, uiFontSize);
+        setFont(fontPath, uiFontSize);
     }
 
     void MutatrisWindow::ensureIntroFonts() {
@@ -989,7 +982,7 @@ namespace mutatris {
     }
 
     void MutatrisWindow::resetScaledFont(mxvk::Font &font, int designSize, float scale) {
-        font.reset(mutatris_FONT_PATH, std::max(1, static_cast<int>(std::lround(static_cast<float>(designSize) * scale))));
+        font.reset(fontPath, std::max(1, static_cast<int>(std::lround(static_cast<float>(designSize) * scale))));
     }
 
     void MutatrisWindow::drawTextCentered(const std::string &text, int y, SDL_Color color) {

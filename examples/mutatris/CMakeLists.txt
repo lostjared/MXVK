@@ -1,3 +1,5 @@
+include(GNUInstallDirs)
+
 add_executable(mutatris
     ${CMAKE_SOURCE_DIR}/examples/mutatris/game_grid.cpp
     ${CMAKE_SOURCE_DIR}/examples/mutatris/mutatris.cpp
@@ -91,8 +93,6 @@ add_dependencies(mutatris mutatris_shaders)
 
 target_compile_definitions(mutatris PRIVATE
     mutatris_ASSET_DIR="$<TARGET_FILE_DIR:mutatris>"
-    mutatris_FONT_PATH="$<TARGET_FILE_DIR:mutatris>/data/font.ttf"
-    mutatris_SHADER_DIR="${MUTATRIS_SHADER_OUTPUT_DIR}"
 )
 
 add_custom_command(TARGET mutatris POST_BUILD
@@ -102,3 +102,77 @@ add_custom_command(TARGET mutatris POST_BUILD
         $<TARGET_FILE_DIR:mutatris>/data
     COMMENT "Copying mutatris assets to runtime output directory"
 )
+
+if(UNIX AND NOT APPLE)
+    if(IS_ABSOLUTE "${CMAKE_INSTALL_BINDIR}")
+        set(MUTATRIS_SCRIPT_TO_PREFIX ".")
+        set(MUTATRIS_BINARY_PATH "${CMAKE_INSTALL_FULL_LIBEXECDIR}/mutatris/mutatris")
+        set(MUTATRIS_ASSET_PATH "${CMAKE_INSTALL_FULL_DATADIR}/mutatris")
+    else()
+        file(RELATIVE_PATH MUTATRIS_SCRIPT_TO_PREFIX "/${CMAKE_INSTALL_BINDIR}" "/")
+        if(MUTATRIS_SCRIPT_TO_PREFIX STREQUAL "")
+            set(MUTATRIS_SCRIPT_TO_PREFIX ".")
+        endif()
+
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBEXECDIR}")
+            set(MUTATRIS_BINARY_PATH "${CMAKE_INSTALL_LIBEXECDIR}/mutatris/mutatris")
+        else()
+            set(MUTATRIS_BINARY_PATH "\${prefix}/${CMAKE_INSTALL_LIBEXECDIR}/mutatris/mutatris")
+        endif()
+
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_DATADIR}")
+            set(MUTATRIS_ASSET_PATH "${CMAKE_INSTALL_DATADIR}/mutatris")
+        else()
+            set(MUTATRIS_ASSET_PATH "\${prefix}/${CMAKE_INSTALL_DATADIR}/mutatris")
+        endif()
+    endif()
+
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/mutatris.in
+        ${CMAKE_CURRENT_BINARY_DIR}/mutatris-launcher
+        @ONLY
+    )
+
+    set(MUTATRIS_INSTALL_DATADIR ${CMAKE_INSTALL_DATADIR}/mutatris)
+
+    install(TARGETS mutatris
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/mutatris
+    )
+
+    install(PROGRAMS
+        ${CMAKE_CURRENT_BINARY_DIR}/mutatris-launcher
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RENAME mutatris
+    )
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/
+        DESTINATION ${MUTATRIS_INSTALL_DATADIR}/data
+    )
+
+    install(FILES
+        ${MUTATRIS_BACKGROUND_VERTEX_SPV}
+        ${MUTATRIS_BACKGROUND_FRAGMENT_SPV}
+        ${MUTATRIS_FADE_FRAGMENT_SPV}
+        ${MUTATRIS_CRT_FRAGMENT_SPV}
+        DESTINATION ${MUTATRIS_INSTALL_DATADIR}/shaders
+    )
+
+    if(MUTATRIS_EFFECT_FRAGMENT_SPV)
+        install(FILES
+            ${MUTATRIS_EFFECT_FRAGMENT_SPV}
+            DESTINATION ${MUTATRIS_INSTALL_DATADIR}/shaders/effects
+        )
+    endif()
+
+    install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/mutatris.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+
+    install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/icon.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
+        RENAME mutatris.png
+    )
+endif()

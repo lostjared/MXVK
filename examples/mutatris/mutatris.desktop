@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Mutatris
+Comment=Four-sided falling-block puzzle game
+Exec=mutatris
+Icon=mutatris
+Terminal=false
+Categories=Game;BlocksGame;
+Keywords=tetris;puzzle;blocks;falling blocks;
+StartupNotify=false

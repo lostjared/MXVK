@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+prefix="$(cd -- "${script_dir}/@MUTATRIS_SCRIPT_TO_PREFIX@" && pwd -P)"
+binary_path="@MUTATRIS_BINARY_PATH@"
+asset_path="@MUTATRIS_ASSET_PATH@"
+
+exec "${binary_path}" -p "${asset_path}" "$@"

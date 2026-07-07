@@ -38,6 +38,7 @@ namespace mutatris {
         std::string assetRoot;
         std::string dataRoot;
         std::string shaderRoot;
+        std::string fontPath;
         std::array<mxvk::VK_Sprite *, 8> blocks{};
         std::array<mxvk::VK_Sprite *, 11> backgrounds{};
         std::vector<std::string> effectShaders;
