@@ -615,6 +615,9 @@ For IPv6 UDP, construct `TYPE_INET6_DGRAM`; `bind(port)`, `connect(host, port)`,
 
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/044758b1-81f0-4966-98ae-719c1de2c8e4" />
 
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/4449d4d4-3d77-4356-b6c1-5d7c4a190353" />
+
+
 - If you run an example from a custom working directory, prefer passing `-p` with the correct asset root.
 
   ## Model Viewer
