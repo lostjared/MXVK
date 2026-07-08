@@ -1301,6 +1301,11 @@ namespace mxvk {
     }
 
     void VK_Window::destroyPostProcessTargets() {
+        for (VK_Sprite *sprite : post_process_sprites) {
+            if (sprite != nullptr) {
+                sprite->clearExternalTextureDescriptors();
+            }
+        }
         for (const std::vector<VkImageView> &views : post_process_views) {
             for (VkImageView view : views) {
                 if (view != VK_NULL_HANDLE) {
@@ -1679,7 +1684,7 @@ namespace mxvk {
 
     bool VK_Window::createSwapchain(VkSwapchainKHR old_swapchain) {
         std::cout << "vk: entering createSwapchain\n";
-        const SwapchainSupport support = querySwapchainSupport(physical_device, surface);
+        SwapchainSupport support = querySwapchainSupport(physical_device, surface);
         if (support.formats.empty() || support.present_modes.empty()) {
             std::cout << "vk: cannot create swapchain because support is incomplete\n";
             return false;
@@ -1687,7 +1692,49 @@ namespace mxvk {
 
         const VkSurfaceFormatKHR surface_format = chooseSurfaceFormat(support.formats);
         const VkPresentModeKHR present_mode = choosePresentMode(support.present_modes);
-        const VkExtent2D extent = chooseExtent(support.capabilities, window.get());
+        auto clampedWindowPixelExtent = [this, &support]() -> std::optional<VkExtent2D> {
+            if (window == nullptr) {
+                return std::nullopt;
+            }
+            int pixel_w = 0;
+            int pixel_h = 0;
+            SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+            if (pixel_w <= 0 || pixel_h <= 0) {
+                return std::nullopt;
+            }
+            return VkExtent2D{
+                .width = std::clamp(static_cast<uint32_t>(pixel_w),
+                                    support.capabilities.minImageExtent.width,
+                                    support.capabilities.maxImageExtent.width),
+                .height = std::clamp(static_cast<uint32_t>(pixel_h),
+                                     support.capabilities.minImageExtent.height,
+                                     support.capabilities.maxImageExtent.height),
+            };
+        };
+        auto extentMatchesWindowPixels = [&clampedWindowPixelExtent](const VkExtent2D extent) {
+            const std::optional<VkExtent2D> target_extent = clampedWindowPixelExtent();
+            return !target_extent.has_value() ||
+                   (extent.width == target_extent->width && extent.height == target_extent->height);
+        };
+
+        VkExtent2D extent = chooseExtent(support.capabilities, window.get());
+        for (int attempt = 0; attempt < 50 && !extentMatchesWindowPixels(extent); ++attempt) {
+            SDL_PumpEvents();
+            SDL_Delay(10);
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &support.capabilities);
+            extent = chooseExtent(support.capabilities, window.get());
+        }
+        if (!extentMatchesWindowPixels(extent)) {
+            const std::optional<VkExtent2D> target_extent = clampedWindowPixelExtent();
+            if (target_extent.has_value()) {
+                std::cout << std::format("vk: delaying swapchain creation until surface extent catches up to window pixels (surface={}x{}, window={}x{})\n",
+                                         extent.width,
+                                         extent.height,
+                                         target_extent->width,
+                                         target_extent->height);
+            }
+            return false;
+        }
 
         uint32_t image_count = support.capabilities.minImageCount + 1;
         if (support.capabilities.maxImageCount > 0U && image_count > support.capabilities.maxImageCount) {
@@ -2260,6 +2307,11 @@ namespace mxvk {
         if (swapchain_extent.width != 0 && swapchain_extent.height != 0) {
             if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
                 swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
+                std::cout << std::format("mxvk: requesting swapchain recreation because window pixels changed from {}x{} to {}x{}\n",
+                                         swapchain_extent.width,
+                                         swapchain_extent.height,
+                                         pixel_w,
+                                         pixel_h);
                 framebuffer_resized = true;
                 force_swapchain_recreate = true;
                 return;
@@ -2342,6 +2394,7 @@ namespace mxvk {
         if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
             last_acquire_error = VK_SUCCESS;
             repeated_acquire_errors = 0;
+            std::cout << "mxvk: requesting swapchain recreation because acquire returned VK_ERROR_OUT_OF_DATE_KHR\n";
             force_swapchain_recreate = true;
             framebuffer_resized = true;
             return;
@@ -2353,6 +2406,7 @@ namespace mxvk {
                 last_acquire_error = acquire_result;
                 repeated_acquire_errors = 0;
             }
+            std::cout << "mxvk: requesting swapchain recreation because acquire returned VK_ERROR_SURFACE_LOST_KHR\n";
             force_swapchain_recreate = true;
             framebuffer_resized = true;
             return;
@@ -2811,13 +2865,27 @@ namespace mxvk {
         }
 
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
+            std::cout << "mxvk: requesting swapchain recreation because present returned VK_ERROR_OUT_OF_DATE_KHR\n";
             force_swapchain_recreate = true;
             last_resize_event_ms = SDL_GetTicks();
             framebuffer_resized = true;
         } else if (present_result == VK_SUBOPTIMAL_KHR) {
-            last_resize_event_ms = SDL_GetTicks();
-            framebuffer_resized = true;
-            force_swapchain_recreate = true;
+            int present_pixel_w = 0;
+            int present_pixel_h = 0;
+            if (window != nullptr) {
+                SDL_GetWindowSizeInPixels(window.get(), &present_pixel_w, &present_pixel_h);
+            }
+            const bool known_present_extent = present_pixel_w > 0 && present_pixel_h > 0;
+            const bool present_extent_changed =
+                known_present_extent &&
+                (swapchain_extent.width != static_cast<uint32_t>(present_pixel_w) ||
+                 swapchain_extent.height != static_cast<uint32_t>(present_pixel_h));
+            if (!known_present_extent || present_extent_changed) {
+                std::cout << "mxvk: requesting swapchain recreation because present returned VK_SUBOPTIMAL_KHR with changed window extent\n";
+                last_resize_event_ms = SDL_GetTicks();
+                framebuffer_resized = true;
+                force_swapchain_recreate = true;
+            }
         } else if (present_result != VK_SUCCESS) {
             std::cerr << "mxvk: Failed to present swapchain image\n";
         }

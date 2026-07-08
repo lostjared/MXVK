@@ -1700,6 +1700,18 @@ namespace mxvk {
         spriteLoaded = true;
     }
 
+    void VK_Sprite::clearExternalTextureDescriptors() {
+        if (!externalTexture && externalDescriptorSets.empty()) {
+            return;
+        }
+        destroyDescriptorPools();
+        if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
+            extendedDescriptorPool = VK_NULL_HANDLE;
+            extendedDescriptorSet = VK_NULL_HANDLE;
+        }
+    }
+
     void VK_Sprite::prepareForRendering([[maybe_unused]] VkCommandBuffer cmdBuffer) {
 #ifdef MXVK_CUDA
         recordCudaReadyBarrier(cmdBuffer);

@@ -145,6 +145,7 @@ namespace mxvk {
         void updateTexture(const void *pixels, int width, int height, int pitch = 0);
 
         void setExternalTexture(VkImageView image_view, int width, int height);
+        void clearExternalTextureDescriptors();
 
 #ifdef MXVK_CUDA
         /** @brief Replace the sprite texture directly from CUDA device memory. */
