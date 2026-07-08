@@ -384,6 +384,16 @@ namespace mxvk {
          */
         virtual void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index);
 
+        /**
+         * @brief Allow derived classes to customize depth/stencil attachments for the main dynamic rendering pass.
+         *
+         * Override this when custom rendering needs hardware stencil testing or a custom depth/stencil image.
+         * The callback is invoked immediately before vkCmdBeginRendering.
+         */
+        virtual void onConfigureDepthStencilAttachments(VkRenderingAttachmentInfo &depth_attachment,
+                                                        VkRenderingAttachmentInfo &stencil_attachment,
+                                                        uint32_t image_index);
+
       protected:
         /**
          * @brief Capture the most recently presented swapchain image as tightly packed RGBA8 pixels.

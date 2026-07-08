@@ -26,6 +26,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
@@ -318,6 +319,7 @@ namespace mxvk {
         uint32_t nextDescriptorPoolSets = 16;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        std::unordered_map<VkImageView, VkDescriptorSet> externalDescriptorSets{};
         void createDescriptorPool();
         void destroyDescriptorPools();
         VkDescriptorSet createDescriptorSet(VkImageView imageView);

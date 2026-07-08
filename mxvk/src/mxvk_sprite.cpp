@@ -1663,11 +1663,9 @@ namespace mxvk {
             spriteLoaded = true;
             return;
         }
-        if (descriptorSet != VK_NULL_HANDLE && descriptorSetPool != VK_NULL_HANDLE) {
-            vkFreeDescriptorSets(device, descriptorSetPool, 1, &descriptorSet);
-            descriptorSet = VK_NULL_HANDLE;
-            descriptorSetPool = VK_NULL_HANDLE;
-        }
+        auto cached_descriptor = externalDescriptorSets.find(image_view);
+        descriptorSet = (cached_descriptor != externalDescriptorSets.end()) ? cached_descriptor->second : VK_NULL_HANDLE;
+        descriptorSetPool = VK_NULL_HANDLE;
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
             vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
             extendedDescriptorPool = VK_NULL_HANDLE;
@@ -1699,10 +1697,14 @@ namespace mxvk {
 
     void VK_Sprite::renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
                                   uint32_t screenWidth, uint32_t screenHeight) {
-        if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated)
+        if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated) {
             return;
+        }
         if (descriptorSet == VK_NULL_HANDLE) {
             descriptorSet = createDescriptorSet(spriteImageView);
+            if (externalTexture) {
+                externalDescriptorSets[spriteImageView] = descriptorSet;
+            }
         }
 
         if (instancingEnabled && instancedPipeline != VK_NULL_HANDLE && instanceBuffer != VK_NULL_HANDLE) {
@@ -1819,6 +1821,7 @@ namespace mxvk {
         descriptorPool = VK_NULL_HANDLE;
         descriptorSetPool = VK_NULL_HANDLE;
         descriptorSet = VK_NULL_HANDLE;
+        externalDescriptorSets.clear();
         nextDescriptorPoolSets = 16;
     }
 

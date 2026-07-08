@@ -345,6 +345,7 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_controller.cpp
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_resource.cpp
+    mxvk/src/mxvk_stencil.cpp
     mxvk/src/mxvk_sprite.cpp
     mxvk/src/mxvk_sprite3d.cpp
     mxvk/src/mxvk_point_sprite_batch.cpp
@@ -561,6 +562,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(hello_world)
     add_subdirectory(examples/static_example)
     mxvk_configure_mingw_target(static_example)
+    add_subdirectory(examples/stencil)
+    mxvk_configure_mingw_target(stencil)
     add_subdirectory(examples/sprite_example)
     mxvk_configure_mingw_target(sprite_example)
     add_subdirectory(examples/3dmath)

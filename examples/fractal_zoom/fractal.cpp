@@ -56,8 +56,8 @@ namespace example {
       public:
         FractalWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shaderRoot(((path.empty() || path == ".") ? std::string(fractal_zoom_ASSET_DIR) : path) + "/data"),
-              reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)) {
+              reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)),
+              shaderRoot(((path.empty() || path == ".") ? std::string(fractal_zoom_ASSET_DIR) : path) + "/data") {
         }
 
         ~FractalWindow() override {

@@ -1120,6 +1120,10 @@ namespace mxvk {
 
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
+    void VK_Window::onConfigureDepthStencilAttachments([[maybe_unused]] VkRenderingAttachmentInfo &depth_attachment,
+                                                       [[maybe_unused]] VkRenderingAttachmentInfo &stencil_attachment,
+                                                       [[maybe_unused]] uint32_t image_index) {}
+
     void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) {
         if (device == VK_NULL_HANDLE || swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
             return;
@@ -2460,6 +2464,10 @@ namespace mxvk {
         depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         depth_attachment.clearValue = depth_clear_value;
 
+        VkRenderingAttachmentInfo stencil_attachment{};
+        stencil_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        onConfigureDepthStencilAttachments(depth_attachment, stencil_attachment, image_index);
+
         VkRenderingInfo rendering_info{};
         rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         rendering_info.renderArea.offset = {0, 0};
@@ -2469,7 +2477,7 @@ namespace mxvk {
         rendering_info.colorAttachmentCount = 1;
         rendering_info.pColorAttachments = &color_attachment;
         rendering_info.pDepthAttachment = (depth_attachment.imageView != VK_NULL_HANDLE) ? &depth_attachment : nullptr;
-        rendering_info.pStencilAttachment = nullptr;
+        rendering_info.pStencilAttachment = (stencil_attachment.imageView != VK_NULL_HANDLE) ? &stencil_attachment : nullptr;
 
         vkCmdBeginRendering(cmd, &rendering_info);
 
