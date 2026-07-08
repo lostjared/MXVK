@@ -559,6 +559,7 @@ if(EXAMPLES)
     message(STATUS "Examples ON")
     add_subdirectory(examples/skeleton)
     add_subdirectory(examples/surface)
+    add_subdirectory(examples/stencil_surface)
     add_subdirectory(examples/hello_world)
     mxvk_configure_mingw_target(hello_world)
     add_subdirectory(examples/static_example)
@@ -739,6 +740,7 @@ if(EXAMPLES)
     set(mxvk_example_targets
         skeleton
         surface
+        stencil_surface
         hello_world
         static_example
         sprite_example
