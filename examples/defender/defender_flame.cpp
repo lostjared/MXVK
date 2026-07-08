@@ -321,19 +321,25 @@ namespace defender {
         VkMemoryAllocateInfo alloc_info{};
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         alloc_info.allocationSize = mem_requirements.size;
-        alloc_info.memoryTypeIndex = find_memory_type(mem_requirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS) {
-            vkDestroyBuffer(device, buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-            throw mxvk::Exception("Failed to allocate defender buffer memory");
-        }
-        if (vkBindBufferMemory(device, buffer, buffer_memory, 0) != VK_SUCCESS) {
-            vkFreeMemory(device, buffer_memory, nullptr);
-            vkDestroyBuffer(device, buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-            buffer_memory = VK_NULL_HANDLE;
-            throw mxvk::Exception("Failed to bind defender buffer memory");
+        try {
+            alloc_info.memoryTypeIndex = find_memory_type(mem_requirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to allocate defender buffer memory");
+            }
+            if (vkBindBufferMemory(device, buffer, buffer_memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("Failed to bind defender buffer memory");
+            }
+        } catch (...) {
+            if (buffer_memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, buffer_memory, nullptr);
+                buffer_memory = VK_NULL_HANDLE;
+            }
+            if (buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, buffer, nullptr);
+                buffer = VK_NULL_HANDLE;
+            }
+            throw;
         }
     }
 

@@ -1013,24 +1013,45 @@ class ComputeWindow : public mxvk::VK_Window {
                       VkMemoryPropertyFlags properties,
                       VkBuffer &buffer,
                       VkDeviceMemory &bufferMemory) {
+        VkBuffer newBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+        try {
+            VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &newBuffer));
 
-        VkMemoryRequirements memRequirements{};
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+            VkMemoryRequirements memRequirements{};
+            vkGetBufferMemoryRequirements(device, newBuffer, &memRequirements);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindBufferMemory(device, newBuffer, newMemory, 0));
+        } catch (...) {
+            if (newBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, newBuffer, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
 
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+        if (buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, buffer, nullptr);
+        }
+        if (bufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, bufferMemory, nullptr);
+        }
+        buffer = newBuffer;
+        bufferMemory = newMemory;
     }
 
     [[nodiscard]] VkCommandBuffer beginSingleTimeCommands() const {
@@ -1076,6 +1097,9 @@ class ComputeWindow : public mxvk::VK_Window {
                      VkMemoryPropertyFlags properties,
                      VkImage &image,
                      VkDeviceMemory &imageMemory) {
+        VkImage newImage = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1091,18 +1115,36 @@ class ComputeWindow : public mxvk::VK_Window {
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-        VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
+        try {
+            VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &newImage));
 
-        VkMemoryRequirements memRequirements{};
-        vkGetImageMemoryRequirements(device, image, &memRequirements);
+            VkMemoryRequirements memRequirements{};
+            vkGetImageMemoryRequirements(device, newImage, &memRequirements);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindImageMemory(device, newImage, newMemory, 0));
+        } catch (...) {
+            if (newImage != VK_NULL_HANDLE) {
+                vkDestroyImage(device, newImage, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
 
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, image, nullptr);
+        }
+        if (imageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, imageMemory, nullptr);
+        }
+        image = newImage;
+        imageMemory = newMemory;
     }
 
 #ifdef MXVK_CUDA
@@ -1144,9 +1186,9 @@ class ComputeWindow : public mxvk::VK_Window {
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.pNext = &exportMemoryInfo;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         try {
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &img.memory));
             VK_CHECK_RESULT(vkBindImageMemory(device, img.image, img.memory, 0));
             img.cudaExportMemorySize = memRequirements.size;

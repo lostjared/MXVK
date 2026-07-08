@@ -34,6 +34,13 @@
 #endif
 
 namespace mxvk {
+    namespace {
+        bool shouldLogMissingValidationLayer() {
+            const char *quiet_missing_validation = std::getenv("MXVK_QUIET_MISSING_VALIDATION");
+            return quiet_missing_validation == nullptr || std::strcmp(quiet_missing_validation, "1") != 0;
+        }
+    } // namespace
+
     VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data) {
         const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
                                   ? callback_data->pMessage
@@ -356,9 +363,11 @@ namespace mxvk {
         VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
         if (validation_enabled) {
             if (!hasValidationLayerSupport()) {
-                std::cerr << std::format(
-                    "mxvk: validation layer '{}' is not available; continuing without validation\n",
-                    validation_layer_name);
+                if (shouldLogMissingValidationLayer()) {
+                    std::cerr << std::format(
+                        "mxvk: validation layer '{}' is not available; continuing without validation\n",
+                        validation_layer_name);
+                }
                 validation_enabled = false;
             } else {
                 enabled_layers.push_back(validation_layer_name);
@@ -1301,56 +1310,61 @@ namespace mxvk {
         post_process_initialized.assign(target_count, std::vector<bool>(swapchain_images.size(), false));
         VkPhysicalDeviceMemoryProperties memory_properties{};
         vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-        for (size_t target = 0; target < target_count; ++target) {
-            for (size_t i = 0; i < swapchain_images.size(); ++i) {
-                VkImageCreateInfo image_info{};
-                image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-                image_info.imageType = VK_IMAGE_TYPE_2D;
-                image_info.extent = {swapchain_extent.width, swapchain_extent.height, 1};
-                image_info.mipLevels = 1;
-                image_info.arrayLayers = 1;
-                image_info.format = swapchain_format;
-                image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-                image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-                image_info.samples = VK_SAMPLE_COUNT_1_BIT;
-                image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                if (vkCreateImage(device, &image_info, nullptr, &post_process_images[target][i]) != VK_SUCCESS) {
-                    throw mxvk::Exception("Failed to create post-process image");
-                }
-                VkMemoryRequirements requirements{};
-                vkGetImageMemoryRequirements(device, post_process_images[target][i], &requirements);
-                uint32_t memory_type = UINT32_MAX;
-                for (uint32_t type = 0; type < memory_properties.memoryTypeCount; ++type) {
-                    if ((requirements.memoryTypeBits & (1U << type)) != 0U &&
-                        (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U) {
-                        memory_type = type;
-                        break;
+        try {
+            for (size_t target = 0; target < target_count; ++target) {
+                for (size_t i = 0; i < swapchain_images.size(); ++i) {
+                    VkImageCreateInfo image_info{};
+                    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+                    image_info.imageType = VK_IMAGE_TYPE_2D;
+                    image_info.extent = {swapchain_extent.width, swapchain_extent.height, 1};
+                    image_info.mipLevels = 1;
+                    image_info.arrayLayers = 1;
+                    image_info.format = swapchain_format;
+                    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+                    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+                    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+                    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                    if (vkCreateImage(device, &image_info, nullptr, &post_process_images[target][i]) != VK_SUCCESS) {
+                        throw mxvk::Exception("Failed to create post-process image");
+                    }
+                    VkMemoryRequirements requirements{};
+                    vkGetImageMemoryRequirements(device, post_process_images[target][i], &requirements);
+                    uint32_t memory_type = UINT32_MAX;
+                    for (uint32_t type = 0; type < memory_properties.memoryTypeCount; ++type) {
+                        if ((requirements.memoryTypeBits & (1U << type)) != 0U &&
+                            (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U) {
+                            memory_type = type;
+                            break;
+                        }
+                    }
+                    if (memory_type == UINT32_MAX) {
+                        throw mxvk::Exception("Failed to find post-process image memory type");
+                    }
+                    VkMemoryAllocateInfo allocation{};
+                    allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                    allocation.allocationSize = requirements.size;
+                    allocation.memoryTypeIndex = memory_type;
+                    if (vkAllocateMemory(device, &allocation, nullptr, &post_process_memories[target][i]) != VK_SUCCESS ||
+                        vkBindImageMemory(device, post_process_images[target][i], post_process_memories[target][i], 0) != VK_SUCCESS) {
+                        throw mxvk::Exception("Failed to allocate post-process image memory");
+                    }
+                    VkImageViewCreateInfo view_info{};
+                    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                    view_info.image = post_process_images[target][i];
+                    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                    view_info.format = swapchain_format;
+                    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    view_info.subresourceRange.levelCount = 1;
+                    view_info.subresourceRange.layerCount = 1;
+                    if (vkCreateImageView(device, &view_info, nullptr, &post_process_views[target][i]) != VK_SUCCESS) {
+                        throw mxvk::Exception("Failed to create post-process image view");
                     }
                 }
-                if (memory_type == UINT32_MAX) {
-                    throw mxvk::Exception("Failed to find post-process image memory type");
-                }
-                VkMemoryAllocateInfo allocation{};
-                allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-                allocation.allocationSize = requirements.size;
-                allocation.memoryTypeIndex = memory_type;
-                if (vkAllocateMemory(device, &allocation, nullptr, &post_process_memories[target][i]) != VK_SUCCESS ||
-                    vkBindImageMemory(device, post_process_images[target][i], post_process_memories[target][i], 0) != VK_SUCCESS) {
-                    throw mxvk::Exception("Failed to allocate post-process image memory");
-                }
-                VkImageViewCreateInfo view_info{};
-                view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-                view_info.image = post_process_images[target][i];
-                view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                view_info.format = swapchain_format;
-                view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                view_info.subresourceRange.levelCount = 1;
-                view_info.subresourceRange.layerCount = 1;
-                if (vkCreateImageView(device, &view_info, nullptr, &post_process_views[target][i]) != VK_SUCCESS) {
-                    throw mxvk::Exception("Failed to create post-process image view");
-                }
             }
+        } catch (...) {
+            destroyPostProcessTargets();
+            throw;
         }
     }
 
@@ -1718,6 +1732,20 @@ namespace mxvk {
 
             std::cout << std::format("vk: creating image view for swapchain image {}\n", i);
             if (vkCreateImageView(device, &view_info, nullptr, &swapchain_image_views[i]) != VK_SUCCESS) {
+                for (VkImageView image_view : swapchain_image_views) {
+                    if (image_view != VK_NULL_HANDLE) {
+                        vkDestroyImageView(device, image_view, nullptr);
+                    }
+                }
+                swapchain_image_views.clear();
+                swapchain_images.clear();
+                swapchain_image_initialized.clear();
+                last_presented_image_index = invalid_queue_index;
+                vkDestroySwapchainKHR(device, swapchain, nullptr);
+                swapchain = VK_NULL_HANDLE;
+                swapchain_format = VK_FORMAT_UNDEFINED;
+                swapchain_extent = {};
+                swapchain_supports_transfer_src = false;
                 return false;
             }
         }
@@ -1728,6 +1756,43 @@ namespace mxvk {
 
     bool VK_Window::createRenderResources() {
         std::cout << "vk: entering createRenderResources\n";
+        const auto cleanup_render_resource_failure = [this]() {
+            if (command_pool != VK_NULL_HANDLE && !command_buffers.empty()) {
+                vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
+                command_buffers.clear();
+            }
+            if (!depth_image_views.empty()) {
+                for (VkImageView &view : depth_image_views) {
+                    if (view != VK_NULL_HANDLE) {
+                        vkDestroyImageView(device, view, nullptr);
+                        view = VK_NULL_HANDLE;
+                    }
+                }
+            }
+            if (!depth_images.empty()) {
+                for (VkImage &image : depth_images) {
+                    if (image != VK_NULL_HANDLE) {
+                        vkDestroyImage(device, image, nullptr);
+                        image = VK_NULL_HANDLE;
+                    }
+                }
+            }
+            if (!depth_image_memories.empty()) {
+                for (VkDeviceMemory &memory : depth_image_memories) {
+                    if (memory != VK_NULL_HANDLE) {
+                        vkFreeMemory(device, memory, nullptr);
+                        memory = VK_NULL_HANDLE;
+                    }
+                }
+            }
+            depth_image_views.clear();
+            depth_images.clear();
+            depth_image_memories.clear();
+            depth_image_initialized.clear();
+            depth_format = VK_FORMAT_UNDEFINED;
+            destroyPostProcessTargets();
+        };
+
         if (command_pool == VK_NULL_HANDLE) {
             VkCommandPoolCreateInfo pool_info{};
             pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1755,6 +1820,7 @@ namespace mxvk {
 
         std::cout << "vk: allocating command buffers\n";
         if (vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data()) != VK_SUCCESS) {
+            command_buffers.clear();
             return false;
         }
 
@@ -1778,6 +1844,7 @@ namespace mxvk {
         depth_format = findDepthFormat(physical_device);
         if (depth_format == VK_FORMAT_UNDEFINED) {
             std::cerr << "mxvk: failed to find a supported depth format\n";
+            cleanup_render_resource_failure();
             return false;
         }
 
@@ -1805,6 +1872,7 @@ namespace mxvk {
 
             if (vkCreateImage(device, &imageInfo, nullptr, &depth_images[i]) != VK_SUCCESS) {
                 std::cerr << std::format("mxvk: failed to create depth image {}\n", i);
+                cleanup_render_resource_failure();
                 return false;
             }
 
@@ -1823,6 +1891,7 @@ namespace mxvk {
             }
             if (memoryTypeIndex == UINT32_MAX) {
                 std::cerr << "mxvk: failed to find depth image memory type\n";
+                cleanup_render_resource_failure();
                 return false;
             }
 
@@ -1834,11 +1903,13 @@ namespace mxvk {
 
             if (vkAllocateMemory(device, &allocInfo, nullptr, &depth_image_memories[i]) != VK_SUCCESS) {
                 std::cerr << std::format("mxvk: failed to allocate depth image memory {}\n", i);
+                cleanup_render_resource_failure();
                 return false;
             }
 
             if (vkBindImageMemory(device, depth_images[i], depth_image_memories[i], 0) != VK_SUCCESS) {
                 std::cerr << std::format("mxvk: failed to bind depth image memory {}\n", i);
+                cleanup_render_resource_failure();
                 return false;
             }
 
@@ -1856,12 +1927,19 @@ namespace mxvk {
 
             if (vkCreateImageView(device, &viewInfo, nullptr, &depth_image_views[i]) != VK_SUCCESS) {
                 std::cerr << std::format("mxvk: failed to create depth image view {}\n", i);
+                cleanup_render_resource_failure();
                 return false;
             }
         }
 
         if (!post_process_sprites.empty()) {
-            createPostProcessTargets();
+            try {
+                createPostProcessTargets();
+            } catch (const mxvk::Exception &ex) {
+                std::cerr << std::format("mxvk: {}\n", ex.text());
+                cleanup_render_resource_failure();
+                return false;
+            }
         }
 
         std::cout << "vk: createRenderResources complete\n";

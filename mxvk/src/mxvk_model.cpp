@@ -1297,20 +1297,26 @@ namespace mxvk {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            vkDestroyBuffer(device, buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-            throw mxvk::Exception("MXModel::createBuffer failed to allocate memory");
-        }
+        try {
+            allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                throw mxvk::Exception("MXModel::createBuffer failed to allocate memory");
+            }
 
-        if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS) {
-            vkDestroyBuffer(device, buffer, nullptr);
-            vkFreeMemory(device, bufferMemory, nullptr);
-            buffer = VK_NULL_HANDLE;
-            bufferMemory = VK_NULL_HANDLE;
-            throw mxvk::Exception("MXModel::createBuffer failed to bind memory");
+            if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("MXModel::createBuffer failed to bind memory");
+            }
+        } catch (...) {
+            if (bufferMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, bufferMemory, nullptr);
+                bufferMemory = VK_NULL_HANDLE;
+            }
+            if (buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, buffer, nullptr);
+                buffer = VK_NULL_HANDLE;
+            }
+            throw;
         }
     }
 

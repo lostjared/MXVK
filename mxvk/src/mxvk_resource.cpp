@@ -90,14 +90,17 @@ namespace mxvk {
         VkMemoryAllocateInfo allocation{};
         allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocation.allocationSize = requirements.size;
-        allocation.memoryTypeIndex = find_memory_type(context.physical_device, requirements.memoryTypeBits, properties);
-        if (vkAllocateMemory(context.device, &allocation, nullptr, &buffer.memory) != VK_SUCCESS) {
+        try {
+            allocation.memoryTypeIndex = find_memory_type(context.physical_device, requirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(context.device, &allocation, nullptr, &buffer.memory) != VK_SUCCESS) {
+                throw mxvk::Exception("failed to allocate Vulkan buffer memory");
+            }
+            if (vkBindBufferMemory(context.device, buffer.buffer, buffer.memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("failed to bind Vulkan buffer memory");
+            }
+        } catch (...) {
             destroy_buffer(context.device, buffer);
-            throw mxvk::Exception("failed to allocate Vulkan buffer memory");
-        }
-        if (vkBindBufferMemory(context.device, buffer.buffer, buffer.memory, 0) != VK_SUCCESS) {
-            destroy_buffer(context.device, buffer);
-            throw mxvk::Exception("failed to bind Vulkan buffer memory");
+            throw;
         }
         buffer.size = size;
     }
@@ -149,6 +152,14 @@ namespace mxvk {
         if (width == 0 || height == 0) {
             throw mxvk::Exception("create_image requires non-zero dimensions");
         }
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(context.device, image, nullptr);
+            image = VK_NULL_HANDLE;
+        }
+        if (memory != VK_NULL_HANDLE) {
+            vkFreeMemory(context.device, memory, nullptr);
+            memory = VK_NULL_HANDLE;
+        }
 
         VkImageCreateInfo image_info{};
         image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -172,18 +183,24 @@ namespace mxvk {
         VkMemoryAllocateInfo allocation{};
         allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocation.allocationSize = requirements.size;
-        allocation.memoryTypeIndex = find_memory_type(context.physical_device, requirements.memoryTypeBits, properties);
-        if (vkAllocateMemory(context.device, &allocation, nullptr, &memory) != VK_SUCCESS) {
-            vkDestroyImage(context.device, image, nullptr);
-            image = VK_NULL_HANDLE;
-            throw mxvk::Exception("failed to allocate Vulkan image memory");
-        }
-        if (vkBindImageMemory(context.device, image, memory, 0) != VK_SUCCESS) {
-            vkFreeMemory(context.device, memory, nullptr);
-            vkDestroyImage(context.device, image, nullptr);
-            image = VK_NULL_HANDLE;
-            memory = VK_NULL_HANDLE;
-            throw mxvk::Exception("failed to bind Vulkan image memory");
+        try {
+            allocation.memoryTypeIndex = find_memory_type(context.physical_device, requirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(context.device, &allocation, nullptr, &memory) != VK_SUCCESS) {
+                throw mxvk::Exception("failed to allocate Vulkan image memory");
+            }
+            if (vkBindImageMemory(context.device, image, memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("failed to bind Vulkan image memory");
+            }
+        } catch (...) {
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(context.device, memory, nullptr);
+                memory = VK_NULL_HANDLE;
+            }
+            if (image != VK_NULL_HANDLE) {
+                vkDestroyImage(context.device, image, nullptr);
+                image = VK_NULL_HANDLE;
+            }
+            throw;
         }
     }
 

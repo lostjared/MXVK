@@ -923,8 +923,8 @@ namespace mxvk {
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
 #endif
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingMemory;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
 
         createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1196,6 +1196,15 @@ namespace mxvk {
 
     void VK_Sprite::createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory) {
         std::cout << std::format("mxvk: CUDA interop init: requesting exportable Vulkan image {}x{} RGBA8 OPAQUE_FD\n", width, height);
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, image, nullptr);
+            image = VK_NULL_HANDLE;
+        }
+        if (imageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, imageMemory, nullptr);
+            imageMemory = VK_NULL_HANDLE;
+        }
+
         VkExternalMemoryImageCreateInfo externalImageInfo{};
         externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
         externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -1229,9 +1238,9 @@ namespace mxvk {
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.pNext = &exportMemoryInfo;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         try {
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
             VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
             cudaExportMemorySize = memRequirements.size;
@@ -1248,6 +1257,7 @@ namespace mxvk {
                 vkDestroyImage(device, image, nullptr);
                 image = VK_NULL_HANDLE;
             }
+            cudaExportMemorySize = 0;
             throw;
         }
     }
@@ -1563,8 +1573,8 @@ namespace mxvk {
         }
 #endif
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingMemory;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         VkDeviceSize imageSize = static_cast<VkDeviceSize>(surface->w) * surface->h * 4;
 
         createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1875,24 +1885,45 @@ namespace mxvk {
     void VK_Sprite::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                                  VkMemoryPropertyFlags properties, VkBuffer &buffer,
                                  VkDeviceMemory &bufferMemory) {
+        VkBuffer newBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-        VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+        try {
+            VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &newBuffer));
 
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+            VkMemoryRequirements memRequirements;
+            vkGetBufferMemoryRequirements(device, newBuffer, &memRequirements);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindBufferMemory(device, newBuffer, newMemory, 0));
+        } catch (...) {
+            if (newBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, newBuffer, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
 
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+        if (buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, buffer, nullptr);
+        }
+        if (bufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, bufferMemory, nullptr);
+        }
+        buffer = newBuffer;
+        bufferMemory = newMemory;
     }
 
     uint32_t VK_Sprite::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
@@ -2010,6 +2041,9 @@ namespace mxvk {
     void VK_Sprite::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                                 VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
                                 VkImage &image, VkDeviceMemory &imageMemory) {
+        VkImage newImage = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -2025,18 +2059,36 @@ namespace mxvk {
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-        VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
+        try {
+            VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &newImage));
 
-        VkMemoryRequirements memRequirements;
-        vkGetImageMemoryRequirements(device, image, &memRequirements);
+            VkMemoryRequirements memRequirements;
+            vkGetImageMemoryRequirements(device, newImage, &memRequirements);
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindImageMemory(device, newImage, newMemory, 0));
+        } catch (...) {
+            if (newImage != VK_NULL_HANDLE) {
+                vkDestroyImage(device, newImage, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
 
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, image, nullptr);
+        }
+        if (imageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, imageMemory, nullptr);
+        }
+        image = newImage;
+        imageMemory = newMemory;
     }
 
     VkImageView VK_Sprite::createImageView(VkImage image, VkFormat format) {

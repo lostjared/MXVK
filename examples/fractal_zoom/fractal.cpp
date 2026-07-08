@@ -1126,24 +1126,51 @@ namespace example {
         void createReferenceOrbitBuffers(size_t buffer_count) {
             const VkDeviceSize buffer_size = static_cast<VkDeviceSize>(reference_orbit_capacity * sizeof(OrbitSample));
 
+            auto cleanup_reference_orbit_buffers = [&]() {
+                for (size_t i = 0; i < reference_orbit_memories.size(); ++i) {
+                    if (reference_orbit_memories[i] != VK_NULL_HANDLE) {
+                        if (i < reference_orbit_mapped.size() && reference_orbit_mapped[i] != nullptr) {
+                            vkUnmapMemory(device, reference_orbit_memories[i]);
+                        }
+                        vkFreeMemory(device, reference_orbit_memories[i], nullptr);
+                    }
+                }
+                for (VkBuffer buffer : reference_orbit_buffers) {
+                    if (buffer != VK_NULL_HANDLE) {
+                        vkDestroyBuffer(device, buffer, nullptr);
+                    }
+                }
+                reference_orbit_buffers.clear();
+                reference_orbit_memories.clear();
+                reference_orbit_mapped.clear();
+                reference_orbit_coherent.clear();
+                reference_orbit_uploaded_generations.clear();
+            };
+
+            cleanup_reference_orbit_buffers();
             reference_orbit_buffers.assign(buffer_count, VK_NULL_HANDLE);
             reference_orbit_memories.assign(buffer_count, VK_NULL_HANDLE);
             reference_orbit_mapped.assign(buffer_count, nullptr);
             reference_orbit_coherent.assign(buffer_count, false);
             reference_orbit_uploaded_generations.assign(buffer_count, 0);
 
-            for (size_t i = 0; i < buffer_count; ++i) {
-                try {
-                    createBuffer(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, reference_orbit_buffers[i], reference_orbit_memories[i]);
-                    reference_orbit_coherent[i] = true;
-                } catch (...) {
-                    createBuffer(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, reference_orbit_buffers[i], reference_orbit_memories[i]);
-                    reference_orbit_coherent[i] = false;
-                }
+            try {
+                for (size_t i = 0; i < buffer_count; ++i) {
+                    try {
+                        createBuffer(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, reference_orbit_buffers[i], reference_orbit_memories[i]);
+                        reference_orbit_coherent[i] = true;
+                    } catch (...) {
+                        createBuffer(buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, reference_orbit_buffers[i], reference_orbit_memories[i]);
+                        reference_orbit_coherent[i] = false;
+                    }
 
-                if (vkMapMemory(device, reference_orbit_memories[i], 0, buffer_size, 0, &reference_orbit_mapped[i]) != VK_SUCCESS) {
-                    throw mxvk::Exception("Failed to map fractal reference orbit buffer");
+                    if (vkMapMemory(device, reference_orbit_memories[i], 0, buffer_size, 0, &reference_orbit_mapped[i]) != VK_SUCCESS) {
+                        throw mxvk::Exception("Failed to map fractal reference orbit buffer");
+                    }
                 }
+            } catch (...) {
+                cleanup_reference_orbit_buffers();
+                throw;
             }
         }
 

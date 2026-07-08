@@ -1147,19 +1147,25 @@ namespace example {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = memRequirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                vkDestroyBuffer(device, buffer, nullptr);
-                buffer = VK_NULL_HANDLE;
-                throw mxvk::Exception("Failed to allocate buffer memory");
-            }
-            if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS) {
-                vkFreeMemory(device, bufferMemory, nullptr);
-                vkDestroyBuffer(device, buffer, nullptr);
-                buffer = VK_NULL_HANDLE;
-                bufferMemory = VK_NULL_HANDLE;
-                throw mxvk::Exception("Failed to bind buffer memory");
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to allocate buffer memory");
+                }
+                if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to bind buffer memory");
+                }
+            } catch (...) {
+                if (bufferMemory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, bufferMemory, nullptr);
+                    bufferMemory = VK_NULL_HANDLE;
+                }
+                if (buffer != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(device, buffer, nullptr);
+                    buffer = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 
@@ -1255,19 +1261,25 @@ namespace example {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = memRequirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                vkDestroyImage(device, image, nullptr);
-                image = VK_NULL_HANDLE;
-                throw mxvk::Exception("Failed to allocate image memory");
-            }
-            if (vkBindImageMemory(device, image, memory, 0) != VK_SUCCESS) {
-                vkFreeMemory(device, memory, nullptr);
-                vkDestroyImage(device, image, nullptr);
-                image = VK_NULL_HANDLE;
-                memory = VK_NULL_HANDLE;
-                throw mxvk::Exception("Failed to bind image memory");
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to allocate image memory");
+                }
+                if (vkBindImageMemory(device, image, memory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to bind image memory");
+                }
+            } catch (...) {
+                if (memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, memory, nullptr);
+                    memory = VK_NULL_HANDLE;
+                }
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(device, image, nullptr);
+                    image = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 

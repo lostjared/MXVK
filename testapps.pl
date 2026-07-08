@@ -105,6 +105,7 @@ for my $test (@tests) {
 
     if ($pid == 0) {
         setpgrp(0, 0);
+        $ENV{MXVK_QUIET_MISSING_VALIDATION} //= '1';
         exec @cmd;
         die "Error: failed to exec program '$test': $!\n";
     }
@@ -129,7 +130,7 @@ for my $test (@tests) {
 
         if ($timeout_mode && time >= $deadline) {
             $timed_out = 1;
-            print ">> Timeout: closing $test after ${timeout_seconds}s\n";
+            print ">> Timeout reached for $test after ${timeout_seconds}s; closing as requested by --timeout\n";
             kill_child('TERM');
 
             my $kill_deadline = time + 2;

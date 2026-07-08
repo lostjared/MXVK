@@ -780,20 +780,26 @@ namespace mxvk {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = requirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            vkDestroyBuffer(windowPtr->getDevice(), buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to allocate buffer memory");
-        }
+        try {
+            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to allocate buffer memory");
+            }
 
-        if (vkBindBufferMemory(windowPtr->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-            vkDestroyBuffer(windowPtr->getDevice(), buffer, nullptr);
-            vkFreeMemory(windowPtr->getDevice(), bufferMemory, nullptr);
-            buffer = VK_NULL_HANDLE;
-            bufferMemory = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to bind buffer memory");
+            if (vkBindBufferMemory(windowPtr->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to bind buffer memory");
+            }
+        } catch (...) {
+            if (bufferMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(windowPtr->getDevice(), bufferMemory, nullptr);
+                bufferMemory = VK_NULL_HANDLE;
+            }
+            if (buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(windowPtr->getDevice(), buffer, nullptr);
+                buffer = VK_NULL_HANDLE;
+            }
+            throw;
         }
     }
 
@@ -888,20 +894,26 @@ namespace mxvk {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = requirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-            vkDestroyImage(windowPtr->getDevice(), image, nullptr);
-            image = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to allocate image memory");
-        }
+        try {
+            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+            if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to allocate image memory");
+            }
 
-        if (vkBindImageMemory(windowPtr->getDevice(), image, memory, 0) != VK_SUCCESS) {
-            vkDestroyImage(windowPtr->getDevice(), image, nullptr);
-            vkFreeMemory(windowPtr->getDevice(), memory, nullptr);
-            image = VK_NULL_HANDLE;
-            memory = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to bind image memory");
+            if (vkBindImageMemory(windowPtr->getDevice(), image, memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to bind image memory");
+            }
+        } catch (...) {
+            if (memory != VK_NULL_HANDLE) {
+                vkFreeMemory(windowPtr->getDevice(), memory, nullptr);
+                memory = VK_NULL_HANDLE;
+            }
+            if (image != VK_NULL_HANDLE) {
+                vkDestroyImage(windowPtr->getDevice(), image, nullptr);
+                image = VK_NULL_HANDLE;
+            }
+            throw;
         }
     }
 
@@ -994,19 +1006,26 @@ namespace mxvk {
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.pNext = &exportMemoryInfo;
         allocInfo.allocationSize = requirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &texture.memory) != VK_SUCCESS) {
-            vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
-            texture.image = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to allocate CUDA exportable texture memory");
-        }
-        if (vkBindImageMemory(windowPtr->getDevice(), texture.image, texture.memory, 0) != VK_SUCCESS) {
-            vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
-            vkFreeMemory(windowPtr->getDevice(), texture.memory, nullptr);
-            texture.image = VK_NULL_HANDLE;
-            texture.memory = VK_NULL_HANDLE;
-            throw mxvk::Exception("VKAbstractModel failed to bind CUDA exportable texture memory");
+        try {
+            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            if (vkAllocateMemory(windowPtr->getDevice(), &allocInfo, nullptr, &texture.memory) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to allocate CUDA exportable texture memory");
+            }
+            if (vkBindImageMemory(windowPtr->getDevice(), texture.image, texture.memory, 0) != VK_SUCCESS) {
+                throw mxvk::Exception("VKAbstractModel failed to bind CUDA exportable texture memory");
+            }
+        } catch (...) {
+            if (texture.memory != VK_NULL_HANDLE) {
+                vkFreeMemory(windowPtr->getDevice(), texture.memory, nullptr);
+                texture.memory = VK_NULL_HANDLE;
+            }
+            if (texture.image != VK_NULL_HANDLE) {
+                vkDestroyImage(windowPtr->getDevice(), texture.image, nullptr);
+                texture.image = VK_NULL_HANDLE;
+            }
+            texture.cudaExportMemorySize = 0;
+            throw;
         }
 
         texture.width = width;

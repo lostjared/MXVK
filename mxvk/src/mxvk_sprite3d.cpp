@@ -611,22 +611,45 @@ namespace mxvk {
                                    VkMemoryPropertyFlags properties,
                                    VkBuffer &buffer,
                                    VkDeviceMemory &bufferMemory) const {
+        VkBuffer newBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
         bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
 
-        VkMemoryRequirements memRequirements{};
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+        try {
+            VK_CHECK_RESULT(vkCreateBuffer(device, &bufferInfo, nullptr, &newBuffer));
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory));
-        VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+            VkMemoryRequirements memRequirements{};
+            vkGetBufferMemoryRequirements(device, newBuffer, &memRequirements);
+
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindBufferMemory(device, newBuffer, newMemory, 0));
+        } catch (...) {
+            if (newBuffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, newBuffer, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
+
+        if (buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, buffer, nullptr);
+        }
+        if (bufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, bufferMemory, nullptr);
+        }
+        buffer = newBuffer;
+        bufferMemory = newMemory;
     }
 
     uint32_t VK_Sprite3D::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
@@ -678,6 +701,9 @@ namespace mxvk {
                                   VkMemoryPropertyFlags properties,
                                   VkImage &image,
                                   VkDeviceMemory &imageMemory) const {
+        VkImage newImage = VK_NULL_HANDLE;
+        VkDeviceMemory newMemory = VK_NULL_HANDLE;
+
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -692,17 +718,37 @@ namespace mxvk {
         imageInfo.usage = usage;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
 
-        VkMemoryRequirements memRequirements{};
-        vkGetImageMemoryRequirements(device, image, &memRequirements);
+        try {
+            VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &newImage));
 
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-        VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
-        VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
+            VkMemoryRequirements memRequirements{};
+            vkGetImageMemoryRequirements(device, newImage, &memRequirements);
+
+            VkMemoryAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memRequirements.size;
+            allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+            VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &newMemory));
+            VK_CHECK_RESULT(vkBindImageMemory(device, newImage, newMemory, 0));
+        } catch (...) {
+            if (newImage != VK_NULL_HANDLE) {
+                vkDestroyImage(device, newImage, nullptr);
+            }
+            if (newMemory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, newMemory, nullptr);
+            }
+            throw;
+        }
+
+        if (image != VK_NULL_HANDLE) {
+            vkDestroyImage(device, image, nullptr);
+        }
+        if (imageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, imageMemory, nullptr);
+        }
+        image = newImage;
+        imageMemory = newMemory;
     }
 
     VkImageView VK_Sprite3D::createImageView(VkImage image, VkFormat format) const {

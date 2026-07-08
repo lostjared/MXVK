@@ -693,20 +693,26 @@ namespace walk {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
-                buffer = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to allocate raw pillar buffer memory");
-            }
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to allocate raw pillar buffer memory");
+                }
 
-            if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
-                vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
-                buffer = VK_NULL_HANDLE;
-                bufferMemory = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to bind raw pillar buffer memory");
+                if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to bind raw pillar buffer memory");
+                }
+            } catch (...) {
+                if (bufferMemory != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
+                    bufferMemory = VK_NULL_HANDLE;
+                }
+                if (buffer != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(window->getDevice(), buffer, nullptr);
+                    buffer = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 
@@ -743,20 +749,26 @@ namespace walk {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                vkDestroyImage(window->getDevice(), image, nullptr);
-                image = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to allocate raw pillar image memory");
-            }
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to allocate raw pillar image memory");
+                }
 
-            if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
-                vkDestroyImage(window->getDevice(), image, nullptr);
-                vkFreeMemory(window->getDevice(), memory, nullptr);
-                image = VK_NULL_HANDLE;
-                memory = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to bind raw pillar image memory");
+                if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to bind raw pillar image memory");
+                }
+            } catch (...) {
+                if (memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), memory, nullptr);
+                    memory = VK_NULL_HANDLE;
+                }
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(window->getDevice(), image, nullptr);
+                    image = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 
@@ -1673,20 +1685,26 @@ namespace walk {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
-                buffer = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to allocate raw wall buffer memory");
-            }
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to allocate raw wall buffer memory");
+                }
 
-            if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
-                vkDestroyBuffer(window->getDevice(), buffer, nullptr);
-                vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
-                buffer = VK_NULL_HANDLE;
-                bufferMemory = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to bind raw wall buffer memory");
+                if (vkBindBufferMemory(window->getDevice(), buffer, bufferMemory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to bind raw wall buffer memory");
+                }
+            } catch (...) {
+                if (bufferMemory != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), bufferMemory, nullptr);
+                    bufferMemory = VK_NULL_HANDLE;
+                }
+                if (buffer != VK_NULL_HANDLE) {
+                    vkDestroyBuffer(window->getDevice(), buffer, nullptr);
+                    buffer = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 
@@ -2223,20 +2241,26 @@ namespace walk {
             VkMemoryAllocateInfo allocInfo{};
             allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
             allocInfo.allocationSize = requirements.size;
-            allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
 
-            if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-                vkDestroyImage(window->getDevice(), image, nullptr);
-                image = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to allocate raw wall image memory");
-            }
+            try {
+                allocInfo.memoryTypeIndex = findMemoryType(requirements.memoryTypeBits, properties);
+                if (vkAllocateMemory(window->getDevice(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to allocate raw wall image memory");
+                }
 
-            if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
-                vkDestroyImage(window->getDevice(), image, nullptr);
-                vkFreeMemory(window->getDevice(), memory, nullptr);
-                image = VK_NULL_HANDLE;
-                memory = VK_NULL_HANDLE;
-                throw mxvk::Exception("walk: failed to bind raw wall image memory");
+                if (vkBindImageMemory(window->getDevice(), image, memory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to bind raw wall image memory");
+                }
+            } catch (...) {
+                if (memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(window->getDevice(), memory, nullptr);
+                    memory = VK_NULL_HANDLE;
+                }
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(window->getDevice(), image, nullptr);
+                    image = VK_NULL_HANDLE;
+                }
+                throw;
             }
         }
 
@@ -3196,32 +3220,38 @@ namespace walk {
                 throw mxvk::Exception("walk: render resources unavailable for point particles");
             }
 
-            VkBufferCreateInfo bufferInfo{};
-            bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufferInfo.size = maxPointVertices * sizeof(ParticlePointVertex);
-            bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            if (vkCreateBuffer(getDevice(), &bufferInfo, nullptr, &pointVertexBuffer) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to create point particle vertex buffer");
-            }
+            destroyPointParticles();
+            try {
+                VkBufferCreateInfo bufferInfo{};
+                bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+                bufferInfo.size = maxPointVertices * sizeof(ParticlePointVertex);
+                bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+                bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                if (vkCreateBuffer(getDevice(), &bufferInfo, nullptr, &pointVertexBuffer) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to create point particle vertex buffer");
+                }
 
-            VkMemoryRequirements memReq{};
-            vkGetBufferMemoryRequirements(getDevice(), pointVertexBuffer, &memReq);
-            VkMemoryAllocateInfo allocInfo{};
-            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            allocInfo.allocationSize = memReq.size;
-            allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-            if (vkAllocateMemory(getDevice(), &allocInfo, nullptr, &pointVertexMemory) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to allocate point particle vertex memory");
-            }
-            if (vkBindBufferMemory(getDevice(), pointVertexBuffer, pointVertexMemory, 0) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to bind point particle vertex memory");
-            }
-            if (vkMapMemory(getDevice(), pointVertexMemory, 0, bufferInfo.size, 0, &pointVertexMapped) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to map point particle vertex memory");
-            }
+                VkMemoryRequirements memReq{};
+                vkGetBufferMemoryRequirements(getDevice(), pointVertexBuffer, &memReq);
+                VkMemoryAllocateInfo allocInfo{};
+                allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocInfo.allocationSize = memReq.size;
+                allocInfo.memoryTypeIndex = findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                if (vkAllocateMemory(getDevice(), &allocInfo, nullptr, &pointVertexMemory) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to allocate point particle vertex memory");
+                }
+                if (vkBindBufferMemory(getDevice(), pointVertexBuffer, pointVertexMemory, 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to bind point particle vertex memory");
+                }
+                if (vkMapMemory(getDevice(), pointVertexMemory, 0, bufferInfo.size, 0, &pointVertexMapped) != VK_SUCCESS) {
+                    throw mxvk::Exception("walk: failed to map point particle vertex memory");
+                }
 
-            rebuildPointParticlePipeline();
+                rebuildPointParticlePipeline();
+            } catch (...) {
+                destroyPointParticles();
+                throw;
+            }
         }
 
         void rebuildPointParticlePipeline() {
