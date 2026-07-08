@@ -7,7 +7,7 @@
 
 DOXYFILE_ENCODING       = UTF-8
 PROJECT_NAME            = "MXVK Vulkan Framework"
-PROJECT_NUMBER          = "0.18.0"
+PROJECT_NUMBER          = "0.19.0"
 PROJECT_BRIEF           = "C++20 Vulkan rendering framework for practical 2D and 3D application development with SDL3."
 OUTPUT_DIRECTORY        = docs/doxygen
 CREATE_SUBDIRS          = YES

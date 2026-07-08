@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.16.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, and a `walk_post` first-person sample for browsing full-screen post-processing shaders.
+Current development is on version `0.19.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, and a `walk_post` first-person sample for browsing full-screen post-processing shaders.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
