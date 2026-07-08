@@ -418,8 +418,6 @@ namespace matrix {
 
         if (rain_sprite == nullptr) {
             rain_sprite = window.createSprite(canvas.get());
-        } else {
-            rain_sprite->updateTexture(canvas.get());
         }
 
         if (resized || streams.empty()) {

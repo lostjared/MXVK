@@ -395,37 +395,43 @@ namespace mxvk {
         }
 
         BufferResource staging{};
-        create_buffer(context,
-                      image_size,
-                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                      staging);
-        map_buffer(context.device, staging);
-        std::memcpy(staging.mapped, tight_pixels.data(), tight_pixels.size());
-        unmap_buffer(context.device, staging);
+        try {
+            create_buffer(context,
+                          image_size,
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                          staging);
+            map_buffer(context.device, staging);
+            std::memcpy(staging.mapped, tight_pixels.data(), tight_pixels.size());
+            unmap_buffer(context.device, staging);
 
-        create_image(context,
-                     width,
-                     height,
-                     format,
-                     VK_IMAGE_TILING_OPTIMAL,
-                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     texture.image,
-                     texture.memory);
+            create_image(context,
+                         width,
+                         height,
+                         format,
+                         VK_IMAGE_TILING_OPTIMAL,
+                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                         texture.image,
+                         texture.memory);
 
-        const VkCommandBuffer cmd = begin_one_time_commands(context);
-        transition_image_layout(cmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copy_buffer_to_image(cmd, staging.buffer, texture.image, width, height);
-        transition_image_layout(cmd, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        end_one_time_commands(context, cmd);
+            const VkCommandBuffer cmd = begin_one_time_commands(context);
+            transition_image_layout(cmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            copy_buffer_to_image(cmd, staging.buffer, texture.image, width, height);
+            transition_image_layout(cmd, texture.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            end_one_time_commands(context, cmd);
 
-        destroy_buffer(context.device, staging);
+            destroy_buffer(context.device, staging);
 
-        texture.view = create_image_view(context.device, texture.image, format, VK_IMAGE_ASPECT_COLOR_BIT);
-        create_sampler(context.device, texture);
-        texture.width = width;
-        texture.height = height;
+            texture.view = create_image_view(context.device, texture.image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+            create_sampler(context.device, texture);
+            texture.width = width;
+            texture.height = height;
+        } catch (...) {
+            destroy_buffer(context.device, staging);
+            destroy_texture(context.device, texture);
+            throw;
+        }
     }
 
     void create_texture_from_png(const VulkanContext &context,

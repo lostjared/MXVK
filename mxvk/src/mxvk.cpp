@@ -1076,6 +1076,18 @@ namespace mxvk {
             std::cout << "SDL3: video/gamepad subsystems initialized\n";
         }
 
+        const bool fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+        const SDL_DisplayMode *fullscreen_mode = nullptr;
+        if (fullscreen) {
+            const SDL_DisplayID display = SDL_GetPrimaryDisplay();
+            fullscreen_mode = display != 0 ? SDL_GetCurrentDisplayMode(display) : nullptr;
+            if (fullscreen_mode != nullptr && fullscreen_mode->w > 0 && fullscreen_mode->h > 0) {
+                width = fullscreen_mode->w;
+                height = fullscreen_mode->h;
+                std::cout << std::format("SDL3: using current display mode for fullscreen window: {}x{}\n", width, height);
+            }
+        }
+
         std::cout << "SDL3: creating SDL window with Vulkan capability\n";
         SDL_Window *raw_window = SDL_CreateWindow(title.c_str(), width, height, flags);
         if (raw_window == nullptr) {
@@ -1087,8 +1099,26 @@ namespace mxvk {
         }
 
         window.reset(raw_window);
+        if (fullscreen && fullscreen_mode != nullptr && !SDL_SetWindowFullscreenMode(window.get(), fullscreen_mode)) {
+            std::cerr << std::format("mxvk: SDL_SetWindowFullscreenMode failed: {}\n", SDL_GetError());
+        }
         std::cout << "SDL3: showing created window\n";
         SDL_ShowWindow(window.get());
+        if (fullscreen && !SDL_SyncWindow(window.get())) {
+            std::cerr << std::format("mxvk: SDL_SyncWindow failed after fullscreen show: {}\n", SDL_GetError());
+        }
+        if (fullscreen) {
+            for (int attempt = 0; attempt < 50; ++attempt) {
+                int pixel_width = 0;
+                int pixel_height = 0;
+                SDL_GetWindowSizeInPixels(window.get(), &pixel_width, &pixel_height);
+                if (pixel_width == width && pixel_height == height) {
+                    break;
+                }
+                SDL_PumpEvents();
+                SDL_Delay(10);
+            }
+        }
         std::cout << "mxvk: initWindow complete\n";
         return true;
     }
