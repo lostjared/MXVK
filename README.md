@@ -255,6 +255,10 @@ Examples:
 ./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl planet
 ./run.pl surface
+./run.pl stencil_surface
+./run.pl stencil
+./run.pl bluesky
+./run.pl fire
 ./run.pl pointsprite
 ./run.pl fireworks
 ./run.pl starfield
@@ -363,6 +367,7 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 - `skeleton` - smallest practical subclass of `mxvk::VK_Window`, intended as a copyable starting point for new examples. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `surface` - SDL surface upload smoke test that fills a CPU-side surface with random pixels, uploads it to an MXVK sprite each frame, and redraws it after resize. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
+- `stencil_surface` - SDL surface upload demo that fills a CPU-side star mask with randomized color, uploads it to an MXVK sprite, and redraws it after resize. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
 - `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
 - `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `rain` - static helper library used by Matrix-style examples to render configurable glyph rain into an SDL surface and MXVK sprite texture. It is not launched directly through `run.pl`.
@@ -381,7 +386,9 @@ These programs are not intended as standalone applications. They are small visua
 - `matrix` - Matrix-style digital rain rendered from `SDL_ttf` glyphs and a sprite-backed framebuffer. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the streams, `Escape` quits.
 - `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the rain, arrow keys orbit the camera, `Page Up` / `Page Down` zoom, `Escape` quits.
 - `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel zoom, drag pan, `W` / `A` / `S` / `D` or arrow keys pan, `Z` / `X` continuous zoom, `1` / `2` / `3` presets, `+` / `=` and `-` iteration count, `[` / `]` palette, `R` reset, `Escape` quit.
+- `fire` - full-screen procedural fire shader driven through the `VK_Window` post-processing path. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel adjusts shader zoom, `Escape` quits.
 - `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `stencil` - `VK_Stencil` demo that writes a shader-generated mask into a stencil attachment, then fills only the masked region with a second shader pass. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
 - `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
 - `pointsprite` - direct `mxvk::VK_PointSpriteBatch` sample that renders many Tux sprites as point primitives and grows the active point count at runtime. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** hold `Space` to add sprites, `Enter` resets to the default count and size, `Page Up` / `Page Down` adjust sprite size, `Escape` quits.
@@ -393,6 +400,7 @@ These programs are not intended as standalone applications. They are small visua
 - `viewer` - general-purpose model inspection renderer for OBJ, MXMOD, and compressed MXMOD assets. It defaults to `cube.mxmod.z`, accepts `--filename`, `--texture`, `--resource_path`, `--shader-path`, and common window arguments, and is the backend launched by the Qt `model_viewer` app. **Controls:** left mouse drag or arrow keys rotate, mouse wheel / `+` / `-` / `A` / `S` zoom, `W` toggles wireframe, `R` or `P` toggles auto-rotate, `H` or `Space` toggles help, `Home` resets the view, `Escape` quits.
 - `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. By default it loads `data/pyramid.obj` from the example asset directory. `--filename` overrides the model file, `--resource` can point at a texture manifest, `--resource_path` can override the texture lookup directory, and `--binary` replaces the model's texture with animated Matrix-style green rain while also enabling the skybox toggle. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, `--resource_path`, and `--binary`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Enter` toggles skybox mode when `--binary` is enabled, `W/A/S/D` look around inside the skybox view, `Escape` quits.
 - `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging. **Inputs:** common `-p`, `-r`, `-f`, `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
+- `bluesky` - procedural water and sky scene that renders a large indexed water grid with custom Vulkan buffers and shaders. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` orbit, `Up` / `Page Up` zoom in, `Down` / `Page Down` zoom out, `Escape` quits.
 - `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
 - `starship` - ship viewer with Phong shading, a moving starfield, and exhaust effects. **Inputs:** common `-p`, `-r`, `-f`, plus the example asset set. **Controls:** mouse drag rotates the ship, `Escape` quits.
