@@ -3,6 +3,7 @@
 layout(push_constant) uniform PushConstants {
     mat4 u_viewProjection;
     vec4 u_cameraTime;
+    vec4 u_viewport;
 } pc;
 
 layout(location = 0) in vec3 v_worldPos;

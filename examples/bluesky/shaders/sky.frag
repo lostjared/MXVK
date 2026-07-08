@@ -3,6 +3,7 @@
 layout(push_constant) uniform PushConstants {
     mat4 u_viewProjection;
     vec4 u_cameraTime;
+    vec4 u_viewport;
 } pc;
 
 layout(location = 0) in vec2 v_uv;
@@ -88,7 +89,12 @@ float cloudLayer(vec2 uv, float time) {
 
 void main() {
     float time = pc.u_cameraTime.w;
-    vec2 skyUv = vec2(v_uv.x, 1.0 - v_uv.y);
+    float viewportAspect = max(pc.u_viewport.x, 0.0001);
+    float referenceAspect = max(pc.u_viewport.y, 0.0001);
+    vec2 skyScale = viewportAspect < referenceAspect
+        ? vec2(viewportAspect / referenceAspect, 1.0)
+        : vec2(1.0, referenceAspect / viewportAspect);
+    vec2 skyUv = (vec2(v_uv.x, 1.0 - v_uv.y) - vec2(0.5)) * skyScale + vec2(0.5);
     vec3 horizon = vec3(0.62, 0.84, 1.0);
     vec3 zenith = vec3(0.04, 0.25, 0.70);
     vec3 sky = mix(horizon, zenith, pow(smoothstep(0.0, 1.0, skyUv.y), 0.75));

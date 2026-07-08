@@ -8,6 +8,7 @@ layout(location = 3) in vec4 a_color;
 layout(push_constant) uniform PushConstants {
     mat4 u_viewProjection;
     vec4 u_cameraTime;
+    vec4 u_viewport;
 } pc;
 
 layout(location = 0) out vec3 v_worldPos;

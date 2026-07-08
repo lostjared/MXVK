@@ -49,10 +49,12 @@ namespace {
     struct PushConstants {
         alignas(16) glm::mat4 viewProjection{1.0f};
         alignas(16) glm::vec4 cameraTime{0.0f};
+        alignas(16) glm::vec4 viewport{1.0f};
     };
 
     constexpr int WATER_GRID_RESOLUTION = 2048;
     constexpr float WATER_SIZE = 320.0f;
+    constexpr float SCENE_REFERENCE_ASPECT = 16.0f / 9.0f;
 
     void check_vk(VkResult result, const std::string &message) {
         if (result != VK_SUCCESS) {
@@ -156,6 +158,7 @@ namespace example {
             const PushConstants push_constants{
                 projection * view,
                 glm::vec4(camera_pos, elapsed_seconds),
+                glm::vec4(aspect, SCENE_REFERENCE_ASPECT, 0.0f, 0.0f),
             };
 
             drawSky(cmd, sky_pipeline, push_constants);
