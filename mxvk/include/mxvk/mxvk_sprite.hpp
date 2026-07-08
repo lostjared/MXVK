@@ -371,7 +371,6 @@ namespace mxvk {
         bool cudaImageNeedsShaderBarrier = false;
         VkImageLayout cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 #endif
-        VkShaderModule createShaderModule(const std::vector<char> &code);
         std::vector<char> readShaderFile(const std::string &filename);
 
         struct SpriteExtendedUBO {

@@ -2,12 +2,12 @@
 
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstring>
 #include <format>
-#include <fstream>
 
 namespace mxvk {
 
@@ -318,11 +318,11 @@ namespace mxvk {
 
         const std::vector<char> vert_code = read_shader_file(vertex_shader_path);
         const std::vector<char> frag_code = read_shader_file(fragment_shader_path);
-        const VkShaderModule vert_module = create_shader_module(vert_code);
+        const VkShaderModule vert_module = mxvk::create_shader_module(context.device, vert_code);
         VkShaderModule frag_module = VK_NULL_HANDLE;
 
         try {
-            frag_module = create_shader_module(frag_code);
+            frag_module = mxvk::create_shader_module(context.device, frag_code);
 
             VkPipelineShaderStageCreateInfo vert_stage{};
             vert_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -474,33 +474,7 @@ namespace mxvk {
     }
 
     std::vector<char> VK_PointSpriteBatch::read_shader_file(const std::string &path) const {
-        std::ifstream file(path, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) {
-            throw mxvk::Exception(std::format("failed to open point-sprite shader: {}", path));
-        }
-
-        const std::streamsize size = file.tellg();
-        if (size <= 0) {
-            throw mxvk::Exception(std::format("point-sprite shader is empty: {}", path));
-        }
-
-        std::vector<char> buffer(static_cast<size_t>(size));
-        file.seekg(0);
-        file.read(buffer.data(), size);
-        return buffer;
-    }
-
-    VkShaderModule VK_PointSpriteBatch::create_shader_module(const std::vector<char> &code) const {
-        VkShaderModuleCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        create_info.codeSize = code.size();
-        create_info.pCode = reinterpret_cast<const uint32_t *>(code.data());
-
-        VkShaderModule module = VK_NULL_HANDLE;
-        if (vkCreateShaderModule(context.device, &create_info, nullptr, &module) != VK_SUCCESS) {
-            throw mxvk::Exception("failed to create point-sprite shader module");
-        }
-        return module;
+        return mxvk::load_spv(path);
     }
 
 } // namespace mxvk

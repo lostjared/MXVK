@@ -26,6 +26,7 @@
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_io_window.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 
 namespace walk {
 
@@ -662,19 +663,6 @@ namespace walk {
         }
 
       private:
-        [[nodiscard]] static VkShaderModule createShaderModule(VkDevice device, const std::vector<char> &spvBytes) {
-            VkShaderModuleCreateInfo createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            createInfo.codeSize = spvBytes.size();
-            createInfo.pCode = reinterpret_cast<const uint32_t *>(spvBytes.data());
-
-            VkShaderModule module = VK_NULL_HANDLE;
-            if (vkCreateShaderModule(device, &createInfo, nullptr, &module) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to create raw pillar shader module");
-            }
-            return module;
-        }
-
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
             VkPhysicalDeviceMemoryProperties memProperties{};
             vkGetPhysicalDeviceMemoryProperties(window->getPhysicalDevice(), &memProperties);
@@ -1042,8 +1030,8 @@ namespace walk {
                 return;
             }
 
-            const VkShaderModule vertModule = createShaderModule(window->getDevice(), vertexSpv);
-            const VkShaderModule fragModule = createShaderModule(window->getDevice(), fragmentSpv);
+            const VkShaderModule vertModule = mxvk::create_shader_module(window->getDevice(), vertexSpv);
+            const VkShaderModule fragModule = mxvk::create_shader_module(window->getDevice(), fragmentSpv);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1655,19 +1643,6 @@ namespace walk {
         }
 
       private:
-        [[nodiscard]] VkShaderModule createShaderModule(VkDevice device, const std::vector<char> &spvBytes) const {
-            VkShaderModuleCreateInfo createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            createInfo.codeSize = spvBytes.size();
-            createInfo.pCode = reinterpret_cast<const uint32_t *>(spvBytes.data());
-
-            VkShaderModule module = VK_NULL_HANDLE;
-            if (vkCreateShaderModule(device, &createInfo, nullptr, &module) != VK_SUCCESS) {
-                throw mxvk::Exception("walk: failed to create raw wall shader module");
-            }
-            return module;
-        }
-
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const {
             VkPhysicalDeviceMemoryProperties memProperties{};
             vkGetPhysicalDeviceMemoryProperties(window->getPhysicalDevice(), &memProperties);
@@ -1969,8 +1944,8 @@ namespace walk {
                 return;
             }
 
-            const VkShaderModule vertModule = createShaderModule(window->getDevice(), vertSpv);
-            const VkShaderModule fragModule = createShaderModule(window->getDevice(), fragSpv);
+            const VkShaderModule vertModule = mxvk::create_shader_module(window->getDevice(), vertSpv);
+            const VkShaderModule fragModule = mxvk::create_shader_module(window->getDevice(), fragSpv);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -3463,8 +3438,8 @@ namespace walk {
 
             const std::vector<char> vertBytes = loadSpv(pointParticleVertSpv);
             const std::vector<char> fragBytes = loadSpv(pointParticleFragSpv);
-            const VkShaderModule vertModule = createShaderModule(getDevice(), vertBytes);
-            const VkShaderModule fragModule = createShaderModule(getDevice(), fragBytes);
+            const VkShaderModule vertModule = mxvk::create_shader_module(getDevice(), vertBytes);
+            const VkShaderModule fragModule = mxvk::create_shader_module(getDevice(), fragBytes);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

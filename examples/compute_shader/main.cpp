@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_cv.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 #if defined(MXVK_WITH_FFMPEG_CAPTURE)
 #include "mxvk/mxvk_ff_capture.hpp"
 #endif
@@ -18,7 +19,6 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <string_view>
@@ -1395,22 +1395,8 @@ class ComputeWindow : public mxvk::VK_Window {
 
     void buildComputePipeline() {
         const std::string spvPath = assetRoot + "/data/" + spvFiles[currentSpvIndex];
-        std::ifstream spvFile(spvPath, std::ios::binary | std::ios::ate);
-        if (!spvFile.is_open()) {
-            throw mxvk::Exception("Cannot open compute SPIR-V: " + spvPath);
-        }
-
-        const size_t size = static_cast<size_t>(spvFile.tellg());
-        std::vector<char> spv(size);
-        spvFile.seekg(0);
-        spvFile.read(spv.data(), static_cast<std::streamsize>(size));
-
-        VkShaderModuleCreateInfo moduleInfo{};
-        moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        moduleInfo.codeSize = spv.size();
-        moduleInfo.pCode = reinterpret_cast<const uint32_t *>(spv.data());
-        VkShaderModule module = VK_NULL_HANDLE;
-        VK_CHECK_RESULT(vkCreateShaderModule(device, &moduleInfo, nullptr, &module));
+        const std::vector<char> spv = mxvk::load_spv(spvPath);
+        VkShaderModule module = mxvk::create_shader_module(device, spv);
 
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -1498,25 +1484,11 @@ class ComputeWindow : public mxvk::VK_Window {
         for (const std::string &path : candidates) {
             std::ifstream file(path, std::ios::binary);
             if (file.is_open()) {
-                std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-                if (!bytes.empty()) {
-                    return bytes;
-                }
+                return mxvk::load_spv(path);
             }
         }
 
         throw mxvk::Exception("Cannot open compute display shader: " + name);
-    }
-
-    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<char> &bytes) const {
-        VkShaderModuleCreateInfo info{};
-        info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        info.codeSize = bytes.size();
-        info.pCode = reinterpret_cast<const uint32_t *>(bytes.data());
-
-        VkShaderModule module = VK_NULL_HANDLE;
-        VK_CHECK_RESULT(vkCreateShaderModule(device, &info, nullptr, &module));
-        return module;
     }
 
     void createDisplayBuffers() {
@@ -1624,8 +1596,8 @@ class ComputeWindow : public mxvk::VK_Window {
             return;
         }
 
-        const VkShaderModule vertModule = createShaderModule(readDisplayShader("sprite.vert.spv"));
-        const VkShaderModule fragModule = createShaderModule(readDisplayShader("sprite.frag.spv"));
+        const VkShaderModule vertModule = mxvk::create_shader_module(device, readDisplayShader("sprite.vert.spv"));
+        const VkShaderModule fragModule = mxvk::create_shader_module(device, readDisplayShader("sprite.frag.spv"));
 
         VkPipelineShaderStageCreateInfo vertStage{};
         vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

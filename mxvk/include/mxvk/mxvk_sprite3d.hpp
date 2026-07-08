@@ -276,8 +276,6 @@ namespace mxvk {
         [[nodiscard]] SDL_Surface *convertToRGBA(SDL_Surface *surface) const;
         /** @brief Read a SPIR-V shader file from disk. */
         [[nodiscard]] std::vector<char> readShaderFile(const std::string &path) const;
-        /** @brief Create a Vulkan shader module from SPIR-V bytecode. */
-        [[nodiscard]] VkShaderModule createShaderModule(const std::vector<char> &code) const;
     };
 
 } // namespace mxvk

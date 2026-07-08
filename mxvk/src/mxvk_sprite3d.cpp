@@ -3,6 +3,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 
 #include <algorithm>
 #include <array>
@@ -413,8 +414,8 @@ namespace mxvk {
 
         auto vertCode = readShaderFile(vertexShaderPath);
         auto fragCode = readShaderFile(fragmentShaderPath);
-        VkShaderModule vertModule = createShaderModule(vertCode);
-        VkShaderModule fragModule = createShaderModule(fragCode);
+        VkShaderModule vertModule = mxvk::create_shader_module(device, vertCode);
+        VkShaderModule fragModule = mxvk::create_shader_module(device, fragCode);
 
         VkPipelineShaderStageCreateInfo vertStage{};
         vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -787,17 +788,6 @@ namespace mxvk {
         file.seekg(0);
         file.read(buffer.data(), fileSize);
         return buffer;
-    }
-
-    VkShaderModule VK_Sprite3D::createShaderModule(const std::vector<char> &code) const {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
-
-        VkShaderModule shaderModule = VK_NULL_HANDLE;
-        VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));
-        return shaderModule;
     }
 
 } // namespace mxvk

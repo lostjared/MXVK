@@ -5,6 +5,7 @@
 
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 
 #include <algorithm>
 #include <array>
@@ -28,39 +29,6 @@ namespace mxvk {
             if (important) {
                 std::cout << "mxvk_abstract_model: " << message << '\n';
             }
-        }
-
-        [[nodiscard]] std::vector<char> readBinaryFile(const std::string &path) {
-            if (path.empty()) {
-                throw mxvk::Exception("Shader path is empty");
-            }
-
-            std::ifstream file(path, std::ios::binary);
-            if (!file.is_open()) {
-                throw mxvk::Exception("Failed to open shader file: " + path);
-            }
-
-            std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            if (bytes.empty()) {
-                throw mxvk::Exception("Shader file is empty: " + path);
-            }
-            if ((bytes.size() % 4U) != 0U) {
-                throw mxvk::Exception("Shader file is not 4-byte aligned: " + path);
-            }
-            return bytes;
-        }
-
-        [[nodiscard]] VkShaderModule createShaderModule(VkDevice device, const std::vector<char> &spvBytes) {
-            VkShaderModuleCreateInfo createInfo{};
-            createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            createInfo.codeSize = spvBytes.size();
-            createInfo.pCode = reinterpret_cast<const uint32_t *>(spvBytes.data());
-
-            VkShaderModule module = VK_NULL_HANDLE;
-            if (vkCreateShaderModule(device, &createInfo, nullptr, &module) != VK_SUCCESS) {
-                throw mxvk::Exception("Failed to create shader module");
-            }
-            return module;
         }
 
         [[nodiscard]] std::string parseMTLTexturePath(std::istream &stream) {
@@ -1656,14 +1624,14 @@ namespace mxvk {
             return;
         }
 
-        const std::vector<char> vertBytes = readBinaryFile(vertexShaderPath);
-        const std::vector<char> fragBytes = readBinaryFile(fragmentShaderPath);
+        const std::vector<char> vertBytes = mxvk::load_spv(vertexShaderPath);
+        const std::vector<char> fragBytes = mxvk::load_spv(fragmentShaderPath);
 
-        const VkShaderModule vertModule = createShaderModule(windowPtr->getDevice(), vertBytes);
+        const VkShaderModule vertModule = mxvk::create_shader_module(windowPtr->getDevice(), vertBytes);
         VkShaderModule fragModule = VK_NULL_HANDLE;
 
         try {
-            fragModule = createShaderModule(windowPtr->getDevice(), fragBytes);
+            fragModule = mxvk::create_shader_module(windowPtr->getDevice(), fragBytes);
 
             VkPipelineShaderStageCreateInfo vertStage{};
             vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

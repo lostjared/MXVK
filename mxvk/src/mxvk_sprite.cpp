@@ -5,6 +5,7 @@
 #include "mxvk/mxvk_sprite.hpp"
 #include "mxvk/mxvk_opencv_compat.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <limits>
@@ -462,8 +463,8 @@ namespace mxvk {
 
         auto vertShaderCode = readShaderFile(vertPath);
         auto fragShaderCode = readShaderFile(fragPath);
-        VkShaderModule vertModule = createShaderModule(vertShaderCode);
-        VkShaderModule fragModule = createShaderModule(fragShaderCode);
+        VkShaderModule vertModule = mxvk::create_shader_module(device, vertShaderCode);
+        VkShaderModule fragModule = mxvk::create_shader_module(device, fragShaderCode);
 
         VkPipelineShaderStageCreateInfo vertStageInfo{};
         vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -633,7 +634,7 @@ namespace mxvk {
 
         std::string vertPath = vertexShaderPath.empty() ? "sprite.vert.spv" : vertexShaderPath;
         auto vertShaderCode = readShaderFile(vertPath);
-        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        VkShaderModule vertShaderModule = mxvk::create_shader_module(device, vertShaderCode);
 
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -805,7 +806,7 @@ namespace mxvk {
         }
 
         const auto shaderCode = readShaderFile(fragmentShaderPath);
-        fragmentShaderModule = createShaderModule(shaderCode);
+        fragmentShaderModule = mxvk::create_shader_module(device, shaderCode);
         hasCustomShader = true;
 
         if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
@@ -881,7 +882,7 @@ namespace mxvk {
         createQuadBuffer();
         if (!fragmentShaderPath.empty()) {
             auto shaderCode = readShaderFile(fragmentShaderPath);
-            fragmentShaderModule = createShaderModule(shaderCode);
+            fragmentShaderModule = mxvk::create_shader_module(device, shaderCode);
             hasCustomShader = true;
             this->fragmentShaderPath = fragmentShaderPath;
 
@@ -954,7 +955,7 @@ namespace mxvk {
 
         if (!fragmentShaderPath.empty()) {
             auto shaderCode = readShaderFile(fragmentShaderPath);
-            fragmentShaderModule = createShaderModule(shaderCode);
+            fragmentShaderModule = mxvk::create_shader_module(device, shaderCode);
             hasCustomShader = true;
             this->fragmentShaderPath = fragmentShaderPath;
 
@@ -2097,17 +2098,6 @@ namespace mxvk {
         file.close();
 
         return buffer;
-    }
-
-    VkShaderModule VK_Sprite::createShaderModule(const std::vector<char> &code) {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
-
-        VkShaderModule shaderModule;
-        VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule));
-        return shaderModule;
     }
 
 } // namespace mxvk

@@ -1,51 +1,12 @@
 #include "mxvk/mxvk_stencil.hpp"
 
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 
 #include <array>
-#include <fstream>
-#include <iterator>
 #include <vector>
 
 namespace mxvk {
-    namespace {
-        /**
-         * @brief Load a SPIR-V file and validate basic shader bytecode constraints.
-         * @param path Path to a .spv file.
-         * @return Raw SPIR-V bytes.
-         */
-        std::vector<char> load_spv(const std::string &path) {
-            std::ifstream file(path, std::ios::binary);
-            if (!file.is_open()) {
-                throw mxvk::Exception("failed to open stencil SPIR-V shader");
-            }
-            const std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            if (bytes.empty() || (bytes.size() % 4U) != 0U) {
-                throw mxvk::Exception("invalid stencil SPIR-V shader");
-            }
-            return bytes;
-        }
-
-        /**
-         * @brief Create a Vulkan shader module from validated SPIR-V bytes.
-         * @param device Logical device that will own the shader module.
-         * @param bytes 4-byte-aligned SPIR-V bytecode.
-         * @return Created shader module handle.
-         */
-        VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &bytes) {
-            VkShaderModuleCreateInfo info{};
-            info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            info.codeSize = bytes.size();
-            info.pCode = reinterpret_cast<const uint32_t *>(bytes.data());
-
-            VkShaderModule module = VK_NULL_HANDLE;
-            if (vkCreateShaderModule(device, &info, nullptr, &module) != VK_SUCCESS) {
-                throw mxvk::Exception("failed to create stencil shader module");
-            }
-            return module;
-        }
-    } // namespace
-
     VK_Stencil::~VK_Stencil() {
         destroy();
     }

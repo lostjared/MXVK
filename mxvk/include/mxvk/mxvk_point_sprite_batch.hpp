@@ -171,9 +171,6 @@ namespace mxvk {
         void destroy_pipeline();
         /** @brief Read a SPIR-V shader file into memory. */
         [[nodiscard]] std::vector<char> read_shader_file(const std::string &path) const;
-        /** @brief Create a shader module from SPIR-V bytecode. */
-        [[nodiscard]] VkShaderModule create_shader_module(const std::vector<char> &code) const;
-
         /** @brief Vulkan handles required for allocation, upload, and draw resource creation. */
         VulkanContext context{};
         /** @brief Persistent pipeline cache borrowed from VK_Window. */

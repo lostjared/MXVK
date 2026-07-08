@@ -1,6 +1,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
+#include "mxvk/mxvk_shader_module.hpp"
 #include <SDL3/SDL_oldnames.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_vulkan.h>
@@ -122,45 +123,11 @@ namespace mxvk {
     }
 
     std::vector<char> VK_Window::loadSpv(const std::string &path) {
-        if (path.empty()) {
-            throw mxvk::Exception("SPIR-V path is empty");
-        }
-
-        std::ifstream file(path, std::ios::binary);
-        if (!file.is_open()) {
-            throw mxvk::Exception("Failed to open SPIR-V file");
-        }
-
-        const std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        if (bytes.empty()) {
-            throw mxvk::Exception("SPIR-V file is empty");
-        }
-        if ((bytes.size() % 4U) != 0U) {
-            throw mxvk::Exception("SPIR-V file size is not 4-byte aligned");
-        }
-
-        return bytes;
+        return mxvk::load_spv(path);
     }
 
     VkShaderModule VK_Window::createShaderModule(VkDevice device, const std::vector<char> &spv_bytes) {
-        if (device == VK_NULL_HANDLE) {
-            throw mxvk::Exception("Cannot create shader module with a null device");
-        }
-        if (spv_bytes.empty() || (spv_bytes.size() % 4U) != 0U) {
-            throw mxvk::Exception("Invalid SPIR-V shader data");
-        }
-
-        VkShaderModuleCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        create_info.codeSize = spv_bytes.size();
-        create_info.pCode = reinterpret_cast<const uint32_t *>(spv_bytes.data());
-
-        VkShaderModule module = VK_NULL_HANDLE;
-        if (vkCreateShaderModule(device, &create_info, nullptr, &module) != VK_SUCCESS) {
-            throw mxvk::Exception("Failed to create shader module");
-        }
-
-        return module;
+        return mxvk::create_shader_module(device, spv_bytes);
     }
 
     std::string VK_Window::resolveRuntimeShaderPath(const std::string &shaderFileName, const char *fallbackDir) const {

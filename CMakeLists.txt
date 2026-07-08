@@ -345,6 +345,7 @@ add_library(mxvk STATIC
     mxvk/src/mxvk_controller.cpp
     mxvk/src/mxvk_png.cpp
     mxvk/src/mxvk_resource.cpp
+    mxvk/src/mxvk_shader_module.cpp
     mxvk/src/mxvk_stencil.cpp
     mxvk/src/mxvk_sprite.cpp
     mxvk/src/mxvk_sprite3d.cpp
