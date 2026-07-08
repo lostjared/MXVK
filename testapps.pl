@@ -32,6 +32,7 @@ my @tests = qw(
     static_example
     surface
     stencil
+    stencil_surface
     pointsprite
     3dmath
     3dmath_cube 
