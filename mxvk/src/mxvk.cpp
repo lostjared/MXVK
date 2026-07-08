@@ -49,6 +49,15 @@ namespace mxvk {
         return VK_FALSE;
     }
 
+    VulkanContext VK_Window::context() const {
+        return VulkanContext{
+            .device = getDevice(),
+            .physical_device = getPhysicalDevice(),
+            .graphics_queue = getGraphicsQueue(),
+            .command_pool = getCommandPool(),
+        };
+    }
+
     VK_Window::SwapchainSupport VK_Window::querySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
         std::cout << "vk: querying swapchain support details\n";
         SwapchainSupport support{};

@@ -5,6 +5,8 @@
 #ifndef MXVK_RESOURCE_HPP
 #define MXVK_RESOURCE_HPP
 
+#include "mxvk_context.hpp"
+
 #include <volk/volk.h>
 
 #include <SDL3/SDL.h>
@@ -51,23 +53,6 @@ namespace mxvk {
         uint32_t width = 0;
         /** @brief Texture height in pixels. */
         uint32_t height = 0;
-    };
-
-    /**
-     * @brief Minimal Vulkan handles required by MXVK resource helpers.
-     *
-     * Buffer and image allocation require @ref device and @ref physical_device.
-     * Upload helpers also require @ref graphics_queue and @ref command_pool.
-     */
-    struct VulkanContext {
-        /** @brief Logical device used to create and destroy resources. */
-        VkDevice device = VK_NULL_HANDLE;
-        /** @brief Physical device used for memory type queries. */
-        VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-        /** @brief Queue used for one-shot upload command submission. */
-        VkQueue graphics_queue = VK_NULL_HANDLE;
-        /** @brief Command pool used for transient upload command buffers. */
-        VkCommandPool command_pool = VK_NULL_HANDLE;
     };
 
     /**

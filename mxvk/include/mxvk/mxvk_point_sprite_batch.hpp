@@ -5,6 +5,7 @@
 #ifndef MXVK_POINT_SPRITE_BATCH_HPP
 #define MXVK_POINT_SPRITE_BATCH_HPP
 
+#include "mxvk/mxvk_context.hpp"
 #include "mxvk/mxvk_resource.hpp"
 
 #include <volk/volk.h>

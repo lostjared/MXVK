@@ -5,6 +5,7 @@
 #ifndef MXVK_STENCIL_HPP
 #define MXVK_STENCIL_HPP
 
+#include "mxvk_context.hpp"
 #include "mxvk_resource.hpp"
 
 #include <volk/volk.h>

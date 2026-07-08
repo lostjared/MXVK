@@ -1,6 +1,7 @@
 #ifndef _MXVK_MXVK_H_
 #define _MXVK_MXVK_H_
 
+#include "mxvk_context.hpp"
 #include "mxvk_runtime_options.hpp"
 #include "mxvk_sprite.hpp"
 #include "mxvk_sprite3d.hpp"
@@ -310,6 +311,8 @@ namespace mxvk {
         static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data);
 
         void showCursor(bool on);
+
+        VulkanContext context() const;
 
       protected:
         /**
