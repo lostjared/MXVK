@@ -349,6 +349,8 @@ namespace mutatris {
             if (game->grid[focus].gamePiece.drop()) {
                 processGrid();
                 advanceFocus();
+            } else if (activePiecePlacementBlocked()) {
+                triggerGameOver("active piece placement blocked");
             }
             return;
         }
@@ -384,6 +386,8 @@ namespace mutatris {
             if (game->grid[focus].gamePiece.drop()) {
                 processGrid();
                 advanceFocus();
+            } else if (activePiecePlacementBlocked()) {
+                triggerGameOver("active piece placement blocked");
             }
         } else if (button == SDL_GAMEPAD_BUTTON_DPAD_LEFT) {
             handleGamepadDpad(button);
@@ -502,6 +506,8 @@ namespace mutatris {
                 if (piece.moveDown()) {
                     processGrid();
                     advanceFocus();
+                } else if (activePiecePlacementBlocked()) {
+                    triggerGameOver("active piece placement blocked");
                 }
             }
         } else if (focus == 1) {
@@ -515,6 +521,8 @@ namespace mutatris {
                 if (piece.moveDown()) {
                     processGrid();
                     advanceFocus();
+                } else if (activePiecePlacementBlocked()) {
+                    triggerGameOver("active piece placement blocked");
                 }
             }
         } else if (focus == 2) {
@@ -528,6 +536,8 @@ namespace mutatris {
                 if (piece.moveDown()) {
                     processGrid();
                     advanceFocus();
+                } else if (activePiecePlacementBlocked()) {
+                    triggerGameOver("active piece placement blocked");
                 }
             }
         } else if (focus == 3) {
@@ -541,6 +551,8 @@ namespace mutatris {
                 if (piece.moveDown()) {
                     processGrid();
                     advanceFocus();
+                } else if (activePiecePlacementBlocked()) {
+                    triggerGameOver("active piece placement blocked");
                 }
             }
         }
@@ -553,7 +565,27 @@ namespace mutatris {
         if (game->grid[focus].gamePiece.moveDown()) {
             processGrid();
             advanceFocus();
+        } else if (activePiecePlacementBlocked()) {
+            triggerGameOver("active piece placement blocked");
         }
+    }
+
+    bool MutatrisWindow::activePiecePlacementBlocked() const {
+        if (game == nullptr) {
+            return false;
+        }
+        const Piece &piece = game->grid[focus].gamePiece;
+        return !piece.checkLocation(piece.getX(), piece.getY());
+    }
+
+    void MutatrisWindow::triggerGameOver(const std::string &reason) {
+        if (game == nullptr) {
+            return;
+        }
+        finalScore = game->score;
+        finalClears = game->clears;
+        setScreen(Screen::GameOver, reason);
+        logMutatris(std::format("Game over. score={} clears={}", finalScore, finalClears));
     }
 
     bool MutatrisWindow::openController() {
@@ -733,13 +765,12 @@ namespace mutatris {
                     logMutatris(std::format("Timer drop advanced piece on {} grid.", focusName(focus)));
                     processGrid();
                     advanceFocus();
+                } else if (activePiecePlacementBlocked()) {
+                    triggerGameOver("active piece placement blocked");
                 }
                 lastDropTick = now;
             } else {
-                finalScore = game->score;
-                finalClears = game->clears;
-                setScreen(Screen::GameOver, "active grid blocked");
-                logMutatris(std::format("Game over. score={} clears={}", finalScore, finalClears));
+                triggerGameOver("active grid blocked");
             }
         }
     }

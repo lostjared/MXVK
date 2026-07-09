@@ -110,7 +110,7 @@ namespace mutatris {
         }
 
         for (std::size_t i = 0; i < target.size(); ++i) {
-            if (target[i] == nullptr) {
+            if (target[i] == nullptr || target[i]->color != 0) {
                 return false;
             }
             target[i]->color = blocks[i].color;

@@ -98,6 +98,8 @@ namespace mutatris {
         [[nodiscard]] bool isStartupTitleFullyVisible() const;
         void handleDirectionalKey(SDL_Keycode key);
         void softDropActivePiece();
+        [[nodiscard]] bool activePiecePlacementBlocked() const;
+        void triggerGameOver(const std::string &reason);
         bool openController();
         void syncControllerConnection();
         void processGrid();
