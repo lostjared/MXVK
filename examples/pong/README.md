@@ -8,7 +8,7 @@ A Vulkan implementation of the classic Pong game, ported from the OpenGL version
 ## Features
 
 - Full Vulkan rendering pipeline
-- 3D cube-based paddles and ball
+- 3D cube-based paddles and a textured sphere ball
 - AI opponent
 - Keyboard and mouse/touch input support
 - Wireframe mode toggle
@@ -54,7 +54,9 @@ Or specify resolution:
 The game requires the following assets in the data path:
 - `bg.png` - Background texture
 - `font.ttf` - TrueType font for text rendering
-- `torus.mxmod` or similar model file - 3D model for game objects
+- `cube.mxmod` - paddle model
+- `better_sphere.obj` and `better_sphere.mtl` - ball model and material
+- `ball.png` and `paddle_texture_manifest.txt` - object textures
 - Compiled SPIR-V shaders: `vert.spv`, `frag.spv`
 
 ## Architecture
@@ -64,4 +66,3 @@ This Vulkan pong implementation extends the `mx::VKWindow` base class, overridin
 - `event()` - Handle keyboard, mouse, and touch input
 - `proc()` - Game logic update (physics, AI, scoring)
 - `draw()` - Render the game objects using the Vulkan pipeline
-

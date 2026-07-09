@@ -518,19 +518,19 @@ namespace {
         VkPipelineLayout starPipelineLayout = VK_NULL_HANDLE;
 
         void initModels() {
-            const std::string modelPath = dataRoot + "/cube.mxmod";
+            const std::string paddleModelPath = dataRoot + "/cube.mxmod";
+            const std::string ballModelPath = dataRoot + "/better_sphere.obj";
             const std::string shaderVert = shaderRoot + "/pong_model.vert.spv";
             const std::string shaderFrag = shaderRoot + "/pong_model.frag.spv";
             const std::string paddleManifest = dataRoot + "/paddle_texture_manifest.txt";
-            const std::string ballManifest = dataRoot + "/ball_texture_manifest.txt";
 
-            paddleModel1.load(this, modelPath, paddleManifest, dataRoot, 1.0f);
+            paddleModel1.load(this, paddleModelPath, paddleManifest, dataRoot, 1.0f);
             paddleModel1.setShaders(this, shaderVert, shaderFrag);
 
-            paddleModel2.load(this, modelPath, paddleManifest, dataRoot, 1.0f);
+            paddleModel2.load(this, paddleModelPath, paddleManifest, dataRoot, 1.0f);
             paddleModel2.setShaders(this, shaderVert, shaderFrag);
 
-            ballModel.load(this, modelPath, ballManifest, dataRoot, 1.0f);
+            ballModel.load(this, ballModelPath, "", dataRoot, 0.1f);
             ballModel.setShaders(this, shaderVert, shaderFrag);
         }
 
