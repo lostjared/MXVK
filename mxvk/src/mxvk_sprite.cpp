@@ -54,7 +54,7 @@ namespace mxvk {
             vkFreeMemory(device, quadIndexBufferMemory, nullptr);
         }
 
-        destroyDescriptorPools();
+        destroyTextureDescriptorPools();
 
         if (spriteSampler != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite sampler\n";
@@ -96,15 +96,7 @@ namespace mxvk {
         destroyCudaInterop();
 #endif
 
-        destroyDescriptorPools();
-
-        // Extended descriptor set references spriteImageView/spriteSampler,
-        // so it must be invalidated when those are destroyed.
-        if (extendedDescriptorPool != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
-            extendedDescriptorPool = VK_NULL_HANDLE;
-            extendedDescriptorSet = VK_NULL_HANDLE;
-        }
+        destroyTextureDescriptorPools();
 
         if (spriteSampler != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite sampler\n";
@@ -228,6 +220,7 @@ namespace mxvk {
             return;
 
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
             vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
             extendedDescriptorPool = VK_NULL_HANDLE;
             extendedDescriptorSet = VK_NULL_HANDLE;
@@ -287,6 +280,7 @@ namespace mxvk {
 
     void VK_Sprite::destroyExtendedUBO() {
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
             vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
             extendedDescriptorPool = VK_NULL_HANDLE;
             extendedDescriptorSet = VK_NULL_HANDLE;
@@ -995,6 +989,7 @@ namespace mxvk {
 #ifdef MXVK_CUDA
             destroyCudaInterop();
 #endif
+            destroyTextureDescriptorPools();
             if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
@@ -1010,12 +1005,6 @@ namespace mxvk {
             spriteWidth = rgbaSurface->w;
             spriteHeight = rgbaSurface->h;
             createSpriteTexture(rgbaSurface);
-            destroyDescriptorPools();
-            if (extendedDescriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
-                extendedDescriptorPool = VK_NULL_HANDLE;
-                extendedDescriptorSet = VK_NULL_HANDLE;
-            }
             createDescriptorPool();
         }
         SDL_DestroySurface(rgbaSurface);
@@ -1058,6 +1047,7 @@ namespace mxvk {
 #ifdef MXVK_CUDA
             destroyCudaInterop();
 #endif
+            destroyTextureDescriptorPools();
             if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
@@ -1091,12 +1081,6 @@ namespace mxvk {
             }
             createSpriteTexture(tmpSurface);
             SDL_DestroySurface(tmpSurface);
-            destroyDescriptorPools();
-            if (extendedDescriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
-                extendedDescriptorPool = VK_NULL_HANDLE;
-                extendedDescriptorSet = VK_NULL_HANDLE;
-            }
             createDescriptorPool();
         }
     }
@@ -1448,6 +1432,7 @@ namespace mxvk {
             }
             vkDeviceWaitIdle(device);
             destroyCudaInterop();
+            destroyTextureDescriptorPools();
             if (spriteImageView != VK_NULL_HANDLE) {
                 vkDestroyImageView(device, spriteImageView, nullptr);
                 spriteImageView = VK_NULL_HANDLE;
@@ -1475,12 +1460,6 @@ namespace mxvk {
                 return false;
             }
 
-            destroyDescriptorPools();
-            if (extendedDescriptorPool != VK_NULL_HANDLE) {
-                vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
-                extendedDescriptorPool = VK_NULL_HANDLE;
-                extendedDescriptorSet = VK_NULL_HANDLE;
-            }
             createDescriptorPool();
             if (spriteSampler == VK_NULL_HANDLE) {
                 createSampler();
@@ -1677,7 +1656,10 @@ namespace mxvk {
         auto cached_descriptor = externalDescriptorSets.find(image_view);
         descriptorSet = (cached_descriptor != externalDescriptorSets.end()) ? cached_descriptor->second : VK_NULL_HANDLE;
         descriptorSetPool = VK_NULL_HANDLE;
-        if (extendedDescriptorPool != VK_NULL_HANDLE) {
+        if (!externalTexture) {
+            destroyTextureDescriptorPools();
+        } else if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
             vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
             extendedDescriptorPool = VK_NULL_HANDLE;
             extendedDescriptorSet = VK_NULL_HANDLE;
@@ -1704,12 +1686,7 @@ namespace mxvk {
         if (!externalTexture && externalDescriptorSets.empty()) {
             return;
         }
-        destroyDescriptorPools();
-        if (extendedDescriptorPool != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
-            extendedDescriptorPool = VK_NULL_HANDLE;
-            extendedDescriptorSet = VK_NULL_HANDLE;
-        }
+        destroyTextureDescriptorPools();
     }
 
     void VK_Sprite::prepareForRendering([[maybe_unused]] VkCommandBuffer cmdBuffer) {
@@ -1846,6 +1823,18 @@ namespace mxvk {
         descriptorSet = VK_NULL_HANDLE;
         externalDescriptorSets.clear();
         nextDescriptorPoolSets = 16;
+    }
+
+    void VK_Sprite::destroyTextureDescriptorPools() {
+        if (!descriptorPools.empty() || extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
+        }
+        destroyDescriptorPools();
+        if (extendedDescriptorPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
+            extendedDescriptorPool = VK_NULL_HANDLE;
+            extendedDescriptorSet = VK_NULL_HANDLE;
+        }
     }
 
     VkDescriptorSet VK_Sprite::createDescriptorSet(VkImageView imageView) {

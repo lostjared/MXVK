@@ -323,6 +323,7 @@ namespace mxvk {
         std::unordered_map<VkImageView, VkDescriptorSet> externalDescriptorSets{};
         void createDescriptorPool();
         void destroyDescriptorPools();
+        void destroyTextureDescriptorPools();
         VkDescriptorSet createDescriptorSet(VkImageView imageView);
         void destroySpriteResources();
 
