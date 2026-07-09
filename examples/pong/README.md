@@ -11,6 +11,7 @@ A Vulkan implementation of the classic Pong game, ported from the OpenGL version
 - 3D cube-based paddles and a textured sphere ball
 - AI opponent
 - Keyboard and mouse/touch input support
+- Optional `ping.wav` paddle-hit sound when SDL3_mixer support is enabled
 - Wireframe mode toggle
 - Grid rotation for 3D viewing effects
 - Text overlay for score and FPS display
@@ -57,6 +58,7 @@ The game requires the following assets in the data path:
 - `cube.mxmod` - paddle model
 - `better_sphere.obj` and `better_sphere.mtl` - ball model and material
 - `ball.png` and `paddle_texture_manifest.txt` - object textures
+- `ping.wav` - paddle-hit sound effect when built with mixer support
 - Compiled SPIR-V shaders: `vert.spv`, `frag.spv`
 
 ## Architecture

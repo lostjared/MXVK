@@ -10,6 +10,7 @@
 #include <format>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <sstream>
 #include <string>
@@ -24,6 +25,9 @@
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+#include "mxvk/mxvk_sound.hpp"
+#endif
 
 #ifndef pong_ASSET_DIR
 #define pong_ASSET_DIR "."
@@ -250,6 +254,7 @@ namespace {
             std::srand(static_cast<unsigned>(std::time(nullptr)));
             setFont(dataRoot + "/font.ttf", 24);
             initModels();
+            initAudio();
             createParticleBuffer();
             initStarfield(30000);
             ball.resetBall();
@@ -399,9 +404,11 @@ namespace {
 
             if (ball.hitPaddle1) {
                 spawnBurst(ball.lastImpactPos, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec4(0.3f, 0.6f, 1.0f, 1.0f));
+                playPaddleHitSound();
             }
             if (ball.hitPaddle2) {
                 spawnBurst(ball.lastImpactPos, glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec4(1.0f, 0.3f, 0.3f, 1.0f));
+                playPaddleHitSound();
             }
 
             updateParticles(deltaTime);
@@ -449,6 +456,11 @@ namespace {
         mxvk::VKAbstractModel paddleModel1{};
         mxvk::VKAbstractModel paddleModel2{};
         mxvk::VKAbstractModel ballModel{};
+
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+        std::unique_ptr<mxvk::VK_Mixer> mixer{};
+        int paddleHitSound = -1;
+#endif
 
         int score1 = 0;
         int score2 = 0;
@@ -532,6 +544,27 @@ namespace {
 
             ballModel.load(this, ballModelPath, "", dataRoot, 0.1f);
             ballModel.setShaders(this, shaderVert, shaderFrag);
+        }
+
+        void initAudio() {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            try {
+                mixer = std::make_unique<mxvk::VK_Mixer>();
+                paddleHitSound = mixer->loadWav(dataRoot + "/ping.wav");
+            } catch (const mxvk::Exception &e) {
+                std::cerr << std::format("pong: audio disabled: {}\n", e.text());
+                mixer.reset();
+                paddleHitSound = -1;
+            }
+#endif
+        }
+
+        void playPaddleHitSound() {
+#if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
+            if (mixer != nullptr && paddleHitSound >= 0) {
+                mixer->playWav(paddleHitSound, 0, 0);
+            }
+#endif
         }
 
         [[nodiscard]] glm::mat4 buildViewMatrix() const {
