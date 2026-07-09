@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.19.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, a `walk_post` first-person sample for browsing full-screen post-processing shaders, stronger post-processing target cleanup, and resize fixes for SDL surface upload examples.
+Current development is on version `0.20.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects, refreshed menu/game-over art, optional music, updated Pong assets and sound effects, a `walk_post` first-person sample for browsing full-screen post-processing shaders, stronger post-processing target cleanup, descriptor cleanup fixes, and resize fixes for SDL surface upload examples.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -147,7 +147,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.19.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
+The current Doxygen project version is `0.20.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
 
 
 <a id="command-line-arguments"></a>
@@ -445,6 +445,7 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 9, 2026: the project version moved to `0.20.0`, and `Doxyfile` now reports `0.20.0` for generated API documentation. This release also includes descriptor cleanup hardening in `VK_Sprite`, updated Pong assets and sound effects, and refreshed Mutatris menu/game-over presentation.
 - July 8, 2026: the project version moved through `0.18.0` to `0.19.0`, and `Doxyfile` now reports `0.19.0` for generated API documentation.
 - July 8, 2026: `mxvk_context.hpp` now owns the shared `mxvk::VulkanContext` handle bundle, and `VK_Window::context()` exposes the current logical device, physical device, graphics queue, and command pool to helper renderers.
 - July 8, 2026: Vulkan allocation and upload paths were hardened so replacement resources are only committed after successful creation, partial post-processing target creation is cleaned up on failure, and several examples explicitly release pending uploads before command-pool teardown.
