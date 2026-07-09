@@ -18,6 +18,7 @@
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/glm.hpp>
 
 #include "mxvk/argz.hpp"
@@ -124,12 +125,14 @@ namespace {
         bool hitPaddle2 = false;
         bool hitWall = false;
         glm::vec3 lastImpactPos{0.0f};
+        glm::quat rollingOrientation{1.0f, 0.0f, 0.0f, 0.0f};
 
         explicit Ball(const glm::vec3 &pos, const glm::vec3 &vel, float r)
             : position(pos), velocity(vel), radius(r), speed(glm::length(vel)) {}
 
         void resetBall() {
             position = glm::vec3(0.0f, 0.0f, 0.0f);
+            rollingOrientation = glm::quat{1.0f, 0.0f, 0.0f, 0.0f};
             const float angle = glm::radians(static_cast<float>(std::rand() % 120 - 60));
             speed = 1.0f;
 
@@ -147,6 +150,7 @@ namespace {
         [[nodiscard]] glm::mat4 modelMatrix() const {
             glm::mat4 model(1.0f);
             model = glm::translate(model, position);
+            model *= glm::mat4_cast(rollingOrientation);
             model = glm::scale(model, glm::vec3(radius));
             return model;
         }
@@ -156,7 +160,9 @@ namespace {
             hitPaddle2 = false;
             hitWall = false;
 
-            position += velocity * deltaTime;
+            const glm::vec3 movement = velocity * deltaTime;
+            updateRollingOrientation(movement);
+            position += movement;
 
             if (position.y + radius > 1.0f) {
                 position.y = 1.0f - radius;
@@ -187,6 +193,19 @@ namespace {
       private:
         static float clampf(float value, float minv, float maxv) {
             return std::max(minv, std::min(value, maxv));
+        }
+
+        void updateRollingOrientation(const glm::vec3 &movement) {
+            const float distance = glm::length(movement);
+            if (distance <= 0.000001f || radius <= 0.000001f) {
+                return;
+            }
+
+            const glm::vec3 movementDirection = movement / distance;
+            const glm::vec3 playfieldNormal(0.0f, 0.0f, 1.0f);
+            const glm::vec3 rollAxis = glm::normalize(glm::cross(movementDirection, playfieldNormal));
+            const float rollRadians = distance / radius;
+            rollingOrientation = glm::normalize(glm::angleAxis(rollRadians, rollAxis) * rollingOrientation);
         }
 
         void handlePaddleCollision(Paddle &paddle) {
