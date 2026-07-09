@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.19.0`. Recent work added a reusable Vulkan resource helper layer, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, and a `walk_post` first-person sample for browsing full-screen post-processing shaders.
+Current development is on version `0.19.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects and optional music, a `walk_post` first-person sample for browsing full-screen post-processing shaders, stronger post-processing target cleanup, and resize fixes for SDL surface upload examples.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -147,7 +147,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.16.0`. Recent public API comments cover `VK_Window`, the new Vulkan resource helpers in `mxvk_resource.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
+The current Doxygen project version is `0.19.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
 
 
 <a id="command-line-arguments"></a>
@@ -240,9 +240,17 @@ whole list. Unlike the default `--all` mode, timeout mode collects failures and
 prints a summary after every example has been attempted. You can override the
 timeout with `--timeout=<seconds>`.
 
+Timeout mode is also supported for a single example. `run.pl` accepts
+`--timeout` before or after the example name, and closes the child process group
+when the deadline is reached. In non-interactive `CODEX_CI` runs, single-example
+launches default to timeout mode unless `MXVK_RUN_DEFAULT_TIMEOUT` overrides the
+duration.
+
 ```bash
 ./run.pl --all --timeout
 ./run.pl --all --timeout=3
+./run.pl surface --timeout=2
+./run.pl --timeout=2 stencil_surface
 ```
 
 Examples:
@@ -366,8 +374,8 @@ The examples are grouped below by what they demonstrate. Most accept the shared 
 - `hello_world` - minimal `mxvk::VK_Window` example with a custom graphics pipeline and animated triangle. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `skeleton` - smallest practical subclass of `mxvk::VK_Window`, intended as a copyable starting point for new examples. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `static_example` - fullscreen triangle sample that pushes window size and frame count into the shader. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
-- `surface` - SDL surface upload smoke test that fills a CPU-side surface with random pixels, uploads it to an MXVK sprite each frame, and redraws it after resize. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
-- `stencil_surface` - SDL surface upload demo that fills a CPU-side star mask with randomized color, uploads it to an MXVK sprite, and redraws it after resize. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
+- `surface` - SDL surface upload smoke test that fills a CPU-side surface with random pixels, uploads it to an MXVK sprite each frame, and redraws it after resize. The canvas is sized from the active swapchain extent so high-DPI and MoltenVK/macOS resize behavior matches the presented image. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
+- `stencil_surface` - SDL surface upload demo that fills a CPU-side star mask with randomized color, uploads it to an MXVK sprite, and redraws it after resize. The canvas is sized from the active swapchain extent so high-DPI and MoltenVK/macOS resize behavior matches the presented image. **Inputs:** common `-r`, `-f`, optional `--filename` as the sprite shader path. **Controls:** `Escape` quits.
 - `sprite_example` - loads a PNG sprite, renders it full-screen, and overlays text with a custom sprite shader. **Inputs:** common `-p`, `-r`, `-f`; optional texture and shader path arguments. **Controls:** `Escape` quits.
 - `text_example` - compact text-rendering sample built around `setFont(...)` and `printText(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `rain` - static helper library used by Matrix-style examples to render configurable glyph rain into an SDL surface and MXVK sprite texture. It is not launched directly through `run.pl`.
@@ -387,7 +395,7 @@ These programs are not intended as standalone applications. They are small visua
 - `binary_matrix` - 3D variant of `matrix` that turns `0` and `1` glyphs into a depth-aware scene. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Space` randomizes the rain, arrow keys orbit the camera, `Page Up` / `Page Down` zoom, `Escape` quits.
 - `fractal_zoom` - fullscreen Mandelbrot-style renderer with runtime zoom, pan, palette switching, and shader-driven color output. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel zoom, drag pan, `W` / `A` / `S` / `D` or arrow keys pan, `Z` / `X` continuous zoom, `1` / `2` / `3` presets, `+` / `=` and `-` iteration count, `[` / `]` palette, `R` reset, `Escape` quit.
 - `fire` - full-screen procedural fire shader driven through the `VK_Window` post-processing path. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** mouse wheel adjusts shader zoom, `Escape` quits.
-- `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
+- `postprocess` - full-screen post-processing chain demo. It reads `data/shaders.txt`, creates one effect per listed fragment shader, and runs the chain through `VK_Window::attachPostProcessingShaders(...)`. Post-process sprites cache external texture descriptors per offscreen image and clear those descriptors when the swapchain targets are rebuilt. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `stencil` - `VK_Stencil` demo that writes a shader-generated mask into a stencil attachment, then fills only the masked region with a second shader pass. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `console_demo` - in-window console layered over a moving shader background. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `F3` opens or closes the console, `Escape` quits when the console is hidden, console commands include `help`, `echo`, `about`, `quit`, and `exit`.
 - `glitch_cube` - stylized cube viewer with time-based transforms, shader-driven presentation, and runtime scale/orbit controls. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Space` toggles the rotation axis, `Page Up` / `Page Down` scales the cube, `Escape` quits.
@@ -400,7 +408,7 @@ These programs are not intended as standalone applications. They are small visua
 - `viewer` - general-purpose model inspection renderer for OBJ, MXMOD, and compressed MXMOD assets. It defaults to `cube.mxmod.z`, accepts `--filename`, `--texture`, `--resource_path`, `--shader-path`, and common window arguments, and is the backend launched by the Qt `model_viewer` app. **Controls:** left mouse drag or arrow keys rotate, mouse wheel / `+` / `-` / `A` / `S` zoom, `W` toggles wireframe, `R` or `P` toggles auto-rotate, `H` or `Space` toggles help, `Home` resets the view, `Escape` quits.
 - `model_example` - basic `VKAbstractModel` viewer for textured OBJ or MXMOD assets. By default it loads `data/pyramid.obj` from the example asset directory. `--filename` overrides the model file, `--resource` can point at a texture manifest, `--resource_path` can override the texture lookup directory, and `--binary` replaces the model's texture with animated Matrix-style green rain while also enabling the skybox toggle. **Inputs:** common `-p`, `-r`, `-f`, `--filename`, `--fragment`, `--resource`, `--resource_path`, and `--binary`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` toggles auto-spin, `Enter` toggles skybox mode when `--binary` is enabled, `W/A/S/D` look around inside the skybox view, `Escape` quits.
 - `planet` - textured Saturn scene with a ring, orbital camera, and runtime asset staging. **Inputs:** common `-p`, `-r`, `-f`, `--filename`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
-- `bluesky` - procedural water and sky scene that renders a large indexed water grid with custom Vulkan buffers and shaders. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` orbit, `Up` / `Page Up` zoom in, `Down` / `Page Down` zoom out, `Escape` quits.
+- `bluesky` - procedural water and sky scene that renders a large indexed water grid with custom Vulkan buffers and shaders. The shader push constants include viewport aspect data so the sky/cloud presentation remains stable across non-16:9 window sizes. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` orbit, `Up` / `Page Up` zoom in, `Down` / `Page Down` zoom out, `Escape` quits.
 - `tux_example` - layered scene that combines a textured model, an animated background sprite, and text overlays. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `sprite3d_example` - 3D sprite scene with a starfield, a flying saucer, and mouse-driven camera orbiting. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** left mouse drag orbits, mouse wheel zooms, `Escape` quits.
 - `starship` - ship viewer with Phong shading, a moving starfield, and exhaust effects. **Inputs:** common `-p`, `-r`, `-f`, plus the example asset set. **Controls:** mouse drag rotates the ship, `Escape` quits.
@@ -437,6 +445,14 @@ If you want a quick tour of the core demos, `./run.pl --all` executes the defaul
 
 ## Recent Optimizations
 
+- July 8, 2026: the project version moved through `0.18.0` to `0.19.0`, and `Doxyfile` now reports `0.19.0` for generated API documentation.
+- July 8, 2026: `mxvk_context.hpp` now owns the shared `mxvk::VulkanContext` handle bundle, and `VK_Window::context()` exposes the current logical device, physical device, graphics queue, and command pool to helper renderers.
+- July 8, 2026: Vulkan allocation and upload paths were hardened so replacement resources are only committed after successful creation, partial post-processing target creation is cleaned up on failure, and several examples explicitly release pending uploads before command-pool teardown.
+- July 8, 2026: `VK_Sprite` now clears cached external texture descriptors before post-processing targets are destroyed, which avoids stale descriptor references after swapchain recreation.
+- July 8, 2026: `VK_Window` handles `VK_SUBOPTIMAL_KHR` presentation results more conservatively by recreating the swapchain only when the actual window pixel extent changed, reducing unnecessary rebuilds on platforms such as macOS/MoltenVK.
+- July 8, 2026: `surface` and `stencil_surface` now initialize and resize their SDL canvases from the active swapchain extent, fixing redraw and sizing behavior after resize on macOS.
+- July 8, 2026: `bluesky` now passes viewport aspect data into its shaders so clouds, sun, and water presentation keep a stable composition across wider or narrower windows.
+- July 8, 2026: `run.pl` supports timeout smoke testing for single examples as well as `--all`, and `testapps.pl` / timeout child launches suppress repeated missing-validation-layer warnings with `MXVK_QUIET_MISSING_VALIDATION=1`.
 - July 5, 2026: the project version moved to `0.16.0`, and `Doxyfile` now reports the same version for generated API documentation.
 - July 5, 2026: `walk_post` was added as a first-person post-processing browser. It loads a shader index from `--shader-path`, supports `--shader-index`, cycles effects with `R` / `T`, updates extended sprite uniforms for shader-style effects, and keeps the `walk` debug console shader-reload commands.
 - July 5, 2026: `pointsprite` and `fireworks` examples were added to exercise `mxvk::VK_PointSpriteBatch` outside the `starfield` stress scene.
