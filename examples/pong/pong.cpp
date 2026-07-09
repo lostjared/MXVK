@@ -636,6 +636,13 @@ namespace {
                 gridRotation = 0.0f;
                 gridYRotation = 0.0f;
             }
+            if (keyState[SDL_SCANCODE_PAGEUP]) {
+                cameraZ -= 3.0f * deltaTime;
+            }
+            if (keyState[SDL_SCANCODE_PAGEDOWN]) {
+                cameraZ += 3.0f * deltaTime;
+            }
+            cameraZ = std::clamp(cameraZ, 1.0f, 20.0f);
 
             constexpr float speed = 2.0f;
             if (keyState[SDL_SCANCODE_UP]) {

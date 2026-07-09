@@ -23,6 +23,7 @@ A Vulkan implementation of the classic Pong game, ported from the OpenGL version
 | Arrow Up/Down | Move paddle 1 up/down |
 | Mouse Motion | Control paddle 1 position |
 | W/A/S/D | Rotate the 3D view |
+| Page Up/Page Down | Zoom in/out |
 | Q | Reset view rotation |
 | R | Reset game (scores and positions) |
 | SPACE | Toggle wireframe mode |
