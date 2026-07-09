@@ -125,6 +125,7 @@ namespace mutatris {
         void ensureIntroFonts();
         void resetScaledFont(mxvk::Font &font, int designSize, float scale);
         void drawTextCentered(const std::string &text, int y, SDL_Color color);
+        void drawTextCenteredInRect(const std::string &text, int x, int y, int w, int h, SDL_Color color, const mxvk::Font &font);
         void printScaledText(const std::string &text, int x, int y, SDL_Color color);
         void printScaledText(const std::string &text, int x, int y, SDL_Color color, const mxvk::Font &font);
         [[nodiscard]] int scaleX(int value) const;

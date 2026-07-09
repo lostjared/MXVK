@@ -17,6 +17,10 @@ namespace mutatris {
 
     namespace {
         constexpr int CONSOLE_DESIGN_FONT_SIZE = 20;
+        constexpr int START_PROMPT_RECT_X = 530;
+        constexpr int START_PROMPT_RECT_Y = 548;
+        constexpr int START_PROMPT_RECT_W = 217;
+        constexpr int START_PROMPT_RECT_H = 78;
     }
 
     MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt)
@@ -684,7 +688,14 @@ namespace mutatris {
             start->drawSpriteRect(0, 0, width, height);
         }
         printScaledText("Mutatris", 560, 325, {255, 255, 255, 255}, startMediumFont);
-        printScaledText("Press Space", 600, 595, {255, 255, 255, 255}, startSmallFont);
+        drawTextCenteredInRect(
+            "Press Space",
+            START_PROMPT_RECT_X,
+            START_PROMPT_RECT_Y,
+            START_PROMPT_RECT_W,
+            START_PROMPT_RECT_H,
+            {255, 255, 255, 255},
+            startSmallFont);
         const std::array<std::string, 3> labels{{"Easy", "Medium", "Hard"}};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             const SDL_Color color = i == difficulty ? SDL_Color{255, 230, 64, 255} : SDL_Color{255, 255, 255, 255};
@@ -992,6 +1003,23 @@ namespace mutatris {
             textWidth = static_cast<int>(text.size()) * 14;
         }
         printScaledText(text, (DESIGN_WIDTH - textWidth) / 2, y, color);
+    }
+
+    void MutatrisWindow::drawTextCenteredInRect(const std::string &text, int x, int y, int w, int h, SDL_Color color, const mxvk::Font &font) {
+        int textWidth = 0;
+        int textHeight = 0;
+        if (!getTextDimensions(text, textWidth, textHeight, font)) {
+            textWidth = static_cast<int>(text.size()) * scaleX(10);
+            textHeight = scaleY(18);
+        }
+
+        const int rectX = scaleX(x);
+        const int rectY = scaleY(y);
+        const int rectW = scaleX(w);
+        const int rectH = scaleY(h);
+        const int textX = rectX + ((rectW - textWidth) / 2);
+        const int textY = rectY + ((rectH - textHeight) / 2);
+        printText(text, textX, textY, color, font);
     }
 
     void MutatrisWindow::printScaledText(const std::string &text, int x, int y, SDL_Color color) {
