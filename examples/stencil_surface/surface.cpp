@@ -59,7 +59,9 @@ namespace surface {
     public:
         SurfaceWindow(std::string shader_path, int width, int height, bool full, bool enable_vsync) : mxvk::VK_Window(" -[ MXVK Stencil Surface ] - ", width, height, full, MXVK_VALIDATION, enable_vsync) {
             std::cout << "stencil_surface: started example.\n";
-            resize_canvas(width, height);
+            if (!resize_canvas_to_swapchain()) {
+                throw mxvk::Exception("stencil_surface: failed to initialize canvas from swapchain extent");
+            }
             surf = createSprite(bg.get(), "", shader_path);
         }
         void event(SDL_Event &e) override {
@@ -109,14 +111,22 @@ namespace surface {
         }
 
         void onSwapchainRecreated() override {
-            const VkExtent2D extent = getSwapchainExtent();
-            if (extent.width == 0U || extent.height == 0U) {
-                return;
-            }
-            resize_canvas(static_cast<int>(extent.width), static_cast<int>(extent.height));
+            resize_canvas_to_swapchain();
         }
 
     private:
+        bool resize_canvas_to_swapchain() {
+            if (!ensureRenderResources()) {
+                return false;
+            }
+            const VkExtent2D extent = getSwapchainExtent();
+            if (extent.width == 0U || extent.height == 0U) {
+                return false;
+            }
+            resize_canvas(static_cast<int>(extent.width), static_cast<int>(extent.height));
+            return true;
+        }
+
         void resize_canvas(int width, int height) {
             if (width <= 0 || height <= 0 || (bg != nullptr && bg->w == width && bg->h == height)) {
                 return;
