@@ -700,6 +700,7 @@ struct Arguments {
     bool fullscreen = false;              ///< Whether fullscreen mode was requested.
     bool fast = false;                    ///< Whether fast mode was requested (@c --fast).
     std::string filename;                 ///< Optional input filename (@c --filename).
+    std::string model;                    ///< Optional model filename (@c --model).
     std::string output;                   ///< Optional output filename (@c --output).
     std::string crf;                      ///< Optional CRF value (@c --crf).
     std::string encodePreset;             ///< Optional encoder preset (@c --encode-preset).
@@ -789,6 +790,7 @@ struct Arguments {
  * | -f   | --fullscreen       | Enable fullscreen                            |
  * |      | --fast             | Enable fast mode                             |
  * |      | --filename         | Input filename                               |
+ * |      | --model            | Model filename                               |
  * | -o   | --output           | Output filename                              |
  * | -c   | --crf              | Constant Rate Factor                         |
  * |      | --encode-preset    | Encoder preset                               |
@@ -830,6 +832,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble('F', "fullscreen", "fullscreen")
         .addOptionDouble(301, "fast", "fast")
         .addOptionDoubleValue(256, "filename", "input filename")
+        .addOptionDoubleValue(324, "model", "model filename (.obj, .mxmod, or .mxmod.z)")
         .addOptionSingleValue('o', "output filename")
         .addOptionDoubleValue(304, "output", "output filename")
         .addOptionSingleValue('c', "crf value")
@@ -871,6 +874,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool fast = false;
     bool resolutionSpecified = false;
     std::string filename;
+    std::string model;
     std::string output;
     std::string crf;
     std::string encodePreset;
@@ -905,6 +909,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 256:
             filename = arg.arg_value;
+            break;
+        case 324:
+            model = arg.arg_value;
             break;
         case 'o':
         case 304:
@@ -1033,6 +1040,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.fullscreen = fullscreen;
     args.fast = fast;
     args.filename = filename;
+    args.model = model;
     args.output = output;
     args.crf = crf;
     args.encodePreset = encodePreset;

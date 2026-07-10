@@ -211,6 +211,24 @@ namespace mxvk {
         std::memcpy(uniformBuffersMapped[imageIndex], &ubo, sizeof(UniformBufferObject));
     }
 
+    void VKAbstractModel::enableExtendedFragmentUniforms() {
+        if (windowPtr != nullptr) {
+            throw mxvk::Exception("VKAbstractModel::enableExtendedFragmentUniforms must be called before load");
+        }
+        extendedFragmentUniformsEnabled = true;
+    }
+
+    void VKAbstractModel::updateFragmentUBO(uint32_t imageIndex, const ModelFragmentUniforms &uniforms) {
+        if (imageIndex >= fragmentUniformBuffersMapped.size() || fragmentUniformBuffersMapped[imageIndex] == nullptr) {
+            return;
+        }
+        std::memcpy(fragmentUniformBuffersMapped[imageIndex], &uniforms, sizeof(ModelFragmentUniforms));
+    }
+
+    void VKAbstractModel::setFragmentPushConstants(const ModelFragmentPushConstants &constants) {
+        fragmentPushConstants = constants;
+    }
+
     bool VKAbstractModel::updatePrimaryTexture(const void *pixels, int width, int height, int pitch) {
         if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
             return false;
@@ -335,6 +353,12 @@ namespace mxvk {
         }
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vkCmdPushConstants(cmd,
+                           pipelineLayout,
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(ModelFragmentPushConstants),
+                           &fragmentPushConstants);
 
         const size_t textureCount = std::max<size_t>(1, textures.size());
         for (size_t i = 0; i < obj.subMeshCount(); ++i) {
@@ -391,6 +415,12 @@ namespace mxvk {
                            0,
                            sizeof(ModelPushConstants),
                            &pushConstants);
+        vkCmdPushConstants(cmd,
+                           pipelineLayout,
+                           VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(ModelFragmentPushConstants),
+                           &fragmentPushConstants);
         vkCmdBindDescriptorSets(cmd,
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 pipelineLayout,
@@ -1451,17 +1481,23 @@ namespace mxvk {
         samplerBinding.descriptorCount = 1;
         samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutBinding uboBinding{};
-        uboBinding.binding = 1;
-        uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboBinding.descriptorCount = 1;
-        uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        VkDescriptorSetLayoutBinding fragmentBinding{};
+        fragmentBinding.binding = 1;
+        fragmentBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        fragmentBinding.descriptorCount = 1;
+        fragmentBinding.stageFlags = extendedFragmentUniformsEnabled ? VK_SHADER_STAGE_FRAGMENT_BIT : VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        const std::array<VkDescriptorSetLayoutBinding, 2> bindings = {samplerBinding, uboBinding};
+        VkDescriptorSetLayoutBinding modelBinding{};
+        modelBinding.binding = 2;
+        modelBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        modelBinding.descriptorCount = 1;
+        modelBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        const std::array<VkDescriptorSetLayoutBinding, 3> bindings = {samplerBinding, fragmentBinding, modelBinding};
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.bindingCount = extendedFragmentUniformsEnabled ? static_cast<uint32_t>(bindings.size()) : 2U;
         layoutInfo.pBindings = bindings.data();
 
         if (vkCreateDescriptorSetLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
@@ -1480,6 +1516,11 @@ namespace mxvk {
         uniformBuffers.resize(frameCount, VK_NULL_HANDLE);
         uniformBufferMemory.resize(frameCount, VK_NULL_HANDLE);
         uniformBuffersMapped.resize(frameCount, nullptr);
+        if (extendedFragmentUniformsEnabled) {
+            fragmentUniformBuffers.resize(frameCount, VK_NULL_HANDLE);
+            fragmentUniformBufferMemory.resize(frameCount, VK_NULL_HANDLE);
+            fragmentUniformBuffersMapped.resize(frameCount, nullptr);
+        }
 
         for (size_t i = 0; i < frameCount; ++i) {
             createBuffer(sizeof(UniformBufferObject),
@@ -1487,6 +1528,13 @@ namespace mxvk {
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                          uniformBuffers[i], uniformBufferMemory[i]);
             vkMapMemory(windowPtr->getDevice(), uniformBufferMemory[i], 0, sizeof(UniformBufferObject), 0, &uniformBuffersMapped[i]);
+            if (extendedFragmentUniformsEnabled) {
+                createBuffer(sizeof(ModelFragmentUniforms),
+                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             fragmentUniformBuffers[i], fragmentUniformBufferMemory[i]);
+                vkMapMemory(windowPtr->getDevice(), fragmentUniformBufferMemory[i], 0, sizeof(ModelFragmentUniforms), 0, &fragmentUniformBuffersMapped[i]);
+            }
         }
     }
 
@@ -1495,6 +1543,9 @@ namespace mxvk {
             uniformBuffers.clear();
             uniformBufferMemory.clear();
             uniformBuffersMapped.clear();
+            fragmentUniformBuffers.clear();
+            fragmentUniformBufferMemory.clear();
+            fragmentUniformBuffersMapped.clear();
             return;
         }
 
@@ -1514,6 +1565,21 @@ namespace mxvk {
         uniformBuffers.clear();
         uniformBufferMemory.clear();
         uniformBuffersMapped.clear();
+
+        for (size_t i = 0; i < fragmentUniformBuffers.size(); ++i) {
+            if (fragmentUniformBuffersMapped[i] != nullptr) {
+                vkUnmapMemory(windowPtr->getDevice(), fragmentUniformBufferMemory[i]);
+            }
+            if (fragmentUniformBuffers[i] != VK_NULL_HANDLE) {
+                vkDestroyBuffer(windowPtr->getDevice(), fragmentUniformBuffers[i], nullptr);
+            }
+            if (fragmentUniformBufferMemory[i] != VK_NULL_HANDLE) {
+                vkFreeMemory(windowPtr->getDevice(), fragmentUniformBufferMemory[i], nullptr);
+            }
+        }
+        fragmentUniformBuffers.clear();
+        fragmentUniformBufferMemory.clear();
+        fragmentUniformBuffersMapped.clear();
     }
 
     void VKAbstractModel::createDescriptorPool() {
@@ -1526,7 +1592,7 @@ namespace mxvk {
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[0].descriptorCount = setCount;
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSizes[1].descriptorCount = setCount;
+        poolSizes[1].descriptorCount = extendedFragmentUniformsEnabled ? setCount * 2U : setCount;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1546,7 +1612,8 @@ namespace mxvk {
         const size_t frameCount = windowPtr->getSwapchainImageCount();
         const size_t setCount = textureCount * frameCount;
 
-        if (descriptorSetLayout == VK_NULL_HANDLE || frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty()) {
+        if (descriptorSetLayout == VK_NULL_HANDLE || frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty() ||
+            (extendedFragmentUniformsEnabled && fragmentUniformBuffers.size() < frameCount)) {
             return;
         }
 
@@ -1597,6 +1664,12 @@ namespace mxvk {
             bufferInfo.buffer = uniformBuffers[frame];
             bufferInfo.offset = 0;
             bufferInfo.range = sizeof(UniformBufferObject);
+            VkDescriptorBufferInfo fragmentBufferInfo{};
+            if (extendedFragmentUniformsEnabled) {
+                fragmentBufferInfo.buffer = fragmentUniformBuffers[frame];
+                fragmentBufferInfo.offset = 0;
+                fragmentBufferInfo.range = sizeof(ModelFragmentUniforms);
+            }
 
             for (size_t tex = 0; tex < textureCount; ++tex) {
                 const size_t setIndex = frame * textureCount + tex;
@@ -1607,7 +1680,7 @@ namespace mxvk {
                 imageInfo.imageView = entry.view;
                 imageInfo.sampler = textureSampler;
 
-                std::array<VkWriteDescriptorSet, 2> writes{};
+                std::array<VkWriteDescriptorSet, 3> writes{};
                 writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 writes[0].dstSet = descriptorSets[setIndex];
                 writes[0].dstBinding = 0;
@@ -1620,9 +1693,19 @@ namespace mxvk {
                 writes[1].dstBinding = 1;
                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 writes[1].descriptorCount = 1;
-                writes[1].pBufferInfo = &bufferInfo;
+                writes[1].pBufferInfo = extendedFragmentUniformsEnabled ? &fragmentBufferInfo : &bufferInfo;
 
-                vkUpdateDescriptorSets(windowPtr->getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+                if (extendedFragmentUniformsEnabled) {
+                    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    writes[2].dstSet = descriptorSets[setIndex];
+                    writes[2].dstBinding = 2;
+                    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    writes[2].descriptorCount = 1;
+                    writes[2].pBufferInfo = &bufferInfo;
+                }
+
+                const uint32_t writeCount = extendedFragmentUniformsEnabled ? static_cast<uint32_t>(writes.size()) : 2U;
+                vkUpdateDescriptorSets(windowPtr->getDevice(), writeCount, writes.data(), 0, nullptr);
             }
         }
     }
@@ -1756,12 +1839,20 @@ namespace mxvk {
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
             layoutInfo.pSetLayouts = &descriptorSetLayout;
-            VkPushConstantRange pushConstantRange{};
-            pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-            pushConstantRange.offset = 0;
-            pushConstantRange.size = sizeof(ModelPushConstants);
-            layoutInfo.pushConstantRangeCount = 1;
-            layoutInfo.pPushConstantRanges = &pushConstantRange;
+            const std::array<VkPushConstantRange, 2> pushConstantRanges = {
+                VkPushConstantRange{
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                    .offset = 0,
+                    .size = sizeof(ModelPushConstants),
+                },
+                VkPushConstantRange{
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                    .offset = 0,
+                    .size = sizeof(ModelFragmentPushConstants),
+                },
+            };
+            layoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
+            layoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
             if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");

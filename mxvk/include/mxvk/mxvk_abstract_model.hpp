@@ -33,6 +33,31 @@ namespace mxvk {
     };
 
     /**
+     * @struct ModelFragmentPushConstants
+     * @brief Sprite-compatible fragment parameters for UV-based model effects.
+     */
+    struct ModelFragmentPushConstants {
+        float screenWidth = 1.0f;
+        float screenHeight = 1.0f;
+        float spritePosX = 0.0f;
+        float spritePosY = 0.0f;
+        float spriteSizeW = 1.0f;
+        float spriteSizeH = 1.0f;
+        float effectsOn = 1.0f;
+        float padding = 0.0f;
+        glm::vec4 params{0.0f};
+    };
+
+    /** @brief Extended shader-viewer uniforms available to fragment shaders at binding 1. */
+    struct ModelFragmentUniforms {
+        glm::vec4 mouse{0.0f};
+        glm::vec4 u0{0.0f};
+        glm::vec4 u1{0.0f};
+        glm::vec4 u2{0.0f};
+        glm::vec4 u3{0.0f};
+    };
+
+    /**
      * @class VKAbstractModel
      * @brief Convenience wrapper that owns mesh, textures, descriptors, and pipeline state.
      *
@@ -92,6 +117,15 @@ namespace mxvk {
          * @param ubo New transform values.
          */
         void updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo);
+
+        /** @brief Use binding 1 for fragment uniforms and binding 2 for model transforms. Call before load(). */
+        void enableExtendedFragmentUniforms();
+
+        /** @brief Update extended fragment uniforms for one swapchain image. */
+        void updateFragmentUBO(uint32_t imageIndex, const ModelFragmentUniforms &uniforms);
+
+        /** @brief Set sprite-compatible push constants used by custom fragment shaders. */
+        void setFragmentPushConstants(const ModelFragmentPushConstants &constants);
 
         /**
          * @brief Upload raw RGBA pixels into the primary model texture.
@@ -207,6 +241,9 @@ namespace mxvk {
         std::vector<VkBuffer> uniformBuffers{};
         std::vector<VkDeviceMemory> uniformBufferMemory{};
         std::vector<void *> uniformBuffersMapped{};
+        std::vector<VkBuffer> fragmentUniformBuffers{};
+        std::vector<VkDeviceMemory> fragmentUniformBufferMemory{};
+        std::vector<void *> fragmentUniformBuffersMapped{};
 
         glm::vec3 modelCenterOffsetValue{0.0f, 0.0f, 0.0f};
         float modelRenderScaleValue = 1.0f;
@@ -216,6 +253,8 @@ namespace mxvk {
         std::string fragmentShaderPath{};
         bool backfaceCullingEnabled = false;
         bool alphaBlendingEnabled = false;
+        ModelFragmentPushConstants fragmentPushConstants{};
+        bool extendedFragmentUniformsEnabled = false;
 
         VK_Window *windowPtr = nullptr;
 
