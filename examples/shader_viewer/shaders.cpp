@@ -121,6 +121,7 @@ namespace example {
         float rotation_y_degrees = 0.0f;
         float auto_rotation_radians = 0.0f;
         float camera_distance = 5.0f;
+	bool menu_visible = true;
         std::chrono::steady_clock::time_point last_model_update_time{std::chrono::steady_clock::now()};
 
         [[nodiscard]] bool openCaptureSource() {
@@ -407,9 +408,12 @@ namespace example {
                 }
             }
 
+	    if(!menu_visible)
+		    return;
+
             printText(fps_text, 15, 15, SDL_Color{255, 255, 255, 255});
             if (using_model) {
-                printText(std::format("Model: {}  Wire: {}  Auto: {}", std::filesystem::path(model_filename).filename().string(), wireframe ? "on" : "off", auto_rotate ? "on" : "off"),
+                printText(std::format("Model: {}  Wire: {}  Auto: {} M: Toggle Menu", std::filesystem::path(model_filename).filename().string(), wireframe ? "on" : "off", auto_rotate ? "on" : "off"),
                           15, 39, SDL_Color{220, 228, 240, 255});
                 if (show_help) {
                     printText("Drag/Left/Right rotate  Wheel/A/S zoom  Up/Down shader  W wire  R auto  Home reset  Esc quit",
@@ -504,6 +508,9 @@ namespace example {
                 selectShader(1);
             } else if (using_model && e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
                 switch (e.key.key) {
+		case SDLK_M:
+		    menu_visible = !menu_visible;
+		    break;
                 case SDLK_W:
                     wireframe = !wireframe;
                     break;
