@@ -64,6 +64,7 @@ namespace mutatris {
         int introFontSize = 0;
         Uint32 lastDropTick = 0;
         Uint32 lastInputTick = 0;
+        Uint32 lastKeyboardInputTick = 0;
         Uint32 lastClearAnimationTick = 0;
         int finalScore = 0;
         int finalClears = 0;
@@ -96,6 +97,7 @@ namespace mutatris {
         void handleGamepadDpad(Uint8 button);
         void handleConfirm();
         [[nodiscard]] bool isStartupTitleFullyVisible() const;
+        void pollKeyboardInput();
         void handleDirectionalKey(SDL_Keycode key);
         void softDropActivePiece();
         [[nodiscard]] bool activePiecePlacementBlocked() const;

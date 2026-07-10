@@ -354,7 +354,6 @@ namespace mutatris {
             }
             return;
         }
-        handleDirectionalKey(key);
     }
 
     void MutatrisWindow::handleGamepad(Uint8 button) {
@@ -485,15 +484,36 @@ namespace mutatris {
         return elapsed >= SECOND_FADE_OUT_END;
     }
 
+    void MutatrisWindow::pollKeyboardInput() {
+        const bool *keyboardState = SDL_GetKeyboardState(nullptr);
+        SDL_Keycode key = SDLK_UNKNOWN;
+        if (keyboardState[SDL_SCANCODE_LEFT]) {
+            key = SDLK_LEFT;
+        } else if (keyboardState[SDL_SCANCODE_RIGHT]) {
+            key = SDLK_RIGHT;
+        } else if (keyboardState[SDL_SCANCODE_UP]) {
+            key = SDLK_UP;
+        } else if (keyboardState[SDL_SCANCODE_DOWN]) {
+            key = SDLK_DOWN;
+        }
+
+        if (key == SDLK_UNKNOWN) {
+            lastKeyboardInputTick = 0;
+            return;
+        }
+
+        const Uint32 now = SDL_GetTicks();
+        if (lastKeyboardInputTick != 0U && now - lastKeyboardInputTick < KEY_REPEAT_MS) {
+            return;
+        }
+        lastKeyboardInputTick = now;
+        handleDirectionalKey(key);
+    }
+
     void MutatrisWindow::handleDirectionalKey(SDL_Keycode key) {
         if (game == nullptr) {
             return;
         }
-        const Uint32 now = SDL_GetTicks();
-        if (now - lastInputTick < KEY_REPEAT_MS) {
-            return;
-        }
-        lastInputTick = now;
         Piece &piece = game->grid[focus].gamePiece;
         if (focus == 0) {
             if (key == SDLK_LEFT) {
@@ -649,6 +669,7 @@ namespace mutatris {
         });
         focus = 0;
         lastDropTick = SDL_GetTicks();
+        lastKeyboardInputTick = 0;
         lastClearAnimationTick = lastDropTick;
         shaderLevel = -1;
         shaderIndex = -1;
@@ -738,6 +759,10 @@ namespace mutatris {
     void MutatrisWindow::updatePlaying() {
         if (game == nullptr) {
             startGame();
+        }
+        pollKeyboardInput();
+        if (screen != Screen::Playing) {
+            return;
         }
         processGrid();
         updateBackgroundShaderForLevel();
@@ -993,7 +1018,17 @@ namespace mutatris {
             pw = BLOCK_DRAW_HEIGHT;
             ph = BLOCK_DRAW_WIDTH;
         }
-        sprite->drawSpriteRect(scaleX(px), scaleY(py), scaleX(pw), scaleY(ph));
+        const int scaledWidth = scaleX(pw);
+        const int scaledHeight = scaleY(ph);
+        if (color < 0) {
+            const int clearFrame = std::clamp(std::abs(color) - 1, 0, CLEAR_ANIMATION_FRAMES - 1);
+            const float rotation = static_cast<float>(clearFrame) * (360.0f / static_cast<float>(CLEAR_ANIMATION_FRAMES));
+            const float spriteScaleX = static_cast<float>(scaledWidth) / static_cast<float>(sprite->getWidth());
+            const float spriteScaleY = static_cast<float>(scaledHeight) / static_cast<float>(sprite->getHeight());
+            sprite->drawSprite(scaleX(px), scaleY(py), spriteScaleX, spriteScaleY, rotation);
+        } else {
+            sprite->drawSpriteRect(scaleX(px), scaleY(py), scaledWidth, scaledHeight);
+        }
     }
 
     float MutatrisWindow::layoutScale() const {

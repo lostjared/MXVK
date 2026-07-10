@@ -277,6 +277,7 @@ namespace mxvk {
 
         struct SpriteDrawCmd {
             float x, y, w, h;
+            float rotation;
             glm::vec4 params;
         };
 

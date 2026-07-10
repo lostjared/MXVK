@@ -1627,7 +1627,14 @@ namespace mxvk {
     }
 
     void VK_Sprite::drawSprite(int x, int y, float scaleX, float scaleY, float rotation) {
-        drawSpriteRect(x, y, static_cast<int>(spriteWidth * scaleX), static_cast<int>(spriteHeight * scaleY));
+        if (!spriteLoaded) {
+            throw mxvk::Exception("VKSprite::drawSprite called before sprite was loaded");
+        }
+
+        drawQueue.push_back({static_cast<float>(x), static_cast<float>(y),
+                             static_cast<float>(static_cast<int>(spriteWidth * scaleX)),
+                             static_cast<float>(static_cast<int>(spriteHeight * scaleY)),
+                             rotation, shaderParams});
     }
 
     void VK_Sprite::drawSpriteRect(int x, int y, int w, int h) {
@@ -1636,7 +1643,7 @@ namespace mxvk {
         }
 
         drawQueue.push_back({static_cast<float>(x), static_cast<float>(y),
-                             static_cast<float>(w), static_cast<float>(h), shaderParams});
+                             static_cast<float>(w), static_cast<float>(h), 0.0f, shaderParams});
     }
 
     void VK_Sprite::setShaderParams(float p1, float p2, float p3, float p4) {
@@ -1736,7 +1743,7 @@ namespace mxvk {
             vkCmdBindVertexBuffers(cmdBuffer, 0, 2, buffers, bufOffsets);
             vkCmdBindIndexBuffer(cmdBuffer, quadIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-            float screenSize[2] = {(float)screenWidth, (float)screenHeight};
+            float screenSize[2] = {static_cast<float>(screenWidth), static_cast<float>(screenHeight)};
             vkCmdPushConstants(cmdBuffer, instancedPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(screenSize), screenSize);
 
@@ -1779,7 +1786,7 @@ namespace mxvk {
                 float padding2;
                 float params[4];
             } pc{
-                (float)screenWidth, (float)screenHeight, cmd.x, cmd.y, cmd.w, cmd.h, effectsEnabled ? 1.0f : 0.0f, 0.0f, {cmd.params.x, cmd.params.y, cmd.params.z, cmd.params.w}};
+                static_cast<float>(screenWidth), static_cast<float>(screenHeight), cmd.x, cmd.y, cmd.w, cmd.h, effectsEnabled ? 1.0f : 0.0f, cmd.rotation, {cmd.params.x, cmd.params.y, cmd.params.z, cmd.params.w}};
 
             vkCmdPushConstants(cmdBuffer, layoutToUse, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                0, sizeof(SpritePushConstants), &pc);
