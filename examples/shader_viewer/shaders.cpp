@@ -667,7 +667,7 @@ namespace example {
             fragment_constants.screenHeight = static_cast<float>(extent.height);
             fragment_constants.spriteSizeW = static_cast<float>(extent.width);
             fragment_constants.spriteSizeH = static_cast<float>(extent.height);
-            fragment_constants.params = glm::vec4(elapsed_seconds, 1.0f, 1.0f, 1.0f);
+            fragment_constants.params = glm::vec4(1.0f, 1.0f, 1.0f, elapsed_seconds);
             model.setFragmentPushConstants(fragment_constants);
             if (using_file) {
                 model.renderWithPushConstants(cmd, image_index, 0, ubo, wireframe);
