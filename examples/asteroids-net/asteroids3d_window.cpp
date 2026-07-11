@@ -82,6 +82,12 @@ namespace space {
             return requested_root.lexically_normal().string();
         }
 
+        constexpr std::uint32_t MULTIPLAYER_KILLS_TO_WIN = 10U;
+        constexpr std::array<glm::vec3, NETWORK_PLAYER_COUNT> MULTIPLAYER_SPAWNS = {
+            glm::vec3{-75.0f, 0.0f, -75.0f}, glm::vec3{75.0f, 0.0f, 75.0f},
+            glm::vec3{-75.0f, 0.0f, 75.0f}, glm::vec3{75.0f, 0.0f, -75.0f}};
+        constexpr std::array<float, NETWORK_PLAYER_COUNT> MULTIPLAYER_SPAWN_YAWS = {-135.0f, 45.0f, -45.0f, 135.0f};
+
     } // namespace
 
     class Asteroids3DWindow : public mxvk::VK_Window {
@@ -600,6 +606,7 @@ namespace space {
         bool multiplayer_match = false;
         float multiplayer_collision_grace = 0.0f;
         std::array<std::uint32_t, NETWORK_PLAYER_COUNT> multiplayer_kills{};
+        std::array<std::string, NETWORK_PLAYER_COUNT> multiplayer_player_names{};
         std::array<std::uint32_t, NETWORK_PLAYER_COUNT> multiplayer_death_serials{};
         std::array<std::uint32_t, NETWORK_PLAYER_COUNT> received_death_serials{};
         std::uint8_t multiplayer_winner = 0;
@@ -1159,6 +1166,7 @@ namespace space {
             multiplayer_match = true;
             multiplayer_collision_grace = 2.5f;
             multiplayer_kills = {};
+            multiplayer_player_names = multiplayer.player_names();
             multiplayer_death_serials = {};
             received_death_serials = {};
             multiplayer_winner = 0;
@@ -1169,18 +1177,14 @@ namespace space {
             consumed_projectile_ids = {};
             clear_round_state();
             ship.lives = 99;
-            static constexpr std::array<glm::vec3, NETWORK_PLAYER_COUNT> SPAWNS = {
-                glm::vec3{-30.0f, 0.0f, -30.0f}, glm::vec3{30.0f, 0.0f, 30.0f},
-                glm::vec3{-30.0f, 0.0f, 30.0f}, glm::vec3{30.0f, 0.0f, -30.0f}};
             const std::uint8_t local_id = std::min<std::uint8_t>(multiplayer.local_player_id(), 3U);
-            ship.position = SPAWNS[local_id];
-            static constexpr std::array<float, NETWORK_PLAYER_COUNT> SPAWN_YAWS = {-135.0f, 45.0f, -45.0f, 135.0f};
-            ship.rotation.y = SPAWN_YAWS[local_id];
+            ship.position = MULTIPLAYER_SPAWNS[local_id];
+            ship.rotation.y = MULTIPLAYER_SPAWN_YAWS[local_id];
             ship.current_speed = 6.0f;
             ship.prev_position = ship.position;
             for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
-                remote_ships[player].position = SPAWNS[player];
-                remote_ships[player].rotation = {0.0f, SPAWN_YAWS[player], 0.0f};
+                remote_ships[player].position = MULTIPLAYER_SPAWNS[player];
+                remote_ships[player].rotation = {0.0f, MULTIPLAYER_SPAWN_YAWS[player], 0.0f};
                 remote_ships[player].current_speed = 6.0f;
                 remote_ships[player].visible = multiplayer.player_connected()[player];
             }
@@ -1235,6 +1239,13 @@ namespace space {
             multiplayer_winner = winner;
             multiplayer.exchange(make_network_state(true), 1.0f / 20.0f);
             mode = GameMode::MatchOver;
+        }
+
+        void finish_abandoned_multiplayer_match() {
+            const auto winner = std::max_element(multiplayer_kills.begin(), multiplayer_kills.end());
+            const std::uint8_t winner_id = static_cast<std::uint8_t>(std::distance(multiplayer_kills.begin(), winner) + 1);
+            log_game(std::format("All opponents disconnected. Player {} wins with {} kills.", winner_id, *winner));
+            finish_multiplayer_match(winner_id);
         }
 
 #if 0
@@ -1333,7 +1344,7 @@ namespace space {
                         ++client_death_serial;
                         spawn_ship_explosion(remote_ship.position);
                         log_game(std::format("Enemy destroyed. Score {}-{}.", host_kills, client_kills));
-                        if (host_kills >= 5U) {
+                        if (host_kills >= MULTIPLAYER_KILLS_TO_WIN) {
                             finish_multiplayer_match(1U);
                         }
                         break;
@@ -1353,7 +1364,7 @@ namespace space {
                         start_multiplayer_local_explosion();
                         ++client_kills;
                         log_game(std::format("You were destroyed. Score {}-{}.", host_kills, client_kills));
-                        if (client_kills >= 5U) {
+                        if (client_kills >= MULTIPLAYER_KILLS_TO_WIN) {
                             finish_multiplayer_match(2U);
                         }
                         break;
@@ -1375,6 +1386,11 @@ namespace space {
                     consumed_projectile_ids = update.state.consumed_projectile_ids;
                     multiplayer_winner = update.state.winner;
                 }
+            }
+
+            if (multiplayer.player_count() <= 1U) {
+                finish_abandoned_multiplayer_match();
+                return;
             }
 
             const std::uint8_t local_id = multiplayer.local_player_id();
@@ -1465,7 +1481,7 @@ namespace space {
                         projectile.active = false;
                         ++multiplayer_kills[0];
                         destroy_player(target);
-                        if (multiplayer_kills[0] >= 5U)
+                        if (multiplayer_kills[0] >= MULTIPLAYER_KILLS_TO_WIN)
                             finish_multiplayer_match(1U);
                         break;
                     }
@@ -1488,7 +1504,7 @@ namespace space {
                             consumed_projectile_ids[shooter] = projectile.id;
                             ++multiplayer_kills[shooter];
                             destroy_player(target);
-                            if (multiplayer_kills[shooter] >= 5U)
+                            if (multiplayer_kills[shooter] >= MULTIPLAYER_KILLS_TO_WIN)
                                 finish_multiplayer_match(shooter + 1U);
                             consumed = true;
                             break;
@@ -2293,13 +2309,9 @@ namespace space {
                     ship.exploding = false;
                     ship.visible = true;
                     if (multiplayer_match) {
-                        static constexpr std::array<glm::vec3, NETWORK_PLAYER_COUNT> SPAWNS = {
-                            glm::vec3{-30.0f, 0.0f, -30.0f}, glm::vec3{30.0f, 0.0f, 30.0f},
-                            glm::vec3{-30.0f, 0.0f, 30.0f}, glm::vec3{30.0f, 0.0f, -30.0f}};
                         const std::uint8_t player = std::min<std::uint8_t>(multiplayer.local_player_id(), 3U);
-                        ship.position = SPAWNS[player];
-                        static constexpr std::array<float, NETWORK_PLAYER_COUNT> SPAWN_YAWS = {-135.0f, 45.0f, -45.0f, 135.0f};
-                        ship.rotation = {0.0f, SPAWN_YAWS[player], 0.0f};
+                        ship.position = MULTIPLAYER_SPAWNS[player];
+                        ship.rotation = {0.0f, MULTIPLAYER_SPAWN_YAWS[player], 0.0f};
                     } else {
                         ship.position = glm::vec3(0.0f);
                         ship.rotation = glm::vec3(0.0f);
@@ -3530,8 +3542,8 @@ namespace space {
                 for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player)
                     if (player != local_id)
                         enemy_kills = std::max(enemy_kills, multiplayer_kills[player]);
-                printText("Kills: " + std::to_string(local_kills) + " / 5", right_x, 50, white);
-                printText("Leader: " + std::to_string(enemy_kills) + " / 5", right_x, 75, red);
+                printText("Kills: " + std::to_string(local_kills) + " / " + std::to_string(MULTIPLAYER_KILLS_TO_WIN), right_x, 50, white);
+                printText("Leader: " + std::to_string(enemy_kills) + " / " + std::to_string(MULTIPLAYER_KILLS_TO_WIN), right_x, 75, red);
                 printText("Players: " + std::to_string(multiplayer.player_count()) + " / 4", right_x, 100, white);
                 printText("UDP host-authoritative", right_x, 125, yellow);
                 return;
@@ -3580,16 +3592,32 @@ namespace space {
             set_ui_font_size(22);
             const std::uint8_t local_id = multiplayer.local_player_id();
             const bool local_won = multiplayer_winner == local_id + 1U;
-            const int panel_width = 620;
+            const std::size_t winner_index = multiplayer_winner > 0U ? multiplayer_winner - 1U : 0U;
+            const std::string winner_name = winner_index < multiplayer_player_names.size() && !multiplayer_player_names[winner_index].empty()
+                                                ? multiplayer_player_names[winner_index]
+                                                : std::format("Player {}", multiplayer_winner);
+            const std::string result_text = winner_name + " WINS";
+            const std::string score_text = std::format("Final score: {} kills", local_id < NETWORK_PLAYER_COUNT ? multiplayer_kills[local_id] : 0U);
+            const std::string prompt_text = "Press ENTER to return to the multiplayer lobby";
+
+            const auto text_width = [this](const std::string &text) {
+                int width = 0;
+                int height = 0;
+                if (!getTextDimensions(text.c_str(), width, height)) {
+                    return 0;
+                }
+                return width;
+            };
+            const int widest_text = std::max({text_width(result_text), text_width(score_text), text_width(prompt_text)});
+            const int panel_width = std::max(620, widest_text + 80);
             const int panel_x = static_cast<int>(extent.width) / 2 - panel_width / 2;
             const int panel_y = static_cast<int>(extent.height) / 2 - 150;
             draw_ui_rect(panel_x, panel_y, panel_width, 300, {0.015f, 0.025f, 0.08f, 0.94f});
             draw_ui_rect(panel_x, panel_y, panel_width, 4, local_won ? glm::vec4{0.2f, 1.0f, 0.55f, 1.0f} : glm::vec4{1.0f, 0.2f, 0.2f, 1.0f});
-            printText(local_won ? "VICTORY" : "DEFEAT", panel_x + 235, panel_y + 48,
+            printText(result_text, panel_x + (panel_width - text_width(result_text)) / 2, panel_y + 48,
                       local_won ? SDL_Color{100, 255, 160, 255} : SDL_Color{255, 90, 90, 255});
-            printText(std::format("Final score: {} kills", local_id < NETWORK_PLAYER_COUNT ? multiplayer_kills[local_id] : 0U),
-                      panel_x + 210, panel_y + 120, {255, 255, 255, 255});
-            printText("Press ENTER to return to the multiplayer lobby", panel_x + 70, panel_y + 205, {255, 220, 120, 255});
+            printText(score_text, panel_x + (panel_width - text_width(score_text)) / 2, panel_y + 120, {255, 255, 255, 255});
+            printText(prompt_text, panel_x + (panel_width - text_width(prompt_text)) / 2, panel_y + 205, {255, 220, 120, 255});
         }
 
         void draw_end_screen([[maybe_unused]] uint32_t image_index,

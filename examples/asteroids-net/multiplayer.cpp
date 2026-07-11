@@ -110,9 +110,18 @@ namespace space {
                     names[player].clear();
                 }
             }
+        } else if (assigned_player_id < NETWORK_PLAYER_COUNT && connected_players[0]) {
+            peers[0].idle_seconds += delta_time;
+            if (peers[0].idle_seconds > 5.0f) {
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                    if (player != assigned_player_id) {
+                        connected_players[player] = false;
+                    }
+                }
+            }
         }
 
-        for (;;) {
+        while (1) {
             Packet packet{};
             mxnetwork::SocketAddress sender{};
             const ssize_t received = host_role ? socket.recvfrom(&packet, sizeof(packet), sender) : socket.recvfrom(&packet, sizeof(packet));
@@ -145,6 +154,7 @@ namespace space {
                 connected_players[*player] = true;
                 result.players.push_back({*player, packet.state});
             } else {
+                peers[0].idle_seconds = 0.0f;
                 for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
                     connected_players[player] = (packet.connected_mask & (1U << player)) != 0U;
                 }

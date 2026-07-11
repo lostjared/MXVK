@@ -1868,7 +1868,7 @@ namespace mxvk {
         const int sy = y0 < y1 ? 1 : -1;
         int err = dx + dy;
 
-        for (;;) {
+        while (1) {
             plot_pixel(x0, y0, color);
             if (x0 == x1 && y0 == y1) {
                 break;
