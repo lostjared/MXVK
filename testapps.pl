@@ -65,6 +65,7 @@ my @tests = qw(
     walk
     fireworks
     bluesky
+    asteroids-net
 );
 
 my $count = 0;

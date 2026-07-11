@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#include <winsock2.h>
+#endif
+
 #include "asteroids3d_window.hpp"
 #include "asteroids3d_types.hpp"
 #include "multiplayer.hpp"
