@@ -86,19 +86,6 @@ sub resolve_executable_name {
     return $output_name // $target_name;
 }
 
-sub should_use_build_asset_path {
-    my ($cmake_file) = @_;
-    return 0 if !-f $cmake_file;
-
-    open(my $fh, '<', $cmake_file) or return 0;
-    local $/;
-    my $cmake = <$fh>;
-    close($fh);
-
-    return $cmake =~ /ASSET_DIR\s*=\s*"\$<TARGET_FILE_DIR:[^>]+>"/s
-        || $cmake =~ /ASSET_DIR\s*=\s*"\$\{CMAKE_CURRENT_BINARY_DIR\}"/s;
-}
-
 sub resolve_program_executable_path {
     my ($program_name) = @_;
     my $data_path = "$source_dir/$program_name";
@@ -159,12 +146,10 @@ if (!$exe_name) {
 }
 
 my $exe_path = "$build_dir/$program_name/$exe_name";
-my $use_build_asset_path = should_use_build_asset_path($cmake_file);
-
 if (-x $exe_path) {
     my $exe_dir = dirname($exe_path);
     my $resolved_exe_name = basename($exe_path);
-    my $runtime_path = $use_build_asset_path ? $exe_dir : $data_path;
+    my $runtime_path = -d "$exe_dir/data" ? $exe_dir : $data_path;
 
     chdir($exe_dir) or die "Cannot cd to $exe_dir: $!\n";
 

@@ -48,18 +48,46 @@
 
 namespace space {
 
+    namespace {
+
+        [[nodiscard]] std::string resolve_asset_root(const std::string &path) {
+            if (!path.empty() && path != ".") {
+                return path;
+            }
+
+            if (const char *base_path = SDL_GetBasePath(); base_path != nullptr && base_path[0] != '\0') {
+                return std::filesystem::path(base_path).lexically_normal().string();
+            }
+
+            return ".";
+        }
+
+        [[nodiscard]] std::string resolve_shader_root(const std::string &asset_root) {
+            const std::filesystem::path requested_root = std::filesystem::path(asset_root) / "data";
+            if (std::filesystem::exists(requested_root / "crt.frag.spv")) {
+                return requested_root.lexically_normal().string();
+            }
+
+            if (const char *base_path = SDL_GetBasePath(); base_path != nullptr && base_path[0] != '\0') {
+                const std::filesystem::path runtime_root = std::filesystem::path(base_path) / "data";
+                if (std::filesystem::exists(runtime_root / "crt.frag.spv")) {
+                    return runtime_root.lexically_normal().string();
+                }
+            }
+
+            return requested_root.lexically_normal().string();
+        }
+
+    } // namespace
+
     class Asteroids3DWindow : public mxvk::VK_Window {
       public:
         Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt, bool disable_sound)
             : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
-              shader_root(asset_root + "/data"),
+              asset_root(resolve_asset_root(path)),
+              shader_root(resolve_shader_root(asset_root)),
               crt_enabled(enable_crt),
               background_music_disabled(disable_sound) {
-            if (asset_root == ".") {
-                asset_root = ASTEROIDS3D_ASSET_DIR;
-            }
-
             std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(
                 mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
             if (window_icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), window_icon.get())) {
@@ -772,19 +800,11 @@ namespace space {
 
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
         std::string asteroids3d_asset_path(const std::string &filename) const {
-            const std::string local_path = asset_root + "/data/" + filename;
-            if (std::filesystem::exists(local_path)) {
-                return local_path;
-            }
-            return std::string(ASTEROIDS3D_SOURCE_DATA_DIR) + "/" + filename;
+            return asset_root + "/data/" + filename;
         }
 
         std::string sound_effect_path(const std::string &filename) const {
-            const std::string local_path = asset_root + "/data/" + filename;
-            if (std::filesystem::exists(local_path)) {
-                return local_path;
-            }
-            return std::string(ASTEROIDS3D_DEFENDER_SOUND_DIR) + "/" + filename;
+            return asset_root + "/data/" + filename;
         }
 
         void load_sound_effects() {

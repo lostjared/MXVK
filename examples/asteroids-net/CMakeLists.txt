@@ -131,11 +131,6 @@ add_custom_target(asteroids-net_shaders
 )
 
 add_dependencies(asteroids-net asteroids-net_shaders)
-target_compile_definitions(asteroids-net PRIVATE
-    ASTEROIDS3D_ASSET_DIR="$<TARGET_FILE_DIR:asteroids-net>"
-    ASTEROIDS3D_SOURCE_DATA_DIR="$<TARGET_FILE_DIR:asteroids-net>/data"
-    ASTEROIDS3D_DEFENDER_SOUND_DIR="$<TARGET_FILE_DIR:asteroids-net>/data"
-)
 
 add_custom_command(TARGET asteroids-net POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:asteroids-net>/data

@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -46,6 +47,10 @@
 
 #if defined(_WIN32)
 #include <io.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif
@@ -70,6 +75,29 @@ concept StringType = std::is_class_v<T> && requires(T type) {
     { type += T{} } -> std::same_as<T &>;
     { type = T{} } -> std::same_as<T &>;
 };
+
+[[nodiscard]] inline std::string executable_directory(const char *executable) {
+#if defined(_WIN32)
+    std::vector<char> buffer(32768);
+    const DWORD length = GetModuleFileNameA(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length > 0 && length < buffer.size()) {
+        return std::filesystem::path(std::string(buffer.data(), length)).parent_path().lexically_normal().string();
+    }
+#elif defined(__linux__)
+    std::vector<char> buffer(4096);
+    const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size());
+    if (length > 0 && static_cast<std::size_t>(length) < buffer.size()) {
+        return std::filesystem::path(std::string(buffer.data(), static_cast<std::size_t>(length))).parent_path().lexically_normal().string();
+    }
+#endif
+
+    std::error_code error;
+    const std::filesystem::path absolute_path = std::filesystem::absolute(executable == nullptr ? "." : executable, error);
+    if (!error && absolute_path.has_parent_path()) {
+        return absolute_path.parent_path().lexically_normal().string();
+    }
+    return ".";
+}
 
 /** @brief Discriminator for option kind used inside Argument. */
 enum class ArgType {
@@ -696,7 +724,7 @@ struct Arguments {
     int width = 1280;                     ///< Viewport width in pixels (default: 1280).
     int height = 720;                     ///< Viewport height in pixels (default: 720).
     bool resolutionSpecified = false;     ///< Whether -r/--resolution was provided.
-    std::string path = ".";               ///< Asset search path (default: ".").
+    std::string path = ".";               ///< Asset root; proc_args() defaults it to the executable directory.
     bool fullscreen = false;              ///< Whether fullscreen mode was requested.
     bool fast = false;                    ///< Whether fast mode was requested (@c --fast).
     std::string filename;                 ///< Optional input filename (@c --filename).
@@ -1035,8 +1063,14 @@ inline Arguments proc_args(int &argc, char **argv) {
         }
     }
     if (path.empty()) {
-        std::cerr << "mx: No path provided trying default current directory.\n";
-        path = ".";
+        path = executable_directory(argc > 0 ? argv[0] : nullptr);
+        std::cerr << "mx: No path provided; using executable directory: " << path << '\n';
+    } else {
+        std::error_code error;
+        const std::filesystem::path absolute_path = std::filesystem::absolute(path, error);
+        if (!error) {
+            path = absolute_path.lexically_normal().string();
+        }
     }
     args.executable_name = executable_name;
     mxvk::setDefaultExecutableName(executable_name);

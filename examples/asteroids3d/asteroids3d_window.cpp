@@ -42,12 +42,32 @@
 
 namespace space {
 
+    namespace {
+
+        [[nodiscard]] std::string resolve_shader_root(const std::string &asset_root) {
+            const std::filesystem::path requested_root = std::filesystem::path(asset_root) / "data";
+            if (std::filesystem::exists(requested_root / "crt.frag.spv")) {
+                return requested_root.lexically_normal().string();
+            }
+
+            if (const char *base_path = SDL_GetBasePath(); base_path != nullptr && base_path[0] != '\0') {
+                const std::filesystem::path runtime_root = std::filesystem::path(base_path) / "data";
+                if (std::filesystem::exists(runtime_root / "crt.frag.spv")) {
+                    return runtime_root.lexically_normal().string();
+                }
+            }
+
+            return requested_root.lexically_normal().string();
+        }
+
+    } // namespace
+
     class Asteroids3DWindow : public mxvk::VK_Window {
       public:
         Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt)
             : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
-              shader_root(asset_root + "/data"),
+              shader_root(resolve_shader_root(asset_root)),
               crt_enabled(enable_crt) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
