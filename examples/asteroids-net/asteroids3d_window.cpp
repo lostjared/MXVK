@@ -3057,6 +3057,21 @@ namespace space {
             return false;
         }
 
+        bool cannon_has_opponent_target(const glm::vec3 &muzzle, const glm::vec3 &forward) const {
+            if (!multiplayer_match || !remote_ship.visible || remote_ship_exploding) {
+                return false;
+            }
+            constexpr float OPPONENT_TARGET_RADIUS = 1.8f;
+            const float max_range = PROJECTILE_SPEED * PROJECTILE_LIFETIME;
+            const glm::vec3 to_opponent = remote_ship.position - muzzle;
+            const float along_ray = glm::dot(to_opponent, forward);
+            if (along_ray < 0.0f || along_ray > max_range) {
+                return false;
+            }
+            const glm::vec3 closest_point = muzzle + forward * along_ray;
+            return glm::length(closest_point - remote_ship.position) <= OPPONENT_TARGET_RADIUS;
+        }
+
         void draw_cannon_crosshair(const VkExtent2D &extent) {
             if (ui_pixel == nullptr || !ship.visible || ship.exploding || extent.width < 160U || extent.height < 120U) {
                 return;
@@ -3077,9 +3092,14 @@ namespace space {
 
             const int x = std::clamp(screen_position->x, ARM_LENGTH + 2, static_cast<int>(extent.width) - ARM_LENGTH - 2);
             const int y = std::clamp(screen_position->y, ARM_LENGTH + 2, static_cast<int>(extent.height) - ARM_LENGTH - 2);
-            const bool target_locked = cannon_has_asteroid_target(muzzle, forward);
-            const glm::vec4 shadow = target_locked ? glm::vec4{0.0f, 0.02f, 0.07f, 0.7f} : glm::vec4{0.05f, 0.0f, 0.0f, 0.7f};
-            const glm::vec4 crosshair_color = target_locked ? glm::vec4{0.12f, 0.58f, 1.0f, 0.98f} : glm::vec4{1.0f, 0.03f, 0.02f, 0.96f};
+            const bool opponent_locked = cannon_has_opponent_target(muzzle, forward);
+            const bool asteroid_locked = cannon_has_asteroid_target(muzzle, forward);
+            const glm::vec4 shadow = opponent_locked
+                                         ? glm::vec4{0.12f, 0.08f, 0.0f, 0.75f}
+                                         : (asteroid_locked ? glm::vec4{0.0f, 0.02f, 0.07f, 0.7f} : glm::vec4{0.05f, 0.0f, 0.0f, 0.7f});
+            const glm::vec4 crosshair_color = opponent_locked
+                                                  ? glm::vec4{1.0f, 0.86f, 0.08f, 1.0f}
+                                                  : (asteroid_locked ? glm::vec4{0.12f, 0.58f, 1.0f, 0.98f} : glm::vec4{1.0f, 0.03f, 0.02f, 0.96f});
 
             draw_ui_rect(x - ARM_LENGTH - 1, y - THICKNESS / 2 - 1, ARM_LENGTH - GAP + 2, THICKNESS + 2, shadow);
             draw_ui_rect(x + GAP - 1, y - THICKNESS / 2 - 1, ARM_LENGTH - GAP + 2, THICKNESS + 2, shadow);
