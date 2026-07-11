@@ -1,19 +1,37 @@
 #ifndef ASTEROIDS_NET_PORT_MAPPING_HPP
 #define ASTEROIDS_NET_PORT_MAPPING_HPP
 
+/**
+ * @file port_mapping.hpp
+ * @brief Automatic UDP port mapping for hosted multiplayer sessions.
+ */
+
 #include <cstdint>
 #include <string>
 
 namespace space {
 
+    /**
+     * @class PortMapping
+     * @brief Owns an automatically created UPnP or NAT-PMP port mapping.
+     *
+     * Destroying the object removes any mapping successfully created by open().
+     */
     class PortMapping {
       public:
+        /** @brief Creates an inactive port mapping. */
         PortMapping() = default;
+        /** @brief Removes the active mapping, if one was created. */
         ~PortMapping();
         PortMapping(const PortMapping &) = delete;
         PortMapping &operator=(const PortMapping &) = delete;
 
+        /**
+         * @brief Attempts to expose a local UDP port through the router.
+         * @param port Decimal UDP port number to map.
+         */
         void open(const std::string &port);
+        /** @brief Returns a human-readable description of the mapping result. */
         [[nodiscard]] const std::string &status() const;
 
       private:

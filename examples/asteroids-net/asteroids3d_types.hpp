@@ -1,6 +1,11 @@
 #ifndef ASTEROIDS3D_TYPES_HPP
 #define ASTEROIDS3D_TYPES_HPP
 
+/**
+ * @file asteroids3d_types.hpp
+ * @brief Shared simulation constants, data types, and utility functions.
+ */
+
 #include "mxvk/mxvk_exception.hpp"
 #include "mxvk/mxvk_png.hpp"
 
@@ -22,62 +27,88 @@
 
 namespace space {
 
-    constexpr float PI = 3.14159265358979323846f;
-    constexpr int GAME_STARS = 22000;
-    constexpr int MAX_PROJECTILES = 64;
-    constexpr int MAX_ASTEROIDS = 64;
-    constexpr int MAX_PARTICLES = 6000;
-    constexpr int MAX_GENERATIONS = 1;
-    constexpr int CHILDREN_PER_SPAWN = 2;
-    constexpr int LARGE_ASTEROID_POINTS = 20;
-    constexpr int MEDIUM_ASTEROID_POINTS = 50;
-    constexpr int SMALL_ASTEROID_POINTS = 100;
-    constexpr float PROJECTILE_SPEED = 52.0f;
-    constexpr float PROJECTILE_LIFETIME = 3.0f;
-    constexpr int FIRE_COOLDOWN = 5;
-    constexpr int SHOTS_PER_BURST = 5;
-    constexpr int FIRE_DELAY = 3;
-    constexpr int EXPLOSION_DURATION_FRAMES = 90;
-    constexpr float ROUND_TIME_LIMIT_SECONDS = 270.0f;
-    constexpr float SHIP_MODEL_SCALE = 1.55f;
-    constexpr float ASTEROID_SHIP_COLLISION_SCALE = 1.08f;
-    constexpr float ASTEROID_PROJECTILE_COLLISION_SCALE = 1.18f;
-    constexpr glm::vec4 PROJECTILE_COLOR{1.0f, 0.58f, 0.12f, 1.0f};
-    constexpr Sint16 CONTROLLER_DEAD_ZONE = 8000;
-    constexpr float CONTROLLER_AXIS_MAX = 32767.0f;
-    constexpr float BOUNDARY_X_MIN = -150.0f;
-    constexpr float BOUNDARY_X_MAX = 150.0f;
-    constexpr float BOUNDARY_Y_MIN = -100.0f;
-    constexpr float BOUNDARY_Y_MAX = 100.0f;
-    constexpr float BOUNDARY_Z_MIN = -150.0f;
-    constexpr float BOUNDARY_Z_MAX = 150.0f;
-    constexpr float BOUNDARY_BOUNCE_FACTOR = 1.2f;
+    /** @name Simulation constants
+     * @{
+     */
+    constexpr float PI = 3.14159265358979323846f;                   ///< Single-precision value of pi.
+    constexpr int GAME_STARS = 22000;                               ///< Number of stars in the background field.
+    constexpr int MAX_PROJECTILES = 64;                             ///< Maximum locally simulated projectiles.
+    constexpr int MAX_ASTEROIDS = 64;                               ///< Maximum locally simulated asteroids.
+    constexpr int MAX_PARTICLES = 6000;                             ///< Maximum particles in the shared particle pool.
+    constexpr int MAX_GENERATIONS = 1;                              ///< Maximum asteroid split generation.
+    constexpr int CHILDREN_PER_SPAWN = 2;                           ///< Child asteroids created by a split.
+    constexpr int LARGE_ASTEROID_POINTS = 20;                       ///< Score awarded for a large asteroid.
+    constexpr int MEDIUM_ASTEROID_POINTS = 50;                      ///< Score awarded for a medium asteroid.
+    constexpr int SMALL_ASTEROID_POINTS = 100;                      ///< Score awarded for a small asteroid.
+    constexpr float PROJECTILE_SPEED = 52.0f;                       ///< Projectile travel speed in world units per second.
+    constexpr float PROJECTILE_LIFETIME = 3.0f;                     ///< Projectile lifetime in seconds.
+    constexpr int FIRE_COOLDOWN = 5;                                ///< Frames between firing bursts.
+    constexpr int SHOTS_PER_BURST = 5;                              ///< Projectiles fired in one burst.
+    constexpr int FIRE_DELAY = 3;                                   ///< Frames between shots within a burst.
+    constexpr int EXPLOSION_DURATION_FRAMES = 90;                   ///< Ship explosion duration in frames.
+    constexpr float ROUND_TIME_LIMIT_SECONDS = 270.0f;              ///< Multiplayer round limit in seconds.
+    constexpr float SHIP_MODEL_SCALE = 1.55f;                       ///< Uniform ship model scale.
+    constexpr float ASTEROID_SHIP_COLLISION_SCALE = 1.08f;          ///< Ship collision-radius adjustment.
+    constexpr float ASTEROID_PROJECTILE_COLLISION_SCALE = 1.18f;    ///< Projectile collision-radius adjustment.
+    constexpr glm::vec4 PROJECTILE_COLOR{1.0f, 0.58f, 0.12f, 1.0f}; ///< Default projectile color.
+    constexpr Sint16 CONTROLLER_DEAD_ZONE = 8000;                   ///< Controller axis dead-zone magnitude.
+    constexpr float CONTROLLER_AXIS_MAX = 32767.0f;                 ///< Maximum signed controller axis magnitude.
+    constexpr float BOUNDARY_X_MIN = -150.0f;                       ///< Minimum simulation x-coordinate.
+    constexpr float BOUNDARY_X_MAX = 150.0f;                        ///< Maximum simulation x-coordinate.
+    constexpr float BOUNDARY_Y_MIN = -100.0f;                       ///< Minimum simulation y-coordinate.
+    constexpr float BOUNDARY_Y_MAX = 100.0f;                        ///< Maximum simulation y-coordinate.
+    constexpr float BOUNDARY_Z_MIN = -150.0f;                       ///< Minimum simulation z-coordinate.
+    constexpr float BOUNDARY_Z_MAX = 150.0f;                        ///< Maximum simulation z-coordinate.
+    constexpr float BOUNDARY_BOUNCE_FACTOR = 1.2f;                  ///< Boundary collision response multiplier.
+    /** @} */
 
+    /** @brief High-level state of the Asteroids application. */
     enum class GameMode {
-        Intro,
-        Loading,
-        Lobby,
-        Playing,
-        MatchOver,
-        GameComplete,
-        GameOver
+        Intro,        ///< Introductory screen.
+        Loading,      ///< Asset-loading screen.
+        Lobby,        ///< Multiplayer lobby.
+        Playing,      ///< Active gameplay.
+        MatchOver,    ///< Completed multiplayer round.
+        GameComplete, ///< Completed game.
+        GameOver      ///< Player has no remaining lives.
     };
 
+    /** @brief Returns the thread-local random number engine used by simulation helpers. */
     inline std::default_random_engine &rng() {
         static thread_local std::default_random_engine engine{std::random_device{}()};
         return engine;
     }
 
+    /**
+     * @brief Generates a uniformly distributed floating-point value.
+     * @param min_value Inclusive lower bound.
+     * @param max_value Inclusive upper bound.
+     * @return Generated value.
+     */
     inline float random_float(float min_value, float max_value) {
         std::uniform_real_distribution<float> dist(min_value, max_value);
         return dist(rng());
     }
 
+    /**
+     * @brief Generates a uniformly distributed integer.
+     * @param min_value Inclusive lower bound.
+     * @param max_value Inclusive upper bound.
+     * @return Generated value.
+     */
     inline int random_int(int min_value, int max_value) {
         std::uniform_int_distribution<int> dist(min_value, max_value);
         return dist(rng());
     }
 
+    /**
+     * @brief Loads a PNG and fades dark color-key pixels to transparency.
+     * @param path PNG file path.
+     * @param threshold Brightness at or below which pixels become transparent.
+     * @param softness Brightness range over which alpha fades in.
+     * @return Newly allocated RGBA surface owned by the caller.
+     * @throws mxvk::Exception If the image cannot be loaded, converted, queried, or locked.
+     */
     inline SDL_Surface *load_color_keyed_png(const std::string &path, std::uint8_t threshold = 12, std::uint8_t softness = 48) {
         SDL_Surface *loaded_surface = mxvk::LoadPNG(path.c_str());
         if (loaded_surface == nullptr) {
@@ -185,6 +216,11 @@ namespace space {
         return surface;
     }
 
+    /**
+     * @brief Normalizes a direction with a stable fallback.
+     * @param value Direction to normalize.
+     * @return Normalized value, or forward when its length is near zero.
+     */
     inline glm::vec3 normalize_or_zero(const glm::vec3 &value) {
         const float len = glm::length(value);
         if (len <= 1e-6f) {
@@ -193,6 +229,14 @@ namespace space {
         return value / len;
     }
 
+    /**
+     * @brief Builds a translated, rotated, scaled model matrix.
+     * @param position World-space translation.
+     * @param rotation_degrees Euler rotation in degrees.
+     * @param scale Uniform scale.
+     * @param center_offset Model-space center correction.
+     * @return Composed model matrix.
+     */
     inline glm::mat4 build_model_matrix(const glm::vec3 &position,
                                         const glm::vec3 &rotation_degrees,
                                         float scale,
@@ -207,62 +251,69 @@ namespace space {
         return model;
     }
 
+    /** @brief Runtime state for a ship projectile. */
     struct Projectile {
-        glm::vec3 position{0.0f};
-        glm::vec3 prev_position{0.0f};
-        glm::vec3 velocity{0.0f};
-        glm::vec4 color{1.0f, 0.58f, 0.12f, 1.0f};
-        float lifetime = 0.0f;
-        bool active = false;
+        glm::vec3 position{0.0f};                  ///< Current world-space position.
+        glm::vec3 prev_position{0.0f};             ///< Position from the previous simulation step.
+        glm::vec3 velocity{0.0f};                  ///< World-space velocity.
+        glm::vec4 color{1.0f, 0.58f, 0.12f, 1.0f}; ///< Render color.
+        float lifetime = 0.0f;                     ///< Remaining lifetime in seconds.
+        bool active = false;                       ///< Whether this slot is active.
     };
 
+    /** @brief Runtime state for an asteroid. */
     struct Asteroid {
-        glm::vec3 position{0.0f};
-        glm::vec3 velocity{0.0f};
-        glm::vec3 rotation{0.0f};
-        glm::vec3 rotation_speed{0.0f};
-        float radius = 0.0f;
-        bool active = false;
-        int generation = 0;
-        int model_index = 0;
+        glm::vec3 position{0.0f};       ///< Current world-space position.
+        glm::vec3 velocity{0.0f};       ///< World-space velocity.
+        glm::vec3 rotation{0.0f};       ///< Euler rotation in degrees.
+        glm::vec3 rotation_speed{0.0f}; ///< Angular velocity in degrees per second.
+        float radius = 0.0f;            ///< Collision radius.
+        bool active = false;            ///< Whether this slot is active.
+        int generation = 0;             ///< Split generation used to determine size and scoring.
+        int model_index = 0;            ///< Asteroid model variant.
     };
 
+    /** @brief One spherical sample used by the compound ship collision shape. */
     struct ShipCollisionSample {
-        glm::vec3 local_position{0.0f};
-        float radius = 0.0f;
+        glm::vec3 local_position{0.0f}; ///< Sample center in ship-local space.
+        float radius = 0.0f;            ///< Sample sphere radius.
     };
 
+    /** @brief Runtime state for an explosion or engine particle. */
     struct Particle {
-        glm::vec3 position{0.0f};
-        glm::vec3 velocity{0.0f};
-        glm::vec4 color{1.0f};
-        float size = 0.0f;
-        float lifetime = 0.0f;
-        float max_lifetime = 0.0f;
-        bool color_flash = false;
-        bool active = false;
+        glm::vec3 position{0.0f};  ///< Current world-space position.
+        glm::vec3 velocity{0.0f};  ///< World-space velocity.
+        glm::vec4 color{1.0f};     ///< Render color.
+        float size = 0.0f;         ///< Rendered point size.
+        float lifetime = 0.0f;     ///< Remaining lifetime in seconds.
+        float max_lifetime = 0.0f; ///< Initial lifetime in seconds.
+        bool color_flash = false;  ///< Whether the particle flashes as it ages.
+        bool active = false;       ///< Whether this slot is active.
     };
 
+    /** @brief Vertex consumed by the procedural engine-flame pipeline. */
     struct FlameVertex {
-        glm::vec3 pos{};
-        glm::vec4 color{};
+        glm::vec3 pos{};   ///< Vertex position.
+        glm::vec4 color{}; ///< Vertex color.
     };
 
+    /** @brief Push-constant payload for the engine-flame shaders. */
     struct FlamePushConstants {
-        glm::mat4 mvp{1.0f};
-        glm::vec4 params{0.0f};
+        glm::mat4 mvp{1.0f};    ///< Model-view-projection matrix.
+        glm::vec4 params{0.0f}; ///< Shader-specific animation parameters.
     };
 
+    /** @brief Runtime state for one animated background star. */
     struct Star {
-        glm::vec3 position{0.0f};
-        glm::vec3 velocity{0.0f};
-        glm::vec4 base_color{1.0f};
-        glm::vec4 color{1.0f};
-        float size = 1.0f;
-        float brightness = 1.0f;
-        float twinkle_phase = 0.0f;
-        float twinkle_speed = 1.0f;
-        int layer = 0;
+        glm::vec3 position{0.0f};   ///< World-space position.
+        glm::vec3 velocity{0.0f};   ///< World-space velocity.
+        glm::vec4 base_color{1.0f}; ///< Color before brightness modulation.
+        glm::vec4 color{1.0f};      ///< Current rendered color.
+        float size = 1.0f;          ///< Rendered point size.
+        float brightness = 1.0f;    ///< Base brightness multiplier.
+        float twinkle_phase = 0.0f; ///< Twinkle animation phase.
+        float twinkle_speed = 1.0f; ///< Twinkle animation rate.
+        int layer = 0;              ///< Parallax layer index.
     };
 
 } // namespace space

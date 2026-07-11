@@ -60,13 +60,12 @@ namespace space {
 
 #if defined(ASTEROIDS_NET_HAS_MINIUPNPC)
         int get_valid_igd(UPNPDev *devices, UPNPUrls &urls, IGDdatas &data, char *local_address,
-                          std::size_t local_address_size, char *external_address, std::size_t external_address_size) {
+                          std::size_t local_address_size, [[maybe_unused]] char *external_address,
+                          [[maybe_unused]] std::size_t external_address_size) {
 #if MINIUPNPC_API_VERSION >= 21
             return UPNP_GetValidIGD(devices, &urls, &data, local_address, static_cast<int>(local_address_size), external_address,
                                     static_cast<int>(external_address_size));
 #else
-            (void)external_address;
-            (void)external_address_size;
             return UPNP_GetValidIGD(devices, &urls, &data, local_address, static_cast<int>(local_address_size));
 #endif
         }
