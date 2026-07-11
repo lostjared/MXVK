@@ -6,6 +6,9 @@ add_executable(asteroids-net
     ship.cpp
     starfield.cpp
 )
+if(MINGW)
+    target_sources(asteroids-net PRIVATE data/icon.rc)
+endif()
 target_link_libraries(asteroids-net PRIVATE rain libmxnetwork::mxnetwork)
 
 find_path(MINIUPNPC_INCLUDE_DIR miniupnpc/miniupnpc.h)

@@ -11,6 +11,7 @@
 #include "mxvk/mxvk_console.hpp"
 #include "mxvk/mxvk_controller.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_png.hpp"
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
 #include "mxvk/mxvk_sound.hpp"
 #endif
@@ -29,6 +30,7 @@
 #include <exception>
 #include <filesystem>
 #include <format>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -56,6 +58,12 @@ namespace space {
               background_music_disabled(disable_sound) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
+            }
+
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(
+                mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
+            if (window_icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), window_icon.get())) {
+                std::cerr << "asteroids-net: could not set SDL window icon: " << SDL_GetError() << '\n';
             }
 
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
