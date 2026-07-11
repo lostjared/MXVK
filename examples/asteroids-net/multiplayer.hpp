@@ -32,6 +32,7 @@ namespace space {
     struct NetworkState {
         std::array<float, 3> position{};
         std::array<float, 3> rotation{};
+        float current_speed = 1.0f;
         std::array<NetworkProjectile, NETWORK_PROJECTILE_COUNT> projectiles{};
         std::array<NetworkAsteroid, NETWORK_ASTEROID_COUNT> asteroids{};
         std::uint32_t host_kills = 0;

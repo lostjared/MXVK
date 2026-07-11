@@ -409,10 +409,12 @@ namespace space {
             draw_asteroids(image_index);
             if (!first_person_camera && !camera_transition_active) {
                 draw_ship(image_index);
-                draw_engine_flame(cmd, extent);
+                draw_engine_flame(cmd, extent, last_ship_model_matrix, ship.current_speed, ship.visible && !ship.exploding);
             }
             if (multiplayer_match) {
                 draw_remote_ship(image_index);
+                draw_engine_flame(cmd, extent, last_remote_ship_model_matrix, std::max(remote_ship.current_speed, 1.0f),
+                                  remote_ship.visible && !remote_ship_exploding);
             }
             draw_projectiles();
             if (multiplayer_match) {
@@ -520,6 +522,7 @@ namespace space {
         std::atomic<int> loading_step_index{0};
         static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
         glm::mat4 last_ship_model_matrix{1.0f};
+        glm::mat4 last_remote_ship_model_matrix{1.0f};
         VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
         VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
         VkPipeline flame_pipeline = VK_NULL_HANDLE;
@@ -1000,6 +1003,7 @@ namespace space {
             NetworkState state{};
             state.position = {ship.position.x, ship.position.y, ship.position.z};
             state.rotation = {ship.rotation.x, ship.rotation.y, ship.rotation.z};
+            state.current_speed = ship.current_speed;
             state.exploding = ship.exploding ? 1U : 0U;
             state.match_started = match_started ? 1U : 0U;
             state.host_kills = host_kills;
@@ -1043,6 +1047,7 @@ namespace space {
             remote_ship.prev_position = remote_ship.position;
             remote_ship.position = {state.position[0], state.position[1], state.position[2]};
             remote_ship.rotation = {state.rotation[0], state.rotation[1], state.rotation[2]};
+            remote_ship.current_speed = state.current_speed;
             remote_ship.visible = state.exploding == 0U;
             remote_projectiles = state.projectiles;
             if (!multiplayer.is_host()) {
@@ -2602,6 +2607,7 @@ namespace space {
             }
             mxvk::UniformBufferObject ubo{};
             ubo.model = build_model_matrix(remote_ship.position, remote_ship.rotation, rendered_ship_scale(), remote_ship_model.modelCenterOffset());
+            last_remote_ship_model_matrix = ubo.model;
             ubo.view = view_matrix;
             ubo.proj = projection_matrix;
             ubo.fx = glm::vec4(camera_position, elapsed_seconds);
@@ -2914,8 +2920,12 @@ namespace space {
             vkDestroyShaderModule(device, vert_shader_module, nullptr);
         }
 
-        void draw_engine_flame(VkCommandBuffer cmd, const VkExtent2D &extent) {
-            if (!ship.visible || ship.current_speed <= ship.min_speed * 1.2f) {
+        void draw_engine_flame(VkCommandBuffer cmd,
+                               const VkExtent2D &extent,
+                               const glm::mat4 &ship_matrix,
+                               float ship_speed,
+                               bool ship_visible) {
+            if (!ship_visible) {
                 return;
             }
             if (flame_pipeline == VK_NULL_HANDLE || flame_vertex_buffer == VK_NULL_HANDLE || flame_vertex_count == 0) {
@@ -2937,8 +2947,9 @@ namespace space {
             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
             FlamePushConstants pc{};
-            pc.mvp = projection_matrix * view_matrix * last_ship_model_matrix;
-            pc.params = glm::vec4(elapsed_seconds, ship.current_speed / ship.max_speed, 0.0f, 0.0f);
+            pc.mvp = projection_matrix * view_matrix * ship_matrix;
+            const float flame_power = std::clamp(ship_speed / ship.max_speed, 0.08f, 1.0f);
+            pc.params = glm::vec4(elapsed_seconds, flame_power, 0.0f, 0.0f);
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, flame_pipeline);
             vkCmdPushConstants(cmd,
