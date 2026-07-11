@@ -92,10 +92,14 @@ namespace space {
               shader_root(resolve_shader_root(asset_root)),
               crt_enabled(enable_crt),
               background_music_disabled(disable_sound) {
-            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(
-                mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
-            if (window_icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), window_icon.get())) {
-                std::cerr << "asteroids-net: could not set SDL window icon: " << SDL_GetError() << '\n';
+            const char *video_driver = SDL_GetCurrentVideoDriver();
+            const bool uses_wayland = video_driver != nullptr && std::strcmp(video_driver, "wayland") == 0;
+            if (!uses_wayland) {
+                std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(
+                    mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
+                if (window_icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), window_icon.get())) {
+                    std::cerr << "asteroids-net: could not set SDL window icon: " << SDL_GetError() << '\n';
+                }
             }
 
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1768,7 +1772,7 @@ namespace space {
                 if (format_details == nullptr || !SDL_FillSurfaceRect(ui_surface.get(), nullptr, SDL_MapRGBA(format_details, nullptr, 255, 255, 255, 255))) {
                     throw mxvk::Exception("Failed to initialize asteroids3d UI pixel surface");
                 }
-                ui_pixel = createSprite(ui_surface.get(), "", shader_root + "/fade_overlay.frag.spv");
+                ui_pixel = createSprite(ui_surface.get(), asset_root + "/data/sprite.vert.spv", shader_root + "/fade_overlay.frag.spv");
                 if (ui_pixel == nullptr) {
                     throw mxvk::Exception("Failed to create asteroids3d UI pixel sprite");
                 }

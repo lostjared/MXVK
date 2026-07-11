@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Asteroids Net
+Comment=Networked 3D asteroids game
+Exec=asteroids-net
+Icon=asteroids-net
+Terminal=false
+Categories=Game;ArcadeGame;
+Keywords=asteroids;space;multiplayer;arcade;
+StartupNotify=false
