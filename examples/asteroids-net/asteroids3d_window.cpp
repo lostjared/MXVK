@@ -526,6 +526,7 @@ namespace space {
         mxvk::VK_Sprite *ui_pixel = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
         mxvk::Font lobby_status_font{};
+        mxvk::Font lobby_roster_font{};
         mxvk::VK_Console console;
         mxvk::VK_Controller controller;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
@@ -542,6 +543,7 @@ namespace space {
         std::atomic<bool> model_preload_failed{false};
         int last_font_size = 0;
         int lobby_status_font_size = 16;
+        int lobby_roster_font_size = 16;
         float round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
         std::atomic<int> loading_step_index{0};
         static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
@@ -817,6 +819,7 @@ namespace space {
         void load_loading_screen_resources() {
             set_ui_font_size(18);
             lobby_status_font.reset(asset_root + "/data/font.ttf", lobby_status_font_size);
+            lobby_roster_font.reset(asset_root + "/data/font.ttf", lobby_roster_font_size);
 
             intro_sprite = createSprite(
                 asset_root + "/data/intro.png",
@@ -1509,10 +1512,15 @@ namespace space {
                                                static_cast<float>(extent.height) / 720.0f);
             const int lobby_font_size = std::clamp(static_cast<int>(std::lround(22.0f * lobby_scale)), 14, 22);
             const int desired_status_font_size = std::clamp(static_cast<int>(std::lround(16.0f * lobby_scale)), 12, 16);
+            const int desired_roster_font_size = std::clamp(static_cast<int>(std::lround(16.0f * lobby_scale)), 12, 16);
             set_ui_font_size(lobby_font_size);
             if (desired_status_font_size != lobby_status_font_size) {
                 lobby_status_font_size = desired_status_font_size;
                 lobby_status_font.reset(asset_root + "/data/font.ttf", lobby_status_font_size);
+            }
+            if (desired_roster_font_size != lobby_roster_font_size) {
+                lobby_roster_font_size = desired_roster_font_size;
+                lobby_roster_font.reset(asset_root + "/data/font.ttf", lobby_roster_font_size);
             }
             printText("ASTEROIDS NET", panel_x + 284, 100, {120, 220, 255, 255});
             printText("MULTIPLAYER - UP TO 4", panel_x + 235, 145, {255, 255, 255, 255});
@@ -1552,14 +1560,15 @@ namespace space {
             }
 
             if (multiplayer.active()) {
-                printText("CONNECTED PLAYERS", panel_x + 30, 525, {120, 220, 255, 255});
-                int roster_x = panel_x + 285;
+                printText("CONNECTED PLAYERS", panel_x + 30, 550, {120, 220, 255, 255}, lobby_roster_font);
+                int roster_x = panel_x + 255;
                 for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
                     const std::string name = multiplayer.player_connected()[player] ? multiplayer.player_names()[player] : "Waiting...";
-                    printText(std::format("P{}: {}", player + 1, name), roster_x, 525 + static_cast<int>(player % 2U) * 28,
-                              multiplayer.player_connected()[player] ? SDL_Color{120, 255, 170, 255} : SDL_Color{120, 130, 150, 255});
+                    printText(std::format("P{}: {}", player + 1, name), roster_x, 550 + static_cast<int>(player % 2U) * 20,
+                              multiplayer.player_connected()[player] ? SDL_Color{120, 255, 170, 255} : SDL_Color{120, 130, 150, 255},
+                              lobby_roster_font);
                     if (player == 1)
-                        roster_x = panel_x + 520;
+                        roster_x = panel_x + 500;
                 }
             }
             std::vector<std::string> status_lines;
@@ -1581,7 +1590,7 @@ namespace space {
             if (!line.empty())
                 status_lines.push_back(line);
             for (std::size_t index = 0; index < std::min<std::size_t>(status_lines.size(), 2U); ++index) {
-                printText(status_lines[index], panel_x + 30, 585 + static_cast<int>(index) * 20, {255, 210, 100, 255}, lobby_status_font);
+                printText(status_lines[index], panel_x + 30, 595 + static_cast<int>(index) * 20, {255, 210, 100, 255}, lobby_status_font);
             }
             printText("Arrow keys / W,S: select    Enter: confirm    Esc: back", panel_x + 30, 637, {135, 155, 185, 255},
                       lobby_status_font);
