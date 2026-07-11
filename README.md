@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.20.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects, refreshed menu/game-over art, optional music, updated Pong assets and sound effects, a `walk_post` first-person sample for browsing full-screen post-processing shaders, automatic UPnP/NAT-PMP router mapping for `asteroids-net`, stronger post-processing target cleanup, descriptor cleanup fixes, and resize fixes for SDL surface upload examples.
+Current development is on version `0.21.0`. This release expands `asteroids-net` to four-player games, improves its host/join flow and bundled runtime assets, and adds automatic temporary UDP router mapping through optional UPnP/NAT-PMP support. It also adds model and texture-manifest loading to `shader_viewer`, expands the Mutatris background-effect pack, and extends Doxygen coverage for the multiplayer example. Recent framework work also added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, stronger post-processing and descriptor cleanup, and resize fixes for SDL surface upload examples.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -149,7 +149,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.20.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, and the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`.
+The current Doxygen project version is `0.21.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -474,6 +474,7 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Optimizations
 
+- July 11, 2026: version `0.21.0` adds the four-player `asteroids-net` mode, including richer host/join screens, player-state and projectile synchronization improvements, runtime asset-path handling, and an application icon. The release also adds model/texture-manifest support to `shader_viewer`, enlarges the Mutatris background-effect pack, and documents the `asteroids-net` public types and networking helpers with Doxygen.
 - July 11, 2026: `asteroids-net` added automatic temporary UDP router mapping for hosted games. It tries UPnP through `miniupnpc`, falls back to NAT-PMP through `libnatpmp`, reports mapping results in the lobby, and removes active mappings when hosting stops. Both dependencies remain optional, preserving LAN play and builds on systems without them.
 - July 11, 2026: `asteroids-net` documentation now covers multiplayer hosting/joining, Arch Linux dependency installation, compile-time feature gating, router capability diagnostics, manual forwarding, IPv6/overlay alternatives, CGNAT limitations, and mapping cleanup behavior.
 - July 9, 2026: the project version moved to `0.20.0`, and `Doxyfile` now reports `0.20.0` for generated API documentation. This release also includes descriptor cleanup hardening in `VK_Sprite`, updated Pong assets and sound effects, and refreshed Mutatris menu/game-over presentation.
