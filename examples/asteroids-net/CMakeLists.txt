@@ -1,11 +1,34 @@
 add_executable(asteroids-net
     main.cpp
     multiplayer.cpp
+    port_mapping.cpp
     asteroids3d_window.cpp
     ship.cpp
     starfield.cpp
 )
 target_link_libraries(asteroids-net PRIVATE rain libmxnetwork::mxnetwork)
+
+find_path(MINIUPNPC_INCLUDE_DIR miniupnpc/miniupnpc.h)
+find_library(MINIUPNPC_LIBRARY NAMES miniupnpc)
+if(MINIUPNPC_INCLUDE_DIR AND MINIUPNPC_LIBRARY)
+    target_include_directories(asteroids-net PRIVATE ${MINIUPNPC_INCLUDE_DIR})
+    target_link_libraries(asteroids-net PRIVATE ${MINIUPNPC_LIBRARY})
+    target_compile_definitions(asteroids-net PRIVATE ASTEROIDS_NET_HAS_MINIUPNPC=1)
+    message(STATUS "asteroids-net: UPnP automatic port mapping enabled")
+else()
+    message(STATUS "asteroids-net: miniupnpc not found; UPnP automatic port mapping disabled")
+endif()
+
+find_path(NATPMP_INCLUDE_DIR natpmp.h)
+find_library(NATPMP_LIBRARY NAMES natpmp)
+if(NATPMP_INCLUDE_DIR AND NATPMP_LIBRARY)
+    target_include_directories(asteroids-net PRIVATE ${NATPMP_INCLUDE_DIR})
+    target_link_libraries(asteroids-net PRIVATE ${NATPMP_LIBRARY})
+    target_compile_definitions(asteroids-net PRIVATE ASTEROIDS_NET_HAS_NATPMP=1)
+    message(STATUS "asteroids-net: NAT-PMP automatic port mapping enabled")
+else()
+    message(STATUS "asteroids-net: libnatpmp not found; NAT-PMP automatic port mapping disabled")
+endif()
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)

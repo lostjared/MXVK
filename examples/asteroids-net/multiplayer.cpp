@@ -1,4 +1,5 @@
 #include "multiplayer.hpp"
+#include "port_mapping.hpp"
 
 #include "mxnetwork/exception.hpp"
 
@@ -7,6 +8,9 @@
 #include <random>
 
 namespace space {
+
+    MultiplayerSession::MultiplayerSession() = default;
+    MultiplayerSession::~MultiplayerSession() { stop(); }
 
     namespace {
         std::string packet_name(const std::array<char, 32> &name) {
@@ -24,7 +28,8 @@ namespace space {
             std::random_device random_device;
             std::uniform_int_distribution<std::size_t> distribution(0, sizeof(ALPHABET) - 2U);
             std::string code(8, 'A');
-            for (char &character : code) character = ALPHABET[distribution(random_device)];
+            for (char &character : code)
+                character = ALPHABET[distribution(random_device)];
             return code;
         }
     } // namespace
@@ -37,6 +42,8 @@ namespace space {
             stop();
             throw mxnetwork::Exception("Could not make the host UDP socket nonblocking.");
         }
+        port_mapping = std::make_unique<PortMapping>();
+        port_mapping->open(port);
         session_active = true;
         host_role = true;
         assigned_player_id = 0;
@@ -66,6 +73,7 @@ namespace space {
     }
 
     void MultiplayerSession::stop() {
+        port_mapping.reset();
         if (socket.valid()) {
             socket.close();
         }
@@ -93,7 +101,8 @@ namespace space {
         }
         if (host_role) {
             for (std::uint8_t player = 1; player < NETWORK_PLAYER_COUNT; ++player) {
-                if (!peers[player].connected) continue;
+                if (!peers[player].connected)
+                    continue;
                 peers[player].idle_seconds += delta_time;
                 if (peers[player].idle_seconds > 5.0f) {
                     peers[player] = {};
@@ -188,6 +197,11 @@ namespace space {
     const std::array<bool, NETWORK_PLAYER_COUNT> &MultiplayerSession::player_connected() const { return connected_players; }
     const std::string &MultiplayerSession::join_code() const { return session_join_code; }
 
+    const std::string &MultiplayerSession::port_mapping_status() const {
+        static const std::string NO_MAPPING = "Automatic router mapping unavailable; forward the UDP port manually.";
+        return port_mapping ? port_mapping->status() : NO_MAPPING;
+    }
+
     void MultiplayerSession::send_client_state(const NetworkState &state) {
         Packet packet{};
         packet.sequence = ++send_sequence;
@@ -206,7 +220,8 @@ namespace space {
         packet.player_id = source_player;
         packet.assigned_player_id = destination_player;
         for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
-            if (connected_players[player]) packet.connected_mask |= static_cast<std::uint8_t>(1U << player);
+            if (connected_players[player])
+                packet.connected_mask |= static_cast<std::uint8_t>(1U << player);
         }
         packet.state = peers[source_player].state;
         set_packet_name(packet.player_name, names[source_player]);

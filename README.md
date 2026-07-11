@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.20.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects, refreshed menu/game-over art, optional music, updated Pong assets and sound effects, a `walk_post` first-person sample for browsing full-screen post-processing shaders, stronger post-processing target cleanup, descriptor cleanup fixes, and resize fixes for SDL surface upload examples.
+Current development is on version `0.20.0`. Recent work added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, dedicated `pointsprite`, `fireworks`, and `starfield` examples, expanded Doxygen coverage for the public rendering helpers, a fuller Mutatris demo with shader effects, refreshed menu/game-over art, optional music, updated Pong assets and sound effects, a `walk_post` first-person sample for browsing full-screen post-processing shaders, automatic UPnP/NAT-PMP router mapping for `asteroids-net`, stronger post-processing target cleanup, descriptor cleanup fixes, and resize fixes for SDL surface upload examples.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -21,6 +21,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Debugging Examples](#debugging-examples)
 - [Model Viewer Tools](#model-viewer-tools)
 - [Examples](#examples)
+- [Asteroids Net Multiplayer](#asteroids-net-multiplayer)
 - [Recent Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
 - [MXNetwork](#mxnetwork)
@@ -75,6 +76,7 @@ The root CMake configuration checks for and uses:
 - glslc (shader compiler)
 - Optional: OpenCV (when building with `-DCV=ON`)
 - Optional: FFmpeg for MXWrite (when building with `-DWITH_MXWRITE=AUTO|ON`)
+- Optional: `miniupnpc` and `libnatpmp` for automatic UDP router mapping in `asteroids-net`
 
 
 <a id="build"></a>
@@ -419,6 +421,7 @@ These programs are not intended as standalone applications. They are small visua
 
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
 - `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
+- `asteroids-net` - network multiplayer variant of the 3D Asteroids game for up to four players over UDP. Hosts receive an eight-character join code and automatically request a temporary router mapping through UPnP or NAT-PMP when the optional libraries are installed. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`; host/join address, UDP port, pilot name, and join code are entered in the lobby. **Controls:** the same flight, camera, firing, console, and CRT controls as `asteroids3d`.
 - `breakout` - 3D Breakout game with a model-rendered paddle, ball, block field, animated crystal backgrounds, touch/gamepad support, and optional SDL3_mixer sound effects. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter`, `Space`, click, tap, or gamepad start begins play; `Left` / `Right` or `H` / `L` move the paddle; `Space`, `Enter`, click, double tap, or gamepad south launches the ball; `W` / `A` / `S` / `D` rotate the board, `Page Up` / `Page Down` zoom, `Q` resets the view, `R` restarts, `Backspace` returns to intro, and `Escape` quits.
 - `defender` - side-scrolling 3D starfield shooter with model-based ship and asteroids, animated UFO sprites, radar/HUD, controller support, console commands, Matrix-rain intro, CRT post-processing, and optional SDL3_mixer audio. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Enter` or `Space` starts, `Z` thrusts, `D` boosts, `X` reverses, `W` / `Up` and `Down` move vertically, `A` / `S` roll, `Space` fires, `F3` toggles the console, `F4` toggles FPS, `F8` toggles CRT, `Escape` quits.
 - `pong` - 3D-styled Pong demo with paddle/ball gameplay and real-time state updates. **Inputs:** common `-p`, `-r`, `-f` plus the example data directory. **Controls:** arrow keys move the paddle, `W` / `A` / `S` / `D` rotate the view, `Q` resets rotation, `R` resets the game, `Space` toggles wireframe, `Enter` resets the camera, `Escape` quits.
@@ -441,10 +444,38 @@ These programs are not intended as standalone applications. They are small visua
 
 If you want a quick tour of the core demos, `./run.pl --all` executes the default example sweep used by `testapps.pl`.
 
+<a id="asteroids-net-multiplayer"></a>
+
+## Asteroids Net Multiplayer
+
+`asteroids-net` hosts an authoritative UDP session on port `48120` by default and supports up to four players. When hosting, it tries UPnP first and NAT-PMP second to create a temporary public UDP mapping. The lobby reports the selected method and, when the router supplies it, the public endpoint. The mapping is removed when the host leaves the lobby or exits the application.
+
+Router mapping support is optional. On Arch Linux, install both client libraries and run a fresh CMake configure so they are detected:
+
+```bash
+sudo pacman -S miniupnpc libnatpmp
+cmake --fresh -S . -B build
+cmake --build build -j --target asteroids-net
+./run.pl asteroids-net
+```
+
+The package-to-feature mapping is:
+
+- `miniupnpc` provides the `miniupnpc` library and `upnpc` diagnostic program used for UPnP IGD discovery and mappings.
+- `libnatpmp` provides the `libnatpmp` library and `natpmpc` diagnostic program used for NAT-PMP mappings.
+
+CMake gates the features independently. UPnP is compiled only when both `miniupnpc/miniupnpc.h` and the `miniupnpc` library are found; NAT-PMP is compiled only when both `natpmp.h` and the `natpmp` library are found. Neither package is required for a successful MXVK build.
+
+If neither library is present, the example still builds and local/LAN multiplayer still works. If automatic mapping is unavailable, disabled on the router, or blocked by carrier-grade NAT, the lobby asks the host to forward the selected UDP port manually. Carrier-grade NAT generally requires a VPN/overlay network or a relay service; UPnP and NAT-PMP cannot bypass it.
+
+See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for the complete lobby flow, controls, security notes, and troubleshooting steps.
+
 <a id="recent-optimizations"></a>
 
 ## Recent Optimizations
 
+- July 11, 2026: `asteroids-net` added automatic temporary UDP router mapping for hosted games. It tries UPnP through `miniupnpc`, falls back to NAT-PMP through `libnatpmp`, reports mapping results in the lobby, and removes active mappings when hosting stops. Both dependencies remain optional, preserving LAN play and builds on systems without them.
+- July 11, 2026: `asteroids-net` documentation now covers multiplayer hosting/joining, Arch Linux dependency installation, compile-time feature gating, router capability diagnostics, manual forwarding, IPv6/overlay alternatives, CGNAT limitations, and mapping cleanup behavior.
 - July 9, 2026: the project version moved to `0.20.0`, and `Doxyfile` now reports `0.20.0` for generated API documentation. This release also includes descriptor cleanup hardening in `VK_Sprite`, updated Pong assets and sound effects, and refreshed Mutatris menu/game-over presentation.
 - July 8, 2026: the project version moved through `0.18.0` to `0.19.0`, and `Doxyfile` now reports `0.19.0` for generated API documentation.
 - July 8, 2026: `mxvk_context.hpp` now owns the shared `mxvk::VulkanContext` handle bundle, and `VK_Window::context()` exposes the current logical device, physical device, graphics queue, and command pool to helper renderers.

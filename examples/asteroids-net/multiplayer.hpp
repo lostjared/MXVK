@@ -5,11 +5,14 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace space {
+
+    class PortMapping;
 
     constexpr std::size_t NETWORK_PROJECTILE_COUNT = 15;
     constexpr std::size_t NETWORK_ASTEROID_COUNT = 16;
@@ -56,8 +59,8 @@ namespace space {
 
     class MultiplayerSession {
       public:
-        MultiplayerSession() = default;
-        ~MultiplayerSession() = default;
+        MultiplayerSession();
+        ~MultiplayerSession();
         MultiplayerSession(const MultiplayerSession &) = delete;
         MultiplayerSession &operator=(const MultiplayerSession &) = delete;
 
@@ -74,6 +77,7 @@ namespace space {
         [[nodiscard]] const std::array<std::string, NETWORK_PLAYER_COUNT> &player_names() const;
         [[nodiscard]] const std::array<bool, NETWORK_PLAYER_COUNT> &player_connected() const;
         [[nodiscard]] const std::string &join_code() const;
+        [[nodiscard]] const std::string &port_mapping_status() const;
 
       private:
         struct Packet {
@@ -110,6 +114,7 @@ namespace space {
         std::uint32_t send_sequence = 0;
         std::string local_player_name{};
         std::string session_join_code{};
+        std::unique_ptr<PortMapping> port_mapping{};
 
         void send_client_state(const NetworkState &state);
         void send_host_relay(std::uint8_t source_player, std::uint8_t destination_player);

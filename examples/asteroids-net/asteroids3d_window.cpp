@@ -20,8 +20,8 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -34,6 +34,7 @@
 #include <mutex>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -516,6 +517,7 @@ namespace space {
         mxvk::VK_Sprite *intro_sprite = nullptr;
         mxvk::VK_Sprite *ui_pixel = nullptr;
         std::unique_ptr<matrix::Rain> intro_rain{};
+        mxvk::Font lobby_status_font{};
         mxvk::VK_Console console;
         mxvk::VK_Controller controller;
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
@@ -531,6 +533,7 @@ namespace space {
         std::atomic<bool> model_preload_done{false};
         std::atomic<bool> model_preload_failed{false};
         int last_font_size = 0;
+        int lobby_status_font_size = 16;
         float round_time_remaining = ROUND_TIME_LIMIT_SECONDS;
         std::atomic<int> loading_step_index{0};
         static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
@@ -805,6 +808,7 @@ namespace space {
 
         void load_loading_screen_resources() {
             set_ui_font_size(18);
+            lobby_status_font.reset(asset_root + "/data/font.ttf", lobby_status_font_size);
 
             intro_sprite = createSprite(
                 asset_root + "/data/intro.png",
@@ -937,7 +941,7 @@ namespace space {
                         } else {
                             multiplayer.host(lobby_port, lobby_player_name);
                             host_requested_start = false;
-                            lobby_status = "Join code: " + multiplayer.join_code() + " - waiting for players...";
+                            lobby_status = multiplayer.port_mapping_status();
                         }
                     } else {
                         if (multiplayer.active()) {
@@ -1121,7 +1125,8 @@ namespace space {
             multiplayer_winner = 0;
             remote_ship_exploding = {};
             remote_explosion_timers = {};
-            for (auto &consumed : consumed_remote_projectiles) consumed.clear();
+            for (auto &consumed : consumed_remote_projectiles)
+                consumed.clear();
             consumed_projectile_ids = {};
             clear_round_state();
             ship.lives = 99;
@@ -1193,7 +1198,7 @@ namespace space {
             mode = GameMode::MatchOver;
         }
 
-        #if 0
+#if 0
         void update_multiplayer_legacy(float dt) {
             const std::optional<NetworkState> state = multiplayer.exchange(make_network_state(true), dt);
             if (state.has_value()) {
@@ -1318,7 +1323,7 @@ namespace space {
             }
         }
 
-        #endif
+#endif
 
         void update_multiplayer(float dt) {
             multiplayer_collision_grace = std::max(0.0f, multiplayer_collision_grace - dt);
@@ -1334,22 +1339,26 @@ namespace space {
             }
 
             const std::uint8_t local_id = multiplayer.local_player_id();
-            if (local_id >= NETWORK_PLAYER_COUNT) return;
+            if (local_id >= NETWORK_PLAYER_COUNT)
+                return;
             if (!multiplayer.is_host()) {
                 if (consumed_projectile_ids[local_id] != 0U) {
                     for (std::size_t index = 0; index < projectile_ids.size(); ++index) {
-                        if (projectile_ids[index] == consumed_projectile_ids[local_id]) projectiles[index].active = false;
+                        if (projectile_ids[index] == consumed_projectile_ids[local_id])
+                            projectiles[index].active = false;
                     }
                 }
                 if (multiplayer_death_serials[local_id] != received_death_serials[local_id]) {
                     received_death_serials[local_id] = multiplayer_death_serials[local_id];
                     start_multiplayer_local_explosion();
                 }
-                if (multiplayer_winner != 0U) mode = GameMode::MatchOver;
+                if (multiplayer_winner != 0U)
+                    mode = GameMode::MatchOver;
             }
 
             for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
-                if (player == local_id) continue;
+                if (player == local_id)
+                    continue;
                 if (multiplayer_death_serials[player] != received_death_serials[player]) {
                     received_death_serials[player] = multiplayer_death_serials[player];
                     remote_ship_exploding[player] = true;
@@ -1358,10 +1367,12 @@ namespace space {
                 }
                 if (remote_ship_exploding[player]) {
                     remote_explosion_timers[player] -= dt;
-                    if (remote_explosion_timers[player] <= 0.0f) remote_ship_exploding[player] = false;
+                    if (remote_explosion_timers[player] <= 0.0f)
+                        remote_ship_exploding[player] = false;
                 }
             }
-            if (!multiplayer.is_host()) return;
+            if (!multiplayer.is_host())
+                return;
 
             auto destroy_player = [this](std::uint8_t target) {
                 if (target == 0) {
@@ -1382,9 +1393,11 @@ namespace space {
             if (multiplayer_collision_grace <= 0.0f) {
                 constexpr float SHIP_COLLISION_RADIUS = 2.4f;
                 for (std::uint8_t first = 0; first < NETWORK_PLAYER_COUNT; ++first) {
-                    if (!multiplayer.player_connected()[first] || player_exploding(first)) continue;
+                    if (!multiplayer.player_connected()[first] || player_exploding(first))
+                        continue;
                     for (std::uint8_t second = first + 1; second < NETWORK_PLAYER_COUNT; ++second) {
-                        if (!multiplayer.player_connected()[second] || player_exploding(second)) continue;
+                        if (!multiplayer.player_connected()[second] || player_exploding(second))
+                            continue;
                         if (glm::length(player_position(first) - player_position(second)) < SHIP_COLLISION_RADIUS) {
                             destroy_player(first);
                             destroy_player(second);
@@ -1394,7 +1407,8 @@ namespace space {
             }
 
             for (std::uint8_t player = 1; player < NETWORK_PLAYER_COUNT; ++player) {
-                if (!multiplayer.player_connected()[player] || player_exploding(player)) continue;
+                if (!multiplayer.player_connected()[player] || player_exploding(player))
+                    continue;
                 for (const Asteroid &asteroid : asteroids) {
                     if (asteroid.active && glm::length(asteroid.position - player_position(player)) < asteroid.radius + 1.8f) {
                         destroy_player(player);
@@ -1404,38 +1418,45 @@ namespace space {
             }
 
             for (Projectile &projectile : projectiles) {
-                if (!projectile.active) continue;
+                if (!projectile.active)
+                    continue;
                 for (std::uint8_t target = 1; target < NETWORK_PLAYER_COUNT; ++target) {
                     if (multiplayer.player_connected()[target] && !player_exploding(target) &&
                         projectile_distance_to_ship(projectile, player_position(target)) < 1.8f) {
                         projectile.active = false;
                         ++multiplayer_kills[0];
                         destroy_player(target);
-                        if (multiplayer_kills[0] >= 5U) finish_multiplayer_match(1U);
+                        if (multiplayer_kills[0] >= 5U)
+                            finish_multiplayer_match(1U);
                         break;
                     }
                 }
             }
 
             for (std::uint8_t shooter = 1; shooter < NETWORK_PLAYER_COUNT; ++shooter) {
-                if (!multiplayer.player_connected()[shooter]) continue;
+                if (!multiplayer.player_connected()[shooter])
+                    continue;
                 for (const NetworkProjectile &projectile : remote_projectiles[shooter]) {
-                    if (projectile.active == 0U || consumed_remote_projectiles[shooter].contains(projectile.id)) continue;
+                    if (projectile.active == 0U || consumed_remote_projectiles[shooter].contains(projectile.id))
+                        continue;
                     const glm::vec3 position{projectile.position[0], projectile.position[1], projectile.position[2]};
                     bool consumed = false;
                     for (std::uint8_t target = 0; target < NETWORK_PLAYER_COUNT; ++target) {
-                        if (target == shooter || !multiplayer.player_connected()[target] || player_exploding(target)) continue;
+                        if (target == shooter || !multiplayer.player_connected()[target] || player_exploding(target))
+                            continue;
                         if (glm::length(position - player_position(target)) < 1.8f) {
                             consumed_remote_projectiles[shooter].insert(projectile.id);
                             consumed_projectile_ids[shooter] = projectile.id;
                             ++multiplayer_kills[shooter];
                             destroy_player(target);
-                            if (multiplayer_kills[shooter] >= 5U) finish_multiplayer_match(shooter + 1U);
+                            if (multiplayer_kills[shooter] >= 5U)
+                                finish_multiplayer_match(shooter + 1U);
                             consumed = true;
                             break;
                         }
                     }
-                    if (consumed) continue;
+                    if (consumed)
+                        continue;
                     for (Asteroid &asteroid : asteroids) {
                         if (asteroid.active && glm::length(position - asteroid.position) < asteroid.radius * ASTEROID_PROJECTILE_COLLISION_SCALE) {
                             consumed_remote_projectiles[shooter].insert(projectile.id);
@@ -1476,7 +1497,15 @@ namespace space {
             draw_ui_rect(panel_x, 65, panel_width, 3, {0.20f, 0.72f, 1.0f, 1.0f});
             draw_ui_rect(panel_x, 662, panel_width, 3, {0.20f, 0.72f, 1.0f, 1.0f});
 
-            set_ui_font_size(22);
+            const float lobby_scale = std::min(static_cast<float>(extent.width) / 1280.0f,
+                                               static_cast<float>(extent.height) / 720.0f);
+            const int lobby_font_size = std::clamp(static_cast<int>(std::lround(22.0f * lobby_scale)), 14, 22);
+            const int desired_status_font_size = std::clamp(static_cast<int>(std::lround(16.0f * lobby_scale)), 12, 16);
+            set_ui_font_size(lobby_font_size);
+            if (desired_status_font_size != lobby_status_font_size) {
+                lobby_status_font_size = desired_status_font_size;
+                lobby_status_font.reset(asset_root + "/data/font.ttf", lobby_status_font_size);
+            }
             printText("ASTEROIDS NET", panel_x + 284, 100, {120, 220, 255, 255});
             printText("MULTIPLAYER - UP TO 4", panel_x + 235, 145, {255, 255, 255, 255});
 
@@ -1515,17 +1544,39 @@ namespace space {
             }
 
             if (multiplayer.active()) {
-                printText("CONNECTED PLAYERS", panel_x + 30, 550, {120, 220, 255, 255});
-                int roster_x = panel_x + 245;
+                printText("CONNECTED PLAYERS", panel_x + 30, 525, {120, 220, 255, 255});
+                int roster_x = panel_x + 285;
                 for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
                     const std::string name = multiplayer.player_connected()[player] ? multiplayer.player_names()[player] : "Waiting...";
-                    printText(std::format("P{}: {}", player + 1, name), roster_x, 550 + static_cast<int>(player % 2U) * 28,
+                    printText(std::format("P{}: {}", player + 1, name), roster_x, 525 + static_cast<int>(player % 2U) * 28,
                               multiplayer.player_connected()[player] ? SDL_Color{120, 255, 170, 255} : SDL_Color{120, 130, 150, 255});
-                    if (player == 1) roster_x = panel_x + 500;
+                    if (player == 1)
+                        roster_x = panel_x + 520;
                 }
             }
-            printText(lobby_status, panel_x + 30, 610, {255, 210, 100, 255});
-            printText("Arrow keys / W,S: select    Enter: confirm    Esc: back", panel_x + 30, 640, {135, 155, 185, 255});
+            std::vector<std::string> status_lines;
+            std::istringstream status_words(lobby_status);
+            std::string line;
+            std::string word;
+            while (status_words >> word) {
+                const std::string candidate = line.empty() ? word : line + " " + word;
+                int text_width = 0;
+                int text_height = 0;
+                if (!line.empty() && getTextDimensions(candidate, text_width, text_height, lobby_status_font) &&
+                    text_width > panel_width - 60) {
+                    status_lines.push_back(line);
+                    line = word;
+                } else {
+                    line = candidate;
+                }
+            }
+            if (!line.empty())
+                status_lines.push_back(line);
+            for (std::size_t index = 0; index < std::min<std::size_t>(status_lines.size(), 2U); ++index) {
+                printText(status_lines[index], panel_x + 30, 585 + static_cast<int>(index) * 20, {255, 210, 100, 255}, lobby_status_font);
+            }
+            printText("Arrow keys / W,S: select    Enter: confirm    Esc: back", panel_x + 30, 637, {135, 155, 185, 255},
+                      lobby_status_font);
         }
 
         void draw_intro(const VkExtent2D &extent) {
@@ -2862,9 +2913,11 @@ namespace space {
 
         void draw_remote_projectiles() {
             for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
-                if (player == multiplayer.local_player_id()) continue;
+                if (player == multiplayer.local_player_id())
+                    continue;
                 for (const NetworkProjectile &projectile : remote_projectiles[player]) {
-                    if (projectile.active == 0U) continue;
+                    if (projectile.active == 0U)
+                        continue;
                     const glm::vec3 position{projectile.position[0], projectile.position[1], projectile.position[2]};
                     projectile_sprite->drawSprite(position, glm::vec2(0.62f), {0.20f, 0.65f, 1.0f, 1.0f});
                 }
@@ -3280,17 +3333,21 @@ namespace space {
         }
 
         bool cannon_has_opponent_target(const glm::vec3 &muzzle, const glm::vec3 &forward) const {
-            if (!multiplayer_match) return false;
+            if (!multiplayer_match)
+                return false;
             constexpr float OPPONENT_TARGET_RADIUS = 1.8f;
             const float max_range = PROJECTILE_SPEED * PROJECTILE_LIFETIME;
             for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
                 if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player] ||
-                    !remote_ships[player].visible || remote_ship_exploding[player]) continue;
+                    !remote_ships[player].visible || remote_ship_exploding[player])
+                    continue;
                 const glm::vec3 to_opponent = remote_ships[player].position - muzzle;
                 const float along_ray = glm::dot(to_opponent, forward);
-                if (along_ray < 0.0f || along_ray > max_range) continue;
+                if (along_ray < 0.0f || along_ray > max_range)
+                    continue;
                 const glm::vec3 closest_point = muzzle + forward * along_ray;
-                if (glm::length(closest_point - remote_ships[player].position) <= OPPONENT_TARGET_RADIUS) return true;
+                if (glm::length(closest_point - remote_ships[player].position) <= OPPONENT_TARGET_RADIUS)
+                    return true;
             }
             return false;
         }
@@ -3389,10 +3446,12 @@ namespace space {
 
             if (multiplayer_match) {
                 for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
-                    if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player]) continue;
+                    if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player])
+                        continue;
                     glm::vec2 relative{remote_ships[player].position.x - ship.position.x, remote_ships[player].position.z - ship.position.z};
                     const float distance = glm::length(relative);
-                    if (distance > RADAR_RANGE && distance > 1e-4f) relative *= RADAR_RANGE / distance;
+                    if (distance > RADAR_RANGE && distance > 1e-4f)
+                        relative *= RADAR_RANGE / distance;
                     const int opponent_x = center_x + static_cast<int>((relative.x / RADAR_RANGE) * half_size);
                     const int opponent_y = center_y + static_cast<int>((relative.y / RADAR_RANGE) * half_size);
                     const glm::vec4 color = remote_ship_exploding[player] ? glm::vec4{1.0f, 0.35f, 0.12f, 1.0f} : glm::vec4{1.0f, 0.08f, 0.12f, 1.0f};
@@ -3423,7 +3482,9 @@ namespace space {
                 const std::uint8_t local_id = multiplayer.local_player_id();
                 const unsigned local_kills = local_id < NETWORK_PLAYER_COUNT ? multiplayer_kills[local_id] : 0U;
                 unsigned enemy_kills = 0;
-                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) if (player != local_id) enemy_kills = std::max(enemy_kills, multiplayer_kills[player]);
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player)
+                    if (player != local_id)
+                        enemy_kills = std::max(enemy_kills, multiplayer_kills[player]);
                 printText("Kills: " + std::to_string(local_kills) + " / 5", right_x, 50, white);
                 printText("Leader: " + std::to_string(enemy_kills) + " / 5", right_x, 75, red);
                 printText("Players: " + std::to_string(multiplayer.player_count()) + " / 4", right_x, 100, white);
