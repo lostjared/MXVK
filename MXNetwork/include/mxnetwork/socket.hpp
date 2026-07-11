@@ -9,6 +9,12 @@
 
 namespace mxnetwork {
 
+    struct SocketAddress {
+        MXSocketAddress value{};
+        [[nodiscard]] bool valid() const { return value.length > 0; }
+        [[nodiscard]] bool operator==(const SocketAddress &other) const;
+    };
+
     /**
      * @brief RAII helper that initializes and shuts down the platform socket subsystem.
      */
@@ -181,6 +187,8 @@ namespace mxnetwork {
          * @return Number of bytes received, or a negative error value.
          */
         ssize_t recvfrom(void *buf, size_t bytes);
+        ssize_t recvfrom(void *buf, size_t bytes, SocketAddress &address);
+        ssize_t sendto(const void *buf, size_t bytes, const SocketAddress &address);
 
         /** @brief Return true when the socket handle is valid. */
         [[nodiscard]] bool valid() const;

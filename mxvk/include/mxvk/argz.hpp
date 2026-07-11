@@ -713,6 +713,7 @@ struct Arguments {
     bool enable_crt = false;              ///< Enable CRT post-processing at startup (@c --enable-crt).
     bool enable_vsync = false;            ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
     bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
+    bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
     double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
     std::string font_path;                ///< Optional font file path (@c --font-path).
@@ -803,6 +804,7 @@ struct Arguments {
  * |      | --enable-crt       | Enable CRT post-processing at startup         |
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
  * |      | --enable-screenshot| Enable F10 screenshot capture                 |
+ * |      | --disable-sound    | Disable application background music          |
  * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
@@ -847,6 +849,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(319, "enable-crt", "enable CRT post-processing at startup")
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
         .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
+        .addOptionDouble(325, "disable-sound", "disable background music")
         .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
@@ -887,6 +890,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool enable_crt = false;
     bool enable_vsync = false;
     bool enable_screenshot = false;
+    bool disable_sound = false;
     double fps = 0.0;
     int font_size = 22;
     std::string font_path;
@@ -950,6 +954,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 322:
             enable_screenshot = true;
+            break;
+        case 325:
+            disable_sound = true;
             break;
         case 321:
             fps = parse_arg_double(arg.arg_value, "--fps");
@@ -1053,6 +1060,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.enable_crt = enable_crt;
     args.enable_vsync = enable_vsync;
     args.enable_screenshot = enable_screenshot;
+    args.disable_sound = disable_sound;
     mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;
     args.font_size = font_size;

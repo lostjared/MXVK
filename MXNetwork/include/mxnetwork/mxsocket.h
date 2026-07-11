@@ -74,6 +74,11 @@ typedef struct {
     struct sockaddr_in6 inet6; /**< IPv6 address storage. */
 } MXSocket;
 
+typedef struct {
+    struct sockaddr_storage storage;
+    socklen_t length;
+} MXSocketAddress;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -254,6 +259,8 @@ ssize_t mx_socket_ipv6_sendto(MXSocket *sock, const void *buf, size_t bytes);
  * @return Number of bytes received, or a negative error value.
  */
 ssize_t mx_socket_recvfrom(MXSocket *sock, void *buf, size_t bytes);
+ssize_t mx_socket_recvfrom_address(MXSocket *sock, void *buf, size_t bytes, MXSocketAddress *address);
+ssize_t mx_socket_sendto_address(MXSocket *sock, const void *buf, size_t bytes, const MXSocketAddress *address);
 /**
  * @brief Receive a datagram using an IPv6 Internet socket.
  * @param sock Socket state.

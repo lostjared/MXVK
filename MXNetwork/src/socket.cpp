@@ -1,9 +1,15 @@
 #include "mxnetwork/socket.hpp"
 #include <exception>
+#include <cstring>
 #include <format>
 #include <iostream>
 #include <string>
 namespace mxnetwork {
+
+    bool SocketAddress::operator==(const SocketAddress &other) const {
+        return value.length == other.value.length && value.length > 0 &&
+               std::memcmp(&value.storage, &other.value.storage, static_cast<std::size_t>(value.length)) == 0;
+    }
 
     MXNetworkInit::MXNetworkInit() {
 #ifdef _WIN32
@@ -215,6 +221,14 @@ namespace mxnetwork {
         else if (type == SocketType::TYPE_UNIX_DGRAM)
             return mx_socket_unix_recvfrom(&sock, buf, bytes);
         return 0;
+    }
+
+    ssize_t Socket::recvfrom(void *buf, size_t bytes, SocketAddress &address) {
+        return mx_socket_recvfrom_address(&sock, buf, bytes, &address.value);
+    }
+
+    ssize_t Socket::sendto(const void *buf, size_t bytes, const SocketAddress &address) {
+        return mx_socket_sendto_address(&sock, buf, bytes, &address.value);
     }
 
     void Socket::setsocket(const MXSocket &s) {

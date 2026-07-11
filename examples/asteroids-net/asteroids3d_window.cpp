@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
@@ -46,11 +47,12 @@ namespace space {
 
     class Asteroids3DWindow : public mxvk::VK_Window {
       public:
-        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt)
+        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt, bool disable_sound)
             : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
               shader_root(asset_root + "/data"),
-              crt_enabled(enable_crt) {
+              crt_enabled(enable_crt),
+              background_music_disabled(disable_sound) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
             }
@@ -89,7 +91,9 @@ namespace space {
             for (auto &model : asteroid_models) {
                 model.cleanup(this);
             }
-            remote_ship_model.cleanup(this);
+            for (auto &model : remote_ship_models) {
+                model.cleanup(this);
+            }
             if (star_sprite != nullptr) {
                 star_sprite->cleanup();
             }
@@ -258,7 +262,9 @@ namespace space {
                 return;
             }
             ship_model.resize(this);
-            remote_ship_model.resize(this);
+            for (auto &model : remote_ship_models) {
+                model.resize(this);
+            }
             for (auto &model : asteroid_models) {
                 model.resize(this);
             }
@@ -412,9 +418,14 @@ namespace space {
                 draw_engine_flame(cmd, extent, last_ship_model_matrix, ship.current_speed, ship.visible && !ship.exploding);
             }
             if (multiplayer_match) {
-                draw_remote_ship(image_index);
-                draw_engine_flame(cmd, extent, last_remote_ship_model_matrix, std::max(remote_ship.current_speed, 1.0f),
-                                  remote_ship.visible && !remote_ship_exploding);
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                    if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player]) {
+                        continue;
+                    }
+                    draw_remote_ship(image_index, player);
+                    draw_engine_flame(cmd, extent, last_remote_ship_model_matrices[player], std::max(remote_ships[player].current_speed, 1.0f),
+                                      remote_ships[player].visible && !remote_ship_exploding[player]);
+                }
             }
             draw_projectiles();
             if (multiplayer_match) {
@@ -457,6 +468,7 @@ namespace space {
         std::string lobby_player_name = "Pilot 1";
         std::string lobby_host_address = "127.0.0.1";
         std::string lobby_port = "48120";
+        std::string lobby_join_code{};
         std::string lobby_status = "Choose how you want to play.";
         float lobby_camera_distance = 0.0f;
         bool debug_menu = false;
@@ -467,6 +479,7 @@ namespace space {
         bool first_person_camera = false;
         bool camera_transition_active = false;
         bool crt_enabled = false;
+        bool background_music_disabled = false;
         bool ship_returning_to_field = false;
         float keyboard_yaw = 0.0f;
         float keyboard_pitch = 0.0f;
@@ -480,7 +493,7 @@ namespace space {
         static constexpr float MOUSE_LOOK_SENSITIVITY = 0.04f;
 
         Ship ship{};
-        Ship remote_ship{};
+        std::array<Ship, NETWORK_PLAYER_COUNT> remote_ships{};
         std::array<Projectile, MAX_PROJECTILES> projectiles{};
         std::array<Asteroid, MAX_ASTEROIDS> asteroids{};
         std::array<Particle, MAX_PARTICLES> particles{};
@@ -495,7 +508,7 @@ namespace space {
         glm::mat4 projection_matrix{1.0f};
 
         mxvk::VKAbstractModel ship_model{};
-        mxvk::VKAbstractModel remote_ship_model{};
+        std::array<mxvk::VKAbstractModel, NETWORK_PLAYER_COUNT> remote_ship_models{};
         std::array<mxvk::VKAbstractModel, MAX_ASTEROIDS> asteroid_models{};
         mxvk::VK_Sprite3D *star_sprite = nullptr;
         mxvk::VK_Sprite3D *projectile_sprite = nullptr;
@@ -522,7 +535,7 @@ namespace space {
         std::atomic<int> loading_step_index{0};
         static constexpr int loading_step_count = MAX_ASTEROIDS + 8;
         glm::mat4 last_ship_model_matrix{1.0f};
-        glm::mat4 last_remote_ship_model_matrix{1.0f};
+        std::array<glm::mat4, NETWORK_PLAYER_COUNT> last_remote_ship_model_matrices{};
         VkBuffer flame_vertex_buffer = VK_NULL_HANDLE;
         VkDeviceMemory flame_vertex_buffer_memory = VK_NULL_HANDLE;
         VkPipeline flame_pipeline = VK_NULL_HANDLE;
@@ -536,20 +549,19 @@ namespace space {
         uint32_t flame_vertex_count = 0;
         MultiplayerSession multiplayer{};
         bool multiplayer_match = false;
-        std::uint32_t host_kills = 0;
-        std::uint32_t client_kills = 0;
-        std::uint32_t host_death_serial = 0;
-        std::uint32_t client_death_serial = 0;
-        std::uint32_t received_host_death_serial = 0;
-        std::uint32_t received_client_death_serial = 0;
+        float multiplayer_collision_grace = 0.0f;
+        std::array<std::uint32_t, NETWORK_PLAYER_COUNT> multiplayer_kills{};
+        std::array<std::uint32_t, NETWORK_PLAYER_COUNT> multiplayer_death_serials{};
+        std::array<std::uint32_t, NETWORK_PLAYER_COUNT> received_death_serials{};
         std::uint8_t multiplayer_winner = 0;
-        bool remote_ship_exploding = false;
-        float remote_explosion_timer = 0.0f;
-        std::array<NetworkProjectile, NETWORK_PROJECTILE_COUNT> remote_projectiles{};
+        std::array<bool, NETWORK_PLAYER_COUNT> remote_ship_exploding{};
+        std::array<float, NETWORK_PLAYER_COUNT> remote_explosion_timers{};
+        std::array<std::array<NetworkProjectile, NETWORK_PROJECTILE_COUNT>, NETWORK_PLAYER_COUNT> remote_projectiles{};
         std::array<std::uint32_t, MAX_PROJECTILES> projectile_ids{};
         std::uint32_t next_projectile_id = 1;
-        std::unordered_set<std::uint32_t> consumed_remote_projectiles{};
-        std::uint32_t consumed_client_projectile_id = 0;
+        std::array<std::unordered_set<std::uint32_t>, NETWORK_PLAYER_COUNT> consumed_remote_projectiles{};
+        std::array<std::uint32_t, NETWORK_PLAYER_COUNT> consumed_projectile_ids{};
+        bool host_requested_start = false;
 
         void log_game(const std::string &message, SDL_Color color = SDL_Color{180, 220, 255, 255}) {
             if (!console_ready) {
@@ -764,14 +776,16 @@ namespace space {
 
         void load_sound_effects() {
             sound_effects = std::make_unique<mxvk::VK_Mixer>();
-            background_music_track = sound_effects->loadMusic(asteroids3d_asset_path("music.ogg"));
+            if (!background_music_disabled) {
+                background_music_track = sound_effects->loadMusic(asteroids3d_asset_path("music.ogg"));
+            }
             crash_sound = sound_effects->loadWav(sound_effect_path("crash.wav"));
             cannon_sound = sound_effects->loadWav(asteroids3d_asset_path("cannon.wav"));
             asteroid_explosion_sound = sound_effects->loadWav(sound_effect_path("asteroid.wav"));
         }
 
         void ensure_background_music_playing() {
-            if (!sound_effects || background_music_track < 0) {
+            if (background_music_disabled || !sound_effects || background_music_track < 0) {
                 return;
             }
             if (!sound_effects->isMusicPlaying(background_music_track)) {
@@ -871,7 +885,7 @@ namespace space {
                 return 4;
             }
             if (lobby_page == LobbyPage::Join) {
-                return 5;
+                return 6;
             }
             return 3;
         }
@@ -898,25 +912,40 @@ namespace space {
             }
 
             const bool host_page = lobby_page == LobbyPage::Host;
-            const int action_item = host_page ? 2 : 3;
-            const int back_item = host_page ? 3 : 4;
+            const int action_item = host_page ? 2 : 4;
+            const int back_item = host_page ? 3 : 5;
             if (lobby_selection < action_item) {
                 lobby_edit_field = lobby_selection;
                 SDL_StartTextInput(getSDLWindow());
                 lobby_status = "Editing field. Press Enter when finished.";
             } else if (lobby_selection == action_item) {
                 stop_lobby_editing();
-                if (lobby_player_name.empty() || lobby_port.empty() || (!host_page && lobby_host_address.empty())) {
+                if (lobby_player_name.empty() || lobby_port.empty() ||
+                    (!host_page && (lobby_host_address.empty() || lobby_join_code.size() != 8U))) {
                     lobby_status = "Complete every field before continuing.";
                     return;
                 }
                 try {
                     if (host_page) {
-                        multiplayer.host(lobby_port, lobby_player_name);
-                        lobby_status = "Hosting 1v1 on port " + lobby_port + " - waiting for Player 2...";
+                        if (multiplayer.active() && multiplayer.is_host()) {
+                            if (multiplayer.player_count() < 2U) {
+                                lobby_status = "At least one other player must join before starting.";
+                            } else {
+                                host_requested_start = true;
+                                lobby_status = "Starting match...";
+                            }
+                        } else {
+                            multiplayer.host(lobby_port, lobby_player_name);
+                            host_requested_start = false;
+                            lobby_status = "Join code: " + multiplayer.join_code() + " - waiting for players...";
+                        }
                     } else {
-                        multiplayer.join(lobby_host_address, lobby_port, lobby_player_name);
-                        lobby_status = "Connecting to " + lobby_host_address + ":" + lobby_port + "...";
+                        if (multiplayer.active()) {
+                            lobby_status = "Connected. Waiting for the host to start the match.";
+                        } else {
+                            multiplayer.join(lobby_host_address, lobby_port, lobby_player_name, lobby_join_code);
+                            lobby_status = "Connecting to " + lobby_host_address + ":" + lobby_port + "...";
+                        }
                     }
                 } catch (const std::exception &error) {
                     multiplayer.stop();
@@ -924,6 +953,8 @@ namespace space {
                 }
             } else if (lobby_selection == back_item) {
                 stop_lobby_editing();
+                multiplayer.stop();
+                host_requested_start = false;
                 lobby_page = LobbyPage::Main;
                 lobby_selection = 0;
                 lobby_status = "Choose how you want to play.";
@@ -938,8 +969,16 @@ namespace space {
                 } else if ((lobby_page == LobbyPage::Host && lobby_edit_field == 1) ||
                            (lobby_page == LobbyPage::Join && lobby_edit_field == 2)) {
                     field = &lobby_port;
+                } else if (lobby_page == LobbyPage::Join && lobby_edit_field == 3) {
+                    field = &lobby_join_code;
                 }
-                if (field->size() < 32U) {
+                if (field == &lobby_join_code) {
+                    for (const char character : std::string(event.text.text)) {
+                        if (field->size() < 8U && std::isalnum(static_cast<unsigned char>(character))) {
+                            field->push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(character))));
+                        }
+                    }
+                } else if (field->size() < 32U) {
                     *field += event.text.text;
                 }
                 return;
@@ -953,6 +992,8 @@ namespace space {
                     } else if ((lobby_page == LobbyPage::Host && lobby_edit_field == 1) ||
                                (lobby_page == LobbyPage::Join && lobby_edit_field == 2)) {
                         field = &lobby_port;
+                    } else if (lobby_page == LobbyPage::Join && lobby_edit_field == 3) {
+                        field = &lobby_join_code;
                     }
                     if (event.key.key == SDLK_BACKSPACE && !field->empty()) {
                         field->pop_back();
@@ -972,6 +1013,8 @@ namespace space {
                     if (lobby_page == LobbyPage::Main) {
                         exit();
                     } else {
+                        multiplayer.stop();
+                        host_requested_start = false;
                         lobby_page = LobbyPage::Main;
                         lobby_selection = 0;
                         lobby_status = "Choose how you want to play.";
@@ -1006,11 +1049,9 @@ namespace space {
             state.current_speed = ship.current_speed;
             state.exploding = ship.exploding ? 1U : 0U;
             state.match_started = match_started ? 1U : 0U;
-            state.host_kills = host_kills;
-            state.client_kills = client_kills;
-            state.host_death_serial = host_death_serial;
-            state.client_death_serial = client_death_serial;
-            state.consumed_client_projectile_id = consumed_client_projectile_id;
+            state.kills = multiplayer_kills;
+            state.death_serials = multiplayer_death_serials;
+            state.consumed_projectile_ids = consumed_projectile_ids;
             state.winner = multiplayer_winner;
             std::size_t output_index = 0;
             for (std::size_t projectile_index = 0; projectile_index < projectiles.size(); ++projectile_index) {
@@ -1043,14 +1084,18 @@ namespace space {
             return state;
         }
 
-        void apply_remote_state(const NetworkState &state) {
+        void apply_remote_state(std::uint8_t player, const NetworkState &state) {
+            if (player >= NETWORK_PLAYER_COUNT || player == multiplayer.local_player_id()) {
+                return;
+            }
+            Ship &remote_ship = remote_ships[player];
             remote_ship.prev_position = remote_ship.position;
             remote_ship.position = {state.position[0], state.position[1], state.position[2]};
             remote_ship.rotation = {state.rotation[0], state.rotation[1], state.rotation[2]};
             remote_ship.current_speed = state.current_speed;
             remote_ship.visible = state.exploding == 0U;
-            remote_projectiles = state.projectiles;
-            if (!multiplayer.is_host()) {
+            remote_projectiles[player] = state.projectiles;
+            if (!multiplayer.is_host() && player == 0) {
                 for (Asteroid &asteroid : asteroids) {
                     asteroid.active = false;
                 }
@@ -1069,25 +1114,32 @@ namespace space {
 
         void begin_multiplayer_match() {
             multiplayer_match = true;
-            host_kills = 0;
-            client_kills = 0;
-            host_death_serial = 0;
-            client_death_serial = 0;
-            received_host_death_serial = 0;
-            received_client_death_serial = 0;
+            multiplayer_collision_grace = 2.5f;
+            multiplayer_kills = {};
+            multiplayer_death_serials = {};
+            received_death_serials = {};
             multiplayer_winner = 0;
-            remote_ship_exploding = false;
-            remote_explosion_timer = 0.0f;
-            consumed_remote_projectiles.clear();
-            consumed_client_projectile_id = 0;
+            remote_ship_exploding = {};
+            remote_explosion_timers = {};
+            for (auto &consumed : consumed_remote_projectiles) consumed.clear();
+            consumed_projectile_ids = {};
             clear_round_state();
             ship.lives = 99;
-            ship.position = multiplayer.is_host() ? glm::vec3(-24.0f, 0.0f, 0.0f) : glm::vec3(24.0f, 0.0f, 0.0f);
-            ship.rotation.y = multiplayer.is_host() ? -90.0f : 90.0f;
+            static constexpr std::array<glm::vec3, NETWORK_PLAYER_COUNT> SPAWNS = {
+                glm::vec3{-30.0f, 0.0f, -30.0f}, glm::vec3{30.0f, 0.0f, 30.0f},
+                glm::vec3{-30.0f, 0.0f, 30.0f}, glm::vec3{30.0f, 0.0f, -30.0f}};
+            const std::uint8_t local_id = std::min<std::uint8_t>(multiplayer.local_player_id(), 3U);
+            ship.position = SPAWNS[local_id];
+            static constexpr std::array<float, NETWORK_PLAYER_COUNT> SPAWN_YAWS = {-135.0f, 45.0f, -45.0f, 135.0f};
+            ship.rotation.y = SPAWN_YAWS[local_id];
+            ship.current_speed = 6.0f;
             ship.prev_position = ship.position;
-            remote_ship.position = -ship.position;
-            remote_ship.rotation = {0.0f, -ship.rotation.y, 0.0f};
-            remote_ship.visible = true;
+            for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                remote_ships[player].position = SPAWNS[player];
+                remote_ships[player].rotation = {0.0f, SPAWN_YAWS[player], 0.0f};
+                remote_ships[player].current_speed = 6.0f;
+                remote_ships[player].visible = multiplayer.player_connected()[player];
+            }
             if (multiplayer.is_host()) {
                 spawn_initial_asteroids();
             } else {
@@ -1096,21 +1148,23 @@ namespace space {
                 }
             }
             mode = GameMode::Playing;
-            log_game("UDP 1v1 match started against " + multiplayer.peer_name() + ".");
+            log_game(std::format("UDP match started with {} players.", multiplayer.player_count()));
         }
 
         void update_lobby_network() {
             if (!multiplayer.active()) {
                 return;
             }
-            const std::optional<NetworkState> remote = multiplayer.exchange(make_network_state(false), last_delta_time);
-            if (remote.has_value()) {
-                apply_remote_state(*remote);
+            const NetworkExchange exchange = multiplayer.exchange(make_network_state(host_requested_start), last_delta_time);
+            for (const NetworkPlayerUpdate &update : exchange.players) {
+                apply_remote_state(update.player_id, update.state);
+                if (!multiplayer.is_host() && update.player_id == 0 && update.state.match_started != 0U) {
+                    begin_multiplayer_match();
+                    return;
+                }
             }
-            if (multiplayer.is_host() && multiplayer.connected()) {
-                begin_multiplayer_match();
+            if (multiplayer.is_host() && host_requested_start) {
                 multiplayer.exchange(make_network_state(true), 1.0f / 20.0f);
-            } else if (!multiplayer.is_host() && remote.has_value() && remote->match_started != 0U) {
                 begin_multiplayer_match();
             }
         }
@@ -1139,7 +1193,8 @@ namespace space {
             mode = GameMode::MatchOver;
         }
 
-        void update_multiplayer(float dt) {
+        #if 0
+        void update_multiplayer_legacy(float dt) {
             const std::optional<NetworkState> state = multiplayer.exchange(make_network_state(true), dt);
             if (state.has_value()) {
                 apply_remote_state(*state);
@@ -1263,6 +1318,136 @@ namespace space {
             }
         }
 
+        #endif
+
+        void update_multiplayer(float dt) {
+            multiplayer_collision_grace = std::max(0.0f, multiplayer_collision_grace - dt);
+            const NetworkExchange exchange = multiplayer.exchange(make_network_state(true), dt);
+            for (const NetworkPlayerUpdate &update : exchange.players) {
+                apply_remote_state(update.player_id, update.state);
+                if (!multiplayer.is_host() && update.player_id == 0) {
+                    multiplayer_kills = update.state.kills;
+                    multiplayer_death_serials = update.state.death_serials;
+                    consumed_projectile_ids = update.state.consumed_projectile_ids;
+                    multiplayer_winner = update.state.winner;
+                }
+            }
+
+            const std::uint8_t local_id = multiplayer.local_player_id();
+            if (local_id >= NETWORK_PLAYER_COUNT) return;
+            if (!multiplayer.is_host()) {
+                if (consumed_projectile_ids[local_id] != 0U) {
+                    for (std::size_t index = 0; index < projectile_ids.size(); ++index) {
+                        if (projectile_ids[index] == consumed_projectile_ids[local_id]) projectiles[index].active = false;
+                    }
+                }
+                if (multiplayer_death_serials[local_id] != received_death_serials[local_id]) {
+                    received_death_serials[local_id] = multiplayer_death_serials[local_id];
+                    start_multiplayer_local_explosion();
+                }
+                if (multiplayer_winner != 0U) mode = GameMode::MatchOver;
+            }
+
+            for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                if (player == local_id) continue;
+                if (multiplayer_death_serials[player] != received_death_serials[player]) {
+                    received_death_serials[player] = multiplayer_death_serials[player];
+                    remote_ship_exploding[player] = true;
+                    remote_explosion_timers[player] = 1.5f;
+                    spawn_ship_explosion(remote_ships[player].position);
+                }
+                if (remote_ship_exploding[player]) {
+                    remote_explosion_timers[player] -= dt;
+                    if (remote_explosion_timers[player] <= 0.0f) remote_ship_exploding[player] = false;
+                }
+            }
+            if (!multiplayer.is_host()) return;
+
+            auto destroy_player = [this](std::uint8_t target) {
+                if (target == 0) {
+                    start_multiplayer_local_explosion();
+                } else {
+                    remote_ship_exploding[target] = true;
+                    ++multiplayer_death_serials[target];
+                }
+                spawn_ship_explosion(target == 0 ? ship.position : remote_ships[target].position);
+            };
+            auto player_position = [this](std::uint8_t player) {
+                return player == 0 ? ship.position : remote_ships[player].position;
+            };
+            auto player_exploding = [this](std::uint8_t player) {
+                return player == 0 ? ship.exploding : remote_ship_exploding[player];
+            };
+
+            if (multiplayer_collision_grace <= 0.0f) {
+                constexpr float SHIP_COLLISION_RADIUS = 2.4f;
+                for (std::uint8_t first = 0; first < NETWORK_PLAYER_COUNT; ++first) {
+                    if (!multiplayer.player_connected()[first] || player_exploding(first)) continue;
+                    for (std::uint8_t second = first + 1; second < NETWORK_PLAYER_COUNT; ++second) {
+                        if (!multiplayer.player_connected()[second] || player_exploding(second)) continue;
+                        if (glm::length(player_position(first) - player_position(second)) < SHIP_COLLISION_RADIUS) {
+                            destroy_player(first);
+                            destroy_player(second);
+                        }
+                    }
+                }
+            }
+
+            for (std::uint8_t player = 1; player < NETWORK_PLAYER_COUNT; ++player) {
+                if (!multiplayer.player_connected()[player] || player_exploding(player)) continue;
+                for (const Asteroid &asteroid : asteroids) {
+                    if (asteroid.active && glm::length(asteroid.position - player_position(player)) < asteroid.radius + 1.8f) {
+                        destroy_player(player);
+                        break;
+                    }
+                }
+            }
+
+            for (Projectile &projectile : projectiles) {
+                if (!projectile.active) continue;
+                for (std::uint8_t target = 1; target < NETWORK_PLAYER_COUNT; ++target) {
+                    if (multiplayer.player_connected()[target] && !player_exploding(target) &&
+                        projectile_distance_to_ship(projectile, player_position(target)) < 1.8f) {
+                        projectile.active = false;
+                        ++multiplayer_kills[0];
+                        destroy_player(target);
+                        if (multiplayer_kills[0] >= 5U) finish_multiplayer_match(1U);
+                        break;
+                    }
+                }
+            }
+
+            for (std::uint8_t shooter = 1; shooter < NETWORK_PLAYER_COUNT; ++shooter) {
+                if (!multiplayer.player_connected()[shooter]) continue;
+                for (const NetworkProjectile &projectile : remote_projectiles[shooter]) {
+                    if (projectile.active == 0U || consumed_remote_projectiles[shooter].contains(projectile.id)) continue;
+                    const glm::vec3 position{projectile.position[0], projectile.position[1], projectile.position[2]};
+                    bool consumed = false;
+                    for (std::uint8_t target = 0; target < NETWORK_PLAYER_COUNT; ++target) {
+                        if (target == shooter || !multiplayer.player_connected()[target] || player_exploding(target)) continue;
+                        if (glm::length(position - player_position(target)) < 1.8f) {
+                            consumed_remote_projectiles[shooter].insert(projectile.id);
+                            consumed_projectile_ids[shooter] = projectile.id;
+                            ++multiplayer_kills[shooter];
+                            destroy_player(target);
+                            if (multiplayer_kills[shooter] >= 5U) finish_multiplayer_match(shooter + 1U);
+                            consumed = true;
+                            break;
+                        }
+                    }
+                    if (consumed) continue;
+                    for (Asteroid &asteroid : asteroids) {
+                        if (asteroid.active && glm::length(position - asteroid.position) < asteroid.radius * ASTEROID_PROJECTILE_COLLISION_SCALE) {
+                            consumed_remote_projectiles[shooter].insert(projectile.id);
+                            consumed_projectile_ids[shooter] = projectile.id;
+                            split_asteroid(asteroid);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         void draw_lobby(VkCommandBuffer cmd, uint32_t image_index, const VkExtent2D &extent, float aspect) {
             update_lobby_network();
             lobby_camera_distance += last_delta_time * 4.5f;
@@ -1287,23 +1472,29 @@ namespace space {
 
             const int panel_width = 760;
             const int panel_x = static_cast<int>(extent.width) / 2 - panel_width / 2;
-            draw_ui_rect(panel_x, 65, panel_width, 535, {0.015f, 0.025f, 0.08f, 0.90f});
+            draw_ui_rect(panel_x, 65, panel_width, 600, {0.015f, 0.025f, 0.08f, 0.90f});
             draw_ui_rect(panel_x, 65, panel_width, 3, {0.20f, 0.72f, 1.0f, 1.0f});
-            draw_ui_rect(panel_x, 597, panel_width, 3, {0.20f, 0.72f, 1.0f, 1.0f});
+            draw_ui_rect(panel_x, 662, panel_width, 3, {0.20f, 0.72f, 1.0f, 1.0f});
 
             set_ui_font_size(22);
             printText("ASTEROIDS NET", panel_x + 284, 100, {120, 220, 255, 255});
-            printText("MULTIPLAYER 1v1", panel_x + 270, 145, {255, 255, 255, 255});
+            printText("MULTIPLAYER - UP TO 4", panel_x + 235, 145, {255, 255, 255, 255});
 
             std::vector<std::string> labels;
             if (lobby_page == LobbyPage::Main) {
-                labels = {"HOST 1v1 MATCH", "JOIN 1v1 MATCH", "QUIT"};
+                labels = {"HOST MULTIPLAYER MATCH", "JOIN MULTIPLAYER MATCH", "QUIT"};
                 printText("One pilot hosts. The other pilot connects.", panel_x + 165, 195, {170, 190, 220, 255});
             } else if (lobby_page == LobbyPage::Host) {
-                labels = {"PILOT NAME:  " + lobby_player_name, "LISTEN PORT: " + lobby_port, "START HOSTING", "BACK"};
+                labels = {"PILOT NAME:  " + lobby_player_name, "LISTEN PORT: " + lobby_port,
+                          multiplayer.active() ? "START MATCH" : "START HOSTING", "BACK"};
                 printText("HOST SETUP", panel_x + 310, 195, {255, 210, 90, 255});
+                if (multiplayer.active()) {
+                    printText("CODE: " + multiplayer.join_code(), panel_x + 540, 195, {120, 255, 170, 255});
+                }
             } else {
-                labels = {"PILOT NAME: " + lobby_player_name, "HOST:       " + lobby_host_address, "PORT:       " + lobby_port, "CONNECT", "BACK"};
+                labels = {"PILOT NAME: " + lobby_player_name, "HOST:       " + lobby_host_address, "PORT:       " + lobby_port,
+                          "JOIN CODE:  " + lobby_join_code,
+                          multiplayer.active() ? "WAITING FOR HOST" : "CONNECT", "BACK"};
                 printText("JOIN SETUP", panel_x + 315, 195, {100, 255, 170, 255});
             }
 
@@ -1323,8 +1514,18 @@ namespace space {
                 printText(text, panel_x + 40, y + 9, selected ? SDL_Color{255, 255, 255, 255} : SDL_Color{170, 195, 220, 255});
             }
 
-            printText(lobby_status, panel_x + 30, 525, {255, 210, 100, 255});
-            printText("Arrow keys / W,S: select    Enter: confirm    Esc: back", panel_x + 30, 560, {135, 155, 185, 255});
+            if (multiplayer.active()) {
+                printText("CONNECTED PLAYERS", panel_x + 30, 550, {120, 220, 255, 255});
+                int roster_x = panel_x + 245;
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                    const std::string name = multiplayer.player_connected()[player] ? multiplayer.player_names()[player] : "Waiting...";
+                    printText(std::format("P{}: {}", player + 1, name), roster_x, 550 + static_cast<int>(player % 2U) * 28,
+                              multiplayer.player_connected()[player] ? SDL_Color{120, 255, 170, 255} : SDL_Color{120, 130, 150, 255});
+                    if (player == 1) roster_x = panel_x + 500;
+                }
+            }
+            printText(lobby_status, panel_x + 30, 610, {255, 210, 100, 255});
+            printText("Arrow keys / W,S: select    Enter: confirm    Esc: back", panel_x + 30, 640, {135, 155, 185, 255});
         }
 
         void draw_intro(const VkExtent2D &extent) {
@@ -1513,9 +1714,11 @@ namespace space {
                 if (!ship_model.isLoaded()) {
                     return;
                 }
-                remote_ship_model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
-                remote_ship_model.setShaders(this, model_vert, model_frag);
-                remote_ship_model.setBackfaceCulling(false);
+                for (auto &model : remote_ship_models) {
+                    model.load(this, asset_root + "/data/starship.obj", "", asset_root + "/data", 1.0f);
+                    model.setShaders(this, model_vert, model_frag);
+                    model.setBackfaceCulling(false);
+                }
             } else if (current_step == 5) {
                 create_flame_resources();
             } else if (current_step >= 6 && current_step < 6 + MAX_ASTEROIDS) {
@@ -1994,8 +2197,13 @@ namespace space {
                     ship.exploding = false;
                     ship.visible = true;
                     if (multiplayer_match) {
-                        ship.position = multiplayer.is_host() ? glm::vec3(-24.0f, 0.0f, 0.0f) : glm::vec3(24.0f, 0.0f, 0.0f);
-                        ship.rotation = {0.0f, multiplayer.is_host() ? -90.0f : 90.0f, 0.0f};
+                        static constexpr std::array<glm::vec3, NETWORK_PLAYER_COUNT> SPAWNS = {
+                            glm::vec3{-30.0f, 0.0f, -30.0f}, glm::vec3{30.0f, 0.0f, 30.0f},
+                            glm::vec3{-30.0f, 0.0f, 30.0f}, glm::vec3{30.0f, 0.0f, -30.0f}};
+                        const std::uint8_t player = std::min<std::uint8_t>(multiplayer.local_player_id(), 3U);
+                        ship.position = SPAWNS[player];
+                        static constexpr std::array<float, NETWORK_PLAYER_COUNT> SPAWN_YAWS = {-135.0f, 45.0f, -45.0f, 135.0f};
+                        ship.rotation = {0.0f, SPAWN_YAWS[player], 0.0f};
                     } else {
                         ship.position = glm::vec3(0.0f);
                         ship.rotation = glm::vec3(0.0f);
@@ -2290,7 +2498,7 @@ namespace space {
             ship.visible = false;
             ship.explosion_timer = EXPLOSION_DURATION_FRAMES;
             if (multiplayer_match && multiplayer.is_host()) {
-                ++host_death_serial;
+                ++multiplayer_death_serials[0];
             }
             ship.lives--;
             ship.overheated = false;
@@ -2601,13 +2809,15 @@ namespace space {
             ship_model.render(current_command_buffer, image_index, false);
         }
 
-        void draw_remote_ship(uint32_t image_index) {
-            if (!remote_ship.visible || remote_ship_exploding || !remote_ship_model.isLoaded()) {
+        void draw_remote_ship(uint32_t image_index, std::uint8_t player) {
+            Ship &remote_ship = remote_ships[player];
+            mxvk::VKAbstractModel &remote_ship_model = remote_ship_models[player];
+            if (!remote_ship.visible || remote_ship_exploding[player] || !remote_ship_model.isLoaded()) {
                 return;
             }
             mxvk::UniformBufferObject ubo{};
             ubo.model = build_model_matrix(remote_ship.position, remote_ship.rotation, rendered_ship_scale(), remote_ship_model.modelCenterOffset());
-            last_remote_ship_model_matrix = ubo.model;
+            last_remote_ship_model_matrices[player] = ubo.model;
             ubo.view = view_matrix;
             ubo.proj = projection_matrix;
             ubo.fx = glm::vec4(camera_position, elapsed_seconds);
@@ -2651,12 +2861,13 @@ namespace space {
         }
 
         void draw_remote_projectiles() {
-            for (const NetworkProjectile &projectile : remote_projectiles) {
-                if (projectile.active == 0U) {
-                    continue;
+            for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                if (player == multiplayer.local_player_id()) continue;
+                for (const NetworkProjectile &projectile : remote_projectiles[player]) {
+                    if (projectile.active == 0U) continue;
+                    const glm::vec3 position{projectile.position[0], projectile.position[1], projectile.position[2]};
+                    projectile_sprite->drawSprite(position, glm::vec2(0.62f), {0.20f, 0.65f, 1.0f, 1.0f});
                 }
-                const glm::vec3 position{projectile.position[0], projectile.position[1], projectile.position[2]};
-                projectile_sprite->drawSprite(position, glm::vec2(0.62f), {0.20f, 0.65f, 1.0f, 1.0f});
             }
         }
 
@@ -3069,18 +3280,19 @@ namespace space {
         }
 
         bool cannon_has_opponent_target(const glm::vec3 &muzzle, const glm::vec3 &forward) const {
-            if (!multiplayer_match || !remote_ship.visible || remote_ship_exploding) {
-                return false;
-            }
+            if (!multiplayer_match) return false;
             constexpr float OPPONENT_TARGET_RADIUS = 1.8f;
             const float max_range = PROJECTILE_SPEED * PROJECTILE_LIFETIME;
-            const glm::vec3 to_opponent = remote_ship.position - muzzle;
-            const float along_ray = glm::dot(to_opponent, forward);
-            if (along_ray < 0.0f || along_ray > max_range) {
-                return false;
+            for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player] ||
+                    !remote_ships[player].visible || remote_ship_exploding[player]) continue;
+                const glm::vec3 to_opponent = remote_ships[player].position - muzzle;
+                const float along_ray = glm::dot(to_opponent, forward);
+                if (along_ray < 0.0f || along_ray > max_range) continue;
+                const glm::vec3 closest_point = muzzle + forward * along_ray;
+                if (glm::length(closest_point - remote_ships[player].position) <= OPPONENT_TARGET_RADIUS) return true;
             }
-            const glm::vec3 closest_point = muzzle + forward * along_ray;
-            return glm::length(closest_point - remote_ship.position) <= OPPONENT_TARGET_RADIUS;
+            return false;
         }
 
         void draw_cannon_crosshair(const VkExtent2D &extent) {
@@ -3176,17 +3388,18 @@ namespace space {
             }
 
             if (multiplayer_match) {
-                glm::vec2 relative{remote_ship.position.x - ship.position.x, remote_ship.position.z - ship.position.z};
-                const float distance = glm::length(relative);
-                if (distance > RADAR_RANGE && distance > 1e-4f) {
-                    relative *= RADAR_RANGE / distance;
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) {
+                    if (player == multiplayer.local_player_id() || !multiplayer.player_connected()[player]) continue;
+                    glm::vec2 relative{remote_ships[player].position.x - ship.position.x, remote_ships[player].position.z - ship.position.z};
+                    const float distance = glm::length(relative);
+                    if (distance > RADAR_RANGE && distance > 1e-4f) relative *= RADAR_RANGE / distance;
+                    const int opponent_x = center_x + static_cast<int>((relative.x / RADAR_RANGE) * half_size);
+                    const int opponent_y = center_y + static_cast<int>((relative.y / RADAR_RANGE) * half_size);
+                    const glm::vec4 color = remote_ship_exploding[player] ? glm::vec4{1.0f, 0.35f, 0.12f, 1.0f} : glm::vec4{1.0f, 0.08f, 0.12f, 1.0f};
+                    draw_ui_rect(opponent_x - 6, opponent_y - 6, 12, 12, color);
+                    draw_ui_rect(opponent_x - 9, opponent_y - 1, 18, 3, color);
+                    draw_ui_rect(opponent_x - 1, opponent_y - 9, 3, 18, color);
                 }
-                const int opponent_x = center_x + static_cast<int>((relative.x / RADAR_RANGE) * half_size);
-                const int opponent_y = center_y + static_cast<int>((relative.y / RADAR_RANGE) * half_size);
-                const glm::vec4 opponent_color = remote_ship_exploding ? glm::vec4{1.0f, 0.35f, 0.12f, 1.0f} : glm::vec4{1.0f, 0.08f, 0.12f, 1.0f};
-                draw_ui_rect(opponent_x - 6, opponent_y - 6, 12, 12, opponent_color);
-                draw_ui_rect(opponent_x - 9, opponent_y - 1, 18, 3, opponent_color);
-                draw_ui_rect(opponent_x - 1, opponent_y - 9, 3, 18, opponent_color);
             }
 
             draw_ui_rect(center_x - 5, center_y, 11, 2, {0.95f, 1.0f, 1.0f, 1.0f});
@@ -3207,11 +3420,13 @@ namespace space {
             const int right_x = std::max(25, static_cast<int>(extent.width) - 250);
             printText("MXVK Asteroids v1.0", right_x, 25, red);
             if (multiplayer_match) {
-                const unsigned local_kills = multiplayer.is_host() ? host_kills : client_kills;
-                const unsigned enemy_kills = multiplayer.is_host() ? client_kills : host_kills;
+                const std::uint8_t local_id = multiplayer.local_player_id();
+                const unsigned local_kills = local_id < NETWORK_PLAYER_COUNT ? multiplayer_kills[local_id] : 0U;
+                unsigned enemy_kills = 0;
+                for (std::uint8_t player = 0; player < NETWORK_PLAYER_COUNT; ++player) if (player != local_id) enemy_kills = std::max(enemy_kills, multiplayer_kills[player]);
                 printText("Kills: " + std::to_string(local_kills) + " / 5", right_x, 50, white);
-                printText("Enemy: " + std::to_string(enemy_kills) + " / 5", right_x, 75, red);
-                printText("Opponent: " + multiplayer.peer_name(), right_x, 100, white);
+                printText("Leader: " + std::to_string(enemy_kills) + " / 5", right_x, 75, red);
+                printText("Players: " + std::to_string(multiplayer.player_count()) + " / 4", right_x, 100, white);
                 printText("UDP host-authoritative", right_x, 125, yellow);
                 return;
             }
@@ -3257,8 +3472,8 @@ namespace space {
         void draw_multiplayer_end(const VkExtent2D &extent) {
             multiplayer.exchange(make_network_state(true), last_delta_time);
             set_ui_font_size(22);
-            const bool local_won = (multiplayer.is_host() && multiplayer_winner == 1U) ||
-                                   (!multiplayer.is_host() && multiplayer_winner == 2U);
+            const std::uint8_t local_id = multiplayer.local_player_id();
+            const bool local_won = multiplayer_winner == local_id + 1U;
             const int panel_width = 620;
             const int panel_x = static_cast<int>(extent.width) / 2 - panel_width / 2;
             const int panel_y = static_cast<int>(extent.height) / 2 - 150;
@@ -3266,8 +3481,7 @@ namespace space {
             draw_ui_rect(panel_x, panel_y, panel_width, 4, local_won ? glm::vec4{0.2f, 1.0f, 0.55f, 1.0f} : glm::vec4{1.0f, 0.2f, 0.2f, 1.0f});
             printText(local_won ? "VICTORY" : "DEFEAT", panel_x + 235, panel_y + 48,
                       local_won ? SDL_Color{100, 255, 160, 255} : SDL_Color{255, 90, 90, 255});
-            printText(std::format("Final score: {} - {}", multiplayer.is_host() ? host_kills : client_kills,
-                                  multiplayer.is_host() ? client_kills : host_kills),
+            printText(std::format("Final score: {} kills", local_id < NETWORK_PLAYER_COUNT ? multiplayer_kills[local_id] : 0U),
                       panel_x + 210, panel_y + 120, {255, 255, 255, 255});
             printText("Press ENTER to return to the multiplayer lobby", panel_x + 70, panel_y + 205, {255, 220, 120, 255});
         }
@@ -3353,6 +3567,6 @@ namespace space {
 } // namespace space
 
 void space::run_asteroids3d(const Arguments &args) {
-    Asteroids3DWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync, args.enable_crt);
+    Asteroids3DWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync, args.enable_crt, args.disable_sound);
     window.loop();
 }
