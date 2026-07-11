@@ -608,6 +608,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(asteroids)
     add_subdirectory(examples/asteroids3d)
     mxvk_configure_mingw_target(asteroids3d)
+    add_subdirectory(examples/asteroids-net)
+    mxvk_configure_mingw_target(asteroids-net)
     add_subdirectory(examples/defender)
     mxvk_configure_mingw_target(defender)
     add_subdirectory(examples/pong)
@@ -762,6 +764,7 @@ if(EXAMPLES)
         glitch_cube
         asteroids
         asteroids3d
+        asteroids-net
         defender
         pong
         tetris

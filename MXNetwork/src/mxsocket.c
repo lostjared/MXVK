@@ -606,6 +606,8 @@ ssize_t mx_socket_recvfrom(MXSocket *sock, void *buf, size_t src_bytes) {
     socklen_t len = (socklen_t)sizeof(struct sockaddr_storage);
     struct sockaddr_storage caddr;
     bytes = recvfrom(sock->sockfd, (char *)buf, MX_LEN(src_bytes), 0, (struct sockaddr *)&caddr, &len);
+    if (bytes >= 0)
+        mx_socket_store_inet_address(sock, (const struct sockaddr *)&caddr, len);
     return bytes;
 }
 
@@ -617,6 +619,8 @@ ssize_t mx_socket_ipv6_recvfrom(MXSocket *sock, void *buf, size_t src_bytes) {
     socklen_t len = (socklen_t)sizeof(struct sockaddr_storage);
     struct sockaddr_storage caddr;
     bytes = recvfrom(sock->sockfd, (char *)buf, MX_LEN(src_bytes), 0, (struct sockaddr *)&caddr, &len);
+    if (bytes >= 0)
+        mx_socket_store_inet_address(sock, (const struct sockaddr *)&caddr, len);
     return bytes;
 }
 
