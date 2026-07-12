@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+prefix="$(cd -- "${script_dir}/@MXVK_EXAMPLE_SCRIPT_TO_PREFIX@" && pwd -P)"
+binary_path="@MXVK_EXAMPLE_BINARY_PATH@"
+asset_path="@MXVK_EXAMPLE_ASSET_PATH@"
+
+exec "${binary_path}" -f -p "${asset_path}" "$@"

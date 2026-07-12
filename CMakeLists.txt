@@ -748,6 +748,7 @@ if(EXAMPLES)
         stencil_surface
         hello_world
         static_example
+        stencil
         sprite_example
         math3d
         math3d_cube
@@ -760,8 +761,10 @@ if(EXAMPLES)
         dark
         moon
         starship
+        starfield
         pointsprite
         fireworks
+        fire
         planet
         tux_example
         glitch_cube
@@ -770,6 +773,7 @@ if(EXAMPLES)
         asteroids-net
         defender
         pong
+        breakout
         tetris
         puzzle_drop
         tictactoe
@@ -795,6 +799,133 @@ if(EXAMPLES)
     foreach(example_target IN LISTS mxvk_example_targets)
         mxvk_copy_runtime_shaders(${example_target})
     endforeach()
+
+    function(mxvk_install_example target_name)
+        if(NOT TARGET ${target_name})
+            return()
+        endif()
+
+        get_target_property(target_type ${target_name} TYPE)
+        if(NOT target_type STREQUAL "EXECUTABLE")
+            return()
+        endif()
+
+        get_target_property(target_binary_dir ${target_name} BINARY_DIR)
+        get_target_property(target_output_name ${target_name} OUTPUT_NAME)
+        if(NOT target_output_name OR target_output_name MATCHES "-NOTFOUND$")
+            set(target_output_name ${target_name})
+        endif()
+
+        if(NOT UNIX OR APPLE)
+            install(TARGETS ${target_name}
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}
+                BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}
+            )
+            install(DIRECTORY ${target_binary_dir}/data/
+                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}/data
+                OPTIONAL
+            )
+            install(DIRECTORY ${target_binary_dir}/shaders/
+                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}/shaders
+                OPTIONAL
+            )
+            return()
+        endif()
+
+        if(IS_ABSOLUTE "${CMAKE_INSTALL_BINDIR}")
+            set(MXVK_EXAMPLE_SCRIPT_TO_PREFIX ".")
+            set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_FULL_LIBEXECDIR}/${target_name}/${target_output_name}")
+            set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_FULL_DATADIR}/mxvk/examples/${target_name}")
+        else()
+            file(RELATIVE_PATH MXVK_EXAMPLE_SCRIPT_TO_PREFIX "/${CMAKE_INSTALL_BINDIR}" "/")
+            if(MXVK_EXAMPLE_SCRIPT_TO_PREFIX STREQUAL "")
+                set(MXVK_EXAMPLE_SCRIPT_TO_PREFIX ".")
+            endif()
+
+            if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBEXECDIR}")
+                set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_LIBEXECDIR}/${target_name}/${target_output_name}")
+            else()
+                set(MXVK_EXAMPLE_BINARY_PATH "\${prefix}/${CMAKE_INSTALL_LIBEXECDIR}/${target_name}/${target_output_name}")
+            endif()
+
+            if(IS_ABSOLUTE "${CMAKE_INSTALL_DATADIR}")
+                set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}")
+            else()
+                set(MXVK_EXAMPLE_ASSET_PATH "\${prefix}/${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}")
+            endif()
+        endif()
+
+        set(MXVK_EXAMPLE_LAUNCHER "${CMAKE_CURRENT_BINARY_DIR}/example-launchers/${target_name}")
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example-launcher.in
+            ${MXVK_EXAMPLE_LAUNCHER}
+            @ONLY
+        )
+
+        install(TARGETS ${target_name}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/${target_name}
+        )
+        install(PROGRAMS ${MXVK_EXAMPLE_LAUNCHER}
+            DESTINATION ${CMAKE_INSTALL_BINDIR}
+            RENAME ${target_name}
+        )
+        install(DIRECTORY ${target_binary_dir}/data/
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}/data
+            OPTIONAL
+        )
+        install(DIRECTORY ${target_binary_dir}/shaders/
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}/shaders
+            OPTIONAL
+        )
+    endfunction()
+
+    set(mxvk_generic_install_targets ${mxvk_example_targets})
+    list(APPEND mxvk_generic_install_targets bluesky)
+    list(REMOVE_ITEM mxvk_generic_install_targets rain asteroids3d asteroids-net mutatris)
+    list(REMOVE_DUPLICATES mxvk_generic_install_targets)
+    foreach(example_target IN LISTS mxvk_generic_install_targets)
+        mxvk_install_example(${example_target})
+    endforeach()
+
+    set(mxvk_installed_application_targets ${mxvk_generic_install_targets})
+    list(APPEND mxvk_installed_application_targets asteroids3d asteroids-net mutatris)
+    list(REMOVE_DUPLICATES mxvk_installed_application_targets)
+
+    foreach(example_target IN LISTS mxvk_installed_application_targets)
+        if(NOT TARGET ${example_target})
+            continue()
+        endif()
+
+        set(MXVK_EXAMPLE_DESKTOP_ID ${example_target})
+        string(REPLACE "_" " " MXVK_EXAMPLE_DISPLAY_NAME ${example_target})
+        set(MXVK_EXAMPLE_DESKTOP_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-desktop/${example_target}.desktop")
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example.desktop.in
+            ${MXVK_EXAMPLE_DESKTOP_FILE}
+            @ONLY
+        )
+
+        if(MINGW AND NOT example_target STREQUAL "asteroids3d" AND NOT example_target STREQUAL "asteroids-net")
+            set(MXVK_EXAMPLE_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}.ico")
+            set(MXVK_EXAMPLE_RESOURCE_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-resources/${example_target}.rc")
+            configure_file(
+                ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example-icon.rc.in
+                ${MXVK_EXAMPLE_RESOURCE_FILE}
+                @ONLY
+            )
+            target_sources(${example_target} PRIVATE ${MXVK_EXAMPLE_RESOURCE_FILE})
+        endif()
+    endforeach()
+
+    if(UNIX AND NOT APPLE)
+        set(MXVK_INSTALLED_APPLICATION_TARGETS "${mxvk_generic_install_targets}")
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-install-user-desktop.cmake.in
+            ${CMAKE_CURRENT_BINARY_DIR}/mxvk-install-user-desktop.cmake
+            @ONLY
+        )
+        install(SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/mxvk-install-user-desktop.cmake)
+    endif()
 else()
     message(STATUS "Examples OFF")
 endif()

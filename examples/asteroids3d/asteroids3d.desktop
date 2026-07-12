@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Asteroids 3D
+Comment=3D asteroids arcade game
+Exec=asteroids3d
+Icon=asteroids3d
+Terminal=false
+Categories=Game;ArcadeGame;
+Keywords=asteroids;space;arcade;
+StartupNotify=false

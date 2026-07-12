@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=@MXVK_EXAMPLE_DISPLAY_NAME@
+Comment=MXVK Vulkan example
+Exec=@MXVK_EXAMPLE_DESKTOP_ID@
+Icon=@MXVK_EXAMPLE_DESKTOP_ID@
+Terminal=false
+Categories=Graphics;Game;
+Keywords=MXVK;Vulkan;graphics;
+StartupNotify=false

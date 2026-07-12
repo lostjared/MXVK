@@ -1,0 +1,54 @@
+set(MXVK_DESKTOP_INSTALL_HOME "$ENV{HOME}")
+set(MXVK_DESKTOP_INSTALL_OWNER)
+
+if(DEFINED ENV{SUDO_USER} AND DEFINED ENV{SUDO_UID} AND DEFINED ENV{SUDO_GID})
+    execute_process(
+        COMMAND getent passwd "$ENV{SUDO_USER}"
+        OUTPUT_VARIABLE MXVK_SUDO_PASSWD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(MXVK_SUDO_PASSWD)
+        string(REPLACE ":" ";" MXVK_SUDO_PASSWD_FIELDS "${MXVK_SUDO_PASSWD}")
+        list(GET MXVK_SUDO_PASSWD_FIELDS 5 MXVK_DESKTOP_INSTALL_HOME)
+    endif()
+    set(MXVK_DESKTOP_INSTALL_OWNER "$ENV{SUDO_UID}:$ENV{SUDO_GID}")
+endif()
+
+if(NOT MXVK_DESKTOP_INSTALL_HOME)
+    message(WARNING "Skipping MXVK example desktop installation because HOME is not set")
+    return()
+endif()
+
+set(MXVK_DESKTOP_DIR "${MXVK_DESKTOP_INSTALL_HOME}/.local/share/applications")
+set(MXVK_ICON_64_DIR "${MXVK_DESKTOP_INSTALL_HOME}/.local/share/icons/hicolor/64x64/apps")
+set(MXVK_ICON_256_DIR "${MXVK_DESKTOP_INSTALL_HOME}/.local/share/icons/hicolor/256x256/apps")
+
+foreach(MXVK_DESKTOP_TARGET IN ITEMS @MXVK_INSTALLED_APPLICATION_TARGETS@)
+    file(INSTALL
+        DESTINATION "${MXVK_DESKTOP_DIR}"
+        TYPE FILE
+        FILES "@CMAKE_CURRENT_BINARY_DIR@/example-desktop/${MXVK_DESKTOP_TARGET}.desktop"
+    )
+    file(INSTALL
+        DESTINATION "${MXVK_ICON_64_DIR}"
+        TYPE FILE
+        RENAME "${MXVK_DESKTOP_TARGET}.png"
+        FILES "@CMAKE_CURRENT_SOURCE_DIR@/examples/icons/${MXVK_DESKTOP_TARGET}.png"
+    )
+    file(INSTALL
+        DESTINATION "${MXVK_ICON_256_DIR}"
+        TYPE FILE
+        RENAME "${MXVK_DESKTOP_TARGET}.png"
+        FILES "@CMAKE_CURRENT_SOURCE_DIR@/examples/icons/${MXVK_DESKTOP_TARGET}-256.png"
+    )
+
+    if(MXVK_DESKTOP_INSTALL_OWNER)
+        execute_process(
+            COMMAND chown "${MXVK_DESKTOP_INSTALL_OWNER}"
+                "${MXVK_DESKTOP_DIR}/${MXVK_DESKTOP_TARGET}.desktop"
+                "${MXVK_ICON_64_DIR}/${MXVK_DESKTOP_TARGET}.png"
+                "${MXVK_ICON_256_DIR}/${MXVK_DESKTOP_TARGET}.png"
+        )
+    endif()
+endforeach()

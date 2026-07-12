@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+prefix="$(cd -- "${script_dir}/@ASTEROIDS3D_SCRIPT_TO_PREFIX@" && pwd -P)"
+binary_path="@ASTEROIDS3D_BINARY_PATH@"
+asset_path="@ASTEROIDS3D_ASSET_PATH@"
+
+exec "${binary_path}" -f -p "${asset_path}" "$@"
