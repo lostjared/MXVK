@@ -58,6 +58,11 @@ View on YouTube: https://youtu.be/Y3PyGg3qBUA
 git clone https://github.com/lostjared/MXVK.git
 
 
+## Windows X64 Demo Builds:
+
+[Demos for Windows X64](https://lostsidedead.biz/MXVK/demos/)
+
+
 <a id="core-dependencies"></a>
 
 ## Core Dependencies
