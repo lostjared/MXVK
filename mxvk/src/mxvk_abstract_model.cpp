@@ -353,12 +353,14 @@ namespace mxvk {
         }
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        vkCmdPushConstants(cmd,
-                           pipelineLayout,
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(ModelFragmentPushConstants),
-                           &fragmentPushConstants);
+        if (extendedFragmentUniformsEnabled) {
+            vkCmdPushConstants(cmd,
+                               pipelineLayout,
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(ModelFragmentPushConstants),
+                               &fragmentPushConstants);
+        }
 
         const size_t textureCount = std::max<size_t>(1, textures.size());
         for (size_t i = 0; i < obj.subMeshCount(); ++i) {
@@ -415,12 +417,14 @@ namespace mxvk {
                            0,
                            sizeof(ModelPushConstants),
                            &pushConstants);
-        vkCmdPushConstants(cmd,
-                           pipelineLayout,
-                           VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(ModelFragmentPushConstants),
-                           &fragmentPushConstants);
+        if (extendedFragmentUniformsEnabled) {
+            vkCmdPushConstants(cmd,
+                               pipelineLayout,
+                               VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(ModelFragmentPushConstants),
+                               &fragmentPushConstants);
+        }
         vkCmdBindDescriptorSets(cmd,
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 pipelineLayout,
@@ -1851,7 +1855,7 @@ namespace mxvk {
                     .size = sizeof(ModelFragmentPushConstants),
                 },
             };
-            layoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
+            layoutInfo.pushConstantRangeCount = extendedFragmentUniformsEnabled ? static_cast<uint32_t>(pushConstantRanges.size()) : 1U;
             layoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
             if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
