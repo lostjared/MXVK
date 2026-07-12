@@ -139,6 +139,16 @@ cmake -S . -B build -DFRACTAL_ZOOM=ON
 cmake -S . -B build -DEXAMPLES=OFF
 ```
 
+To install the configured build, run:
+
+```bash
+sudo cmake --install build
+```
+
+By default, CMake installs to `/usr/local`. Set
+`-DCMAKE_INSTALL_PREFIX=<path>` during configuration to use a different
+location.
+
 <a id="documentation"></a>
 
 ## Documentation
