@@ -22,7 +22,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Model Viewer Tools](#model-viewer-tools)
 - [Examples](#examples)
 - [Asteroids Net Multiplayer](#asteroids-net-multiplayer)
-- [Recent Optimizations](#recent-optimizations)
+- [Recent Updates and Optimizations](#recent-optimizations)
 - [MXWrite](#mxwrite)
 - [MXNetwork](#mxnetwork)
 - [Project Layout](#project-layout)
@@ -95,21 +95,65 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
-The Perl helper performs prerequisite checks, configures, builds, and installs
-the project in one command. It automatically prefers Ninja for new build
-directories when available and reports likely missing dependencies with
-platform-specific package hints:
+### Automated configure, build, and install
+
+`install.pl` performs prerequisite checks, configures CMake, builds the selected
+targets, and installs the results in one command:
 
 ```bash
 ./install.pl
 ```
 
-Use `./install.pl --help` for options such as `--prefix`, `--jobs`, `--fresh`,
-and `--no-install`. CMake feature options can be passed directly, for example:
+Before configuring, the script checks for CMake 3.10 or newer, a C++ compiler,
+and the `glslc` Vulkan shader compiler. CMake then performs the authoritative
+checks for SDL3, SDL3_ttf, Vulkan 1.4+, PNG, ZLIB, glm, and any dependencies
+required by enabled optional features. If configuration fails because a common
+dependency is missing, the script identifies the likely requirement and prints
+package-installation hints for Arch Linux, Debian/Ubuntu, Fedora, or macOS.
+
+For a new build directory, `install.pl` automatically selects Ninja when the
+`ninja` executable is available. It falls back to CMake's default generator
+otherwise. An existing build directory retains its cached generator to avoid a
+CMake generator-mismatch error. An explicitly supplied `-G` or `--generator`
+option always takes precedence.
+
+The default build directory is `build/`, the default parallel job count is the
+detected CPU count, and the default installation prefix is `/usr/local`. The
+script uses `sudo` automatically only when the installation prefix is not
+writable. Use `--sudo` to require it, `--no-sudo` to prohibit it, or `--prefix`
+to install in a user-writable location.
+
+Common script options are:
+
+- `-B DIR` or `--build-dir DIR` selects a build directory.
+- `--prefix DIR` sets `CMAKE_INSTALL_PREFIX`.
+- `-j N` or `--jobs N` sets the parallel build job count.
+- `--fresh` requests a clean CMake configure and requires CMake 3.24 or newer.
+- `--no-install` configures and builds without installing.
+- `--sudo` always runs the install step through `sudo`.
+- `--no-sudo` prevents privilege escalation and reports an error if the prefix is not writable.
+- `-h` or `--help` displays the complete command-line help.
+
+Unknown arguments are passed directly to CMake, so all project feature options
+can be used with the helper:
 
 ```bash
+# Build and install everything to /usr/local, using sudo when needed
+./install.pl
+
+# Install only the core libraries and tools under the current user's home directory
 ./install.pl --prefix "$HOME/.local" -DEXAMPLES=OFF -DWITH_MIXER=OFF
+
+# Reconfigure and build without installing
+./install.pl --fresh --no-install -DVALIDATION=ON
+
+# Explicitly require optional OpenCV and JPEG support
+./install.pl -DCV=ON -DJPEG=ON
 ```
+
+Each configure, build, and install command is shown before it runs. Output is
+streamed normally, and any failed stage returns a nonzero exit status with a
+short explanation of what to inspect or how to choose a writable prefix.
 
 If you clone/move the repo to a different machine or path, run a fresh configure first.
 CMake-generated build files contain absolute paths and can fail with errors like
@@ -503,8 +547,10 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 <a id="recent-optimizations"></a>
 
-## Recent Optimizations
+## Recent Updates and Optimizations
 
+- July 13, 2026: `install.pl` is now a native Perl configure/build/install helper. It validates required build tools, lets CMake check core and optional libraries, translates common missing-dependency failures into clear platform-specific package hints, supports custom build directories, prefixes, job counts, fresh configuration, build-only operation, and explicit `sudo` policy, and forwards project `-D` feature flags directly to CMake.
+- July 13, 2026: `install.pl` now prefers Ninja automatically for new or fresh build directories when `ninja` is installed. It preserves the cached generator for existing build directories, honors explicit `-G` or `--generator` selections, and reports which generator it selected.
 - July 11, 2026: version `0.21.0` adds the four-player `asteroids-net` mode, including richer host/join screens, player-state and projectile synchronization improvements, runtime asset-path handling, and an application icon. The release also adds model/texture-manifest support to `shader_viewer`, enlarges the Mutatris background-effect pack, and documents the `asteroids-net` public types and networking helpers with Doxygen.
 - July 11, 2026: `asteroids-net` added automatic temporary UDP router mapping for hosted games. It tries UPnP through `miniupnpc`, falls back to NAT-PMP through `libnatpmp`, reports mapping results in the lobby, and removes active mappings when hosting stops. Both dependencies remain optional, preserving LAN play and builds on systems without them.
 - July 11, 2026: `asteroids-net` documentation now covers multiplayer hosting/joining, Arch Linux dependency installation, compile-time feature gating, router capability diagnostics, manual forwarding, IPv6/overlay alternatives, CGNAT limitations, and mapping cleanup behavior.
