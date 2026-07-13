@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.21.0`. This release expands `asteroids-net` to four-player games, improves its host/join flow and bundled runtime assets, and adds automatic temporary UDP router mapping through optional UPnP/NAT-PMP support. It also adds model and texture-manifest loading to `shader_viewer`, expands the Mutatris background-effect pack, and extends Doxygen coverage for the multiplayer example. Recent framework work also added shared Vulkan context/resource helpers, a point-sprite batch renderer for particle/starfield effects, stronger post-processing and descriptor cleanup, and resize fixes for SDL surface upload examples.
+Current development is on version `0.22.0`. This release adds a native Perl configure/build/install helper with automatic Ninja selection, dependency diagnostics, configurable build directories and install prefixes, and direct forwarding of CMake feature options. It also expands CMake installation support with desktop launchers and platform-specific application icons for the examples, while retaining the multiplayer, rendering, and documentation improvements introduced in `0.21.0`.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -224,7 +224,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.21.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.22.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -549,7 +549,7 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
-- July 13, 2026: `install.pl` is now a native Perl configure/build/install helper. It validates required build tools, lets CMake check core and optional libraries, translates common missing-dependency failures into clear platform-specific package hints, supports custom build directories, prefixes, job counts, fresh configuration, build-only operation, and explicit `sudo` policy, and forwards project `-D` feature flags directly to CMake.
+- July 13, 2026: version `0.22.0` adds a native Perl configure/build/install helper, expanded CMake installation support, desktop launchers, and platform-specific application icons for the examples. The installer validates required build tools, lets CMake check core and optional libraries, translates common missing-dependency failures into clear platform-specific package hints, supports custom build directories, prefixes, job counts, fresh configuration, build-only operation, and explicit `sudo` policy, and forwards project `-D` feature flags directly to CMake.
 - July 13, 2026: `install.pl` now prefers Ninja automatically for new or fresh build directories when `ninja` is installed. It preserves the cached generator for existing build directories, honors explicit `-G` or `--generator` selections, and reports which generator it selected.
 - July 11, 2026: version `0.21.0` adds the four-player `asteroids-net` mode, including richer host/join screens, player-state and projectile synchronization improvements, runtime asset-path handling, and an application icon. The release also adds model/texture-manifest support to `shader_viewer`, enlarges the Mutatris background-effect pack, and documents the `asteroids-net` public types and networking helpers with Doxygen.
 - July 11, 2026: `asteroids-net` added automatic temporary UDP router mapping for hosted games. It tries UPnP through `miniupnpc`, falls back to NAT-PMP through `libnatpmp`, reports mapping results in the lobby, and removes active mappings when hosting stops. Both dependencies remain optional, preserving LAN play and builds on systems without them.
