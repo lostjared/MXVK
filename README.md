@@ -95,6 +95,22 @@ cmake -S . -B build
 cmake --build build -j
 ```
 
+The Perl helper performs prerequisite checks, configures, builds, and installs
+the project in one command. It automatically prefers Ninja for new build
+directories when available and reports likely missing dependencies with
+platform-specific package hints:
+
+```bash
+./install.pl
+```
+
+Use `./install.pl --help` for options such as `--prefix`, `--jobs`, `--fresh`,
+and `--no-install`. CMake feature options can be passed directly, for example:
+
+```bash
+./install.pl --prefix "$HOME/.local" -DEXAMPLES=OFF -DWITH_MIXER=OFF
+```
+
 If you clone/move the repo to a different machine or path, run a fresh configure first.
 CMake-generated build files contain absolute paths and can fail with errors like
 `No rule to make target .../examples/.../*.frag` when a previous build directory is reused.
