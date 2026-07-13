@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+if(UNIX AND NOT APPLE)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+endif()
 include(CheckIncludeFile)
 include(CheckIncludeFileCXX)
 include(CheckFunctionExists)
@@ -776,6 +779,7 @@ if(EXAMPLES)
         breakout
         tetris
         puzzle_drop
+        mutatris
         tictactoe
         puzzle
         Pool3D

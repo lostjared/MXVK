@@ -18,7 +18,7 @@ if(NOT GLSLC_EXECUTABLE)
 endif()
 
 set(MUTATRIS_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/shaders)
-set(MUTATRIS_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders)
+set(MUTATRIS_SHADER_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/compiled_shaders)
 set(MUTATRIS_EFFECT_SHADER_SOURCE_DIR ${MUTATRIS_SHADER_SOURCE_DIR}/effects)
 set(MUTATRIS_EFFECT_SHADER_OUTPUT_DIR ${MUTATRIS_SHADER_OUTPUT_DIR}/effects)
 set(MUTATRIS_BACKGROUND_VERTEX_SHADER ${CMAKE_SOURCE_DIR}/mxvk/shaders/sprite.vert)
@@ -91,7 +91,17 @@ add_custom_target(mutatris_shaders
         ${MUTATRIS_EFFECT_FRAGMENT_SPV}
 )
 
-add_dependencies(mutatris mutatris_shaders)
+add_custom_target(mutatris_runtime_shaders
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${MUTATRIS_SHADER_OUTPUT_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}/shaders
+    DEPENDS mutatris_shaders
+    COMMENT "Copying mutatris shaders to runtime output directory"
+    VERBATIM
+)
+
+add_dependencies(mutatris mutatris_runtime_shaders)
 
 target_compile_definitions(mutatris PRIVATE
     mutatris_ASSET_DIR="$<TARGET_FILE_DIR:mutatris>"
