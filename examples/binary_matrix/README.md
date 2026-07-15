@@ -7,6 +7,7 @@ Binary Matrix is a 3D variant of the Matrix rain demo. It renders `0` and `1` gl
 - `-p <path>` or `--path <path>` - asset root, usually handled automatically by `run.pl`
 - `-r <WxH>` or `--resolution <WxH>` - window resolution
 - `-f` or `--fullscreen` - fullscreen mode
+- `-z <px>` or `--font-size <px>` - set the font size and spacing between glyphs
 - `--color <spec>` - tint the rain glyphs using `#RRGGBB` or `R,G,B`
 
 ## Controls

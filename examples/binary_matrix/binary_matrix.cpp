@@ -148,9 +148,11 @@ namespace example {
                            const int height,
                            const bool fullscreen,
                            const bool enable_vsync,
+                           const int requested_glyph_size,
                            const std::string &color)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               assetRoot(path.empty() ? std::string(binary_matrix_ASSET_DIR) : path),
+              glyph_size(requested_glyph_size),
               rng(std::random_device{}()) {
             if (assetRoot == ".") {
                 assetRoot = binary_matrix_ASSET_DIR;
@@ -170,7 +172,7 @@ namespace example {
                 throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
             }
 
-            font.reset(TTF_OpenFont((assetRoot + "/data/NotoSansCJK-Bold.ttc").c_str(), fontSize));
+            font.reset(TTF_OpenFont((assetRoot + "/data/NotoSansCJK-Bold.ttc").c_str(), glyph_size));
             if (!font) {
                 throw mxvk::Exception("Failed to load binary matrix font: " + std::string(SDL_GetError()));
             }
@@ -314,8 +316,10 @@ namespace example {
             extentWidth = width;
             extentHeight = height;
 
-            columns = std::max(48, width / 10);
-            rows = std::max(72, height / 12);
+            const int horizontal_spacing = std::max(1, static_cast<int>(std::round(static_cast<float>(glyph_size) * 0.6f)));
+            const int vertical_spacing = std::max(1, glyph_size);
+            columns = std::max(1, width / horizontal_spacing);
+            rows = std::max(1, height / vertical_spacing);
 
             const float aspect = static_cast<float>(width) / static_cast<float>(std::max(1, height));
             horizontalSpan = 2.15f * aspect;
@@ -482,10 +486,10 @@ namespace example {
             }
         }
 
-        static constexpr int fontSize = 56;
         static constexpr int trailLevels = 7;
 
         std::string assetRoot;
+        int glyph_size = 22;
         FontPtr font;
         mxvk::VK_Sprite *backgroundSprite = nullptr;
         mxvk::VK_Sprite3D *digitZeroSprite = nullptr;
@@ -522,7 +526,7 @@ int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
         example::BinaryMatrixWindow window(
-            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.color);
+            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.font_size, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
