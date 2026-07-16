@@ -630,6 +630,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(mutatris)
     add_subdirectory(examples/tictactoe)
     mxvk_configure_mingw_target(tictactoe)
+    add_subdirectory(examples/knight)
+    mxvk_configure_mingw_target(knight)
     add_subdirectory(examples/puzzle)
     mxvk_configure_mingw_target(puzzle)
     add_subdirectory(examples/pool_demo)
@@ -781,6 +783,7 @@ if(EXAMPLES)
         puzzle_drop
         mutatris
         tictactoe
+        knight
         puzzle
         Pool3D
         masterpiece
