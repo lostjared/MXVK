@@ -34,6 +34,7 @@ my @tests = qw(
     stencil
     stencil_surface
     pointsprite
+    knight
     3dmath
     3dmath_cube 
     3dmath_masterpiece
