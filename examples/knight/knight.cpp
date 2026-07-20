@@ -27,8 +27,11 @@ namespace knight {
         void drawKnight(mxvk::VK_Sprite &texture, float scaleX, float scaleY) const;
         void nextMove();
         void resetTour();
+        void resetTour(int startRow, int startCol);
+        void resetTourFromPoint(float x, float y);
 
         [[nodiscard]] int getMoves() const { return moves; }
+        [[nodiscard]] bool isTourOver() const { return tourOver; }
 
       private:
         struct Position {
@@ -120,7 +123,7 @@ namespace knight {
 
             if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    tour.nextMove();
+                    resetTourFromMousePosition(event.button.x, event.button.y);
                 } else if (event.button.button == SDL_BUTTON_RIGHT) {
                     tour.resetTour();
                 }
@@ -146,8 +149,8 @@ namespace knight {
             tour.drawBoard(*whiteCell, *redCell, *visitedCell, scaleX, scaleY);
             tour.drawKnight(*knightSprite, scaleX, scaleY);
 
-            if (tour.getMoves() < 65) {
-                printScaledText("Knights Tour - Tap Space, Press Return to Reset", TEXT_OFFSET_X, TEXT_OFFSET_Y, scaleX, scaleY);
+            if (!tour.isTourOver()) {
+                printScaledText("Knights Tour - Space to Move, Click a Square to Restart", TEXT_OFFSET_X, TEXT_OFFSET_Y, scaleX, scaleY);
                 printMoveCount(scaleX, scaleY);
             } else {
                 printScaledText("-[ Tour Complete ]- Press Return to Reset", TEXT_OFFSET_X, TEXT_OFFSET_Y, scaleX, scaleY);
@@ -244,6 +247,19 @@ namespace knight {
                       static_cast<int>(std::lround(TEXT_OFFSET_Y * scaleY)),
                       SDL_Color{255, 255, 255, 255});
         }
+
+        void resetTourFromMousePosition(float mouseX, float mouseY) {
+            int windowWidth = 0;
+            int windowHeight = 0;
+            SDL_GetWindowSize(getSDLWindow(), &windowWidth, &windowHeight);
+            if (windowWidth <= 0 || windowHeight <= 0) {
+                return;
+            }
+
+            const float designX = mouseX * DESIGN_WIDTH / static_cast<float>(windowWidth);
+            const float designY = mouseY * DESIGN_HEIGHT / static_cast<float>(windowHeight);
+            tour.resetTourFromPoint(designX, designY);
+        }
     };
 
     Tour::Tour() : moves(1), tourOver(false) {
@@ -313,8 +329,16 @@ namespace knight {
     }
 
     void Tour::resetTour() {
+        resetTour(std::rand() % BOARD_SIZE, std::rand() % BOARD_SIZE);
+    }
+
+    void Tour::resetTour(int startRow, int startCol) {
+        if (startRow < 0 || startRow >= BOARD_SIZE || startCol < 0 || startCol >= BOARD_SIZE) {
+            return;
+        }
+
         clearBoard();
-        knightPos = Position(std::rand() % BOARD_SIZE, std::rand() % BOARD_SIZE);
+        knightPos = Position(startRow, startCol);
         board[knightPos.row][knightPos.col] = 1;
         moveSequence.clear();
         moveSequence.push_back(knightPos);
@@ -323,22 +347,34 @@ namespace knight {
         tourOver = false;
     }
 
-    void Tour::nextMove() {
-        if (moves == TOTAL_MOVES) {
+    void Tour::resetTourFromPoint(float x, float y) {
+        const int localX = static_cast<int>(std::floor(x)) - START_X;
+        const int localY = static_cast<int>(std::floor(y)) - START_Y;
+        if (localX < 0 || localY < 0) {
             return;
         }
 
-        if (!moveSequence.empty()) {
-            const Position nextPosition = moveSequence[static_cast<std::size_t>(moves - 1)];
-            board[knightPos.row][knightPos.col] = -1;
-            knightPos = nextPosition;
-            board[knightPos.row][knightPos.col] = moves;
-            ++moves;
-
-            if (moves == TOTAL_MOVES) {
-                tourOver = true;
-            }
+        const int col = localX / CELL_SIZE;
+        const int row = localY / CELL_SIZE;
+        if (row >= BOARD_SIZE || col >= BOARD_SIZE ||
+            localX % CELL_SIZE >= CELL_DRAW_SIZE || localY % CELL_SIZE >= CELL_DRAW_SIZE) {
+            return;
         }
+
+        resetTour(row, col);
+    }
+
+    void Tour::nextMove() {
+        if (tourOver || static_cast<std::size_t>(moves) >= moveSequence.size()) {
+            return;
+        }
+
+        const Position nextPosition = moveSequence[static_cast<std::size_t>(moves)];
+        board[knightPos.row][knightPos.col] = -1;
+        knightPos = nextPosition;
+        ++moves;
+        board[knightPos.row][knightPos.col] = moves;
+        tourOver = static_cast<std::size_t>(moves) == moveSequence.size();
     }
 
     void Tour::drawBoard(mxvk::VK_Sprite &whiteCell, mxvk::VK_Sprite &redCell, mxvk::VK_Sprite &visitedCell, float scaleX, float scaleY) const {
