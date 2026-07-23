@@ -13,6 +13,7 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -107,11 +108,13 @@ namespace mxvk {
 
     /// Rebuild the sine and cosine lookup tables.
     inline void BuildTables() {
+        std::cout << "mxvk_math: building trigonometric lookup tables\n";
         for (int ang = 0; ang <= 360; ++ang) {
             const float theta = static_cast<float>(ang) * PI / 180.0f;
             cos_look[static_cast<std::size_t>(ang)] = std::cos(theta);
             sin_look[static_cast<std::size_t>(ang)] = std::sin(theta);
         }
+        std::cout << "mxvk_math: trigonometric lookup tables ready (361 entries)\n";
     }
 
     /// Convert degrees to radians.
@@ -1470,9 +1473,15 @@ namespace mxvk {
          * object retains its previous mesh, texture coordinates, and transform.
          */
         [[nodiscard]] bool LoadPLG(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
+            std::cout << "mxvk_math: loading PLG model: " << path << '\n';
+            const auto load_failed = [&path](const char *reason) {
+                std::cerr << "mxvk_math: failed to load PLG model '" << path << "': " << reason << '\n';
+                return false;
+            };
+
             std::ifstream file(path);
             if (!file.is_open()) {
-                return false;
+                return load_failed("could not open file");
             }
 
             const auto read_data_line = [&file](std::string &line) {
@@ -1490,7 +1499,7 @@ namespace mxvk {
 
             std::string line;
             if (!read_data_line(line)) {
-                return false;
+                return load_failed("missing model header");
             }
 
             std::string name;
@@ -1498,8 +1507,9 @@ namespace mxvk {
             int poly_count = 0;
             std::istringstream header(line);
             if (!(header >> name >> vertex_count >> poly_count) || vertex_count < 0 || poly_count < 0) {
-                return false;
+                return load_failed("invalid model header");
             }
+            std::cout << "mxvk_math: PLG header parsed (object='" << name << "', vertices=" << vertex_count << ", triangles=" << poly_count << ")\n";
 
             std::vector<vec4D> loaded_local;
             std::vector<vec4D> loaded_trans;
@@ -1512,20 +1522,20 @@ namespace mxvk {
 
             for (int i = 0; i < vertex_count; ++i) {
                 if (!read_data_line(line)) {
-                    return false;
+                    return load_failed("vertex data ended early");
                 }
 
                 vec4D vertex;
                 std::istringstream vertex_line(line);
                 if (!(vertex_line >> vertex.x >> vertex.y >> vertex.z) ||
                     !std::isfinite(vertex.x) || !std::isfinite(vertex.y) || !std::isfinite(vertex.z)) {
-                    return false;
+                    return load_failed("invalid vertex data");
                 }
 
                 vec2D texcoord;
                 if (vertex_line >> texcoord.x) {
                     if (!(vertex_line >> texcoord.y) || !std::isfinite(texcoord.x) || !std::isfinite(texcoord.y)) {
-                        return false;
+                        return load_failed("invalid texture coordinates");
                     }
                 }
 
@@ -1533,7 +1543,7 @@ namespace mxvk {
                 vertex.y *= scale.y;
                 vertex.z *= scale.z;
                 if (!std::isfinite(vertex.x) || !std::isfinite(vertex.y) || !std::isfinite(vertex.z)) {
-                    return false;
+                    return load_failed("scaled vertex is not finite");
                 }
                 vertex.w = 1.0f;
                 loaded_local.push_back(vertex);
@@ -1542,7 +1552,7 @@ namespace mxvk {
 
             for (int i = 0; i < poly_count; ++i) {
                 if (!read_data_line(line)) {
-                    return false;
+                    return load_failed("triangle data ended early");
                 }
 
                 Triangle tri;
@@ -1550,11 +1560,11 @@ namespace mxvk {
                 std::istringstream polygon_line(line);
                 if (!(polygon_line >> std::hex >> tri.state >> std::dec >> count) || count != 3 ||
                     !(polygon_line >> tri.vert[0] >> tri.vert[1] >> tri.vert[2])) {
-                    return false;
+                    return load_failed("invalid triangle data");
                 }
                 for (const int index : tri.vert) {
                     if (index < 0 || index >= vertex_count) {
-                        return false;
+                        return load_failed("triangle vertex index is out of range");
                     }
                 }
                 loaded_vlist.push_back(tri);
@@ -1574,6 +1584,7 @@ namespace mxvk {
             world_pos = obj_pos;
             dir = rotation;
             ComputeRad();
+            std::cout << "mxvk_math: PLG model ready (object='" << object_name << "', average radius=" << avg_rad << ", maximum radius=" << max_rad << ")\n";
             return true;
         }
 
@@ -2171,6 +2182,10 @@ namespace mxvk {
             clip_min_y = min_clip_y = 0;
             clip_max_x = max_clip_x = std::max(0, width - 1);
             clip_max_y = max_clip_y = std::max(0, height - 1);
+            [[maybe_unused]] static const bool PIPELINE_LOGGED = [width, height] {
+                std::cout << "mxvk_math: software raster pipeline ready (" << width << 'x' << height << ")\n";
+                return true;
+            }();
         }
 
         /// Begin rendering to an SDL renderer.

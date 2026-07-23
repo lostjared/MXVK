@@ -45,7 +45,13 @@ PNG textures automatically receive a complete mip chain. The software
 rasterizer selects and blends mip levels from the projected texture footprint
 to reduce shimmering and moiré on small or oblique triangles. Pass
 `--disable-mipmap` to skip mip generation and always sample the full-resolution
-texture.
+texture. Use `--mip-bias <value>` to adjust automatic selection: negative
+values select sharper levels and positive values select softer levels. For
+example:
+
+```bash
+./run.pl 3dmath_plg_loader --mip-bias -0.75
+```
 
 Texture coordinates use perspective-correct interpolation of `u/z`, `v/z`,
 and `1/z` by default, preventing texture swimming across triangle diagonals.

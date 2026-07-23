@@ -22,6 +22,8 @@ option(VALIDATION "Enable Vulkan validation layers" OFF)
 option(CV "Enable OpenCV video capture support (VK_Capture)" OFF)
 set(WITH_CUDA "AUTO" CACHE STRING "Enable CUDA acceleration/interop (AUTO, ON, OFF)")
 set_property(CACHE WITH_CUDA PROPERTY STRINGS AUTO ON OFF)
+set(WITH_EIGEN "AUTO" CACHE STRING "Enable Eigen for 3dmath examples (AUTO, ON, OFF)")
+set_property(CACHE WITH_EIGEN PROPERTY STRINGS AUTO ON OFF)
 set(WITH_MXWRITE "AUTO" CACHE STRING "Enable MXWrite video writer (AUTO, ON, OFF)")
 set_property(CACHE WITH_MXWRITE PROPERTY STRINGS AUTO ON OFF)
 set(WITH_MIXER "AUTO" CACHE STRING "Enable SDL3_mixer audio support (AUTO, ON, OFF)")
@@ -236,13 +238,19 @@ find_package(PNG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(SDL3_ttf REQUIRED)
 find_package(glm REQUIRED)
-find_package(Eigen3 QUIET)
+
+string(TOUPPER "${WITH_EIGEN}" MXVK_WITH_EIGEN_REQUEST)
+if(NOT MXVK_WITH_EIGEN_REQUEST MATCHES "^(AUTO|ON|OFF)$")
+    message(FATAL_ERROR "WITH_EIGEN must be AUTO, ON, or OFF")
+endif()
 
 set(MXVK_EIGEN_MATH_AVAILABLE OFF)
-if(Eigen3_FOUND AND TARGET Eigen3::Eigen)
-    get_target_property(MXVK_EIGEN_INCLUDE_DIRS Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-    set(CMAKE_REQUIRED_INCLUDES "${MXVK_EIGEN_INCLUDE_DIRS}")
-    check_cxx_source_compiles("
+if(NOT MXVK_WITH_EIGEN_REQUEST STREQUAL "OFF")
+    find_package(Eigen3 QUIET)
+    if(Eigen3_FOUND AND TARGET Eigen3::Eigen)
+        get_target_property(MXVK_EIGEN_INCLUDE_DIRS Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+        set(CMAKE_REQUIRED_INCLUDES "${MXVK_EIGEN_INCLUDE_DIRS}")
+        check_cxx_source_compiles("
 #include <Eigen/Dense>
 
 int main() {
@@ -250,16 +258,23 @@ int main() {
     return matrix.isIdentity() ? 0 : 1;
 }
 " MXVK_EIGEN_COMPILES)
-    unset(CMAKE_REQUIRED_INCLUDES)
+        unset(CMAKE_REQUIRED_INCLUDES)
 
-    if(MXVK_EIGEN_COMPILES)
-        set(MXVK_EIGEN_MATH_AVAILABLE ON)
-        message(STATUS "Eigen support enabled for 3dmath examples")
+        if(MXVK_EIGEN_COMPILES)
+            set(MXVK_EIGEN_MATH_AVAILABLE ON)
+            message(STATUS "Eigen support enabled for 3dmath examples")
+        elseif(MXVK_WITH_EIGEN_REQUEST STREQUAL "ON")
+            message(FATAL_ERROR "WITH_EIGEN=ON was requested, but Eigen failed the compile test")
+        else()
+            message(STATUS "Eigen was found but failed the compile test; 3dmath examples will use mxvk_math.h")
+        endif()
+    elseif(MXVK_WITH_EIGEN_REQUEST STREQUAL "ON")
+        message(FATAL_ERROR "WITH_EIGEN=ON was requested, but Eigen was not found")
     else()
-        message(STATUS "Eigen was found but failed the compile test; 3dmath examples will use mxvk_math.h")
+        message(STATUS "Eigen not found; 3dmath examples will use mxvk_math.h")
     endif()
 else()
-    message(STATUS "Eigen not found; 3dmath examples will use mxvk_math.h")
+    message(STATUS "Eigen support disabled by WITH_EIGEN=OFF; 3dmath examples will use mxvk_math.h")
 endif()
 
 function(mxvk_configure_3dmath_backend target)

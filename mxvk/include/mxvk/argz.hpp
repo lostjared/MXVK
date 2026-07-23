@@ -753,6 +753,7 @@ struct Arguments {
     bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
     bool nowarpfix = false;               ///< Disable perspective-correct texture mapping (@c --nowarpfix).
     bool disable_mipmap = false;          ///< Disable mipmap generation and selection (@c --disable-mipmap).
+    float mip_bias = 0.0f;                ///< Mipmap level-of-detail bias requested by @c --mip-bias.
     FramebufferDimensions framebuffer;    ///< Software framebuffer size requested by @c --framebuffer.
     double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
@@ -847,6 +848,7 @@ struct Arguments {
  * |      | --disable-sound    | Disable application background music          |
  * |      | --nowarpfix        | Disable perspective-correct texture mapping    |
  * |      | --disable-mipmap   | Disable mipmap generation and selection        |
+ * |      | --mip-bias         | Mipmap level-of-detail bias                    |
  * |      | --framebuffer      | Software framebuffer size as WxH               |
  * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
@@ -893,9 +895,10 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
         .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
         .addOptionDouble(325, "disable-sound", "disable background music")
-        .addOptionDouble(326, "nowarpfix", "disable perspective-correct texture mapping")
-        .addOptionDoubleValue(327, "framebuffer", "software framebuffer size WidthxHeight")
-        .addOptionDouble(328, "disable-mipmap", "disable mipmap generation and selection")
+        .addOptionDouble(326, "nowarpfix", "3dmath - disable perspective-correct texture mapping")
+        .addOptionDoubleValue(327, "framebuffer", "3dmath - software framebuffer size WidthxHeight")
+        .addOptionDouble(328, "disable-mipmap", "3dmath - disable mipmap generation and selection")
+        .addOptionDoubleValue(329, "mip-bias", "3dmath - mipmap level-of-detail bias (-16 to 16)")
         .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
@@ -939,6 +942,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool disable_sound = false;
     bool nowarpfix = false;
     bool disable_mipmap = false;
+    float mip_bias = 0.0f;
     FramebufferDimensions framebuffer;
     double fps = 0.0;
     int font_size = 22;
@@ -1024,6 +1028,13 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 328:
             disable_mipmap = true;
             break;
+        case 329: {
+            const double parsed_mip_bias = parse_arg_double(arg.arg_value, "--mip-bias");
+            if (parsed_mip_bias < -16.0 || parsed_mip_bias > 16.0) {
+                throw ArgException<std::string>("Mip bias must be between -16 and 16: " + arg.arg_value);
+            }
+            mip_bias = static_cast<float>(parsed_mip_bias);
+        } break;
         case 321:
             fps = parse_arg_double(arg.arg_value, "--fps");
             if (fps <= 0.0) {
@@ -1135,6 +1146,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.disable_sound = disable_sound;
     args.nowarpfix = nowarpfix;
     args.disable_mipmap = disable_mipmap;
+    args.mip_bias = mip_bias;
     args.framebuffer = framebuffer;
     mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;

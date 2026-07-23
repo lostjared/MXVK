@@ -78,6 +78,7 @@ The root CMake configuration checks for and uses:
 - ZLIB
 - optional: JPEG (use -DJPEG=ON)
 - glm
+- Optional: Eigen for the 3dmath examples (use `-DWITH_EIGEN=AUTO|ON|OFF`)
 - glslc (shader compiler)
 - Optional: OpenCV (when building with `-DCV=ON`)
 - Optional: FFmpeg for MXWrite (when building with `-DWITH_MXWRITE=AUTO|ON`)
@@ -177,6 +178,7 @@ Useful CMake options:
 - `-DVALIDATION=ON` enables Vulkan validation layers.
 - `-DDEBUG_MODE=ON` enables debug compile flags.
 - `-DWITH_CUDA=AUTO|ON|OFF` controls CUDA acceleration/interop. The default is `AUTO`, which enables CUDA when the toolkit is detected; `ON` requires CUDA; `OFF` disables it.
+- `-DWITH_EIGEN=AUTO|ON|OFF` controls the 3dmath math backend. The default is `AUTO`, which uses Eigen when detected; `ON` requires Eigen; `OFF` selects the scalar `mxvk_math.h` fallback.
 - `-DWITH_MXWRITE=AUTO|ON|OFF` controls the MXWrite FFmpeg video writer build. The default is `AUTO`, which builds MXWrite when FFmpeg is detected; `ON` requires FFmpeg; `OFF` skips MXWrite.
 - `-DCV=ON` enables OpenCV-based examples and capture support.
 - `-DWITH_MIXER=AUTO|ON|OFF` controls SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`). The default is `AUTO`, which enables audio when SDL3_mixer is detected; `ON` requires SDL3_mixer; `OFF` disables it.

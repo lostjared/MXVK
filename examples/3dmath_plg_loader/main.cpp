@@ -243,7 +243,7 @@ namespace {
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, bool disable_mipmap, const FramebufferDimensions &framebuffer)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
@@ -251,7 +251,8 @@ namespace example {
               fallback_width(width),
               fallback_height(height),
               warp_fix_enabled(!disable_warp_fix),
-              mipmapping_enabled(!disable_mipmap) {
+              mipmapping_enabled(!disable_mipmap),
+              mip_level_bias(mip_bias) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -398,6 +399,7 @@ namespace example {
         std::uint64_t previous_frame_ticks = 0;
         bool warp_fix_enabled = true;
         bool mipmapping_enabled = true;
+        float mip_level_bias = 0.0f;
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
@@ -520,7 +522,7 @@ namespace example {
             const float vertical_footprint = std::hypot(
                 u_dy * static_cast<float>(texture.width()),
                 v_dy * static_cast<float>(texture.height()));
-            return std::log2(std::max({1.0f, horizontal_footprint, vertical_footprint}));
+            return std::log2(std::max({mxvk::EPSILON, horizontal_footprint, vertical_footprint})) + mip_level_bias;
         }
 
         void draw_gradient_triangle(const FaceDraw &face) {
@@ -624,7 +626,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.disable_mipmap, args.framebuffer);
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.disable_mipmap, args.mip_bias, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
