@@ -63,13 +63,13 @@ namespace {
         std::vector<mxvk::MXCOLOR> pixels;
 
         [[nodiscard]] mxvk::MXCOLOR sample_bilinear(float u, float v) const {
-            u = std::clamp(u, 0.0f, 1.0f);
+            u -= std::floor(u);
             v = std::clamp(v, 0.0f, 1.0f);
-            const float texture_x = u * static_cast<float>(width - 1);
+            const float texture_x = u * static_cast<float>(width);
             const float texture_y = v * static_cast<float>(height - 1);
             const int first_x = static_cast<int>(std::floor(texture_x));
             const int first_y = static_cast<int>(std::floor(texture_y));
-            const int second_x = std::min(first_x + 1, width - 1);
+            const int second_x = (first_x + 1) % width;
             const int second_y = std::min(first_y + 1, height - 1);
             const float x_fraction = texture_x - static_cast<float>(first_x);
             const float y_fraction = texture_y - static_cast<float>(first_y);
@@ -233,6 +233,35 @@ namespace {
         float intensity = 1.0f;
     };
 
+    [[nodiscard]] std::array<mxvk::vec2D, 3> unwrap_horizontal_texcoords(std::array<mxvk::vec2D, 3> texcoords) {
+        const auto [minimum, maximum] = std::minmax_element(
+            texcoords.begin(),
+            texcoords.end(),
+            [](const mxvk::vec2D &first, const mxvk::vec2D &second) {
+                return first.x < second.x;
+            });
+        if (maximum->x - minimum->x <= 0.5f) {
+            return texcoords;
+        }
+
+        for (mxvk::vec2D &texcoord : texcoords) {
+            if (texcoord.x < 0.5f) {
+                texcoord.x += 1.0f;
+            }
+        }
+
+        for (std::size_t index = 0; index < texcoords.size(); ++index) {
+            if (texcoords[index].y > mxvk::EPSILON && texcoords[index].y < 1.0f - mxvk::EPSILON) {
+                continue;
+            }
+
+            const std::size_t next = (index + 1) % texcoords.size();
+            const std::size_t previous = (index + texcoords.size() - 1) % texcoords.size();
+            texcoords[index].x = (texcoords[next].x + texcoords[previous].x) * 0.5f;
+        }
+        return texcoords;
+    }
+
     constexpr float MIN_CAMERA_DISTANCE = 2.5f;
     constexpr float MAX_CAMERA_DISTANCE = 12.0f;
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
@@ -359,13 +388,17 @@ namespace example {
 
                 const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
                 const float intensity = std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f);
+                std::array<mxvk::vec2D, 3> texcoords = {
+                    model.texcoords[first],
+                    model.texcoords[second],
+                    model.texcoords[third],
+                };
+                if (!texture.empty()) {
+                    texcoords = unwrap_horizontal_texcoords(texcoords);
+                }
                 faces.push_back({
                     {projected[first], projected[second], projected[third]},
-                    {
-                        model.texcoords[first],
-                        model.texcoords[second],
-                        model.texcoords[third],
-                    },
+                    texcoords,
                     intensity,
                 });
             }
