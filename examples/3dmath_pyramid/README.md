@@ -3,7 +3,8 @@
 This example loads an indexed pyramid from `data/pyramid.plg` with
 `mxObject::LoadPLG`, then rotates, lights, and rasterizes its triangles with
 smooth vertex-color gradients through the CPU-side MXVK math pipeline. Its
-geometry and triangle layout match `models/obj/pyramid.obj`.
+geometry, triangle layout, and face-local UV coordinates match
+`models/obj/pyramid.obj`.
 
 ## Controls
 

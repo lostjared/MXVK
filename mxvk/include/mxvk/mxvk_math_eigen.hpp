@@ -1439,6 +1439,9 @@ namespace mxvk {
         /// Transformed vertices.
         std::vector<vec4D> trans;
 
+        /// Optional texture coordinates corresponding to local-space vertices.
+        std::vector<vec2D> texcoords;
+
         /// Indexed triangle list.
         std::vector<Triangle> vlist;
 
@@ -1453,8 +1456,9 @@ namespace mxvk {
          * @param rotation Object direction assigned after loading.
          * @return True when the file is opened and parsed successfully.
          *
+         * Vertex lines may contain optional `u v` texture coordinates after `x y z`.
          * Blank lines and lines beginning with `#` are ignored. If loading fails, the
-         * object retains its previous mesh and transform.
+         * object retains its previous mesh, texture coordinates, and transform.
          */
         [[nodiscard]] bool LoadPLG(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
             std::ifstream file(path);
@@ -1490,9 +1494,11 @@ namespace mxvk {
 
             std::vector<vec4D> loaded_local;
             std::vector<vec4D> loaded_trans;
+            std::vector<vec2D> loaded_texcoords;
             std::vector<Triangle> loaded_vlist;
             loaded_local.reserve(static_cast<std::size_t>(vertex_count));
             loaded_trans.resize(static_cast<std::size_t>(vertex_count));
+            loaded_texcoords.reserve(static_cast<std::size_t>(vertex_count));
             loaded_vlist.reserve(static_cast<std::size_t>(poly_count));
 
             for (int i = 0; i < vertex_count; ++i) {
@@ -1506,12 +1512,20 @@ namespace mxvk {
                     return false;
                 }
 
+                vec2D texcoord;
+                if (vertex_line >> texcoord.x) {
+                    if (!(vertex_line >> texcoord.y) || !std::isfinite(texcoord.x) || !std::isfinite(texcoord.y)) {
+                        return false;
+                    }
+                }
+
                 const Eigen::Vector3f scaled =
                     coordinates.cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
                 if (!scaled.allFinite()) {
                     return false;
                 }
                 loaded_local.emplace_back(scaled.x(), scaled.y(), scaled.z(), 1.0f);
+                loaded_texcoords.push_back(texcoord);
             }
 
             for (int i = 0; i < poly_count; ++i) {
@@ -1543,6 +1557,7 @@ namespace mxvk {
             num_polys = poly_count;
             local = std::move(loaded_local);
             trans = std::move(loaded_trans);
+            texcoords = std::move(loaded_texcoords);
             vlist = std::move(loaded_vlist);
             world_pos = obj_pos;
             dir = rotation;

@@ -46,7 +46,8 @@ namespace {
 
     struct FaceDraw {
         std::array<mxvk::vec4D, 3> points{};
-        std::array<mxvk::MXCOLOR, 3> colors{};
+        std::array<mxvk::vec2D, 3> texcoords{};
+        float intensity = 1.0f;
     };
 
     constexpr float MIN_CAMERA_DISTANCE = 2.5f;
@@ -131,10 +132,11 @@ namespace example {
                 faces.push_back({
                     {projected[first], projected[second], projected[third]},
                     {
-                        mxvk::shade_color(vertex_color(pyramid.local[first]), intensity),
-                        mxvk::shade_color(vertex_color(pyramid.local[second]), intensity),
-                        mxvk::shade_color(vertex_color(pyramid.local[third]), intensity),
+                        pyramid.texcoords[first],
+                        pyramid.texcoords[second],
+                        pyramid.texcoords[third],
                     },
+                    intensity,
                 });
             }
 
@@ -248,37 +250,41 @@ namespace example {
                     const float perspective_a = (weight_a / a.z) * depth;
                     const float perspective_b = (weight_b / b.z) * depth;
                     const float perspective_c = (weight_c / c.z) * depth;
-                    put_pixel(x, y, interpolate_color(face.colors, perspective_a, perspective_b, perspective_c));
+                    const float u =
+                        face.texcoords[0].x * perspective_a +
+                        face.texcoords[1].x * perspective_b +
+                        face.texcoords[2].x * perspective_c;
+                    const float v =
+                        face.texcoords[0].y * perspective_a +
+                        face.texcoords[1].y * perspective_b +
+                        face.texcoords[2].y * perspective_c;
+                    put_pixel(x, y, mxvk::shade_color(gradient_color(u, v), face.intensity));
                 }
             }
         }
 
-        [[nodiscard]] static mxvk::MXCOLOR interpolate_color(const std::array<mxvk::MXCOLOR, 3> &colors, float weight_a, float weight_b, float weight_c) {
-            const auto channel = [&](auto component) {
-                const float value =
-                    static_cast<float>(component(colors[0])) * weight_a +
-                    static_cast<float>(component(colors[1])) * weight_b +
-                    static_cast<float>(component(colors[2])) * weight_c;
-                return std::clamp(static_cast<int>(std::lround(value)), 0, 255);
+        [[nodiscard]] static mxvk::MXCOLOR gradient_color(float u, float v) {
+            u = std::clamp(u, 0.0f, 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+
+            constexpr mxvk::MXCOLOR BOTTOM_LEFT = mxvk::MXVK_RGB(68, 214, 255);
+            constexpr mxvk::MXCOLOR BOTTOM_RIGHT = mxvk::MXVK_RGB(92, 255, 142);
+            constexpr mxvk::MXCOLOR TOP_LEFT = mxvk::MXVK_RGB(155, 105, 255);
+            constexpr mxvk::MXCOLOR TOP_RIGHT = mxvk::MXVK_RGB(255, 82, 197);
+            const auto bilinear_channel = [&](auto component) {
+                const float bottom =
+                    static_cast<float>(component(BOTTOM_LEFT)) +
+                    (static_cast<float>(component(BOTTOM_RIGHT)) - static_cast<float>(component(BOTTOM_LEFT))) * u;
+                const float top =
+                    static_cast<float>(component(TOP_LEFT)) +
+                    (static_cast<float>(component(TOP_RIGHT)) - static_cast<float>(component(TOP_LEFT))) * u;
+                return std::clamp(static_cast<int>(std::lround(bottom + (top - bottom) * v)), 0, 255);
             };
 
-            return mxvk::MXVK_RGB(channel(mxvk::color_r), channel(mxvk::color_g), channel(mxvk::color_b));
-        }
-
-        [[nodiscard]] static mxvk::MXCOLOR vertex_color(const mxvk::vec4D &vertex) {
-            if (vertex.y > 0.0f) {
-                return mxvk::MXVK_RGB(255, 82, 197);
-            }
-            if (vertex.x < 0.0f && vertex.z > 0.0f) {
-                return mxvk::MXVK_RGB(68, 214, 255);
-            }
-            if (vertex.x > 0.0f && vertex.z > 0.0f) {
-                return mxvk::MXVK_RGB(92, 255, 142);
-            }
-            if (vertex.x > 0.0f && vertex.z < 0.0f) {
-                return mxvk::MXVK_RGB(255, 222, 74);
-            }
-            return mxvk::MXVK_RGB(155, 105, 255);
+            return mxvk::MXVK_RGB(
+                bilinear_channel(mxvk::color_r),
+                bilinear_channel(mxvk::color_g),
+                bilinear_channel(mxvk::color_b));
         }
 
         [[nodiscard]] static mxvk::vec4D project_to_screen(const mxvk::vec4D &point, int width, int height) {
