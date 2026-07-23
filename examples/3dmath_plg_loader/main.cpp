@@ -33,21 +33,80 @@ namespace {
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
 
-    struct Texture {
+    [[nodiscard]] mxvk::MXCOLOR pack_color(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha) {
+        return ((alpha & 0xFFU) << 24U) |
+               ((red & 0xFFU) << 16U) |
+               ((green & 0xFFU) << 8U) |
+               (blue & 0xFFU);
+    }
+
+    [[nodiscard]] mxvk::MXCOLOR interpolate_color(mxvk::MXCOLOR first, mxvk::MXCOLOR second, float fraction) {
+        const std::uint32_t second_weight = static_cast<std::uint32_t>(
+            std::clamp(static_cast<int>(fraction * 256.0f + 0.5f), 0, 256));
+        const std::uint32_t first_weight = 256U - second_weight;
+        const auto interpolate_channel = [first_weight, second_weight](std::uint8_t first_channel, std::uint8_t second_channel) {
+            return (static_cast<std::uint32_t>(first_channel) * first_weight +
+                    static_cast<std::uint32_t>(second_channel) * second_weight +
+                    128U) >>
+                   8U;
+        };
+        return pack_color(
+            interpolate_channel(mxvk::color_r(first), mxvk::color_r(second)),
+            interpolate_channel(mxvk::color_g(first), mxvk::color_g(second)),
+            interpolate_channel(mxvk::color_b(first), mxvk::color_b(second)),
+            interpolate_channel(mxvk::color_a(first), mxvk::color_a(second)));
+    }
+
+    struct MipLevel {
         int width = 0;
         int height = 0;
         std::vector<mxvk::MXCOLOR> pixels;
 
-        [[nodiscard]] bool empty() const {
-            return width <= 0 || height <= 0 || pixels.empty();
-        }
-
-        [[nodiscard]] mxvk::MXCOLOR sample_nearest(float u, float v) const {
+        [[nodiscard]] mxvk::MXCOLOR sample_bilinear(float u, float v) const {
             u = std::clamp(u, 0.0f, 1.0f);
             v = std::clamp(v, 0.0f, 1.0f);
-            const int x = static_cast<int>(u * static_cast<float>(width - 1) + 0.5f);
-            const int y = static_cast<int>(v * static_cast<float>(height - 1) + 0.5f);
-            return pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+            const float texture_x = u * static_cast<float>(width - 1);
+            const float texture_y = v * static_cast<float>(height - 1);
+            const int first_x = static_cast<int>(std::floor(texture_x));
+            const int first_y = static_cast<int>(std::floor(texture_y));
+            const int second_x = std::min(first_x + 1, width - 1);
+            const int second_y = std::min(first_y + 1, height - 1);
+            const float x_fraction = texture_x - static_cast<float>(first_x);
+            const float y_fraction = texture_y - static_cast<float>(first_y);
+            const auto texel = [this](int x, int y) {
+                return pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+            };
+            const mxvk::MXCOLOR top = interpolate_color(texel(first_x, first_y), texel(second_x, first_y), x_fraction);
+            const mxvk::MXCOLOR bottom = interpolate_color(texel(first_x, second_y), texel(second_x, second_y), x_fraction);
+            return interpolate_color(top, bottom, y_fraction);
+        }
+    };
+
+    struct Texture {
+        std::vector<MipLevel> levels;
+
+        [[nodiscard]] bool empty() const {
+            return levels.empty() || levels.front().width <= 0 || levels.front().height <= 0 || levels.front().pixels.empty();
+        }
+
+        [[nodiscard]] int width() const {
+            return empty() ? 0 : levels.front().width;
+        }
+
+        [[nodiscard]] int height() const {
+            return empty() ? 0 : levels.front().height;
+        }
+
+        [[nodiscard]] mxvk::MXCOLOR sample(float u, float v, float level) const {
+            level = std::clamp(level, 0.0f, static_cast<float>(levels.size() - 1));
+            const std::size_t first_level = static_cast<std::size_t>(std::floor(level));
+            const std::size_t second_level = std::min(first_level + 1, levels.size() - 1);
+            const float fraction = level - static_cast<float>(first_level);
+            const mxvk::MXCOLOR first_color = levels[first_level].sample_bilinear(u, v);
+            if (first_level == second_level) {
+                return first_color;
+            }
+            return interpolate_color(first_color, levels[second_level].sample_bilinear(u, v), fraction);
         }
     };
 
@@ -101,27 +160,70 @@ namespace {
         }
 
         Texture texture;
-        texture.width = rgba->w;
-        texture.height = rgba->h;
-        texture.pixels.resize(static_cast<std::size_t>(texture.width) * static_cast<std::size_t>(texture.height));
-        for (int y = 0; y < texture.height; ++y) {
+        MipLevel base_level;
+        base_level.width = rgba->w;
+        base_level.height = rgba->h;
+        base_level.pixels.resize(static_cast<std::size_t>(base_level.width) * static_cast<std::size_t>(base_level.height));
+        for (int y = 0; y < base_level.height; ++y) {
             const auto *row = static_cast<const std::uint8_t *>(rgba->pixels) + static_cast<std::size_t>(y) * static_cast<std::size_t>(rgba->pitch);
             const auto *source = reinterpret_cast<const std::uint32_t *>(row);
-            for (int x = 0; x < texture.width; ++x) {
+            for (int x = 0; x < base_level.width; ++x) {
                 std::uint8_t red = 0;
                 std::uint8_t green = 0;
                 std::uint8_t blue = 0;
                 std::uint8_t alpha = 0;
                 SDL_GetRGBA(source[x], format, nullptr, &red, &green, &blue, &alpha);
-                texture.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(texture.width) + static_cast<std::size_t>(x)] =
-                    (static_cast<mxvk::MXCOLOR>(alpha) << 24U) |
-                    (static_cast<mxvk::MXCOLOR>(red) << 16U) |
-                    (static_cast<mxvk::MXCOLOR>(green) << 8U) |
-                    static_cast<mxvk::MXCOLOR>(blue);
+                base_level.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(base_level.width) + static_cast<std::size_t>(x)] =
+                    pack_color(red, green, blue, alpha);
             }
         }
+        texture.levels.push_back(std::move(base_level));
 
-        std::cout << std::format("3dmath_plg_loader: loaded texture '{}' ({}x{})\n", path.string(), texture.width, texture.height);
+        while (texture.levels.back().width > 1 || texture.levels.back().height > 1) {
+            const MipLevel &source = texture.levels.back();
+            MipLevel destination;
+            destination.width = std::max(1, (source.width + 1) / 2);
+            destination.height = std::max(1, (source.height + 1) / 2);
+            destination.pixels.resize(static_cast<std::size_t>(destination.width) * static_cast<std::size_t>(destination.height));
+            for (int y = 0; y < destination.height; ++y) {
+                for (int x = 0; x < destination.width; ++x) {
+                    const int first_x = std::min(x * 2, source.width - 1);
+                    const int second_x = std::min(first_x + 1, source.width - 1);
+                    const int first_y = std::min(y * 2, source.height - 1);
+                    const int second_y = std::min(first_y + 1, source.height - 1);
+                    const auto texel = [&source](int source_x, int source_y) {
+                        return source.pixels[static_cast<std::size_t>(source_y) * static_cast<std::size_t>(source.width) + static_cast<std::size_t>(source_x)];
+                    };
+                    const std::array<mxvk::MXCOLOR, 4> colors = {
+                        texel(first_x, first_y),
+                        texel(second_x, first_y),
+                        texel(first_x, second_y),
+                        texel(second_x, second_y),
+                    };
+                    const auto average_channel = [&colors](auto component) {
+                        std::uint32_t sum = 0;
+                        for (const mxvk::MXCOLOR color : colors) {
+                            sum += component(color);
+                        }
+                        return (sum + 2U) / 4U;
+                    };
+                    destination.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(destination.width) + static_cast<std::size_t>(x)] =
+                        pack_color(
+                            average_channel(mxvk::color_r),
+                            average_channel(mxvk::color_g),
+                            average_channel(mxvk::color_b),
+                            average_channel(mxvk::color_a));
+                }
+            }
+            texture.levels.push_back(std::move(destination));
+        }
+
+        std::cout << std::format(
+            "3dmath_plg_loader: loaded texture '{}' ({}x{}, {} mip levels)\n",
+            path.string(),
+            texture.width(),
+            texture.height(),
+            texture.levels.size());
         return texture;
     }
 
@@ -330,6 +432,95 @@ namespace example {
             *pixel = map_color(color);
         }
 
+        [[nodiscard]] float texture_level_for_face(const FaceDraw &face, float area) const {
+            if (texture.empty()) {
+                return 0.0f;
+            }
+
+            const mxvk::vec4D &a = face.points[0];
+            const mxvk::vec4D &b = face.points[1];
+            const mxvk::vec4D &c = face.points[2];
+            const float weight_a_dx = (c.y - b.y) / area;
+            const float weight_a_dy = -(c.x - b.x) / area;
+            const float weight_b_dx = (a.y - c.y) / area;
+            const float weight_b_dy = -(a.x - c.x) / area;
+            const float weight_c_dx = (b.y - a.y) / area;
+            const float weight_c_dy = -(b.x - a.x) / area;
+
+            float u_dx = 0.0f;
+            float u_dy = 0.0f;
+            float v_dx = 0.0f;
+            float v_dy = 0.0f;
+            if (warp_fix_enabled) {
+                const float inverse_z_a = 1.0f / a.z;
+                const float inverse_z_b = 1.0f / b.z;
+                const float inverse_z_c = 1.0f / c.z;
+                const float inverse_z = (inverse_z_a + inverse_z_b + inverse_z_c) / 3.0f;
+                const float inverse_z_dx =
+                    weight_a_dx * inverse_z_a +
+                    weight_b_dx * inverse_z_b +
+                    weight_c_dx * inverse_z_c;
+                const float inverse_z_dy =
+                    weight_a_dy * inverse_z_a +
+                    weight_b_dy * inverse_z_b +
+                    weight_c_dy * inverse_z_c;
+                const auto corrected_derivatives = [&](float first, float second, float third) {
+                    const float value_over_z =
+                        (first * inverse_z_a + second * inverse_z_b + third * inverse_z_c) / 3.0f;
+                    const float value_over_z_dx =
+                        weight_a_dx * first * inverse_z_a +
+                        weight_b_dx * second * inverse_z_b +
+                        weight_c_dx * third * inverse_z_c;
+                    const float value_over_z_dy =
+                        weight_a_dy * first * inverse_z_a +
+                        weight_b_dy * second * inverse_z_b +
+                        weight_c_dy * third * inverse_z_c;
+                    const float denominator = inverse_z * inverse_z;
+                    return std::array<float, 2>{
+                        (value_over_z_dx * inverse_z - value_over_z * inverse_z_dx) / denominator,
+                        (value_over_z_dy * inverse_z - value_over_z * inverse_z_dy) / denominator,
+                    };
+                };
+                const std::array<float, 2> u_derivatives = corrected_derivatives(
+                    face.texcoords[0].x,
+                    face.texcoords[1].x,
+                    face.texcoords[2].x);
+                const std::array<float, 2> v_derivatives = corrected_derivatives(
+                    face.texcoords[0].y,
+                    face.texcoords[1].y,
+                    face.texcoords[2].y);
+                u_dx = u_derivatives[0];
+                u_dy = u_derivatives[1];
+                v_dx = v_derivatives[0];
+                v_dy = v_derivatives[1];
+            } else {
+                u_dx =
+                    weight_a_dx * face.texcoords[0].x +
+                    weight_b_dx * face.texcoords[1].x +
+                    weight_c_dx * face.texcoords[2].x;
+                u_dy =
+                    weight_a_dy * face.texcoords[0].x +
+                    weight_b_dy * face.texcoords[1].x +
+                    weight_c_dy * face.texcoords[2].x;
+                v_dx =
+                    weight_a_dx * face.texcoords[0].y +
+                    weight_b_dx * face.texcoords[1].y +
+                    weight_c_dx * face.texcoords[2].y;
+                v_dy =
+                    weight_a_dy * face.texcoords[0].y +
+                    weight_b_dy * face.texcoords[1].y +
+                    weight_c_dy * face.texcoords[2].y;
+            }
+
+            const float horizontal_footprint = std::hypot(
+                u_dx * static_cast<float>(texture.width()),
+                v_dx * static_cast<float>(texture.height()));
+            const float vertical_footprint = std::hypot(
+                u_dy * static_cast<float>(texture.width()),
+                v_dy * static_cast<float>(texture.height()));
+            return std::log2(std::max({1.0f, horizontal_footprint, vertical_footprint}));
+        }
+
         void draw_gradient_triangle(const FaceDraw &face) {
             const mxvk::vec4D &a = face.points[0];
             const mxvk::vec4D &b = face.points[1];
@@ -347,6 +538,7 @@ namespace example {
             const int max_x = std::clamp(static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))), 0, frame_width - 1);
             const int min_y = std::clamp(static_cast<int>(std::floor(std::min({a.y, b.y, c.y}))), 0, frame_height - 1);
             const int max_y = std::clamp(static_cast<int>(std::ceil(std::max({a.y, b.y, c.y}))), 0, frame_height - 1);
+            const float texture_level = texture_level_for_face(face, area);
 
             for (int y = min_y; y <= max_y; ++y) {
                 for (int x = min_x; x <= max_x; ++x) {
@@ -387,7 +579,7 @@ namespace example {
                         face.texcoords[0].y * texture_weight_a +
                         face.texcoords[1].y * texture_weight_b +
                         face.texcoords[2].y * texture_weight_c;
-                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample_nearest(u, v);
+                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample(u, v, texture_level);
                     put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
             }
