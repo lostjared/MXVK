@@ -35,6 +35,26 @@ namespace mxvk {
         commandPool = pool;
     }
 
+    void VK_Sprite::setTextureFilter(VkFilter filter) {
+        if (filter != VK_FILTER_NEAREST && filter != VK_FILTER_LINEAR) {
+            throw mxvk::Exception("VKSprite::setTextureFilter supports only nearest or linear filtering");
+        }
+        if (textureFilter == filter) {
+            return;
+        }
+
+        textureFilter = filter;
+        if (spriteSampler != VK_NULL_HANDLE) {
+            destroyTextureDescriptorPools();
+            vkDestroySampler(device, spriteSampler, nullptr);
+            spriteSampler = VK_NULL_HANDLE;
+            createSampler();
+        }
+
+        std::cout << "mxvk: Sprite texture filter set to "
+                  << (textureFilter == VK_FILTER_NEAREST ? "nearest\n" : "linear\n");
+    }
+
     VK_Sprite::~VK_Sprite() {
         vkDeviceWaitIdle(device);
         drawQueue.clear();
@@ -1600,8 +1620,8 @@ namespace mxvk {
         }
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.magFilter = textureFilter;
+        samplerInfo.minFilter = textureFilter;
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;

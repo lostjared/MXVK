@@ -191,6 +191,12 @@ namespace mxvk {
         /** @return Sprite texture height in pixels. */
         int getHeight() const { return spriteHeight; }
 
+        /**
+         * @brief Select the hardware filter used when scaling this sprite.
+         * @param filter VK_FILTER_NEAREST for sharp pixels or VK_FILTER_LINEAR for smoothing.
+         */
+        void setTextureFilter(VkFilter filter);
+
         /** @brief Assign an external descriptor-set layout. */
         void setDescriptorSetLayout(VkDescriptorSetLayout layout) { descriptorSetLayout = layout; }
         /** @brief Assign the render pass used to build the custom pipeline. */
@@ -322,6 +328,7 @@ namespace mxvk {
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
         std::unordered_map<VkImageView, VkDescriptorSet> externalDescriptorSets{};
+        VkFilter textureFilter = VK_FILTER_LINEAR;
         void createDescriptorPool();
         void destroyDescriptorPools();
         void destroyTextureDescriptorPools();

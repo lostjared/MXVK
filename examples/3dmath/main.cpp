@@ -125,6 +125,7 @@ namespace example {
 
             clear_frame(mxvk::MXVK_RGB(4, 4, 6));
             frame_sprite = createSprite(frame_surface.get());
+            frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
         }
 
         [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
