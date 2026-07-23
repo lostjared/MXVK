@@ -62,14 +62,14 @@ namespace {
         int height = 0;
         std::vector<mxvk::MXCOLOR> pixels;
 
-        [[nodiscard]] mxvk::MXCOLOR sample_bilinear(float u, float v) const {
-            u -= std::floor(u);
+        [[nodiscard]] mxvk::MXCOLOR sample_bilinear(float u, float v, bool repeat_horizontal) const {
+            u = repeat_horizontal ? u - std::floor(u) : std::clamp(u, 0.0f, 1.0f);
             v = std::clamp(v, 0.0f, 1.0f);
-            const float texture_x = u * static_cast<float>(width);
+            const float texture_x = u * static_cast<float>(repeat_horizontal ? width : width - 1);
             const float texture_y = v * static_cast<float>(height - 1);
             const int first_x = static_cast<int>(std::floor(texture_x));
             const int first_y = static_cast<int>(std::floor(texture_y));
-            const int second_x = (first_x + 1) % width;
+            const int second_x = repeat_horizontal ? (first_x + 1) % width : std::min(first_x + 1, width - 1);
             const int second_y = std::min(first_y + 1, height - 1);
             const float x_fraction = texture_x - static_cast<float>(first_x);
             const float y_fraction = texture_y - static_cast<float>(first_y);
@@ -97,16 +97,16 @@ namespace {
             return empty() ? 0 : levels.front().height;
         }
 
-        [[nodiscard]] mxvk::MXCOLOR sample(float u, float v, float level) const {
+        [[nodiscard]] mxvk::MXCOLOR sample(float u, float v, float level, bool repeat_horizontal) const {
             level = std::clamp(level, 0.0f, static_cast<float>(levels.size() - 1));
             const std::size_t first_level = static_cast<std::size_t>(std::floor(level));
             const std::size_t second_level = std::min(first_level + 1, levels.size() - 1);
             const float fraction = level - static_cast<float>(first_level);
-            const mxvk::MXCOLOR first_color = levels[first_level].sample_bilinear(u, v);
+            const mxvk::MXCOLOR first_color = levels[first_level].sample_bilinear(u, v, repeat_horizontal);
             if (first_level == second_level) {
                 return first_color;
             }
-            return interpolate_color(first_color, levels[second_level].sample_bilinear(u, v), fraction);
+            return interpolate_color(first_color, levels[second_level].sample_bilinear(u, v, repeat_horizontal), fraction);
         }
     };
 
@@ -272,7 +272,7 @@ namespace {
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
@@ -281,7 +281,8 @@ namespace example {
               fallback_height(height),
               warp_fix_enabled(!disable_warp_fix),
               mipmapping_enabled(!disable_mipmap),
-              mip_level_bias(mip_bias) {
+              mip_level_bias(mip_bias),
+              texture_repeat_enabled(repeat_texture) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -393,7 +394,7 @@ namespace example {
                     model.texcoords[second],
                     model.texcoords[third],
                 };
-                if (!texture.empty()) {
+                if (!texture.empty() && texture_repeat_enabled) {
                     texcoords = unwrap_horizontal_texcoords(texcoords);
                 }
                 faces.push_back({
@@ -433,6 +434,7 @@ namespace example {
         bool warp_fix_enabled = true;
         bool mipmapping_enabled = true;
         float mip_level_bias = 0.0f;
+        bool texture_repeat_enabled = false;
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
@@ -617,7 +619,7 @@ namespace example {
                         face.texcoords[0].y * texture_weight_a +
                         face.texcoords[1].y * texture_weight_b +
                         face.texcoords[2].y * texture_weight_c;
-                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample(u, v, texture_level);
+                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample(u, v, texture_level, texture_repeat_enabled);
                     put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
             }
@@ -660,7 +662,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.disable_mipmap, args.mip_bias, args.framebuffer);
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

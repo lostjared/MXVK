@@ -745,7 +745,7 @@ struct Arguments {
     std::string encodeCodec;              ///< Optional encoder codec policy/name (@c --encode-codec).
     bool encodeRealtime = false;          ///< Enable low-latency encoder settings (@c --encode-realtime).
     bool mxwriteBlockWhenFull = false;    ///< Make MXWrite block instead of dropping frames (@c --mxwrite-block).
-    bool repeat = false;                  ///< Repeat video playback when a file reaches EOF.
+    bool repeat = false;                  ///< Enable repeat behavior such as playback looping or wrapped textures.
     bool binary = false;                  ///< Use binary glyphs only (@c --binary).
     bool enable_crt = false;              ///< Enable CRT post-processing at startup (@c --enable-crt).
     bool enable_vsync = false;            ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
@@ -840,7 +840,7 @@ struct Arguments {
  * |      | --encode-codec     | Encoder codec policy or name                 |
  * |      | --encode-realtime  | Enable realtime/low-latency encoding         |
  * |      | --mxwrite-block    | Block MXWrite when its queue is full          |
- * |      | --repeat           | Repeat video playback at EOF                 |
+ * |      | --repeat           | Enable playback or texture repetition        |
  * |      | --binary           | Use binary glyphs only                        |
  * |      | --enable-crt       | Enable CRT post-processing at startup         |
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
@@ -889,7 +889,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDoubleValue(308, "encode-codec", "encoder codec policy or name")
         .addOptionDouble(309, "encode-realtime", "encoder realtime mode")
         .addOptionDouble(314, "mxwrite-block", "block MXWrite when its queue is full")
-        .addOptionDouble(310, "repeat", "repeat video playback")
+        .addOptionDouble(310, "repeat", "repeat playback or wrapped textures")
         .addOptionDouble(315, "binary", "use binary glyphs only")
         .addOptionDouble(319, "enable-crt", "enable CRT post-processing at startup")
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")

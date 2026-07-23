@@ -40,6 +40,16 @@ Map a PNG texture using the model's PLG texture coordinates:
     --texture /absolute/path/to/texture.png
 ```
 
+Texture coordinates clamp to the image edges by default, which is suitable
+for cube faces and texture atlases. Add `--repeat` for horizontally wrapped
+models such as spheres:
+
+```bash
+./run.pl 3dmath_plg_loader \
+    --texture /absolute/path/to/texture.png \
+    --repeat
+```
+
 When `--texture` is omitted, the loader uses its UV-based color gradient.
 PNG textures automatically receive a complete mip chain. The software
 rasterizer selects and blends mip levels from the projected texture footprint
