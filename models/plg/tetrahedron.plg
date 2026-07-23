@@ -1,0 +1,11 @@
+# Regular tetrahedron with unit-radius corners.
+# Coordinates are centered at the origin; polygon state 0x0003 marks active, visible triangles.
+tetrahedron 4 4
+0.577350 0.577350 0.577350 0.625000 0.304087
+-0.577350 -0.577350 0.577350 0.875000 0.695913
+-0.577350 0.577350 -0.577350 0.125000 0.304087
+0.577350 -0.577350 -0.577350 0.375000 0.695913
+0x0003 3 0 2 1
+0x0003 3 0 1 3
+0x0003 3 0 3 2
+0x0003 3 1 2 3
