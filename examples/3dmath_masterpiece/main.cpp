@@ -35,6 +35,8 @@ namespace {
     constexpr int base_height = 1080;
     constexpr int game_base_width = 640;
     constexpr int game_base_height = 480;
+    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
+    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
     constexpr int game_board_start_x = 184;
     constexpr int game_board_start_y = 78;
     constexpr int game_block_width = 31;
@@ -1171,7 +1173,7 @@ namespace example {
             const float scaleX = static_cast<float>(layout.width) / static_cast<float>(game_base_width);
             const float scaleY = static_cast<float>(layout.height) / static_cast<float>(game_base_height);
             drawSprite(background_game, 0, 0, layout.width, layout.height);
-            drawCubeScene(now, scaleX, scaleY);
+            drawCubeScene(now);
             drawHud(scaleX, scaleY);
 
             if (paused) {
@@ -1185,15 +1187,17 @@ namespace example {
             }
         }
 
-        void drawCubeScene(Uint64 now, float scaleX, float scaleY) {
-            ensureFramebuffer(layout.width, layout.height);
+        void drawCubeScene(Uint64 now) {
+            ensureFramebuffer();
             if (frame_sprite == nullptr || frame_surface == nullptr || frame_format == nullptr) {
                 return;
             }
 
+            constexpr float SOFTWARE_SCALE_X = static_cast<float>(SOFTWARE_RENDER_WIDTH) / static_cast<float>(game_base_width);
+            constexpr float SOFTWARE_SCALE_Y = static_cast<float>(SOFTWARE_RENDER_HEIGHT) / static_cast<float>(game_base_height);
             clearFrame(transparent_black);
-            drawBoard(now, scaleX, scaleY);
-            drawNextPiece(now, scaleX, scaleY);
+            drawBoard(now, SOFTWARE_SCALE_X, SOFTWARE_SCALE_Y);
+            drawNextPiece(now, SOFTWARE_SCALE_X, SOFTWARE_SCALE_Y);
             frame_sprite->updateTexture(frame_surface.get());
             frame_sprite->drawSpriteRect(0, 0, layout.width, layout.height);
         }
@@ -1257,7 +1261,7 @@ namespace example {
             const float pitched_z = local_y * sin_pitch;
             const float yawed_x = local_x * cos_yaw + pitched_z * sin_yaw;
             const float yawed_z = -local_x * sin_yaw + pitched_z * cos_yaw;
-            const float focal_length = std::max(static_cast<float>(layout.width), static_cast<float>(layout.height)) * 1.1f;
+            const float focal_length = std::max(static_cast<float>(frame_width), static_cast<float>(frame_height)) * 1.1f;
             const float camera_z = focal_length * (camera_distance / GRID_DEFAULT_CAMERA_DISTANCE);
             const float perspective_scale = std::clamp(focal_length / std::max(1.0f, camera_z + yawed_z), 0.35f, 2.3f);
             return {
@@ -1331,26 +1335,22 @@ namespace example {
             }
         }
 
-        void ensureFramebuffer(int width, int height) {
-            if (frame_surface != nullptr && frame_width == width && frame_height == height) {
+        void ensureFramebuffer() {
+            if (frame_surface != nullptr) {
                 return;
             }
 
-            frame_surface = createFrameSurface(width, height);
+            frame_surface = createFrameSurface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath_masterpiece frame format: {}", SDL_GetError()));
             }
 
-            frame_width = width;
-            frame_height = height;
+            frame_width = SOFTWARE_RENDER_WIDTH;
+            frame_height = SOFTWARE_RENDER_HEIGHT;
 
             clearFrame(transparent_black);
-            if (frame_sprite == nullptr) {
-                frame_sprite = createSprite(frame_surface.get());
-            } else {
-                frame_sprite->updateTexture(frame_surface.get());
-            }
+            frame_sprite = createSprite(frame_surface.get());
         }
 
         [[nodiscard]] std::uint32_t mapColor(mxvk::MXCOLOR color) const {

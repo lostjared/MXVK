@@ -28,21 +28,16 @@ namespace {
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
 
-    SurfacePtr create_pixel_surface() {
-        SurfacePtr surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_RGBA32));
+    SurfacePtr create_frame_surface(int width, int height) {
+        SurfacePtr surface(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
         if (!surface) {
-            throw mxvk::Exception(std::format("Failed to create 3dmath pixel surface: {}", SDL_GetError()));
+            throw mxvk::Exception(std::format("Failed to create 3dmath frame surface: {}", SDL_GetError()));
         }
-
-        const SDL_PixelFormatDetails *details = SDL_GetPixelFormatDetails(surface->format);
-        if (details == nullptr) {
-            throw mxvk::Exception(std::format("Failed to query 3dmath pixel format: {}", SDL_GetError()));
-        }
-
-        auto *pixel = static_cast<std::uint32_t *>(surface->pixels);
-        *pixel = SDL_MapRGBA(details, nullptr, 255, 255, 255, 255);
         return surface;
     }
+
+    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
+    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
@@ -54,9 +49,6 @@ namespace example {
               fallback_height(height) {
             setClearColor(0.015f, 0.016f, 0.022f, 1.0f);
             mxvk::BuildTables();
-
-            SurfacePtr surface = create_pixel_surface();
-            pixel = createSprite(surface.get());
         }
 
         void event(SDL_Event &e) override {
@@ -66,12 +58,15 @@ namespace example {
         }
 
         void proc() override {
-            if (pixel == nullptr) {
+            const int output_width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
+            const int output_height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
+
+            ensure_framebuffer();
+            if (frame_sprite == nullptr || frame_surface == nullptr || frame_format == nullptr) {
                 return;
             }
 
-            const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
-            const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
+            clear_frame(mxvk::MXVK_RGB(4, 4, 6));
             const float time = static_cast<float>(SDL_GetTicks()) * 0.001f;
 
             mxvk::vec4D vertices[3] = {
@@ -94,19 +89,67 @@ namespace example {
             }
             render_list.BuildRenderList(triangle);
 
-            project_to_screen(render_list, width, height);
+            project_to_screen(render_list, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
 
-            const int pixel_size = std::max(1, width / 360);
+            const int pixel_size = std::max(1, SOFTWARE_RENDER_WIDTH / 360);
             mxvk::PipeLine pipeline;
-            pipeline.Begin(*pixel, width, height, pixel_size);
+            pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this, pixel_size](int x, int y, mxvk::MXCOLOR color) {
+                put_block(x, y, pixel_size, color);
+            });
             pipeline.DrawPolys(render_list);
             pipeline.End();
+
+            frame_sprite->updateTexture(frame_surface.get());
+            frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
         }
 
       private:
-        mxvk::VK_Sprite *pixel = nullptr;
+        SurfacePtr frame_surface;
+        const SDL_PixelFormatDetails *frame_format = nullptr;
+        mxvk::VK_Sprite *frame_sprite = nullptr;
         int fallback_width = 1280;
         int fallback_height = 720;
+
+        void ensure_framebuffer() {
+            if (frame_surface != nullptr) {
+                return;
+            }
+
+            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
+            if (frame_format == nullptr) {
+                throw mxvk::Exception(std::format("Failed to query 3dmath frame format: {}", SDL_GetError()));
+            }
+
+            clear_frame(mxvk::MXVK_RGB(4, 4, 6));
+            frame_sprite = createSprite(frame_surface.get());
+        }
+
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
+            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
+        }
+
+        void clear_frame(mxvk::MXCOLOR color) {
+            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
+        }
+
+        void put_pixel(int x, int y, mxvk::MXCOLOR color) {
+            if (x < 0 || y < 0 || x >= SOFTWARE_RENDER_WIDTH || y >= SOFTWARE_RENDER_HEIGHT) {
+                return;
+            }
+
+            auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
+            auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
+            *pixel = map_color(color);
+        }
+
+        void put_block(int x, int y, int size, mxvk::MXCOLOR color) {
+            for (int block_y = 0; block_y < size; ++block_y) {
+                for (int block_x = 0; block_x < size; ++block_x) {
+                    put_pixel(x + block_x, y + block_y, color);
+                }
+            }
+        }
 
         static void project_to_screen(mxvk::RenderList &render_list, int width, int height) {
             const float scale = static_cast<float>(std::min(width, height)) * 0.42f;

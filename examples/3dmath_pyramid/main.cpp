@@ -53,6 +53,8 @@ namespace {
     constexpr float MIN_CAMERA_DISTANCE = 2.5f;
     constexpr float MAX_CAMERA_DISTANCE = 12.0f;
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
+    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
+    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
@@ -82,10 +84,10 @@ namespace example {
         }
 
         void proc() override {
-            const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
-            const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
+            const int output_width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
+            const int output_height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
 
-            ensure_framebuffer(width, height);
+            ensure_framebuffer();
             if (frame_sprite == nullptr || frame_surface == nullptr || frame_format == nullptr) {
                 return;
             }
@@ -102,7 +104,7 @@ namespace example {
             for (std::size_t i = 0; i < pyramid.local.size(); ++i) {
                 camera_vertices[i] = rotation.MulVec(pyramid.local[i]);
                 camera_vertices[i].z += camera_distance;
-                projected[i] = project_to_screen(camera_vertices[i], width, height);
+                projected[i] = project_to_screen(camera_vertices[i], SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
             }
 
             mxvk::vec4D light_direction(-0.35f, -0.55f, -1.0f, 0.0f);
@@ -145,7 +147,7 @@ namespace example {
             }
 
             frame_sprite->updateTexture(frame_surface.get());
-            frame_sprite->drawSpriteRect(0, 0, width, height);
+            frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
         }
 
       private:
@@ -160,27 +162,23 @@ namespace example {
         int fallback_height = 720;
         float camera_distance = 4.5f;
 
-        void ensure_framebuffer(int width, int height) {
-            if (frame_surface != nullptr && frame_width == width && frame_height == height) {
+        void ensure_framebuffer() {
+            if (frame_surface != nullptr) {
                 return;
             }
 
-            frame_surface = create_frame_surface(width, height);
+            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("3dmath_pyramid: failed to query frame format: {}", SDL_GetError()));
             }
 
-            frame_width = width;
-            frame_height = height;
-            depth_buffer.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+            frame_width = SOFTWARE_RENDER_WIDTH;
+            frame_height = SOFTWARE_RENDER_HEIGHT;
+            depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
 
-            if (frame_sprite == nullptr) {
-                frame_sprite = createSprite(frame_surface.get());
-            } else {
-                frame_sprite->updateTexture(frame_surface.get());
-            }
+            frame_sprite = createSprite(frame_surface.get());
         }
 
         [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {

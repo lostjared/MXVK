@@ -42,6 +42,9 @@ namespace {
         float depth = 0.0f;
         mxvk::MXCOLOR color = mxvk::MXVK_RGB(255, 255, 255);
     };
+
+    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
+    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
@@ -62,10 +65,10 @@ namespace example {
         }
 
         void proc() override {
-            const int width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
-            const int height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
+            const int output_width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : fallback_width;
+            const int output_height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : fallback_height;
 
-            ensure_framebuffer(width, height);
+            ensure_framebuffer();
             if (frame_sprite == nullptr || frame_surface == nullptr || frame_format == nullptr) {
                 return;
             }
@@ -93,7 +96,7 @@ namespace example {
                 mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
                 point.z += 4.25f;
                 camera_vertices[i] = point;
-                projected[i] = project_to_screen(point, width, height);
+                projected[i] = project_to_screen(point, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
             }
 
             const std::array<std::array<int, 4>, 6> cube_faces = {{
@@ -135,7 +138,7 @@ namespace example {
 
             for (const FaceDraw &face : faces) {
                 mxvk::PipeLine fill_pipeline;
-                fill_pipeline.Begin(width, height, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
+                fill_pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
                 const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[0])];
                 const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[1])];
                 const mxvk::vec4D &c = projected[static_cast<std::size_t>(face.indices[2])];
@@ -145,9 +148,9 @@ namespace example {
                 fill_pipeline.End();
             }
 
-            const int outline_size = std::max(1, width / 640);
+            const int outline_size = std::max(1, SOFTWARE_RENDER_WIDTH / 640);
             mxvk::PipeLine outline_pipeline;
-            outline_pipeline.Begin(width, height, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
+            outline_pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
             for (const FaceDraw &face : faces) {
                 for (int i = 0; i < 4; ++i) {
                     const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>(i)])];
@@ -158,7 +161,7 @@ namespace example {
             outline_pipeline.End();
 
             frame_sprite->updateTexture(frame_surface.get());
-            frame_sprite->drawSpriteRect(0, 0, width, height);
+            frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
         }
 
       private:
@@ -170,26 +173,22 @@ namespace example {
         int fallback_width = 1280;
         int fallback_height = 720;
 
-        void ensure_framebuffer(int width, int height) {
-            if (frame_surface != nullptr && frame_width == width && frame_height == height) {
+        void ensure_framebuffer() {
+            if (frame_surface != nullptr) {
                 return;
             }
 
-            frame_surface = create_frame_surface(width, height);
+            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath_cube frame format: {}", SDL_GetError()));
             }
 
-            frame_width = width;
-            frame_height = height;
+            frame_width = SOFTWARE_RENDER_WIDTH;
+            frame_height = SOFTWARE_RENDER_HEIGHT;
 
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
-            if (frame_sprite == nullptr) {
-                frame_sprite = createSprite(frame_surface.get());
-            } else {
-                frame_sprite->updateTexture(frame_surface.get());
-            }
+            frame_sprite = createSprite(frame_surface.get());
         }
 
         [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
