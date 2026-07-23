@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.22.0`. This release adds a native Perl configure/build/install helper with automatic Ninja selection, dependency diagnostics, configurable build directories and install prefixes, and direct forwarding of CMake feature options. It also expands CMake installation support with desktop launchers and platform-specific application icons for the examples, while retaining the multiplayer, rendering, and documentation improvements introduced in `0.21.0`.
+Current development is on version `0.23.0`. This release adds a native Perl configure/build/install helper with automatic Ninja selection, dependency diagnostics, configurable build directories and install prefixes, and direct forwarding of CMake feature options. It also expands CMake installation support with desktop launchers and platform-specific application icons for the examples, while retaining the multiplayer, rendering, and documentation improvements introduced in `0.21.0`.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -226,7 +226,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.22.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.23.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
