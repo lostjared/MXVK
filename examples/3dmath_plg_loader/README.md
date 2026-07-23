@@ -43,7 +43,9 @@ Map a PNG texture using the model's PLG texture coordinates:
 When `--texture` is omitted, the loader uses its UV-based color gradient.
 PNG textures automatically receive a complete mip chain. The software
 rasterizer selects and blends mip levels from the projected texture footprint
-to reduce shimmering and moiré on small or oblique triangles.
+to reduce shimmering and moiré on small or oblique triangles. Pass
+`--disable-mipmap` to skip mip generation and always sample the full-resolution
+texture.
 
 Texture coordinates use perspective-correct interpolation of `u/z`, `v/z`,
 and `1/z` by default, preventing texture swimming across triangle diagonals.

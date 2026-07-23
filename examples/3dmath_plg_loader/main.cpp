@@ -138,7 +138,7 @@ namespace {
         return requested;
     }
 
-    [[nodiscard]] Texture load_texture(const std::string &filename, const std::string &asset_path) {
+    [[nodiscard]] Texture load_texture(const std::string &filename, const std::string &asset_path, bool generate_mipmaps) {
         if (filename.empty()) {
             return {};
         }
@@ -179,7 +179,7 @@ namespace {
         }
         texture.levels.push_back(std::move(base_level));
 
-        while (texture.levels.back().width > 1 || texture.levels.back().height > 1) {
+        while (generate_mipmaps && (texture.levels.back().width > 1 || texture.levels.back().height > 1)) {
             const MipLevel &source = texture.levels.back();
             MipLevel destination;
             destination.width = std::max(1, (source.width + 1) / 2);
@@ -243,14 +243,15 @@ namespace {
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, const FramebufferDimensions &framebuffer)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, bool disable_mipmap, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              texture(load_texture(texture_filename, asset_path)),
+              texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
               frame_height(framebuffer.height),
               fallback_width(width),
               fallback_height(height),
-              warp_fix_enabled(!disable_warp_fix) {
+              warp_fix_enabled(!disable_warp_fix),
+              mipmapping_enabled(!disable_mipmap) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -396,6 +397,7 @@ namespace example {
         bool automatic_rotation = true;
         std::uint64_t previous_frame_ticks = 0;
         bool warp_fix_enabled = true;
+        bool mipmapping_enabled = true;
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
@@ -433,7 +435,7 @@ namespace example {
         }
 
         [[nodiscard]] float texture_level_for_face(const FaceDraw &face, float area) const {
-            if (texture.empty()) {
+            if (texture.empty() || !mipmapping_enabled) {
                 return 0.0f;
             }
 
@@ -622,7 +624,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.framebuffer);
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.disable_mipmap, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

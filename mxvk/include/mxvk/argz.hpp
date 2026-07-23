@@ -752,6 +752,7 @@ struct Arguments {
     bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
     bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
     bool nowarpfix = false;               ///< Disable perspective-correct texture mapping (@c --nowarpfix).
+    bool disable_mipmap = false;          ///< Disable mipmap generation and selection (@c --disable-mipmap).
     FramebufferDimensions framebuffer;    ///< Software framebuffer size requested by @c --framebuffer.
     double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
@@ -845,6 +846,7 @@ struct Arguments {
  * |      | --enable-screenshot| Enable F10 screenshot capture                 |
  * |      | --disable-sound    | Disable application background music          |
  * |      | --nowarpfix        | Disable perspective-correct texture mapping    |
+ * |      | --disable-mipmap   | Disable mipmap generation and selection        |
  * |      | --framebuffer      | Software framebuffer size as WxH               |
  * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
@@ -893,6 +895,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(325, "disable-sound", "disable background music")
         .addOptionDouble(326, "nowarpfix", "disable perspective-correct texture mapping")
         .addOptionDoubleValue(327, "framebuffer", "software framebuffer size WidthxHeight")
+        .addOptionDouble(328, "disable-mipmap", "disable mipmap generation and selection")
         .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
@@ -935,6 +938,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool enable_screenshot = false;
     bool disable_sound = false;
     bool nowarpfix = false;
+    bool disable_mipmap = false;
     FramebufferDimensions framebuffer;
     double fps = 0.0;
     int font_size = 22;
@@ -1017,6 +1021,9 @@ inline Arguments proc_args(int &argc, char **argv) {
                 throw ArgException<std::string>("Invalid framebuffer size: " + arg.arg_value);
             }
         } break;
+        case 328:
+            disable_mipmap = true;
+            break;
         case 321:
             fps = parse_arg_double(arg.arg_value, "--fps");
             if (fps <= 0.0) {
@@ -1127,6 +1134,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.enable_screenshot = enable_screenshot;
     args.disable_sound = disable_sound;
     args.nowarpfix = nowarpfix;
+    args.disable_mipmap = disable_mipmap;
     args.framebuffer = framebuffer;
     mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;
