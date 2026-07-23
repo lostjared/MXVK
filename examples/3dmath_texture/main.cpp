@@ -1,7 +1,11 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#if defined(MXVK_USE_EIGEN_MATH)
+#include "mxvk/mxvk_math_eigen.hpp"
+#else
 #include "mxvk/mxvk_math.h"
+#endif
 #include "mxvk/mxvk_png.hpp"
 
 #include <SDL3/SDL.h>

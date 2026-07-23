@@ -3,3 +3,4 @@ add_executable(math3d_texture
 )
 set_target_properties(math3d_texture PROPERTIES OUTPUT_NAME "3dmath_texture")
 target_link_libraries(math3d_texture PRIVATE mxvk::mxvk)
+mxvk_configure_3dmath_backend(math3d_texture)

@@ -236,6 +236,39 @@ find_package(PNG REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(SDL3_ttf REQUIRED)
 find_package(glm REQUIRED)
+find_package(Eigen3 QUIET)
+
+set(MXVK_EIGEN_MATH_AVAILABLE OFF)
+if(Eigen3_FOUND AND TARGET Eigen3::Eigen)
+    get_target_property(MXVK_EIGEN_INCLUDE_DIRS Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+    set(CMAKE_REQUIRED_INCLUDES "${MXVK_EIGEN_INCLUDE_DIRS}")
+    check_cxx_source_compiles("
+#include <Eigen/Dense>
+
+int main() {
+    const Eigen::Matrix2f matrix = Eigen::Matrix2f::Identity();
+    return matrix.isIdentity() ? 0 : 1;
+}
+" MXVK_EIGEN_COMPILES)
+    unset(CMAKE_REQUIRED_INCLUDES)
+
+    if(MXVK_EIGEN_COMPILES)
+        set(MXVK_EIGEN_MATH_AVAILABLE ON)
+        message(STATUS "Eigen support enabled for 3dmath examples")
+    else()
+        message(STATUS "Eigen was found but failed the compile test; 3dmath examples will use mxvk_math.h")
+    endif()
+else()
+    message(STATUS "Eigen not found; 3dmath examples will use mxvk_math.h")
+endif()
+
+function(mxvk_configure_3dmath_backend target)
+    if(MXVK_EIGEN_MATH_AVAILABLE)
+        target_link_libraries(${target} PRIVATE Eigen3::Eigen)
+        target_compile_definitions(${target} PRIVATE MXVK_USE_EIGEN_MATH)
+    endif()
+endfunction()
+
 if(JPEG)
     find_package(JPEG REQUIRED)
     message(STATUS "JPEG support enabled")

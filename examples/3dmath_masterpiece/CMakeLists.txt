@@ -3,6 +3,7 @@ add_executable(math3d_masterpiece
 )
 
 target_link_libraries(math3d_masterpiece PRIVATE mxvk::mxvk)
+mxvk_configure_3dmath_backend(math3d_masterpiece)
 
 find_program(GLSLC_EXECUTABLE glslc)
 if(NOT GLSLC_EXECUTABLE)

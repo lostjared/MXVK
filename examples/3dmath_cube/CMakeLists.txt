@@ -3,3 +3,4 @@ add_executable(math3d_cube
 )
 set_target_properties(math3d_cube PROPERTIES OUTPUT_NAME "3dmath_cube")
 target_link_libraries(math3d_cube PRIVATE mxvk::mxvk)
+mxvk_configure_3dmath_backend(math3d_cube)
