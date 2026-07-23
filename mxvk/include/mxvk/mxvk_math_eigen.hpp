@@ -1450,54 +1450,108 @@ namespace mxvk {
          * @param path File path to load.
          * @param scale Per-axis scale applied to vertices.
          * @param obj_pos World position assigned to the object.
+         * @param rotation Object direction assigned after loading.
          * @return True when the file is opened and parsed successfully.
          *
-         * The final vector parameter is retained for API compatibility and is not used.
+         * Blank lines and lines beginning with `#` are ignored. If loading fails, the
+         * object retains its previous mesh and transform.
          */
-        bool LoadPLG(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &) {
+        [[nodiscard]] bool LoadPLG(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
             std::ifstream file(path);
             if (!file.is_open()) {
                 return false;
             }
-            world_pos = obj_pos;
+
+            const auto read_data_line = [&file](std::string &line) {
+                while (std::getline(file, line)) {
+                    const std::size_t comment = line.find('#');
+                    if (comment != std::string::npos) {
+                        line.erase(comment);
+                    }
+                    if (line.find_first_not_of(" \t\r\n") != std::string::npos) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            std::string line;
+            if (!read_data_line(line)) {
+                return false;
+            }
+
             std::string name;
             int vertex_count = 0;
             int poly_count = 0;
-            if (!(file >> name >> vertex_count >> poly_count)) {
+            std::istringstream header(line);
+            if (!(header >> name >> vertex_count >> poly_count) || vertex_count < 0 || poly_count < 0) {
                 return false;
             }
-            object_name = name;
-            num_vertices = vertex_count;
-            num_polys = poly_count;
-            local.clear();
-            trans.clear();
-            vlist.clear();
-            local.reserve(static_cast<std::size_t>(vertex_count));
-            trans.reserve(static_cast<std::size_t>(vertex_count));
+
+            std::vector<vec4D> loaded_local;
+            std::vector<vec4D> loaded_trans;
+            std::vector<Triangle> loaded_vlist;
+            loaded_local.reserve(static_cast<std::size_t>(vertex_count));
+            loaded_trans.resize(static_cast<std::size_t>(vertex_count));
+            loaded_vlist.reserve(static_cast<std::size_t>(poly_count));
+
             for (int i = 0; i < vertex_count; ++i) {
-                vec4D vertex;
-                file >> vertex.x >> vertex.y >> vertex.z;
+                if (!read_data_line(line)) {
+                    return false;
+                }
+
+                Eigen::Vector3f coordinates;
+                std::istringstream vertex_line(line);
+                if (!(vertex_line >> coordinates.x() >> coordinates.y() >> coordinates.z()) || !coordinates.allFinite()) {
+                    return false;
+                }
+
                 const Eigen::Vector3f scaled =
-                    Eigen::Vector3f(vertex.x, vertex.y, vertex.z)
-                        .cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
-                vertex.Set(scaled.x(), scaled.y(), scaled.z());
-                vertex.w = 1.0f;
-                local.push_back(vertex);
-                trans.emplace_back();
+                    coordinates.cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
+                if (!scaled.allFinite()) {
+                    return false;
+                }
+                loaded_local.emplace_back(scaled.x(), scaled.y(), scaled.z(), 1.0f);
             }
+
             for (int i = 0; i < poly_count; ++i) {
+                if (!read_data_line(line)) {
+                    return false;
+                }
+
                 Triangle tri;
                 int count = 0;
-                file >> std::hex >> tri.state >> std::dec >> count >> tri.vert[0] >> tri.vert[1] >> tri.vert[2];
-                tri.color = MXVK_RGB(rrand(0, 255), rrand(0, 255), rrand(0, 255));
-                vlist.push_back(tri);
+                std::istringstream polygon_line(line);
+                if (!(polygon_line >> std::hex >> tri.state >> std::dec >> count) || count != 3 ||
+                    !(polygon_line >> tri.vert[0] >> tri.vert[1] >> tri.vert[2])) {
+                    return false;
+                }
+                for (const int index : tri.vert) {
+                    if (index < 0 || index >= vertex_count) {
+                        return false;
+                    }
+                }
+                loaded_vlist.push_back(tri);
             }
+
+            for (auto &triangle : loaded_vlist) {
+                triangle.color = MXVK_RGB(rrand(0, 255), rrand(0, 255), rrand(0, 255));
+            }
+
+            object_name = std::move(name);
+            num_vertices = vertex_count;
+            num_polys = poly_count;
+            local = std::move(loaded_local);
+            trans = std::move(loaded_trans);
+            vlist = std::move(loaded_vlist);
+            world_pos = obj_pos;
+            dir = rotation;
             ComputeRad();
             return true;
         }
 
         /// Load an MX mesh file using the PLG loader compatibility path.
-        bool LoadMX(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
+        [[nodiscard]] bool LoadMX(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
             return LoadPLG(path, scale, obj_pos, rotation);
         }
 
@@ -2317,4 +2371,3 @@ namespace mxvk {
 } // namespace mxvk
 
 #endif
-

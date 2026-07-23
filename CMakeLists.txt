@@ -611,6 +611,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(math3d)
     add_subdirectory(examples/3dmath_cube)
     mxvk_configure_mingw_target(math3d_cube)
+    add_subdirectory(examples/3dmath_pyramid)
+    mxvk_configure_mingw_target(math3d_pyramid)
     add_subdirectory(examples/3dmath_texture)
     mxvk_configure_mingw_target(math3d_texture)
     add_subdirectory(examples/3dmath_texture_array)
@@ -792,6 +794,7 @@ if(EXAMPLES)
         sprite_example
         math3d
         math3d_cube
+        math3d_pyramid
         math3d_texture
         math3d_texture_array
         sprite3d_example
