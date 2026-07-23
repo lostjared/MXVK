@@ -24,3 +24,13 @@ Load another PLG file:
 ```bash
 ./run.pl 3dmath_plg_loader --filename /absolute/path/to/model.plg
 ```
+
+Map a PNG texture using the model's PLG texture coordinates:
+
+```bash
+./run.pl 3dmath_plg_loader \
+    --filename /absolute/path/to/model.plg \
+    --texture /absolute/path/to/texture.png
+```
+
+When `--texture` is omitted, the loader uses its UV-based color gradient.

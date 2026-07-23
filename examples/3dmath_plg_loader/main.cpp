@@ -6,6 +6,7 @@
 #else
 #include "mxvk/mxvk_math.h"
 #endif
+#include "mxvk/mxvk_png.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -32,6 +33,24 @@ namespace {
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
 
+    struct Texture {
+        int width = 0;
+        int height = 0;
+        std::vector<mxvk::MXCOLOR> pixels;
+
+        [[nodiscard]] bool empty() const {
+            return width <= 0 || height <= 0 || pixels.empty();
+        }
+
+        [[nodiscard]] mxvk::MXCOLOR sample_nearest(float u, float v) const {
+            u = std::clamp(u, 0.0f, 1.0f);
+            v = std::clamp(v, 0.0f, 1.0f);
+            const int x = static_cast<int>(u * static_cast<float>(width - 1) + 0.5f);
+            const int y = static_cast<int>(v * static_cast<float>(height - 1) + 0.5f);
+            return pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+        }
+    };
+
     [[nodiscard]] SurfacePtr create_frame_surface(int width, int height) {
         SurfacePtr surface(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
         if (!surface) {
@@ -45,6 +64,65 @@ namespace {
             return filename;
         }
         return std::filesystem::path(asset_path) / "data" / "sphere.plg";
+    }
+
+    [[nodiscard]] std::filesystem::path texture_path(const std::string &filename, const std::string &asset_path) {
+        const std::filesystem::path requested(filename);
+        if (requested.is_absolute() || std::filesystem::exists(requested)) {
+            return requested;
+        }
+
+        const std::filesystem::path from_asset_path = std::filesystem::path(asset_path) / requested;
+        if (std::filesystem::exists(from_asset_path)) {
+            return from_asset_path;
+        }
+        return requested;
+    }
+
+    [[nodiscard]] Texture load_texture(const std::string &filename, const std::string &asset_path) {
+        if (filename.empty()) {
+            return {};
+        }
+
+        const std::filesystem::path path = texture_path(filename, asset_path);
+        SurfacePtr loaded(mxvk::LoadPNG(path.string().c_str()));
+        if (!loaded) {
+            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to load texture '{}'", path.string()));
+        }
+
+        SurfacePtr rgba(SDL_ConvertSurface(loaded.get(), SDL_PIXELFORMAT_RGBA32));
+        if (!rgba) {
+            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to convert texture '{}': {}", path.string(), SDL_GetError()));
+        }
+
+        const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(rgba->format);
+        if (format == nullptr) {
+            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to query texture format '{}': {}", path.string(), SDL_GetError()));
+        }
+
+        Texture texture;
+        texture.width = rgba->w;
+        texture.height = rgba->h;
+        texture.pixels.resize(static_cast<std::size_t>(texture.width) * static_cast<std::size_t>(texture.height));
+        for (int y = 0; y < texture.height; ++y) {
+            const auto *row = static_cast<const std::uint8_t *>(rgba->pixels) + static_cast<std::size_t>(y) * static_cast<std::size_t>(rgba->pitch);
+            const auto *source = reinterpret_cast<const std::uint32_t *>(row);
+            for (int x = 0; x < texture.width; ++x) {
+                std::uint8_t red = 0;
+                std::uint8_t green = 0;
+                std::uint8_t blue = 0;
+                std::uint8_t alpha = 0;
+                SDL_GetRGBA(source[x], format, nullptr, &red, &green, &blue, &alpha);
+                texture.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(texture.width) + static_cast<std::size_t>(x)] =
+                    (static_cast<mxvk::MXCOLOR>(alpha) << 24U) |
+                    (static_cast<mxvk::MXCOLOR>(red) << 16U) |
+                    (static_cast<mxvk::MXCOLOR>(green) << 8U) |
+                    static_cast<mxvk::MXCOLOR>(blue);
+            }
+        }
+
+        std::cout << std::format("3dmath_plg_loader: loaded texture '{}' ({}x{})\n", path.string(), texture.width, texture.height);
+        return texture;
     }
 
     struct FaceDraw {
@@ -65,8 +143,9 @@ namespace {
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              texture(load_texture(texture_filename, asset_path)),
               fallback_width(width),
               fallback_height(height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
@@ -196,6 +275,7 @@ namespace example {
 
       private:
         mxvk::mxObject model;
+        Texture texture;
         SurfacePtr frame_surface;
         std::vector<float> depth_buffer;
         const SDL_PixelFormatDetails *frame_format = nullptr;
@@ -307,7 +387,8 @@ namespace example {
                         face.texcoords[0].y * perspective_a +
                         face.texcoords[1].y * perspective_b +
                         face.texcoords[2].y * perspective_c;
-                    put_pixel(x, y, mxvk::shade_color(gradient_color(u, v), face.intensity));
+                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample_nearest(u, v);
+                    put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
             }
         }
@@ -349,7 +430,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
