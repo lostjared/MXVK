@@ -1,7 +1,8 @@
 # 3D Math Cube
 
 3D Math Cube extends the software math test into a rotating cube. It demonstrates matrix transforms, backface culling, depth sorting, diffuse face shading, filled triangle rasterization, and line clipping before presenting through MXVK.
-The software framebuffer remains fixed at 1280x720 and its Vulkan sprite is stretched to fit the window.
+The software framebuffer defaults to 1280x720 and its Vulkan sprite is
+stretched to fit the window. Use `--framebuffer WidthxHeight` to override it.
 
 ## Controls
 

@@ -36,15 +36,15 @@ namespace {
         return surface;
     }
 
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
     class Math3DWindow : public mxvk::VK_Window {
       public:
-        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              frame_width(framebuffer.width),
+              frame_height(framebuffer.height),
               fallback_width(width),
               fallback_height(height) {
             setClearColor(0.015f, 0.016f, 0.022f, 1.0f);
@@ -89,11 +89,11 @@ namespace example {
             }
             render_list.BuildRenderList(triangle);
 
-            project_to_screen(render_list, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            project_to_screen(render_list, frame_width, frame_height);
 
-            const int pixel_size = std::max(1, SOFTWARE_RENDER_WIDTH / 360);
+            const int pixel_size = std::max(1, frame_width / 360);
             mxvk::PipeLine pipeline;
-            pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this, pixel_size](int x, int y, mxvk::MXCOLOR color) {
+            pipeline.Begin(frame_width, frame_height, [this, pixel_size](int x, int y, mxvk::MXCOLOR color) {
                 put_block(x, y, pixel_size, color);
             });
             pipeline.DrawPolys(render_list);
@@ -107,6 +107,8 @@ namespace example {
         SurfacePtr frame_surface;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
+        int frame_width = 1280;
+        int frame_height = 720;
         int fallback_width = 1280;
         int fallback_height = 720;
 
@@ -115,7 +117,7 @@ namespace example {
                 return;
             }
 
-            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath frame format: {}", SDL_GetError()));
@@ -134,7 +136,7 @@ namespace example {
         }
 
         void put_pixel(int x, int y, mxvk::MXCOLOR color) {
-            if (x < 0 || y < 0 || x >= SOFTWARE_RENDER_WIDTH || y >= SOFTWARE_RENDER_HEIGHT) {
+            if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
                 return;
             }
 
@@ -170,7 +172,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DWindow window(args.path, "MXVK 3D Math", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::Math3DWindow window(args.path, "MXVK 3D Math", args.width, args.height, args.fullscreen, args.enable_vsync, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

@@ -77,9 +77,6 @@ namespace {
         float intensity = 1.0f;
     };
 
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
-
     [[nodiscard]] std::string resolve_texture_path(const Arguments &args) {
         std::string texture_path = !args.filename.empty() ? args.filename : args.texture;
         if (texture_path.empty()) {
@@ -150,6 +147,8 @@ namespace example {
         Math3DTextureWindow(const Arguments &args, const std::string &title)
             : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
               texture(load_texture(resolve_texture_path(args))),
+              frame_width(args.framebuffer.width),
+              frame_height(args.framebuffer.height),
               fallback_width(args.width),
               fallback_height(args.height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
@@ -198,7 +197,7 @@ namespace example {
                 mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
                 point.z += camera_distance;
                 camera_vertices[i] = point;
-                projected[i] = project_to_screen(point, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+                projected[i] = project_to_screen(point, frame_width, frame_height);
             }
 
             const std::array<std::array<int, 4>, 6> cube_faces = {{
@@ -250,7 +249,7 @@ namespace example {
                 draw_textured_triangle(a, c, d, face.intensity);
             }
 
-            frame_sprite->updateTexture(frame_surface->pixels, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, frame_surface->pitch);
+            frame_sprite->updateTexture(frame_surface->pixels, frame_width, frame_height, frame_surface->pitch);
             frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
         }
 
@@ -259,8 +258,8 @@ namespace example {
         SurfacePtr frame_surface;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        int frame_width = 0;
-        int frame_height = 0;
+        int frame_width = 1280;
+        int frame_height = 720;
         int fallback_width = 1280;
         int fallback_height = 720;
         float camera_distance = 4.25f;
@@ -273,14 +272,11 @@ namespace example {
                 return;
             }
 
-            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath_texture frame format: {}", SDL_GetError()));
             }
-
-            frame_width = SOFTWARE_RENDER_WIDTH;
-            frame_height = SOFTWARE_RENDER_HEIGHT;
 
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
             frame_sprite = createSprite(frame_surface.get());

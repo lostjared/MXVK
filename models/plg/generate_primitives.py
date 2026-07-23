@@ -62,25 +62,22 @@ def orient_outward(mesh: Mesh) -> Mesh:
 
 
 def cube() -> Mesh:
-    points = [
-        (-0.5, -0.5, -0.5),
-        (0.5, -0.5, -0.5),
-        (0.5, 0.5, -0.5),
-        (-0.5, 0.5, -0.5),
-        (-0.5, -0.5, 0.5),
-        (0.5, -0.5, 0.5),
-        (0.5, 0.5, 0.5),
-        (-0.5, 0.5, 0.5),
+    faces = [
+        [(-0.5, -0.5, -0.5), (-0.5, 0.5, -0.5), (0.5, 0.5, -0.5), (0.5, -0.5, -0.5)],
+        [(-0.5, -0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, 0.5), (-0.5, 0.5, 0.5)],
+        [(-0.5, -0.5, -0.5), (-0.5, -0.5, 0.5), (-0.5, 0.5, 0.5), (-0.5, 0.5, -0.5)],
+        [(0.5, -0.5, -0.5), (0.5, 0.5, -0.5), (0.5, 0.5, 0.5), (0.5, -0.5, 0.5)],
+        [(-0.5, 0.5, -0.5), (-0.5, 0.5, 0.5), (0.5, 0.5, 0.5), (0.5, 0.5, -0.5)],
+        [(-0.5, -0.5, -0.5), (0.5, -0.5, -0.5), (0.5, -0.5, 0.5), (-0.5, -0.5, 0.5)],
     ]
-    triangles = [
-        (0, 1, 2), (0, 2, 3),
-        (4, 6, 5), (4, 7, 6),
-        (0, 4, 5), (0, 5, 1),
-        (3, 2, 6), (3, 6, 7),
-        (0, 3, 7), (0, 7, 4),
-        (1, 5, 6), (1, 6, 2),
-    ]
-    return orient_outward(Mesh(with_spherical_uv(points), triangles))
+    uvs = [(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)]
+    vertices: list[tuple[float, float, float, float, float]] = []
+    triangles: list[tuple[int, int, int]] = []
+    for face in faces:
+        first = len(vertices)
+        vertices.extend((*point, *uv) for point, uv in zip(face, uvs))
+        triangles.extend([(first, first + 1, first + 2), (first, first + 2, first + 3)])
+    return Mesh(vertices, triangles)
 
 
 def square_pyramid() -> Mesh:
@@ -268,7 +265,7 @@ def write_mesh(path: Path, name: str, mesh: Mesh, description: str) -> None:
 def main() -> None:
     output_directory = Path(__file__).resolve().parent
     primitives = {
-        "cube": (cube(), "Unit cube with shared corner vertices."),
+        "cube": (cube(), "Unit cube with independent planar UVs on each face."),
         "pyramid": (square_pyramid(), "Square-based unit pyramid."),
         "tetrahedron": (tetrahedron(), "Regular tetrahedron with unit-radius corners."),
         "octahedron": (octahedron(), "Regular octahedron with unit-radius corners."),

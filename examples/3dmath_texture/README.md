@@ -1,7 +1,8 @@
 # 3D Math Texture
 
 3D Math Texture is the textured version of the software cube test. It uses the same CPU-side 3D path as `3dmath_cube`, then adds PNG loading and software UV sampling.
-The software framebuffer remains fixed at 1280x720 and its Vulkan sprite is stretched to fit the window.
+The software framebuffer defaults to 1280x720 and its Vulkan sprite is
+stretched to fit the window. Use `--framebuffer WidthxHeight` to override it.
 
 ## Controls
 
@@ -10,6 +11,7 @@ The software framebuffer remains fixed at 1280x720 and its Vulkan sprite is stre
 ## Inputs
 
 - `--filename <file.png>` or `--texture <file.png>` - texture image for the cube
+- `--framebuffer <WidthxHeight>` - internal software-rendering resolution
 
 ## How It Works
 

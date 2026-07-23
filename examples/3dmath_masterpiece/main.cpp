@@ -35,8 +35,6 @@ namespace {
     constexpr int base_height = 1080;
     constexpr int game_base_width = 640;
     constexpr int game_base_height = 480;
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
     constexpr int game_board_start_x = 184;
     constexpr int game_board_start_y = 78;
     constexpr int game_block_width = 31;
@@ -299,11 +297,13 @@ namespace example {
 
     class MasterPieceWindow final : public mxvk::VK_Window {
       public:
-        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
+        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window("3D Math MasterPiece", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               asset_root(resolveAssetRoot(path)),
               puzzle_asset_root(resolvePuzzleAssetRoot(resolveAssetRoot(path))),
-              high_scores(scorePath(asset_root)) {
+              high_scores(scorePath(asset_root)),
+              frame_width(framebuffer.width),
+              frame_height(framebuffer.height) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             mxvk::BuildTables();
 
@@ -450,8 +450,8 @@ namespace example {
         SurfacePtr frame_surface;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        int frame_width = 0;
-        int frame_height = 0;
+        int frame_width = 1280;
+        int frame_height = 720;
         std::string player_name;
         int menu_selection = 0;
         int score = 0;
@@ -1193,11 +1193,11 @@ namespace example {
                 return;
             }
 
-            constexpr float SOFTWARE_SCALE_X = static_cast<float>(SOFTWARE_RENDER_WIDTH) / static_cast<float>(game_base_width);
-            constexpr float SOFTWARE_SCALE_Y = static_cast<float>(SOFTWARE_RENDER_HEIGHT) / static_cast<float>(game_base_height);
+            const float software_scale_x = static_cast<float>(frame_width) / static_cast<float>(game_base_width);
+            const float software_scale_y = static_cast<float>(frame_height) / static_cast<float>(game_base_height);
             clearFrame(transparent_black);
-            drawBoard(now, SOFTWARE_SCALE_X, SOFTWARE_SCALE_Y);
-            drawNextPiece(now, SOFTWARE_SCALE_X, SOFTWARE_SCALE_Y);
+            drawBoard(now, software_scale_x, software_scale_y);
+            drawNextPiece(now, software_scale_x, software_scale_y);
             frame_sprite->updateTexture(frame_surface.get());
             frame_sprite->drawSpriteRect(0, 0, layout.width, layout.height);
         }
@@ -1340,14 +1340,11 @@ namespace example {
                 return;
             }
 
-            frame_surface = createFrameSurface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = createFrameSurface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath_masterpiece frame format: {}", SDL_GetError()));
             }
-
-            frame_width = SOFTWARE_RENDER_WIDTH;
-            frame_height = SOFTWARE_RENDER_HEIGHT;
 
             clearFrame(transparent_black);
             frame_sprite = createSprite(frame_surface.get());
@@ -1611,7 +1608,7 @@ int main(int argc, char **argv) {
             args.height = base_height;
         }
 
-        example::MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::MasterPieceWindow window(args.path, args.width, args.height, args.fullscreen, args.enable_vsync, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

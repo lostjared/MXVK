@@ -136,18 +136,19 @@ namespace {
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
     constexpr float MOUSE_ROTATION_SENSITIVITY = 0.35f;
     constexpr float MAX_PITCH_DEGREES = 89.0f;
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool disable_warp_fix, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               texture(load_texture(texture_filename, asset_path)),
+              frame_width(framebuffer.width),
+              frame_height(framebuffer.height),
               fallback_width(width),
-              fallback_height(height) {
+              fallback_height(height),
+              warp_fix_enabled(!disable_warp_fix) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -227,7 +228,7 @@ namespace example {
             for (std::size_t i = 0; i < model.local.size(); ++i) {
                 camera_vertices[i] = rotation.MulVec(model.local[i]);
                 camera_vertices[i].z += camera_distance;
-                projected[i] = project_to_screen(camera_vertices[i], SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+                projected[i] = project_to_screen(camera_vertices[i], frame_width, frame_height);
             }
 
             mxvk::vec4D light_direction(-0.35f, -0.55f, -1.0f, 0.0f);
@@ -253,7 +254,7 @@ namespace example {
                 }
 
                 const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
-                const float intensity = std::clamp(0.28f + diffuse * 0.72f, 0.0f, 1.0f);
+                const float intensity = std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f);
                 faces.push_back({
                     {projected[first], projected[second], projected[third]},
                     {
@@ -269,7 +270,7 @@ namespace example {
                 draw_gradient_triangle(face);
             }
 
-            frame_sprite->updateTexture(frame_surface.get());
+            frame_sprite->updateTexture(frame_surface->pixels, frame_width, frame_height, frame_surface->pitch);
             frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
         }
 
@@ -280,11 +281,11 @@ namespace example {
         std::vector<float> depth_buffer;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        int frame_width = 0;
-        int frame_height = 0;
+        int frame_width = 1280;
+        int frame_height = 720;
         int fallback_width = 1280;
         int fallback_height = 720;
-        float camera_distance = 4.5f;
+        float camera_distance = 4.25f;
         float pitch_degrees = 0.0f;
         float yaw_degrees = 0.0f;
         float last_mouse_x = 0.0f;
@@ -292,20 +293,19 @@ namespace example {
         bool mouse_dragging = false;
         bool automatic_rotation = true;
         std::uint64_t previous_frame_ticks = 0;
+        bool warp_fix_enabled = true;
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
                 return;
             }
 
-            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("3dmath_plg_loader: failed to query frame format: {}", SDL_GetError()));
             }
 
-            frame_width = SOFTWARE_RENDER_WIDTH;
-            frame_height = SOFTWARE_RENDER_HEIGHT;
             depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
 
@@ -376,17 +376,17 @@ namespace example {
                     }
                     depth_buffer[pixel_index] = depth;
 
-                    const float perspective_a = (weight_a / a.z) * depth;
-                    const float perspective_b = (weight_b / b.z) * depth;
-                    const float perspective_c = (weight_c / c.z) * depth;
+                    const float texture_weight_a = warp_fix_enabled ? (weight_a / a.z) * depth : weight_a;
+                    const float texture_weight_b = warp_fix_enabled ? (weight_b / b.z) * depth : weight_b;
+                    const float texture_weight_c = warp_fix_enabled ? (weight_c / c.z) * depth : weight_c;
                     const float u =
-                        face.texcoords[0].x * perspective_a +
-                        face.texcoords[1].x * perspective_b +
-                        face.texcoords[2].x * perspective_c;
+                        face.texcoords[0].x * texture_weight_a +
+                        face.texcoords[1].x * texture_weight_b +
+                        face.texcoords[2].x * texture_weight_c;
                     const float v =
-                        face.texcoords[0].y * perspective_a +
-                        face.texcoords[1].y * perspective_b +
-                        face.texcoords[2].y * perspective_c;
+                        face.texcoords[0].y * texture_weight_a +
+                        face.texcoords[1].y * texture_weight_b +
+                        face.texcoords[2].y * texture_weight_c;
                     const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample_nearest(u, v);
                     put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
@@ -430,7 +430,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.nowarpfix, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

@@ -5,8 +5,8 @@ This example loads an indexed pyramid from `data/pyramid.plg` with
 smooth vertex-color gradients through the CPU-side MXVK math pipeline. Its
 geometry, triangle layout, and face-local UV coordinates match
 `models/obj/pyramid.obj`.
-The software framebuffer remains fixed at 1280x720 and its Vulkan sprite is
-stretched to fit the window.
+The software framebuffer defaults to 1280x720 and its Vulkan sprite is
+stretched to fit the window. Use `--framebuffer WidthxHeight` to override it.
 
 ## Controls
 

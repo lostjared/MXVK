@@ -53,15 +53,15 @@ namespace {
     constexpr float MIN_CAMERA_DISTANCE = 2.5f;
     constexpr float MAX_CAMERA_DISTANCE = 12.0f;
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
     class Math3DPyramidWindow : public mxvk::VK_Window {
       public:
-        Math3DPyramidWindow(const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+        Math3DPyramidWindow(const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              frame_width(framebuffer.width),
+              frame_height(framebuffer.height),
               fallback_width(width),
               fallback_height(height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
@@ -104,7 +104,7 @@ namespace example {
             for (std::size_t i = 0; i < pyramid.local.size(); ++i) {
                 camera_vertices[i] = rotation.MulVec(pyramid.local[i]);
                 camera_vertices[i].z += camera_distance;
-                projected[i] = project_to_screen(camera_vertices[i], SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+                projected[i] = project_to_screen(camera_vertices[i], frame_width, frame_height);
             }
 
             mxvk::vec4D light_direction(-0.35f, -0.55f, -1.0f, 0.0f);
@@ -156,8 +156,8 @@ namespace example {
         std::vector<float> depth_buffer;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        int frame_width = 0;
-        int frame_height = 0;
+        int frame_width = 1280;
+        int frame_height = 720;
         int fallback_width = 1280;
         int fallback_height = 720;
         float camera_distance = 4.5f;
@@ -167,14 +167,12 @@ namespace example {
                 return;
             }
 
-            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("3dmath_pyramid: failed to query frame format: {}", SDL_GetError()));
             }
 
-            frame_width = SOFTWARE_RENDER_WIDTH;
-            frame_height = SOFTWARE_RENDER_HEIGHT;
             depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
 
@@ -298,7 +296,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPyramidWindow window(args.path, "MXVK 3D Math Pyramid", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::Math3DPyramidWindow window(args.path, "MXVK 3D Math Pyramid", args.width, args.height, args.fullscreen, args.enable_vsync, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

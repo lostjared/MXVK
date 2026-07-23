@@ -716,6 +716,15 @@ class Argz {
 };
 
 /**
+ * @struct FramebufferDimensions
+ * @brief Parsed software framebuffer dimensions.
+ */
+struct FramebufferDimensions {
+    int width = 1280; ///< Software framebuffer width in pixels.
+    int height = 720; ///< Software framebuffer height in pixels.
+};
+
+/**
  * @struct Arguments
  * @brief Plain data structure returned by proc_args() with all common libmx2 CLI options.
  */
@@ -742,6 +751,8 @@ struct Arguments {
     bool enable_vsync = false;            ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
     bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
     bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
+    bool nowarpfix = false;               ///< Disable perspective-correct texture mapping (@c --nowarpfix).
+    FramebufferDimensions framebuffer;    ///< Software framebuffer size requested by @c --framebuffer.
     double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
     std::string font_path;                ///< Optional font file path (@c --font-path).
@@ -833,6 +844,8 @@ struct Arguments {
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
  * |      | --enable-screenshot| Enable F10 screenshot capture                 |
  * |      | --disable-sound    | Disable application background music          |
+ * |      | --nowarpfix        | Disable perspective-correct texture mapping    |
+ * |      | --framebuffer      | Software framebuffer size as WxH               |
  * |      | --fps              | Override capture FPS                          |
  * | -z   | --font-size        | Matrix rain font size                         |
  * | -j   | --font-path        | Matrix rain font file path                    |
@@ -878,6 +891,8 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
         .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
         .addOptionDouble(325, "disable-sound", "disable background music")
+        .addOptionDouble(326, "nowarpfix", "disable perspective-correct texture mapping")
+        .addOptionDoubleValue(327, "framebuffer", "software framebuffer size WidthxHeight")
         .addOptionDoubleValue(321, "fps", "capture FPS override")
         .addOptionSingleValue('z', "matrix rain font size")
         .addOptionDoubleValue(316, "font-size", "matrix rain font size")
@@ -919,6 +934,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool enable_vsync = false;
     bool enable_screenshot = false;
     bool disable_sound = false;
+    bool nowarpfix = false;
+    FramebufferDimensions framebuffer;
     double fps = 0.0;
     int font_size = 22;
     std::string font_path;
@@ -986,6 +1003,20 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 325:
             disable_sound = true;
             break;
+        case 326:
+            nowarpfix = true;
+            break;
+        case 327: {
+            const std::string::size_type separator = arg.arg_value.find('x');
+            if (separator == std::string::npos) {
+                throw ArgException<std::string>("Invalid framebuffer size, expected WidthxHeight: " + arg.arg_value);
+            }
+            framebuffer.width = parse_arg_int(arg.arg_value.substr(0, separator), "--framebuffer width");
+            framebuffer.height = parse_arg_int(arg.arg_value.substr(separator + 1), "--framebuffer height");
+            if (framebuffer.width <= 0 || framebuffer.height <= 0) {
+                throw ArgException<std::string>("Invalid framebuffer size: " + arg.arg_value);
+            }
+        } break;
         case 321:
             fps = parse_arg_double(arg.arg_value, "--fps");
             if (fps <= 0.0) {
@@ -1095,6 +1126,8 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.enable_vsync = enable_vsync;
     args.enable_screenshot = enable_screenshot;
     args.disable_sound = disable_sound;
+    args.nowarpfix = nowarpfix;
+    args.framebuffer = framebuffer;
     mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;
     args.font_size = font_size;

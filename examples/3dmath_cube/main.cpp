@@ -43,15 +43,15 @@ namespace {
         mxvk::MXCOLOR color = mxvk::MXVK_RGB(255, 255, 255);
     };
 
-    constexpr int SOFTWARE_RENDER_WIDTH = 1280;
-    constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
 
 namespace example {
     class Math3DCubeWindow : public mxvk::VK_Window {
       public:
-        Math3DCubeWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
+        Math3DCubeWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
+              frame_width(framebuffer.width),
+              frame_height(framebuffer.height),
               fallback_width(width),
               fallback_height(height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
@@ -96,7 +96,7 @@ namespace example {
                 mxvk::vec4D point = rotation.MulVec(cube_vertices[i]);
                 point.z += 4.25f;
                 camera_vertices[i] = point;
-                projected[i] = project_to_screen(point, SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+                projected[i] = project_to_screen(point, frame_width, frame_height);
             }
 
             const std::array<std::array<int, 4>, 6> cube_faces = {{
@@ -138,7 +138,7 @@ namespace example {
 
             for (const FaceDraw &face : faces) {
                 mxvk::PipeLine fill_pipeline;
-                fill_pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
+                fill_pipeline.Begin(frame_width, frame_height, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
                 const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[0])];
                 const mxvk::vec4D &b = projected[static_cast<std::size_t>(face.indices[1])];
                 const mxvk::vec4D &c = projected[static_cast<std::size_t>(face.indices[2])];
@@ -148,9 +148,9 @@ namespace example {
                 fill_pipeline.End();
             }
 
-            const int outline_size = std::max(1, SOFTWARE_RENDER_WIDTH / 640);
+            const int outline_size = std::max(1, frame_width / 640);
             mxvk::PipeLine outline_pipeline;
-            outline_pipeline.Begin(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
+            outline_pipeline.Begin(frame_width, frame_height, [this, outline_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, outline_size, color); });
             for (const FaceDraw &face : faces) {
                 for (int i = 0; i < 4; ++i) {
                     const mxvk::vec4D &a = projected[static_cast<std::size_t>(face.indices[static_cast<std::size_t>(i)])];
@@ -168,8 +168,8 @@ namespace example {
         SurfacePtr frame_surface;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        int frame_width = 0;
-        int frame_height = 0;
+        int frame_width = 1280;
+        int frame_height = 720;
         int fallback_width = 1280;
         int fallback_height = 720;
 
@@ -178,14 +178,11 @@ namespace example {
                 return;
             }
 
-            frame_surface = create_frame_surface(SOFTWARE_RENDER_WIDTH, SOFTWARE_RENDER_HEIGHT);
+            frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
                 throw mxvk::Exception(std::format("Failed to query 3dmath_cube frame format: {}", SDL_GetError()));
             }
-
-            frame_width = SOFTWARE_RENDER_WIDTH;
-            frame_height = SOFTWARE_RENDER_HEIGHT;
 
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
             frame_sprite = createSprite(frame_surface.get());
@@ -229,7 +226,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DCubeWindow window(args.path, "MXVK 3D Math Cube", args.width, args.height, args.fullscreen, args.enable_vsync);
+        example::Math3DCubeWindow window(args.path, "MXVK 3D Math Cube", args.width, args.height, args.fullscreen, args.enable_vsync, args.framebuffer);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());
