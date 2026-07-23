@@ -247,7 +247,7 @@ namespace example {
                 draw_textured_triangle(a, c, d, face.intensity);
             }
 
-            frame_sprite->updateTexture(frame_surface.get());
+            frame_sprite->updateTexture(frame_surface->pixels, width, height, frame_surface->pitch);
             frame_sprite->drawSpriteRect(0, 0, width, height);
         }
 
@@ -295,30 +295,13 @@ namespace example {
             SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
         }
 
-        void put_pixel(int x, int y, mxvk::MXCOLOR color) {
-            if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
-                return;
-            }
+        void put_shaded_pixel_unchecked(int x, int y, mxvk::MXCOLOR color, std::uint16_t intensity) {
             auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
-            auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
-            *pixel = map_color(color);
-        }
-
-        void put_pixel_unchecked(int x, int y, mxvk::MXCOLOR color) {
-            auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
-            auto *pixel = reinterpret_cast<std::uint32_t *>(row) + x;
-            *pixel = map_color(color);
-        }
-
-        [[nodiscard]] static mxvk::MXCOLOR shade_texture_color(mxvk::MXCOLOR color, float intensity) {
-            const auto scale = [intensity](std::uint8_t component) {
-                return static_cast<mxvk::MXCOLOR>(static_cast<int>(static_cast<float>(component) * intensity)) & 0xFFU;
-            };
-
-            return (static_cast<mxvk::MXCOLOR>(mxvk::color_a(color)) << 24U) |
-                   (scale(mxvk::color_r(color)) << 16U) |
-                   (scale(mxvk::color_g(color)) << 8U) |
-                   scale(mxvk::color_b(color));
+            auto *pixel = row + (static_cast<std::size_t>(x) * 4U);
+            pixel[0] = static_cast<std::uint8_t>((static_cast<std::uint16_t>(mxvk::color_r(color)) * intensity) >> 8U);
+            pixel[1] = static_cast<std::uint8_t>((static_cast<std::uint16_t>(mxvk::color_g(color)) * intensity) >> 8U);
+            pixel[2] = static_cast<std::uint8_t>((static_cast<std::uint16_t>(mxvk::color_b(color)) * intensity) >> 8U);
+            pixel[3] = mxvk::color_a(color);
         }
 
         void draw_textured_triangle(const TexVertex &a, const TexVertex &b, const TexVertex &c, float intensity) {
@@ -354,6 +337,7 @@ namespace example {
             const float v_over_z0 = a.uv.y * inv_z0;
             const float v_over_z1 = b.uv.y * inv_z1;
             const float v_over_z2 = c.uv.y * inv_z2;
+            const std::uint16_t fixed_intensity = static_cast<std::uint16_t>(std::clamp(intensity, 0.0f, 1.0f) * 256.0f);
 
             const float w0_dx = p2.y - p1.y;
             const float w0_dy = -(p2.x - p1.x);
@@ -366,34 +350,50 @@ namespace example {
             float row_w0 = mxvk::edge_function(p1, p2, row_start);
             float row_w1 = mxvk::edge_function(p2, p0, row_start);
             float row_w2 = mxvk::edge_function(p0, p1, row_start);
+            float row_inv_z = ((row_w0 * inv_z0) + (row_w1 * inv_z1) + (row_w2 * inv_z2)) * inv_area;
+            float row_u_over_z = ((row_w0 * u_over_z0) + (row_w1 * u_over_z1) + (row_w2 * u_over_z2)) * inv_area;
+            float row_v_over_z = ((row_w0 * v_over_z0) + (row_w1 * v_over_z1) + (row_w2 * v_over_z2)) * inv_area;
+
+            const float inv_z_dx = ((w0_dx * inv_z0) + (w1_dx * inv_z1) + (w2_dx * inv_z2)) * inv_area;
+            const float inv_z_dy = ((w0_dy * inv_z0) + (w1_dy * inv_z1) + (w2_dy * inv_z2)) * inv_area;
+            const float u_over_z_dx = ((w0_dx * u_over_z0) + (w1_dx * u_over_z1) + (w2_dx * u_over_z2)) * inv_area;
+            const float u_over_z_dy = ((w0_dy * u_over_z0) + (w1_dy * u_over_z1) + (w2_dy * u_over_z2)) * inv_area;
+            const float v_over_z_dx = ((w0_dx * v_over_z0) + (w1_dx * v_over_z1) + (w2_dx * v_over_z2)) * inv_area;
+            const float v_over_z_dy = ((w0_dy * v_over_z0) + (w1_dy * v_over_z1) + (w2_dy * v_over_z2)) * inv_area;
 
             for (int y = min_y; y <= max_y; ++y) {
                 float w0 = row_w0;
                 float w1 = row_w1;
                 float w2 = row_w2;
+                float inv_z = row_inv_z;
+                float u_over_z = row_u_over_z;
+                float v_over_z = row_v_over_z;
 
                 for (int x = min_x; x <= max_x; ++x) {
                     if ((positive_area && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) ||
                         (!positive_area && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
-                        const float b0 = w0 * inv_area;
-                        const float b1 = w1 * inv_area;
-                        const float b2 = w2 * inv_area;
-                        const float inv_z = (b0 * inv_z0) + (b1 * inv_z1) + (b2 * inv_z2);
                         if (std::fabs(inv_z) > mxvk::EPSILON) {
-                            const float u = ((u_over_z0 * b0) + (u_over_z1 * b1) + (u_over_z2 * b2)) / inv_z;
-                            const float v = ((v_over_z0 * b0) + (v_over_z1 * b1) + (v_over_z2 * b2)) / inv_z;
-                            put_pixel_unchecked(x, y, shade_texture_color(texture.sample_nearest(u, v), intensity));
+                            const float reciprocal_z = 1.0f / inv_z;
+                            const float u = u_over_z * reciprocal_z;
+                            const float v = v_over_z * reciprocal_z;
+                            put_shaded_pixel_unchecked(x, y, texture.sample_nearest(u, v), fixed_intensity);
                         }
                     }
 
                     w0 += w0_dx;
                     w1 += w1_dx;
                     w2 += w2_dx;
+                    inv_z += inv_z_dx;
+                    u_over_z += u_over_z_dx;
+                    v_over_z += v_over_z_dx;
                 }
 
                 row_w0 += w0_dy;
                 row_w1 += w1_dy;
                 row_w2 += w2_dy;
+                row_inv_z += inv_z_dy;
+                row_u_over_z += u_over_z_dy;
+                row_v_over_z += v_over_z_dy;
             }
         }
 
