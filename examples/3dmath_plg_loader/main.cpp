@@ -56,6 +56,8 @@ namespace {
     constexpr float MIN_CAMERA_DISTANCE = 2.5f;
     constexpr float MAX_CAMERA_DISTANCE = 12.0f;
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
+    constexpr float MOUSE_ROTATION_SENSITIVITY = 0.35f;
+    constexpr float MAX_PITCH_DEGREES = 89.0f;
     constexpr int SOFTWARE_RENDER_WIDTH = 1280;
     constexpr int SOFTWARE_RENDER_HEIGHT = 720;
 } // namespace
@@ -81,6 +83,36 @@ namespace example {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
                 exit();
             }
+            if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_SPACE && !e.key.repeat) {
+                automatic_rotation = !automatic_rotation;
+                return;
+            }
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+                mouse_dragging = true;
+                last_mouse_x = e.button.x;
+                last_mouse_y = e.button.y;
+                return;
+            }
+            if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_LEFT) {
+                mouse_dragging = false;
+                return;
+            }
+            if (e.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+                mouse_dragging = false;
+                return;
+            }
+            if (e.type == SDL_EVENT_MOUSE_MOTION && mouse_dragging) {
+                const float delta_x = e.motion.x - last_mouse_x;
+                const float delta_y = e.motion.y - last_mouse_y;
+                yaw_degrees = std::fmod(yaw_degrees + delta_x * MOUSE_ROTATION_SENSITIVITY, 360.0f);
+                pitch_degrees = std::clamp(
+                    pitch_degrees + delta_y * MOUSE_ROTATION_SENSITIVITY,
+                    -MAX_PITCH_DEGREES,
+                    MAX_PITCH_DEGREES);
+                last_mouse_x = e.motion.x;
+                last_mouse_y = e.motion.y;
+                return;
+            }
             if (e.type == SDL_EVENT_MOUSE_WHEEL) {
                 const float delta = e.wheel.y != 0.0f ? e.wheel.y : static_cast<float>(e.wheel.integer_y);
                 camera_distance = std::clamp(camera_distance - delta * CAMERA_ZOOM_STEP, MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
@@ -99,9 +131,17 @@ namespace example {
             clear_frame(mxvk::MXVK_RGB(3, 4, 8));
             std::ranges::fill(depth_buffer, std::numeric_limits<float>::infinity());
 
-            const float time = static_cast<float>(SDL_GetTicks()) * 0.001f;
+            const std::uint64_t current_ticks = SDL_GetTicks();
+            const float elapsed_seconds = previous_frame_ticks == 0
+                                              ? 0.0f
+                                              : static_cast<float>(current_ticks - previous_frame_ticks) * 0.001f;
+            previous_frame_ticks = current_ticks;
+            if (automatic_rotation && !mouse_dragging) {
+                yaw_degrees = std::fmod(yaw_degrees + elapsed_seconds * 42.0f, 360.0f);
+            }
+
             mxvk::Mat4D rotation;
-            rotation.BuildXYZ(0.0f, time * 42.0f, 0.0f);
+            rotation.BuildXYZ(pitch_degrees, yaw_degrees, 0.0f);
 
             std::vector<mxvk::vec4D> camera_vertices(model.local.size());
             std::vector<mxvk::vec4D> projected(model.local.size());
@@ -165,6 +205,13 @@ namespace example {
         int fallback_width = 1280;
         int fallback_height = 720;
         float camera_distance = 4.5f;
+        float pitch_degrees = 0.0f;
+        float yaw_degrees = 0.0f;
+        float last_mouse_x = 0.0f;
+        float last_mouse_y = 0.0f;
+        bool mouse_dragging = false;
+        bool automatic_rotation = true;
+        std::uint64_t previous_frame_ticks = 0;
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
