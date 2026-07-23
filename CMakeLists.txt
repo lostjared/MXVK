@@ -613,6 +613,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(math3d_cube)
     add_subdirectory(examples/3dmath_texture)
     mxvk_configure_mingw_target(math3d_texture)
+    add_subdirectory(examples/3dmath_texture_array)
+    mxvk_configure_mingw_target(math3d_texture_array)
     add_subdirectory(examples/sprite3d_example)
     mxvk_configure_mingw_target(sprite3d_example)
     add_subdirectory(examples/text_example)
@@ -791,6 +793,7 @@ if(EXAMPLES)
         math3d
         math3d_cube
         math3d_texture
+        math3d_texture_array
         sprite3d_example
         text_example
         rain

@@ -336,6 +336,7 @@ Examples:
 ./run.pl 3dmath
 ./run.pl 3dmath_cube
 ./run.pl 3dmath_texture --filename ./examples/sprite_example/data/intro.png
+./run.pl 3dmath_texture_array --filename ./examples/sprite_example/data/intro.png
 ./run.pl model_example
 ./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl planet
@@ -464,6 +465,7 @@ These programs are not intended as standalone applications. They are small visua
 - `3dmath` - minimal rotating triangle test using `vec4D`, `Mat4D`, `RenderList`, and `PipeLine` projection/drawing helpers. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `3dmath_cube` - rotating cube test for matrix transforms, backface culling, depth sorting, diffuse face shading, filled triangle rasterization, and line clipping. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `3dmath_texture` - textured rotating cube test for the same software 3D path plus PNG loading and software UV sampling. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** `Escape` quits.
+- `3dmath_texture_array` - spinning 3×3×3 textured cube lattice using the software 3D path, PNG loading, software UV sampling, and scene-wide face sorting. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** mouse wheel zooms in/out, `Escape` quits.
 - `3dmath_masterpiece` - MasterPiece variant that renders the board and falling blocks as CPU-rasterized spinning 3D cubes before uploading the frame through an MXVK sprite. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** arrow keys move, `Up` rotates forward, `Q` rotates backward, hold `W` / `A` / `S` / `D` to rotate the grid, hold `Page Up` / `Page Down` to zoom, `P` pauses, `Escape` returns to the menu.
 
 ### Shader And Effect Demos
