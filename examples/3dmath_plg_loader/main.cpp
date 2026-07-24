@@ -32,7 +32,7 @@ namespace {
     constexpr std::string_view MODEL_FORMAT = "OBJ";
     constexpr std::string_view DEFAULT_MODEL = "sphere.obj";
     constexpr std::string_view WINDOW_TITLE = "MXVK 3D Math OBJ Loader";
-    constexpr float MODEL_SCALE = 2.0f;
+    constexpr float MODEL_FIT_RADIUS = 1.6f;
     constexpr mxvk::MXCOLOR BACKGROUND_COLOR = mxvk::MXVK_RGB(15, 22, 35);
 #else
     constexpr std::string_view APP_NAME = "3dmath_plg_loader";
@@ -252,17 +252,22 @@ namespace {
         std::array<mxvk::vec2D, 3> texcoords{};
         mxvk::MXCOLOR material_color = mxvk::MXVK_RGB(255, 255, 255);
         int material_index = -1;
+        bool repeat_horizontal = false;
         float intensity = 1.0f;
     };
 
-    [[nodiscard]] std::array<mxvk::vec2D, 3> unwrap_horizontal_texcoords(std::array<mxvk::vec2D, 3> texcoords) {
+    [[nodiscard]] bool crosses_horizontal_texture_seam(const std::array<mxvk::vec2D, 3> &texcoords) {
         const auto [minimum, maximum] = std::minmax_element(
             texcoords.begin(),
             texcoords.end(),
             [](const mxvk::vec2D &first, const mxvk::vec2D &second) {
                 return first.x < second.x;
             });
-        if (maximum->x - minimum->x <= 0.5f) {
+        return maximum->x - minimum->x > 0.5f;
+    }
+
+    [[nodiscard]] std::array<mxvk::vec2D, 3> unwrap_horizontal_texcoords(std::array<mxvk::vec2D, 3> texcoords) {
+        if (!crosses_horizontal_texture_seam(texcoords)) {
             return texcoords;
         }
 
@@ -315,7 +320,11 @@ namespace example {
             mxvk::BuildTables();
 
             const std::filesystem::path path = model_path(filename, asset_path);
+#if defined(MXVK_OBJ_LOADER)
+            const mxvk::vec4D scale(1.0f, 1.0f, 1.0f);
+#else
             const mxvk::vec4D scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+#endif
 #if defined(MXVK_OBJ_LOADER)
             const bool model_loaded = model.LoadOBJ(path.string(), scale, mxvk::vec4D(0.0f, 0.0f, 4.5f), mxvk::vec4D());
 #else
@@ -326,6 +335,7 @@ namespace example {
             }
 #if defined(MXVK_OBJ_LOADER)
             filter_auxiliary_objects();
+            fit_model_to_view();
             load_material_textures(asset_path, !disable_mipmap);
 #endif
 #if defined(MXVK_USE_EIGEN_MATH)
@@ -501,6 +511,68 @@ namespace example {
 
         static constexpr std::size_t BENCHMARK_FRAME_COUNT = 60 * 10;
 
+#if defined(MXVK_OBJ_LOADER)
+        void fit_model_to_view() {
+            if (model.vlist.empty()) {
+                throw mxvk::Exception(std::format("{}: cannot fit an OBJ model with no triangles", APP_NAME));
+            }
+
+            mxvk::vec4D minimum(
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max());
+            mxvk::vec4D maximum(
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest());
+            for (const mxvk::Triangle &triangle : model.vlist) {
+                for (const int vertex_index : triangle.vert) {
+                    const mxvk::vec4D &vertex = model.local[static_cast<std::size_t>(vertex_index)];
+                    minimum.x = std::min(minimum.x, vertex.x);
+                    minimum.y = std::min(minimum.y, vertex.y);
+                    minimum.z = std::min(minimum.z, vertex.z);
+                    maximum.x = std::max(maximum.x, vertex.x);
+                    maximum.y = std::max(maximum.y, vertex.y);
+                    maximum.z = std::max(maximum.z, vertex.z);
+                }
+            }
+
+            const mxvk::vec4D center(
+                (minimum.x + maximum.x) * 0.5f,
+                (minimum.y + maximum.y) * 0.5f,
+                (minimum.z + maximum.z) * 0.5f);
+            float source_radius = 0.0f;
+            for (const mxvk::Triangle &triangle : model.vlist) {
+                for (const int vertex_index : triangle.vert) {
+                    const mxvk::vec4D &vertex = model.local[static_cast<std::size_t>(vertex_index)];
+                    source_radius = std::max(
+                        source_radius,
+                        std::sqrt(
+                            (vertex.x - center.x) * (vertex.x - center.x) +
+                            (vertex.y - center.y) * (vertex.y - center.y) +
+                            (vertex.z - center.z) * (vertex.z - center.z)));
+                }
+            }
+            if (!std::isfinite(source_radius) || source_radius <= mxvk::EPSILON) {
+                throw mxvk::Exception(std::format("{}: cannot fit OBJ model with degenerate bounds", APP_NAME));
+            }
+
+            const float fit_scale = MODEL_FIT_RADIUS / source_radius;
+            for (mxvk::vec4D &vertex : model.local) {
+                vertex.x = (vertex.x - center.x) * fit_scale;
+                vertex.y = (vertex.y - center.y) * fit_scale;
+                vertex.z = (vertex.z - center.z) * fit_scale;
+            }
+            model.ComputeRad();
+            std::cout << std::format(
+                "{}: centered model and scaled radius {:.3f} to {:.3f} (scale {:.6f})\n",
+                APP_NAME,
+                source_radius,
+                MODEL_FIT_RADIUS,
+                fit_scale);
+        }
+#endif
+
         void filter_auxiliary_objects() {
             std::unordered_map<std::string, std::size_t> triangle_counts;
             for (const mxvk::Triangle &triangle : model.vlist) {
@@ -662,7 +734,10 @@ namespace example {
                 texcoord.y = 1.0f - texcoord.y;
             }
 #endif
-            if (face_texture(triangle.material_index) != nullptr && texture_repeat_enabled) {
+            const bool repeat_horizontal =
+                face_texture(triangle.material_index) != nullptr &&
+                (texture_repeat_enabled || crosses_horizontal_texture_seam(texcoords));
+            if (repeat_horizontal) {
                 texcoords = unwrap_horizontal_texcoords(texcoords);
             }
             visible_faces.push_back({
@@ -670,6 +745,7 @@ namespace example {
                 texcoords,
                 triangle.color,
                 triangle.material_index,
+                repeat_horizontal,
                 intensity,
             });
         }
@@ -913,7 +989,7 @@ namespace example {
                         face.texcoords[2].y * texture_weight_c;
                     mxvk::MXCOLOR color = face.material_color;
                     if (texture != nullptr) {
-                        color = texture->sample(u, v, texture_level, texture_repeat_enabled);
+                        color = texture->sample(u, v, texture_level, face.repeat_horizontal);
                     }
 #if !defined(MXVK_OBJ_LOADER)
                     else {
