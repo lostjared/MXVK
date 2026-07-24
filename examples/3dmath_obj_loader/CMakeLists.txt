@@ -9,6 +9,7 @@ mxvk_configure_3dmath_backend(math3d_obj_loader)
 
 set_target_properties(math3d_obj_loader PROPERTIES
     OUTPUT_NAME "3dmath_obj_loader"
+    MXVK_INSTALL_NAME "3dmath_obj_loader"
 )
 
 set(math3d_obj_loader_RUNTIME_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)

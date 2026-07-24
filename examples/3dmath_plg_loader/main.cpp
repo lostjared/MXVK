@@ -446,7 +446,12 @@ namespace example {
 
             for (const FaceDraw &face : visible_faces) {
                 if (wireframe_enabled) {
-                    draw_wireframe_triangle(face);
+                    wireframe_pipeline.DrawWireframeTriangle(
+                        face.points[0],
+                        face.points[1],
+                        face.points[2],
+                        mxvk::shade_color(face.material_color, face.intensity),
+                        depth_buffer);
                 } else {
                     draw_gradient_triangle(face);
                 }
@@ -467,6 +472,7 @@ namespace example {
 
       private:
         mxvk::mxObject model;
+        mxvk::PipeLine wireframe_pipeline;
         Texture override_texture;
         std::vector<Texture> material_textures;
         SurfacePtr frame_surface;
@@ -824,6 +830,9 @@ namespace example {
 
             depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
             clear_frame(BACKGROUND_COLOR);
+            wireframe_pipeline.Begin(frame_width, frame_height, [this](int x, int y, mxvk::MXCOLOR color) {
+                put_pixel(x, y, color);
+            });
 
             frame_sprite = createSprite(frame_surface.get());
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
@@ -1007,48 +1016,6 @@ namespace example {
                     put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
             }
-        }
-
-        void draw_wireframe_edge(const mxvk::vec4D &first, const mxvk::vec4D &second, mxvk::MXCOLOR color) {
-            const float delta_x = second.x - first.x;
-            const float delta_y = second.y - first.y;
-            const int steps = std::max(1, static_cast<int>(std::ceil(std::max(std::abs(delta_x), std::abs(delta_y)))));
-            const float first_reciprocal_depth = 1.0f / first.z;
-            const float second_reciprocal_depth = 1.0f / second.z;
-
-            for (int step = 0; step <= steps; ++step) {
-                const float fraction = static_cast<float>(step) / static_cast<float>(steps);
-                const int x = static_cast<int>(std::lround(first.x + delta_x * fraction));
-                const int y = static_cast<int>(std::lround(first.y + delta_y * fraction));
-                if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
-                    continue;
-                }
-
-                const float reciprocal_depth =
-                    first_reciprocal_depth +
-                    (second_reciprocal_depth - first_reciprocal_depth) * fraction;
-                if (reciprocal_depth <= mxvk::EPSILON) {
-                    continue;
-                }
-
-                const float depth = 1.0f / reciprocal_depth;
-                const std::size_t pixel_index =
-                    static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) +
-                    static_cast<std::size_t>(x);
-                if (depth >= depth_buffer[pixel_index]) {
-                    continue;
-                }
-
-                depth_buffer[pixel_index] = depth;
-                put_pixel(x, y, color);
-            }
-        }
-
-        void draw_wireframe_triangle(const FaceDraw &face) {
-            const mxvk::MXCOLOR color = mxvk::shade_color(face.material_color, face.intensity);
-            draw_wireframe_edge(face.points[0], face.points[1], color);
-            draw_wireframe_edge(face.points[1], face.points[2], color);
-            draw_wireframe_edge(face.points[2], face.points[0], color);
         }
 
         [[nodiscard]] static mxvk::MXCOLOR gradient_color(float u, float v) {

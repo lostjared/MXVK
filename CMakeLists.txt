@@ -826,6 +826,7 @@ if(EXAMPLES)
         rain
         model_example
         viewer
+        math3d_obj_loader
         dark
         moon
         starship
@@ -885,18 +886,22 @@ if(EXAMPLES)
         if(NOT target_output_name OR target_output_name MATCHES "-NOTFOUND$")
             set(target_output_name ${target_name})
         endif()
+        get_target_property(target_install_name ${target_name} MXVK_INSTALL_NAME)
+        if(NOT target_install_name OR target_install_name MATCHES "-NOTFOUND$")
+            set(target_install_name ${target_name})
+        endif()
 
         if(NOT UNIX OR APPLE)
             install(TARGETS ${target_name}
-                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}
-                BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_install_name}
+                BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_install_name}
             )
             install(DIRECTORY ${target_binary_dir}/data/
-                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}/data
+                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_install_name}/data
                 OPTIONAL
             )
             install(DIRECTORY ${target_binary_dir}/shaders/
-                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_name}/shaders
+                DESTINATION ${CMAKE_INSTALL_BINDIR}/${target_install_name}/shaders
                 OPTIONAL
             )
             return()
@@ -904,8 +909,8 @@ if(EXAMPLES)
 
         if(IS_ABSOLUTE "${CMAKE_INSTALL_BINDIR}")
             set(MXVK_EXAMPLE_SCRIPT_TO_PREFIX ".")
-            set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_FULL_LIBEXECDIR}/${target_name}/${target_output_name}")
-            set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_FULL_DATADIR}/mxvk/examples/${target_name}")
+            set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_FULL_LIBEXECDIR}/${target_install_name}/${target_output_name}")
+            set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_FULL_DATADIR}/mxvk/examples/${target_install_name}")
         else()
             file(RELATIVE_PATH MXVK_EXAMPLE_SCRIPT_TO_PREFIX "/${CMAKE_INSTALL_BINDIR}" "/")
             if(MXVK_EXAMPLE_SCRIPT_TO_PREFIX STREQUAL "")
@@ -913,19 +918,19 @@ if(EXAMPLES)
             endif()
 
             if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBEXECDIR}")
-                set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_LIBEXECDIR}/${target_name}/${target_output_name}")
+                set(MXVK_EXAMPLE_BINARY_PATH "${CMAKE_INSTALL_LIBEXECDIR}/${target_install_name}/${target_output_name}")
             else()
-                set(MXVK_EXAMPLE_BINARY_PATH "\${prefix}/${CMAKE_INSTALL_LIBEXECDIR}/${target_name}/${target_output_name}")
+                set(MXVK_EXAMPLE_BINARY_PATH "\${prefix}/${CMAKE_INSTALL_LIBEXECDIR}/${target_install_name}/${target_output_name}")
             endif()
 
             if(IS_ABSOLUTE "${CMAKE_INSTALL_DATADIR}")
-                set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}")
+                set(MXVK_EXAMPLE_ASSET_PATH "${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_install_name}")
             else()
-                set(MXVK_EXAMPLE_ASSET_PATH "\${prefix}/${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}")
+                set(MXVK_EXAMPLE_ASSET_PATH "\${prefix}/${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_install_name}")
             endif()
         endif()
 
-        set(MXVK_EXAMPLE_LAUNCHER "${CMAKE_CURRENT_BINARY_DIR}/example-launchers/${target_name}")
+        set(MXVK_EXAMPLE_LAUNCHER "${CMAKE_CURRENT_BINARY_DIR}/example-launchers/${target_install_name}")
         configure_file(
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example-launcher.in
             ${MXVK_EXAMPLE_LAUNCHER}
@@ -933,18 +938,18 @@ if(EXAMPLES)
         )
 
         install(TARGETS ${target_name}
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/${target_name}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/${target_install_name}
         )
         install(PROGRAMS ${MXVK_EXAMPLE_LAUNCHER}
             DESTINATION ${CMAKE_INSTALL_BINDIR}
-            RENAME ${target_name}
+            RENAME ${target_install_name}
         )
         install(DIRECTORY ${target_binary_dir}/data/
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}/data
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_install_name}/data
             OPTIONAL
         )
         install(DIRECTORY ${target_binary_dir}/shaders/
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_name}/shaders
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/examples/${target_install_name}/shaders
             OPTIONAL
         )
     endfunction()
@@ -959,6 +964,7 @@ if(EXAMPLES)
 
     set(mxvk_installed_application_targets ${mxvk_generic_install_targets})
     list(APPEND mxvk_installed_application_targets asteroids3d asteroids-net mutatris)
+    list(REMOVE_ITEM mxvk_installed_application_targets math3d_obj_loader)
     list(REMOVE_DUPLICATES mxvk_installed_application_targets)
 
     foreach(example_target IN LISTS mxvk_installed_application_targets)
@@ -989,6 +995,7 @@ if(EXAMPLES)
 
     if(UNIX AND NOT APPLE)
         set(MXVK_INSTALLED_APPLICATION_TARGETS "${mxvk_generic_install_targets}")
+        list(REMOVE_ITEM MXVK_INSTALLED_APPLICATION_TARGETS math3d_obj_loader)
         configure_file(
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-install-user-desktop.cmake.in
             ${CMAKE_CURRENT_BINARY_DIR}/mxvk-install-user-desktop.cmake

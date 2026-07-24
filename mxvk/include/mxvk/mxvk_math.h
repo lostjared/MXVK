@@ -2443,6 +2443,131 @@ namespace mxvk {
             DrawClipedLine(x0, y0, x1, y1, color);
         }
 
+        /**
+         * @brief Draw a clipped screen-space line with perspective-correct depth testing.
+         * @param first First endpoint; x/y are screen coordinates and z is positive view depth.
+         * @param second Second endpoint; x/y are screen coordinates and z is positive view depth.
+         * @param color Packed line color.
+         * @param depth_buffer Full framebuffer depth buffer initialized to a far value.
+         */
+        void DrawDepthTestedLine(const vec4D &first, const vec4D &second, MXCOLOR color, std::span<float> depth_buffer) const {
+            if (!plot_pixel ||
+                first.z <= EPSILON ||
+                second.z <= EPSILON ||
+                !std::isfinite(first.x) ||
+                !std::isfinite(first.y) ||
+                !std::isfinite(first.z) ||
+                !std::isfinite(second.x) ||
+                !std::isfinite(second.y) ||
+                !std::isfinite(second.z)) {
+                return;
+            }
+
+            const int framebuffer_width = max_clip_x + 1;
+            const int framebuffer_height = max_clip_y + 1;
+            const std::size_t required_depth_values =
+                static_cast<std::size_t>(framebuffer_width) * static_cast<std::size_t>(framebuffer_height);
+            if (framebuffer_width <= 0 ||
+                framebuffer_height <= 0 ||
+                depth_buffer.size() < required_depth_values) {
+                return;
+            }
+
+            const float delta_x = second.x - first.x;
+            const float delta_y = second.y - first.y;
+            float first_fraction = 0.0f;
+            float last_fraction = 1.0f;
+            const auto clip_fraction = [&first_fraction, &last_fraction](float direction, float distance) {
+                if (std::abs(direction) <= EPSILON) {
+                    return distance >= 0.0f;
+                }
+
+                const float fraction = distance / direction;
+                if (direction < 0.0f) {
+                    first_fraction = std::max(first_fraction, fraction);
+                } else {
+                    last_fraction = std::min(last_fraction, fraction);
+                }
+                return first_fraction <= last_fraction;
+            };
+
+            if (!clip_fraction(-delta_x, first.x - static_cast<float>(clip_min_x)) ||
+                !clip_fraction(delta_x, static_cast<float>(clip_max_x) - first.x) ||
+                !clip_fraction(-delta_y, first.y - static_cast<float>(clip_min_y)) ||
+                !clip_fraction(delta_y, static_cast<float>(clip_max_y) - first.y)) {
+                return;
+            }
+
+            const float clipped_delta_x = delta_x * (last_fraction - first_fraction);
+            const float clipped_delta_y = delta_y * (last_fraction - first_fraction);
+            const float step_count = std::ceil(std::max(std::abs(clipped_delta_x), std::abs(clipped_delta_y)));
+            if (step_count > static_cast<float>(std::numeric_limits<int>::max())) {
+                return;
+            }
+            const int steps = std::max(1, static_cast<int>(step_count));
+            const float first_reciprocal_depth = 1.0f / first.z;
+            const float second_reciprocal_depth = 1.0f / second.z;
+
+            for (int step = 0; step <= steps; ++step) {
+                const float clipped_fraction = static_cast<float>(step) / static_cast<float>(steps);
+                const float fraction =
+                    first_fraction +
+                    (last_fraction - first_fraction) * clipped_fraction;
+                const int x = static_cast<int>(std::lround(first.x + delta_x * fraction));
+                const int y = static_cast<int>(std::lround(first.y + delta_y * fraction));
+                if (x < clip_min_x || x > clip_max_x || y < clip_min_y || y > clip_max_y) {
+                    continue;
+                }
+
+                const float reciprocal_depth =
+                    first_reciprocal_depth +
+                    (second_reciprocal_depth - first_reciprocal_depth) * fraction;
+                if (reciprocal_depth <= EPSILON) {
+                    continue;
+                }
+
+                const float depth = 1.0f / reciprocal_depth;
+                const std::size_t pixel_index =
+                    static_cast<std::size_t>(y) * static_cast<std::size_t>(framebuffer_width) +
+                    static_cast<std::size_t>(x);
+                if (depth >= depth_buffer[pixel_index]) {
+                    continue;
+                }
+
+                depth_buffer[pixel_index] = depth;
+                plot_pixel(x, y, color);
+            }
+        }
+
+        /// Draw a clipped wireframe triangle without depth testing.
+        void DrawWireframeTriangle(const vec4D &first, const vec4D &second, const vec4D &third, MXCOLOR color) const {
+            DrawClippedLine(
+                static_cast<int>(std::lround(first.x)),
+                static_cast<int>(std::lround(first.y)),
+                static_cast<int>(std::lround(second.x)),
+                static_cast<int>(std::lround(second.y)),
+                color);
+            DrawClippedLine(
+                static_cast<int>(std::lround(second.x)),
+                static_cast<int>(std::lround(second.y)),
+                static_cast<int>(std::lround(third.x)),
+                static_cast<int>(std::lround(third.y)),
+                color);
+            DrawClippedLine(
+                static_cast<int>(std::lround(third.x)),
+                static_cast<int>(std::lround(third.y)),
+                static_cast<int>(std::lround(first.x)),
+                static_cast<int>(std::lround(first.y)),
+                color);
+        }
+
+        /// Draw a clipped wireframe triangle with perspective-correct depth testing.
+        void DrawWireframeTriangle(const vec4D &first, const vec4D &second, const vec4D &third, MXCOLOR color, std::span<float> depth_buffer) const {
+            DrawDepthTestedLine(first, second, color, depth_buffer);
+            DrawDepthTestedLine(second, third, color, depth_buffer);
+            DrawDepthTestedLine(third, first, color, depth_buffer);
+        }
+
         /// Draw a clipped filled triangle from 2D screen-space vertices.
         void DrawFilledTriangle(const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color) const {
             if (!plot_pixel) {
@@ -2490,9 +2615,17 @@ namespace mxvk {
                 if (poly.state == 0 || (poly.state & MX_BACKFACE) != 0) {
                     continue;
                 }
-                DrawClipedLine(static_cast<int>(poly.tlist[0].x), static_cast<int>(poly.tlist[0].y), static_cast<int>(poly.tlist[1].x), static_cast<int>(poly.tlist[1].y), poly.color);
-                DrawClipedLine(static_cast<int>(poly.tlist[1].x), static_cast<int>(poly.tlist[1].y), static_cast<int>(poly.tlist[2].x), static_cast<int>(poly.tlist[2].y), poly.color);
-                DrawClipedLine(static_cast<int>(poly.tlist[2].x), static_cast<int>(poly.tlist[2].y), static_cast<int>(poly.tlist[0].x), static_cast<int>(poly.tlist[0].y), poly.color);
+                DrawWireframeTriangle(poly.tlist[0], poly.tlist[1], poly.tlist[2], poly.color);
+            }
+        }
+
+        /// Draw active render-list triangles as depth-tested clipped wireframes.
+        void DrawPolys(const RenderList &list, std::span<float> depth_buffer) const {
+            for (const auto &poly : list.polys) {
+                if (poly.state == 0 || (poly.state & MX_BACKFACE) != 0) {
+                    continue;
+                }
+                DrawWireframeTriangle(poly.tlist[0], poly.tlist[1], poly.tlist[2], poly.color, depth_buffer);
             }
         }
 
@@ -2511,9 +2644,26 @@ namespace mxvk {
                 if (a >= object.trans.size() || b >= object.trans.size() || c >= object.trans.size()) {
                     continue;
                 }
-                DrawClipedLine(static_cast<int>(object.trans[a].x), static_cast<int>(object.trans[a].y), static_cast<int>(object.trans[b].x), static_cast<int>(object.trans[b].y), poly.color);
-                DrawClipedLine(static_cast<int>(object.trans[b].x), static_cast<int>(object.trans[b].y), static_cast<int>(object.trans[c].x), static_cast<int>(object.trans[c].y), poly.color);
-                DrawClipedLine(static_cast<int>(object.trans[c].x), static_cast<int>(object.trans[c].y), static_cast<int>(object.trans[a].x), static_cast<int>(object.trans[a].y), poly.color);
+                DrawWireframeTriangle(object.trans[a], object.trans[b], object.trans[c], poly.color);
+            }
+        }
+
+        /// Draw an object's active transformed triangles as depth-tested clipped wireframes.
+        void DrawObject(const mxObject &object, std::span<float> depth_buffer) const {
+            if ((object.state & MX_CULLED) != 0) {
+                return;
+            }
+            for (const auto &poly : object.vlist) {
+                if (poly.state == 0 || (poly.state & MX_BACKFACE) != 0) {
+                    continue;
+                }
+                const auto a = static_cast<std::size_t>(poly.vert[0]);
+                const auto b = static_cast<std::size_t>(poly.vert[1]);
+                const auto c = static_cast<std::size_t>(poly.vert[2]);
+                if (a >= object.trans.size() || b >= object.trans.size() || c >= object.trans.size()) {
+                    continue;
+                }
+                DrawWireframeTriangle(object.trans[a], object.trans[b], object.trans[c], poly.color, depth_buffer);
             }
         }
 
