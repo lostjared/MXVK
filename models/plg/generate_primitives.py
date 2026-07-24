@@ -306,8 +306,28 @@ def write_mesh(path: Path, name: str, mesh: Mesh, description: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_obj_mesh(path: Path, name: str, mesh: Mesh, description: str) -> None:
+    if any(len(set(triangle)) != 3 for triangle in mesh.triangles):
+        raise ValueError(f"{name} contains a degenerate indexed triangle")
+    lines = [
+        f"# {description}",
+        "# Generated from the same indexed mesh as the corresponding PLG file.",
+        f"o {name}",
+    ]
+    lines.extend(
+        f"v {x:.6f} {y:.6f} {z:.6f}" for x, y, z, _u, _v in mesh.vertices
+    )
+    lines.extend(f"vt {u:.6f} {v:.6f}" for _x, _y, _z, u, v in mesh.vertices)
+    lines.extend(
+        f"f {first + 1}/{first + 1} {second + 1}/{second + 1} {third + 1}/{third + 1}"
+        for first, second, third in mesh.triangles
+    )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     output_directory = Path(__file__).resolve().parent
+    heavy_sphere = uv_sphere(segments=256, rings=128)
     primitives = {
         "cube": (cube(), "Unit cube with independent planar UVs on each face."),
         "cubeaf": (subdivided_cube(), "Unit cube with 8x8 face grids to reduce affine texture warping."),
@@ -319,12 +339,18 @@ def main() -> None:
         "cylinder": (cylinder(), "Unit-height cylinder with 24 radial segments."),
         "cone": (cone(), "Unit-height cone with 24 radial segments."),
         "sphere": (uv_sphere(), "Unit-radius UV sphere with 24 segments and 12 latitude bands."),
-        "heavy_sphere": (uv_sphere(segments=256, rings=128), "High-density unit-radius UV sphere with 256 segments and 128 latitude bands."),
+        "heavy_sphere": (heavy_sphere, "High-density unit-radius UV sphere with 256 segments and 128 latitude bands."),
         "capsule": (capsule(), "Y-axis capsule with radius 0.5 and total height 2."),
         "torus": (torus(), "Y-axis torus with major radius 0.65 and tube radius 0.25."),
     }
     for name, (mesh, description) in primitives.items():
         write_mesh(output_directory / f"{name}.plg", name, mesh, description)
+    write_obj_mesh(
+        output_directory.parent / "obj" / "heavy_sphere.obj",
+        "heavy_sphere",
+        heavy_sphere,
+        "High-density unit-radius UV sphere with 256 segments and 128 latitude bands.",
+    )
 
 
 if __name__ == "__main__":

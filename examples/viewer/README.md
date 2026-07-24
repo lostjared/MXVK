@@ -23,6 +23,7 @@ Run it through the repository helper so the built executable and asset paths are
 ./run.pl viewer
 ./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl viewer --filename ./models/obj/cube.obj --texture ./models/obj/cube.mtl --resource_path ./models/obj
+./run.pl viewer --filename ./models/tux/tux.obj -r 640x360 --benchmark
 ```
 
 When `--filename` is omitted, the viewer looks for the default `cube.mxmod.z` model.
@@ -37,6 +38,7 @@ When `--filename` is omitted, the viewer looks for the default `cube.mxmod.z` mo
 - `-r <WxH>` - window resolution.
 - `-f` - fullscreen.
 - `--enable-vsync` - request FIFO present mode.
+- `--benchmark` - render 600 frames, print the elapsed time using `StopWatch`, and exit. The resolution defaults to 320x180 unless `-r` or `--resolution` is provided.
 
 ## Controls
 

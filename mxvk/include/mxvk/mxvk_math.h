@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mxvk_math_obj.hpp"
 #include "mxvk_sprite.hpp"
 
 #include <SDL3/SDL.h>
@@ -18,6 +19,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -1339,6 +1341,15 @@ namespace mxvk {
 
         /// Indices into an object's vertex arrays.
         int vert[3]{};
+
+        /// Index of the OBJ/MTL material used by this triangle, or -1.
+        int material_index = -1;
+
+        /// Wavefront material name retained for later MTL replacement.
+        std::string material_name;
+
+        /// Wavefront object name from the `o` section containing this triangle.
+        std::string source_object_name;
     };
 
     /// Object and polygon state bit flags.
@@ -1475,6 +1486,12 @@ namespace mxvk {
         /// Object name loaded from the model file.
         std::string object_name;
 
+        /// Materials loaded from the OBJ material library.
+        std::vector<OBJMaterial> materials;
+
+        /// Resolved path of the OBJ material library.
+        std::string material_library_path;
+
         /**
          * @brief Load a PLG mesh file.
          * @param path File path to load.
@@ -1608,6 +1625,107 @@ namespace mxvk {
             return LoadPLG(path, scale, obj_pos, rotation);
         }
 
+        /**
+         * @brief Load a Wavefront OBJ mesh and its referenced MTL material library.
+         *
+         * Wavefront faces may use independent position and texture-coordinate
+         * indices, negative indices, triangles, quads, or concave polygons.
+         * Faces are triangulated and de-indexed into the representation used by
+         * the software rasterizer. MTL diffuse colors become triangle colors.
+         */
+        [[nodiscard]] bool LoadOBJ(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
+            std::cout << "mxvk_math: loading OBJ model: " << path << '\n';
+            detail::OBJLoadResult loaded;
+            std::string error;
+            if (!detail::load_obj_file(path, loaded, error)) {
+                std::cerr << "mxvk_math: failed to load OBJ model '" << path << "': " << error << '\n';
+                return false;
+            }
+
+            std::unordered_map<std::string, int> material_indices;
+            for (std::size_t index = 0; index < loaded.materials.size(); ++index) {
+                material_indices.emplace(loaded.materials[index].name, static_cast<int>(index));
+            }
+
+            std::vector<vec4D> loaded_local;
+            std::vector<vec2D> loaded_texcoords;
+            std::vector<Triangle> loaded_vlist;
+            loaded_local.reserve(loaded.triangles.size() * 3);
+            loaded_texcoords.reserve(loaded.triangles.size() * 3);
+            loaded_vlist.reserve(loaded.triangles.size());
+
+            for (const detail::OBJTriangle &source_triangle : loaded.triangles) {
+                Triangle triangle;
+                triangle.state = MX_ACTIVE;
+                triangle.material_name = source_triangle.material_name;
+                triangle.source_object_name = source_triangle.object_name;
+                const auto material = material_indices.find(source_triangle.material_name);
+                if (material != material_indices.end()) {
+                    triangle.material_index = material->second;
+                    triangle.color = material_color(loaded.materials[static_cast<std::size_t>(material->second)]);
+                }
+
+                for (std::size_t vertex_index = 0; vertex_index < source_triangle.vertices.size(); ++vertex_index) {
+                    const detail::OBJVertex &source_vertex = source_triangle.vertices[vertex_index];
+                    const float x = source_vertex.position[0] * scale.x;
+                    const float y = source_vertex.position[1] * scale.y;
+                    const float z = source_vertex.position[2] * scale.z;
+                    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
+                        std::cerr << "mxvk_math: failed to load OBJ model '" << path << "': scaled vertex is not finite\n";
+                        return false;
+                    }
+                    triangle.vert[vertex_index] = static_cast<int>(loaded_local.size());
+                    loaded_local.emplace_back(x, y, z, 1.0f);
+                    loaded_texcoords.emplace_back(source_vertex.texcoord[0], source_vertex.texcoord[1]);
+                }
+                loaded_vlist.push_back(triangle);
+            }
+
+            object_name = std::move(loaded.object_name);
+            num_vertices = static_cast<int>(loaded_local.size());
+            num_polys = static_cast<int>(loaded_vlist.size());
+            local = std::move(loaded_local);
+            trans.resize(local.size());
+            texcoords = std::move(loaded_texcoords);
+            vlist = std::move(loaded_vlist);
+            materials = std::move(loaded.materials);
+            material_library_path = std::move(loaded.material_library_path);
+            world_pos = obj_pos;
+            dir = rotation;
+            ComputeRad();
+            std::cout << "mxvk_math: OBJ model ready (object='" << object_name << "', vertices=" << num_vertices << ", triangles=" << num_polys << ", materials=" << materials.size() << ")\n";
+            return true;
+        }
+
+        /**
+         * @brief Replace this object's material library with an MTL file.
+         * @return True when the material file is parsed successfully.
+         */
+        [[nodiscard]] bool LoadMTL(const std::string &path) {
+            std::vector<OBJMaterial> loaded_materials;
+            std::string error;
+            if (!detail::load_mtl_file(path, loaded_materials, error)) {
+                std::cerr << "mxvk_math: failed to load MTL file '" << path << "': " << error << '\n';
+                return false;
+            }
+
+            std::unordered_map<std::string, int> material_indices;
+            for (std::size_t index = 0; index < loaded_materials.size(); ++index) {
+                material_indices.emplace(loaded_materials[index].name, static_cast<int>(index));
+            }
+            for (std::size_t index = 0; index < vlist.size(); ++index) {
+                const auto material = material_indices.find(vlist[index].material_name);
+                vlist[index].material_index = material == material_indices.end() ? -1 : material->second;
+                if (material != material_indices.end()) {
+                    vlist[index].color = material_color(loaded_materials[static_cast<std::size_t>(material->second)]);
+                }
+            }
+
+            materials = std::move(loaded_materials);
+            material_library_path = path;
+            return true;
+        }
+
         /// Convert local or transformed vertices to world space.
         void ModelToWorld(int type = 0) {
             if (type == 0) {
@@ -1704,6 +1822,17 @@ namespace mxvk {
         /// Replace the object state flags.
         void SetState(int new_state) {
             state = new_state;
+        }
+
+      private:
+        [[nodiscard]] static MXCOLOR material_color(const OBJMaterial &material) {
+            const auto channel = [](float value) {
+                return static_cast<MXCOLOR>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
+            };
+            return (channel(material.dissolve) << 24u) |
+                   (channel(material.diffuse[0]) << 16u) |
+                   (channel(material.diffuse[1]) << 8u) |
+                   channel(material.diffuse[2]);
         }
     };
 

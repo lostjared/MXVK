@@ -1,8 +1,9 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Cwd 'abs_path';
+use Cwd qw(abs_path getcwd);
 use File::Basename;
+use File::Spec;
 use POSIX qw(:sys_wait_h);
 use Time::HiRes qw(time);
 
@@ -11,6 +12,7 @@ my $parent = dirname($root);
 my $build_dir = "$root/build/examples";
 my $source_dir = "$root/examples";
 my $missing_executable_exit_code = 3;
+my $invocation_dir = getcwd();
 
 my $program = shift @ARGV;
 my $timeout_mode = 0;
@@ -150,6 +152,24 @@ if (-x $exe_path) {
     my $exe_dir = dirname($exe_path);
     my $resolved_exe_name = basename($exe_path);
     my $runtime_path = -d "$exe_dir/data" ? $exe_dir : $data_path;
+
+    for (my $i = 0; $i < @ARGV; ++$i) {
+        if (($ARGV[$i] eq '--filename' || $ARGV[$i] eq '--model') && $i + 1 < @ARGV) {
+            my $value = $ARGV[$i + 1];
+            if (!File::Spec->file_name_is_absolute($value)) {
+                $ARGV[$i + 1] = File::Spec->rel2abs($value, $invocation_dir);
+            }
+            ++$i;
+            next;
+        }
+        if ($ARGV[$i] =~ /^(--filename|--model)=(.+)$/) {
+            my ($option, $value) = ($1, $2);
+            if (!File::Spec->file_name_is_absolute($value)) {
+                $value = File::Spec->rel2abs($value, $invocation_dir);
+            }
+            $ARGV[$i] = "$option=$value";
+        }
+    }
 
     chdir($exe_dir) or die "Cannot cd to $exe_dir: $!\n";
 

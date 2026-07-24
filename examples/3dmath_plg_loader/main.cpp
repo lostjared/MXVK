@@ -22,9 +22,27 @@
 #include <limits>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace {
+#if defined(MXVK_OBJ_LOADER)
+    constexpr std::string_view APP_NAME = "3dmath_obj_loader";
+    constexpr std::string_view MODEL_FORMAT = "OBJ";
+    constexpr std::string_view DEFAULT_MODEL = "sphere.obj";
+    constexpr std::string_view WINDOW_TITLE = "MXVK 3D Math OBJ Loader";
+    constexpr float MODEL_SCALE = 0.2f;
+    constexpr mxvk::MXCOLOR BACKGROUND_COLOR = mxvk::MXVK_RGB(15, 22, 35);
+#else
+    constexpr std::string_view APP_NAME = "3dmath_plg_loader";
+    constexpr std::string_view MODEL_FORMAT = "PLG";
+    constexpr std::string_view DEFAULT_MODEL = "sphere.plg";
+    constexpr std::string_view WINDOW_TITLE = "MXVK 3D Math PLG Loader";
+    constexpr float MODEL_SCALE = 2.0f;
+    constexpr mxvk::MXCOLOR BACKGROUND_COLOR = mxvk::MXVK_RGB(3, 4, 8);
+#endif
+
     class SurfaceDeleter {
       public:
         void operator()(SDL_Surface *surface) const {
@@ -114,7 +132,7 @@ namespace {
     [[nodiscard]] SurfacePtr create_frame_surface(int width, int height) {
         SurfacePtr surface(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
         if (!surface) {
-            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to create frame surface: {}", SDL_GetError()));
+            throw mxvk::Exception(std::format("{}: failed to create frame surface: {}", APP_NAME, SDL_GetError()));
         }
         return surface;
     }
@@ -123,7 +141,7 @@ namespace {
         if (!filename.empty()) {
             return filename;
         }
-        return std::filesystem::path(asset_path) / "data" / "sphere.plg";
+        return std::filesystem::path(asset_path) / "data" / DEFAULT_MODEL;
     }
 
     [[nodiscard]] std::filesystem::path texture_path(const std::string &filename, const std::string &asset_path) {
@@ -147,17 +165,17 @@ namespace {
         const std::filesystem::path path = texture_path(filename, asset_path);
         SurfacePtr loaded(mxvk::LoadPNG(path.string().c_str()));
         if (!loaded) {
-            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to load texture '{}'", path.string()));
+            throw mxvk::Exception(std::format("{}: failed to load texture '{}'", APP_NAME, path.string()));
         }
 
         SurfacePtr rgba(SDL_ConvertSurface(loaded.get(), SDL_PIXELFORMAT_RGBA32));
         if (!rgba) {
-            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to convert texture '{}': {}", path.string(), SDL_GetError()));
+            throw mxvk::Exception(std::format("{}: failed to convert texture '{}': {}", APP_NAME, path.string(), SDL_GetError()));
         }
 
         const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(rgba->format);
         if (format == nullptr) {
-            throw mxvk::Exception(std::format("3dmath_plg_loader: failed to query texture format '{}': {}", path.string(), SDL_GetError()));
+            throw mxvk::Exception(std::format("{}: failed to query texture format '{}': {}", APP_NAME, path.string(), SDL_GetError()));
         }
 
         Texture texture;
@@ -220,7 +238,8 @@ namespace {
         }
 
         std::cout << std::format(
-            "3dmath_plg_loader: loaded texture '{}' ({}x{}, {} mip levels)\n",
+            "{}: loaded texture '{}' ({}x{}, {} mip levels)\n",
+            APP_NAME,
             path.string(),
             texture.width(),
             texture.height(),
@@ -231,6 +250,8 @@ namespace {
     struct FaceDraw {
         std::array<mxvk::vec4D, 3> points{};
         std::array<mxvk::vec2D, 3> texcoords{};
+        mxvk::MXCOLOR material_color = mxvk::MXVK_RGB(255, 255, 255);
+        int material_index = -1;
         float intensity = 1.0f;
     };
 
@@ -269,18 +290,18 @@ namespace {
     constexpr float MOUSE_ROTATION_SENSITIVITY = 0.35f;
     constexpr float MAX_PITCH_DEGREES = 89.0f;
 #if defined(MXVK_USE_EIGEN_MATH)
-    constexpr std::string_view BENCHMARK_NAME = "PLG geometry draw (Eigen backend, 600 frames)";
+    constexpr std::string_view BACKEND_NAME = "Eigen";
 #else
-    constexpr std::string_view BENCHMARK_NAME = "PLG geometry draw (native backend, 600 frames)";
+    constexpr std::string_view BACKEND_NAME = "native";
 #endif
 } // namespace
 
 namespace example {
-    class Math3DPlgLoaderWindow : public mxvk::VK_Window {
+    class Math3DModelLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark)
+        Math3DModelLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
+              override_texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
               frame_height(framebuffer.height),
               fallback_width(width),
@@ -294,19 +315,34 @@ namespace example {
             mxvk::BuildTables();
 
             const std::filesystem::path path = model_path(filename, asset_path);
-            if (!model.LoadPLG(path.string(), mxvk::vec4D(2.0f, 2.0f, 2.0f), mxvk::vec4D(0.0f, 0.0f, 4.5f), mxvk::vec4D())) {
-                throw mxvk::Exception(std::format("3dmath_plg_loader: failed to load PLG model '{}'", path.string()));
+            const mxvk::vec4D scale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+#if defined(MXVK_OBJ_LOADER)
+            const bool model_loaded = model.LoadOBJ(path.string(), scale, mxvk::vec4D(0.0f, 0.0f, 4.5f), mxvk::vec4D());
+#else
+            const bool model_loaded = model.LoadPLG(path.string(), scale, mxvk::vec4D(0.0f, 0.0f, 4.5f), mxvk::vec4D());
+#endif
+            if (!model_loaded) {
+                throw mxvk::Exception(std::format("{}: failed to load {} model '{}'", APP_NAME, MODEL_FORMAT, path.string()));
             }
+#if defined(MXVK_OBJ_LOADER)
+            filter_auxiliary_objects();
+            load_material_textures(asset_path, !disable_mipmap);
+#endif
 #if defined(MXVK_USE_EIGEN_MATH)
             local_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
             camera_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
             projected_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
+            inverse_vertex_depth.resize(static_cast<Eigen::Index>(model.local.size()));
+#if !defined(MXVK_OBJ_LOADER)
             local_face_center_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
             camera_face_center_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
+#endif
             local_face_normal_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
             camera_face_normal_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
             triangle_intensity.resize(static_cast<Eigen::Index>(model.vlist.size()));
+#if !defined(MXVK_OBJ_LOADER)
             triangle_visible.resize(static_cast<Eigen::Index>(model.vlist.size()));
+#endif
             for (std::size_t index = 0; index < model.local.size(); ++index) {
                 local_vertex_batch.col(static_cast<Eigen::Index>(index)) =
                     Eigen::Vector4f(model.local[index].x, model.local[index].y, model.local[index].z, model.local[index].w);
@@ -317,7 +353,7 @@ namespace example {
 #endif
             initialize_face_geometry();
             visible_faces.reserve(model.vlist.size());
-            std::cout << std::format("3dmath_plg_loader: loaded '{}' ({} vertices, {} triangles)\n", path.string(), model.num_vertices, model.num_polys);
+            std::cout << std::format("{}: loaded '{}' ({} vertices, {} triangles, {} materials)\n", APP_NAME, path.string(), model.num_vertices, model.num_polys, model.materials.size());
         }
 
         void event(SDL_Event &e) override {
@@ -369,7 +405,7 @@ namespace example {
                 return;
             }
 
-            clear_frame(mxvk::MXVK_RGB(3, 4, 8));
+            clear_frame(BACKGROUND_COLOR);
             std::ranges::fill(depth_buffer, std::numeric_limits<float>::infinity());
 
             const std::uint64_t current_ticks = SDL_GetTicks();
@@ -382,7 +418,8 @@ namespace example {
             }
 
             if (benchmark_enabled && benchmark_frame_count == 0) {
-                benchmark_stopwatch = std::make_unique<StopWatch<HighResolutionClockPolicy>>(BENCHMARK_NAME);
+                benchmark_stopwatch =
+                    std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmark_name);
             }
 
             mxvk::Mat4D rotation;
@@ -413,13 +450,15 @@ namespace example {
 
       private:
         mxvk::mxObject model;
-        Texture texture;
+        Texture override_texture;
+        std::vector<Texture> material_textures;
         SurfacePtr frame_surface;
 #if defined(MXVK_USE_EIGEN_MATH)
         using VertexBatch = Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::RowMajor>;
         VertexBatch local_vertex_batch;
         VertexBatch camera_vertex_batch;
         VertexBatch projected_vertex_batch;
+        Eigen::RowVectorXf inverse_vertex_depth;
         VertexBatch local_face_center_batch;
         VertexBatch camera_face_center_batch;
         VertexBatch local_face_normal_batch;
@@ -456,9 +495,72 @@ namespace example {
         bool texture_repeat_enabled = false;
         bool benchmark_enabled = false;
         std::size_t benchmark_frame_count = 0;
+        std::string benchmark_name =
+            std::format("{} geometry draw ({} backend, {} frames)", MODEL_FORMAT, BACKEND_NAME, BENCHMARK_FRAME_COUNT);
         std::unique_ptr<StopWatch<HighResolutionClockPolicy>> benchmark_stopwatch;
 
         static constexpr std::size_t BENCHMARK_FRAME_COUNT = 60 * 10;
+
+        void filter_auxiliary_objects() {
+            std::unordered_map<std::string, std::size_t> triangle_counts;
+            for (const mxvk::Triangle &triangle : model.vlist) {
+                ++triangle_counts[triangle.source_object_name];
+            }
+            if (triangle_counts.size() <= 1) {
+                return;
+            }
+
+            const auto dominant = std::max_element(
+                triangle_counts.begin(),
+                triangle_counts.end(),
+                [](const auto &left, const auto &right) {
+                    return left.second < right.second;
+                });
+            constexpr float DOMINANT_OBJECT_FRACTION = 0.95f;
+            if (static_cast<float>(dominant->second) <
+                static_cast<float>(model.vlist.size()) * DOMINANT_OBJECT_FRACTION) {
+                return;
+            }
+
+            const std::size_t original_triangle_count = model.vlist.size();
+            std::erase_if(model.vlist, [&dominant](const mxvk::Triangle &triangle) {
+                return triangle.source_object_name != dominant->first;
+            });
+            model.num_polys = static_cast<int>(model.vlist.size());
+            model.object_name = dominant->first;
+            std::cout << std::format(
+                "{}: selected dominant OBJ object '{}' ({} triangles); ignored {} auxiliary triangle(s)\n",
+                APP_NAME,
+                dominant->first,
+                dominant->second,
+                original_triangle_count - model.vlist.size());
+        }
+
+        void load_material_textures(const std::string &asset_path, bool generate_mipmaps) {
+            if (!override_texture.empty()) {
+                return;
+            }
+
+            material_textures.resize(model.materials.size());
+            for (std::size_t index = 0; index < model.materials.size(); ++index) {
+                const std::string &texture_path = model.materials[index].diffuse_map;
+                if (!texture_path.empty()) {
+                    material_textures[index] = load_texture(texture_path, asset_path, generate_mipmaps);
+                }
+            }
+        }
+
+        [[nodiscard]] const Texture *face_texture(int material_index) const {
+            if (!override_texture.empty()) {
+                return &override_texture;
+            }
+            if (material_index >= 0 &&
+                static_cast<std::size_t>(material_index) < material_textures.size() &&
+                !material_textures[static_cast<std::size_t>(material_index)].empty()) {
+                return &material_textures[static_cast<std::size_t>(material_index)];
+            }
+            return nullptr;
+        }
 
 #if defined(MXVK_USE_EIGEN_MATH)
         static void transform_eigen_batch(const mxvk::Mat4D &matrix, const VertexBatch &input, VertexBatch &output) {
@@ -484,17 +586,21 @@ namespace example {
                 const mxvk::vec4D &a = model.local[static_cast<std::size_t>(triangle.vert[0])];
                 const mxvk::vec4D &b = model.local[static_cast<std::size_t>(triangle.vert[1])];
                 const mxvk::vec4D &c = model.local[static_cast<std::size_t>(triangle.vert[2])];
+#if !defined(MXVK_USE_EIGEN_MATH) || !defined(MXVK_OBJ_LOADER)
                 const mxvk::vec4D center(
                     (a.x + b.x + c.x) * (1.0f / 3.0f),
                     (a.y + b.y + c.y) * (1.0f / 3.0f),
                     (a.z + b.z + c.z) * (1.0f / 3.0f),
                     1.0f);
+#endif
                 mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
                 normal.Normalize();
                 normal.w = 0.0f;
 #if defined(MXVK_USE_EIGEN_MATH)
                 const Eigen::Index batch_index = static_cast<Eigen::Index>(index);
+#if !defined(MXVK_OBJ_LOADER)
                 local_face_center_batch.col(batch_index) = Eigen::Vector4f(center.x, center.y, center.z, center.w);
+#endif
                 local_face_normal_batch.col(batch_index) = Eigen::Vector4f(normal.x, normal.y, normal.z, normal.w);
 #else
                 local_face_centers[index] = center;
@@ -511,9 +617,12 @@ namespace example {
             const float scale = static_cast<float>(std::min(frame_width, frame_height)) * 0.52f;
             const float center_x = static_cast<float>(frame_width) * 0.5f;
             const float center_y = static_cast<float>(frame_height) * 0.5f;
-            const auto safe_depth = camera_vertex_batch.row(2).array().max(0.001f);
-            projected_vertex_batch.row(0).array() = center_x + camera_vertex_batch.row(0).array() / safe_depth * scale;
-            projected_vertex_batch.row(1).array() = center_y - camera_vertex_batch.row(1).array() / safe_depth * scale;
+            inverse_vertex_depth.array() =
+                camera_vertex_batch.row(2).array().max(0.001f).inverse();
+            projected_vertex_batch.row(0).array() =
+                center_x + camera_vertex_batch.row(0).array() * inverse_vertex_depth.array() * scale;
+            projected_vertex_batch.row(1).array() =
+                center_y - camera_vertex_batch.row(1).array() * inverse_vertex_depth.array() * scale;
             projected_vertex_batch.row(2) = camera_vertex_batch.row(2);
             projected_vertex_batch.row(3).setOnes();
 #else
@@ -539,32 +648,46 @@ namespace example {
 #endif
         }
 
-        void append_visible_face(std::size_t first, std::size_t second, std::size_t third, float intensity) {
+        void append_visible_face(const mxvk::Triangle &triangle, float intensity) {
+            const auto first = static_cast<std::size_t>(triangle.vert[0]);
+            const auto second = static_cast<std::size_t>(triangle.vert[1]);
+            const auto third = static_cast<std::size_t>(triangle.vert[2]);
             std::array<mxvk::vec2D, 3> texcoords = {
                 model.texcoords[first],
                 model.texcoords[second],
                 model.texcoords[third],
             };
-            if (!texture.empty() && texture_repeat_enabled) {
+#if defined(MXVK_OBJ_LOADER)
+            for (mxvk::vec2D &texcoord : texcoords) {
+                texcoord.y = 1.0f - texcoord.y;
+            }
+#endif
+            if (face_texture(triangle.material_index) != nullptr && texture_repeat_enabled) {
                 texcoords = unwrap_horizontal_texcoords(texcoords);
             }
             visible_faces.push_back({
                 {projected_vertex(first), projected_vertex(second), projected_vertex(third)},
                 texcoords,
+                triangle.color,
+                triangle.material_index,
                 intensity,
             });
         }
 
         void build_visible_faces(const mxvk::Mat4D &rotation_matrix, const mxvk::vec4D &light_direction) {
 #if defined(MXVK_USE_EIGEN_MATH)
+#if !defined(MXVK_OBJ_LOADER)
             transform_eigen_batch(rotation_matrix, local_face_center_batch, camera_face_center_batch);
-            transform_eigen_batch(rotation_matrix, local_face_normal_batch, camera_face_normal_batch);
             camera_face_center_batch.row(2).array() += camera_distance;
+#endif
+            transform_eigen_batch(rotation_matrix, local_face_normal_batch, camera_face_normal_batch);
+#if !defined(MXVK_OBJ_LOADER)
             triangle_visible =
                 (-camera_face_normal_batch.row(0).array() * camera_face_center_batch.row(0).array() -
                  camera_face_normal_batch.row(1).array() * camera_face_center_batch.row(1).array() -
                  camera_face_normal_batch.row(2).array() * camera_face_center_batch.row(2).array()) >
                 0.0f;
+#endif
 
             const auto diffuse =
                 (camera_face_normal_batch.row(0).array() * light_direction.x +
@@ -575,34 +698,31 @@ namespace example {
 
             for (std::size_t index = 0; index < model.vlist.size(); ++index) {
                 const Eigen::Index batch_index = static_cast<Eigen::Index>(index);
+#if !defined(MXVK_OBJ_LOADER)
                 if (!triangle_visible(batch_index)) {
                     continue;
                 }
+#endif
                 const mxvk::Triangle &triangle = model.vlist[index];
-                append_visible_face(
-                    static_cast<std::size_t>(triangle.vert[0]),
-                    static_cast<std::size_t>(triangle.vert[1]),
-                    static_cast<std::size_t>(triangle.vert[2]),
-                    triangle_intensity(batch_index));
+                append_visible_face(triangle, triangle_intensity(batch_index));
             }
 #else
             rotation_matrix.MulVec(local_face_centers, camera_face_centers);
             rotation_matrix.MulVec(local_face_normals, camera_face_normals);
             for (std::size_t index = 0; index < model.vlist.size(); ++index) {
                 const mxvk::Triangle &triangle = model.vlist[index];
-                const auto first = static_cast<std::size_t>(triangle.vert[0]);
-                const auto second = static_cast<std::size_t>(triangle.vert[1]);
-                const auto third = static_cast<std::size_t>(triangle.vert[2]);
                 mxvk::vec4D &center = camera_face_centers[index];
                 center.z += camera_distance;
                 const mxvk::vec4D &normal = camera_face_normals[index];
                 const mxvk::vec4D view_direction(-center.x, -center.y, -center.z, 0.0f);
+#if !defined(MXVK_OBJ_LOADER)
                 if (normal.DotProduct(view_direction) <= 0.0f) {
                     continue;
                 }
+#endif
 
                 const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
-                append_visible_face(first, second, third, std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f));
+                append_visible_face(triangle, std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f));
             }
 #endif
         }
@@ -615,11 +735,11 @@ namespace example {
             frame_surface = create_frame_surface(frame_width, frame_height);
             frame_format = SDL_GetPixelFormatDetails(frame_surface->format);
             if (frame_format == nullptr) {
-                throw mxvk::Exception(std::format("3dmath_plg_loader: failed to query frame format: {}", SDL_GetError()));
+                throw mxvk::Exception(std::format("{}: failed to query frame format: {}", APP_NAME, SDL_GetError()));
             }
 
             depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
-            clear_frame(mxvk::MXVK_RGB(3, 4, 8));
+            clear_frame(BACKGROUND_COLOR);
 
             frame_sprite = createSprite(frame_surface.get());
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
@@ -643,8 +763,8 @@ namespace example {
             *pixel = map_color(color);
         }
 
-        [[nodiscard]] float texture_level_for_face(const FaceDraw &face, float area) const {
-            if (texture.empty() || !mipmapping_enabled) {
+        [[nodiscard]] float texture_level_for_face(const FaceDraw &face, const Texture *texture, float area) const {
+            if (texture == nullptr || !mipmapping_enabled) {
                 return 0.0f;
             }
 
@@ -724,11 +844,11 @@ namespace example {
             }
 
             const float horizontal_footprint = std::hypot(
-                u_dx * static_cast<float>(texture.width()),
-                v_dx * static_cast<float>(texture.height()));
+                u_dx * static_cast<float>(texture->width()),
+                v_dx * static_cast<float>(texture->height()));
             const float vertical_footprint = std::hypot(
-                u_dy * static_cast<float>(texture.width()),
-                v_dy * static_cast<float>(texture.height()));
+                u_dy * static_cast<float>(texture->width()),
+                v_dy * static_cast<float>(texture->height()));
             return std::log2(std::max({mxvk::EPSILON, horizontal_footprint, vertical_footprint})) + mip_level_bias;
         }
 
@@ -749,7 +869,8 @@ namespace example {
             const int max_x = std::clamp(static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))), 0, frame_width - 1);
             const int min_y = std::clamp(static_cast<int>(std::floor(std::min({a.y, b.y, c.y}))), 0, frame_height - 1);
             const int max_y = std::clamp(static_cast<int>(std::ceil(std::max({a.y, b.y, c.y}))), 0, frame_height - 1);
-            const float texture_level = texture_level_for_face(face, area);
+            const Texture *texture = face_texture(face.material_index);
+            const float texture_level = texture_level_for_face(face, texture, area);
 
             for (int y = min_y; y <= max_y; ++y) {
                 for (int x = min_x; x <= max_x; ++x) {
@@ -790,7 +911,15 @@ namespace example {
                         face.texcoords[0].y * texture_weight_a +
                         face.texcoords[1].y * texture_weight_b +
                         face.texcoords[2].y * texture_weight_c;
-                    const mxvk::MXCOLOR color = texture.empty() ? gradient_color(u, v) : texture.sample(u, v, texture_level, texture_repeat_enabled);
+                    mxvk::MXCOLOR color = face.material_color;
+                    if (texture != nullptr) {
+                        color = texture->sample(u, v, texture_level, texture_repeat_enabled);
+                    }
+#if !defined(MXVK_OBJ_LOADER)
+                    else {
+                        color = gradient_color(u, v);
+                    }
+#endif
                     put_pixel(x, y, mxvk::shade_color(color, face.intensity));
                 }
             }
@@ -836,9 +965,9 @@ int main(int argc, char **argv) {
         FramebufferDimensions framebuffer = args.framebuffer;
         if (args.benchmark && !args.framebufferSpecified) {
             framebuffer = {320, 180};
-            std::cout << "3dmath_plg_loader: benchmark framebuffer defaults to 320x180; use --framebuffer to override\n";
+            std::cout << APP_NAME << ": benchmark framebuffer defaults to 320x180; use --framebuffer to override\n";
         }
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, framebuffer, args.benchmark);
+        example::Math3DModelLoaderWindow window(args.filename, args.texture, args.path, std::string(WINDOW_TITLE), args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, framebuffer, args.benchmark);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

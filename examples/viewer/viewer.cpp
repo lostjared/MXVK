@@ -2,6 +2,7 @@
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_stopwatch.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <format>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include <glm/ext/matrix_clip_space.hpp>
@@ -37,9 +39,10 @@ namespace viewer {
                               args.height,
                               args.fullscreen,
                               MXVK_VALIDATION,
-              args.enable_vsync),
+                              args.enable_vsync),
               assetRoot((args.path.empty() || args.path == ".") ? std::string(VIEWER_ASSET_DIR) : args.path),
-              shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath) {
+              shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath),
+              benchmarkEnabled(args.benchmark) {
             setClearColor(0.3f, 0.3f, 0.3f, 1.0f);
             setFont(resolveFontPath(), 18);
 
@@ -54,6 +57,12 @@ namespace viewer {
 
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, shaderRoot + "/model.vert.spv", shaderRoot + "/model.frag.spv");
+            const std::string modelFormat =
+                std::filesystem::path(modelPath).extension() == ".obj" ? "OBJ" : "model";
+            benchmarkName = std::format(
+                "{} geometry draw (Vulkan backend, {} frames)",
+                modelFormat,
+                BENCHMARK_FRAME_COUNT);
         }
 
         ~ModelViewerWindow() override {
@@ -167,7 +176,31 @@ namespace viewer {
                 autoRotationRadians = wrapRadians(autoRotationRadians + 0.55f * deltaSeconds);
             }
 
-            updateOverlay();
+            if (!benchmarkEnabled) {
+                updateOverlay();
+            }
+        }
+
+        void render() override {
+            if (benchmarkEnabled && benchmarkStopwatch == nullptr) {
+                benchmarkStopwatch =
+                    std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmarkName);
+            }
+
+            mxvk::VK_Window::render();
+
+            if (benchmarkStopwatch == nullptr) {
+                return;
+            }
+            ++benchmarkFrameCount;
+            if (benchmarkFrameCount == BENCHMARK_FRAME_COUNT) {
+                if (device != VK_NULL_HANDLE) {
+                    vkDeviceWaitIdle(device);
+                }
+                benchmarkStopwatch->Stop();
+                benchmarkStopwatch.reset();
+                exit();
+            }
         }
 
         void onSwapchainRecreated() override {
@@ -340,6 +373,7 @@ namespace viewer {
         }
 
         static constexpr const char *defaultModelName = "cube.mxmod.z";
+        static constexpr std::size_t BENCHMARK_FRAME_COUNT = 60 * 10;
 
         std::string assetRoot{};
         std::string shaderRoot{};
@@ -363,6 +397,10 @@ namespace viewer {
         std::chrono::steady_clock::time_point fpsSampleTime{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point lastUpdateTime{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point startTime{std::chrono::steady_clock::now()};
+        bool benchmarkEnabled = false;
+        std::size_t benchmarkFrameCount = 0;
+        std::string benchmarkName;
+        std::unique_ptr<StopWatch<HighResolutionClockPolicy>> benchmarkStopwatch;
     };
 
 } // namespace viewer
@@ -374,7 +412,12 @@ int main(int argc, char **argv) {
     setvbuf(stderr, nullptr, _IONBF, 0);
 
     try {
-        const Arguments args = proc_args(argc, argv);
+        Arguments args = proc_args(argc, argv);
+        if (args.benchmark && !args.resolutionSpecified) {
+            args.width = 320;
+            args.height = 180;
+            std::cout << "viewer: benchmark resolution defaults to 320x180; use -r or --resolution to override\n";
+        }
         viewer::ModelViewerWindow window(args);
         window.loop();
     } catch (const mxvk::Exception &e) {
