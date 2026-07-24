@@ -33,6 +33,7 @@ namespace {
     constexpr int BOARD_HEIGHT = 22;
     constexpr int DEFAULT_FRAME_WIDTH = 640;
     constexpr int DEFAULT_FRAME_HEIGHT = 480;
+    constexpr int LEVEL_COUNT = 8;
     constexpr float BLOCK_SPACING = 0.145f;
     constexpr float BLOCK_HALF_EXTENT = 0.064f;
     constexpr float FRAME_HALF_EXTENT = BLOCK_HALF_EXTENT * 0.72f;
@@ -358,6 +359,14 @@ namespace {
             return frame_surface.get();
         }
 
+        [[nodiscard]] int width() const {
+            return frame_width;
+        }
+
+        [[nodiscard]] int height() const {
+            return frame_height;
+        }
+
         void set_view(float yaw, float pitch, float distance) {
             camera_rotation.BuildXYZ(pitch, yaw, 0.0f);
             camera_distance = distance;
@@ -375,6 +384,19 @@ namespace {
             draw_cube(&block_textures[static_cast<std::size_t>(texture_index(type))], x, y, z, half_extent, tint);
         }
 
+        void draw_wildcard(float x, float y, float z, float half_extent, const mxvk::vec4D &color) {
+            mxvk::vec4D neon(
+                std::max(color.x, 0.08f),
+                std::max(color.y, 0.08f),
+                std::max(color.z, 0.08f),
+                1.0f);
+            const float brightest_channel = std::max({neon.x, neon.y, neon.z});
+            neon.x /= brightest_channel;
+            neon.y /= brightest_channel;
+            neon.z /= brightest_channel;
+            draw_cube(nullptr, x, y, z, half_extent, neon, true);
+        }
+
         void draw_solid_cube(float x, float y, float z, float half_extent, mxvk::MXCOLOR color) {
             const mxvk::vec4D tint(
                 static_cast<float>(mxvk::color_r(color)) / 255.0f,
@@ -382,6 +404,54 @@ namespace {
                 static_cast<float>(mxvk::color_b(color)) / 255.0f,
                 1.0f);
             draw_cube(nullptr, x, y, z, half_extent, tint);
+        }
+
+        void draw_rectangle(int left, int top, int width, int height, mxvk::MXCOLOR color) {
+            const int first_x = std::clamp(left, 0, frame_width);
+            const int first_y = std::clamp(top, 0, frame_height);
+            const int last_x = std::clamp(left + width, 0, frame_width);
+            const int last_y = std::clamp(top + height, 0, frame_height);
+            for (int y = first_y; y < last_y; ++y) {
+                auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y * frame_surface->pitch);
+                for (int x = first_x; x < last_x; ++x) {
+                    write_pixel(row + static_cast<std::size_t>(x * 4), color);
+                }
+            }
+        }
+
+        void draw_block_image(BlockType type, int left, int top, int width, int height) {
+            if (!is_play_block(type) || width <= 0 || height <= 0) {
+                return;
+            }
+
+            const Texture &texture = block_textures[static_cast<std::size_t>(texture_index(type))];
+            const int first_x = std::clamp(left, 0, frame_width);
+            const int first_y = std::clamp(top, 0, frame_height);
+            const int last_x = std::clamp(left + width, 0, frame_width);
+            const int last_y = std::clamp(top + height, 0, frame_height);
+            for (int y = first_y; y < last_y; ++y) {
+                const int source_y = std::clamp((y - top) * texture.height / height, 0, texture.height - 1);
+                auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y * frame_surface->pitch);
+                for (int x = first_x; x < last_x; ++x) {
+                    const int source_x = std::clamp((x - left) * texture.width / width, 0, texture.width - 1);
+                    const mxvk::MXCOLOR color = texture.pixels[static_cast<std::size_t>(source_y * texture.width + source_x)];
+                    blend_pixel(row + static_cast<std::size_t>(x * 4), color);
+                }
+            }
+        }
+
+        void draw_text(TTF_Font *font, const std::string &text, int x, int y, const SDL_Color &color) {
+            if (font == nullptr || text.empty()) {
+                return;
+            }
+
+            SurfacePtr text_surface(TTF_RenderText_Blended(font, text.c_str(), 0, color));
+            if (!text_surface) {
+                return;
+            }
+            SDL_SetSurfaceBlendMode(text_surface.get(), SDL_BLENDMODE_BLEND);
+            const SDL_Rect destination{x, y, text_surface->w, text_surface->h};
+            SDL_BlitSurface(text_surface.get(), nullptr, frame_surface.get(), &destination);
         }
 
       private:
@@ -417,6 +487,22 @@ namespace {
 
         static const std::array<std::array<mxvk::vec2D, 4>, 6> CUBE_FACE_UVS;
 
+        static void write_pixel(std::uint8_t *pixel, mxvk::MXCOLOR color) {
+            pixel[0] = mxvk::color_r(color);
+            pixel[1] = mxvk::color_g(color);
+            pixel[2] = mxvk::color_b(color);
+            pixel[3] = mxvk::color_a(color);
+        }
+
+        static void blend_pixel(std::uint8_t *pixel, mxvk::MXCOLOR color) {
+            const int alpha = mxvk::color_a(color);
+            const int inverse_alpha = 255 - alpha;
+            pixel[0] = static_cast<std::uint8_t>((mxvk::color_r(color) * alpha + pixel[0] * inverse_alpha) / 255);
+            pixel[1] = static_cast<std::uint8_t>((mxvk::color_g(color) * alpha + pixel[1] * inverse_alpha) / 255);
+            pixel[2] = static_cast<std::uint8_t>((mxvk::color_b(color) * alpha + pixel[2] * inverse_alpha) / 255);
+            pixel[3] = 255;
+        }
+
         void draw_flat_image(const Texture &texture) {
             for (int y = 0; y < frame_height; ++y) {
                 const int source_y = y * texture.height / frame_height;
@@ -424,11 +510,7 @@ namespace {
                 for (int x = 0; x < frame_width; ++x) {
                     const int source_x = x * texture.width / frame_width;
                     const mxvk::MXCOLOR color = texture.pixels[static_cast<std::size_t>(source_y * texture.width + source_x)];
-                    auto *pixel = row + static_cast<std::size_t>(x * 4);
-                    pixel[0] = mxvk::color_r(color);
-                    pixel[1] = mxvk::color_g(color);
-                    pixel[2] = mxvk::color_b(color);
-                    pixel[3] = 255;
+                    write_pixel(row + static_cast<std::size_t>(x * 4), color | 0xFF000000U);
                 }
             }
         }
@@ -457,7 +539,7 @@ namespace {
             };
         }
 
-        void draw_cube(const Texture *texture, float x, float y, float z, float half_extent, const mxvk::vec4D &tint) {
+        void draw_cube(const Texture *texture, float x, float y, float z, float half_extent, const mxvk::vec4D &tint, bool neon = false) {
             std::array<mxvk::vec4D, 8> camera_vertices{};
             std::array<mxvk::vec4D, 8> projected{};
             for (std::size_t index = 0; index < CUBE_VERTICES.size(); ++index) {
@@ -487,7 +569,22 @@ namespace {
                 }
                 mxvk::vec4D normalized_light = light_direction;
                 normalized_light.Normalize();
-                const float intensity = std::clamp(0.40f + std::max(0.0f, normal.DotProduct(normalized_light)) * 0.60f, 0.0f, 1.0f);
+                float intensity = std::clamp(0.40f + std::max(0.0f, normal.DotProduct(normalized_light)) * 0.60f, 0.0f, 1.0f);
+                if (neon) {
+                    mxvk::vec4D key_light(-0.18f, 0.58f, -0.80f, 0.0f);
+                    mxvk::vec4D fill_light(0.12f, 0.08f, -0.99f, 0.0f);
+                    mxvk::vec4D view_direction(-center.x, -center.y, -center.z, 0.0f);
+                    key_light.Normalize();
+                    fill_light.Normalize();
+                    view_direction.Normalize();
+                    const float key_diffuse = std::max(normal.DotProduct(key_light), 0.0f);
+                    const float fill_diffuse = std::max(normal.DotProduct(fill_light), 0.0f);
+                    const float diffuse = std::min(key_diffuse * 0.50f + fill_diffuse * 0.62f, 1.0f);
+                    const float rim_amount = 1.0f - std::max(normal.DotProduct(view_direction), 0.0f);
+                    const float rim_fraction = std::clamp((rim_amount - 0.12f) / 0.88f, 0.0f, 1.0f);
+                    const float neon_rim = rim_fraction * rim_fraction * (3.0f - 2.0f * rim_fraction);
+                    intensity = 0.50f + diffuse * 0.52f + neon_rim * 0.34f + 0.12f;
+                }
                 const RasterVertex vertex_a{projected[static_cast<std::size_t>(face[0])], face_uvs[0]};
                 const RasterVertex vertex_b{projected[static_cast<std::size_t>(face[1])], face_uvs[1]};
                 const RasterVertex vertex_c{projected[static_cast<std::size_t>(face[2])], face_uvs[2]};
@@ -589,14 +686,19 @@ namespace {
         PuzzleDropWindow(const Arguments &args, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window("MXVK 3D Math Puzzle Drop", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
               data_root(((args.path.empty() || args.path == ".") ? std::string(math3d_puzzle_drop_ASSET_DIR) : args.path) + "/data"),
-              renderer(framebuffer.width, framebuffer.height, data_root) {
+              renderer(framebuffer.width, framebuffer.height, data_root),
+              ui_font(data_root + "/font.ttf", std::max(8, static_cast<int>(std::round(22.0f * framebuffer_scale(framebuffer))))) {
             setClearColor(0.01f, 0.02f, 0.03f, 1.0f);
-            setFont(data_root + "/font.ttf", 22);
             mxvk::BuildTables();
             std::random_device random_device;
             rng.seed(random_device());
+            try_open_first_gamepad();
             reset_game();
             intro_start = std::chrono::steady_clock::now();
+        }
+
+        ~PuzzleDropWindow() override {
+            close_gamepad();
         }
 
         void event(SDL_Event &event) override {
@@ -604,6 +706,27 @@ namespace {
                 exit();
                 return;
             }
+
+            if (event.type == SDL_EVENT_GAMEPAD_ADDED) {
+                if (!open_gamepad(event.gdevice.which)) {
+                    try_open_first_gamepad();
+                }
+                return;
+            }
+
+            if (event.type == SDL_EVENT_GAMEPAD_REMOVED) {
+                if (gamepad != nullptr && event.gdevice.which == gamepad_id) {
+                    close_gamepad();
+                    try_open_first_gamepad();
+                }
+                return;
+            }
+
+            if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
+                handle_gamepad_button_down(event.gbutton.button);
+                return;
+            }
+
             if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat) {
                 return;
             }
@@ -635,9 +758,6 @@ namespace {
             case SDLK_X:
                 rotate_right();
                 break;
-            case SDLK_SPACE:
-                hard_drop();
-                break;
             default:
                 break;
             }
@@ -645,8 +765,10 @@ namespace {
 
         void proc() override {
             const auto now = std::chrono::steady_clock::now();
-            const float delta_seconds = std::min(std::chrono::duration<float>(now - last_input_update).count(), 0.05f);
+            const float delta_seconds = std::chrono::duration<float>(now - last_input_update).count();
             last_input_update = now;
+            try_open_first_gamepad();
+            randomize_wildcard_color();
             if (intro_active && std::chrono::duration<float>(now - intro_start).count() >= 3.5f) {
                 finish_intro();
             }
@@ -657,47 +779,41 @@ namespace {
                     handle_view_controls(keys, delta_seconds);
                     handle_piece_controls(keys, delta_seconds);
                 }
-                if (game_started && !game_over) {
-                    if (std::chrono::duration<float>(now - last_fall).count() >= FALL_SECONDS[static_cast<std::size_t>(difficulty)]) {
-                        key_down();
-                        last_fall = now;
-                    }
-                    if (std::chrono::duration<float>(now - last_process).count() >= 0.018f) {
-                        proc_blocks();
-                        proc_move_down();
-                        last_process = now;
-                    }
+                handle_gamepad_input(delta_seconds);
+            }
+
+            if (game_started && !game_over) {
+                if (std::chrono::duration<float>(now - last_fall).count() >= FALL_SECONDS[static_cast<std::size_t>(difficulty)]) {
+                    key_down();
+                    last_fall = now;
+                }
+                if (std::chrono::duration<float>(now - last_process).count() >= 0.018f) {
+                    proc_blocks();
+                    proc_move_down();
+                    last_process = now;
                 }
             }
 
             draw_scene();
-            ensure_render_sprites();
+            draw_interface();
+            ensure_frame_sprite();
             frame_sprite->updateTexture(renderer.surface());
             const int output_width = swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : 1280;
             const int output_height = swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : 720;
             frame_sprite->drawSpriteRect(0, 0, output_width, output_height);
-            draw_next_piece_preview(output_width, output_height);
-
-            const SDL_Color primary{255, 244, 223, 255};
-            if (intro_active) {
-                printText("Press Enter", 24, 54, primary);
-            } else if (game_over) {
-                printText(std::format("Game Over: Lines cleared: {} [Press Enter to Restart]", lines), 24, 54, primary);
-            } else {
-                printText(std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1), 24, 22, primary);
-            }
         }
 
       private:
         std::string data_root;
         SoftwareRenderer renderer;
+        mxvk::Font ui_font;
         mxvk::VK_Sprite *frame_sprite = nullptr;
-        mxvk::VK_Sprite *preview_border_sprite = nullptr;
-        std::array<mxvk::VK_Sprite *, BLOCK_TEXTURE_FILES.size()> preview_block_sprites{};
         std::mt19937 rng{};
         std::array<std::array<Cell, BOARD_WIDTH>, BOARD_HEIGHT> board{};
         Piece piece{};
         Piece next_piece{};
+        SDL_Gamepad *gamepad = nullptr;
+        SDL_JoystickID gamepad_id = 0;
         std::chrono::steady_clock::time_point intro_start{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_fall{std::chrono::steady_clock::now()};
         std::chrono::steady_clock::time_point last_process{std::chrono::steady_clock::now()};
@@ -705,9 +821,16 @@ namespace {
         float horizontal_move_timer = 0.0f;
         float soft_drop_timer = 0.0f;
         float cycle_timer = 0.0f;
+        float gamepad_move_repeat_timer = 0.0f;
+        float gamepad_soft_drop_repeat_timer = 0.0f;
+        float gamepad_cycle_repeat_timer = 0.0f;
+        float gamepad_move_held_seconds = 0.0f;
         int horizontal_move_direction = 0;
+        int gamepad_move_direction = 0;
         bool soft_drop_held = false;
         bool cycle_held = false;
+        bool gamepad_soft_drop_held = false;
+        bool gamepad_cycle_held = false;
         int difficulty = 0;
         int level = 1;
         int lines = 0;
@@ -717,46 +840,79 @@ namespace {
         float grid_yaw = -10.0f;
         float grid_pitch = -8.0f;
         float camera_distance = CAMERA_DISTANCE;
+        mxvk::vec4D wildcard_color{1.0f, 0.0f, 1.0f, 1.0f};
+        static constexpr Sint16 GAMEPAD_DEADZONE = 10000;
+        static constexpr float GAMEPAD_MOVE_INITIAL_DELAY_SECONDS = 0.22f;
+        static constexpr float GAMEPAD_MOVE_REPEAT_SECONDS = 0.12f;
+        static constexpr float GAMEPAD_SOFT_DROP_INITIAL_DELAY_SECONDS = 0.18f;
+        static constexpr float GAMEPAD_SOFT_DROP_REPEAT_SECONDS = 0.08f;
+        static constexpr float GAMEPAD_CYCLE_INITIAL_DELAY_SECONDS = 0.16f;
+        static constexpr float GAMEPAD_CYCLE_REPEAT_SECONDS = 0.11f;
+        static constexpr float GAMEPAD_STICK_ROTATE_SPEED = 120.0f;
+        static constexpr float GAMEPAD_STICK_PITCH_SPEED = 100.0f;
+        static constexpr float GAMEPAD_STICK_SCALE = 1.0f / 32768.0f;
 
-        void ensure_render_sprites() {
+        [[nodiscard]] static float framebuffer_scale(const FramebufferDimensions &framebuffer) {
+            return std::min(
+                static_cast<float>(framebuffer.width) / static_cast<float>(DEFAULT_FRAME_WIDTH),
+                static_cast<float>(framebuffer.height) / static_cast<float>(DEFAULT_FRAME_HEIGHT));
+        }
+
+        [[nodiscard]] int scaled(int value) const {
+            return std::max(1, static_cast<int>(std::round(static_cast<float>(value) * framebuffer_scale({renderer.width(), renderer.height()}))));
+        }
+
+        void ensure_frame_sprite() {
             if (frame_sprite != nullptr) {
                 return;
             }
 
             frame_sprite = createSprite(renderer.surface());
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
-
-            preview_border_sprite = createSprite(1, 1);
-            const std::uint32_t white_pixel = 0xFFFFFFFFU;
-            preview_border_sprite->updateTexture(&white_pixel, 1, 1);
-            for (std::size_t index = 0; index < preview_block_sprites.size(); ++index) {
-                preview_block_sprites[index] = createSprite(data_root + "/" + BLOCK_TEXTURE_FILES[index]);
-            }
         }
 
-        void draw_next_piece_preview(int output_width, int output_height) {
-            if (!game_started || intro_active || game_over || preview_border_sprite == nullptr) {
+        void draw_interface() {
+            const SDL_Color primary{255, 244, 223, 255};
+            if (intro_active) {
+                renderer.draw_text(ui_font.get(), "Press Enter", scaled(24), scaled(54), primary);
+            } else if (game_over) {
+                renderer.draw_text(ui_font.get(), std::format("Game Over: Lines cleared: {}", lines), scaled(24), scaled(22), primary);
+                renderer.draw_text(ui_font.get(), "Press Enter to Restart", scaled(24), scaled(50), primary);
+            } else {
+                renderer.draw_text(
+                    ui_font.get(),
+                    std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1),
+                    scaled(24),
+                    scaled(22),
+                    primary);
+            }
+            draw_next_piece_preview();
+        }
+
+        void draw_next_piece_preview() {
+            if (!game_started || intro_active || game_over) {
                 return;
             }
 
             const int panel_size = std::min({
-                180,
-                static_cast<int>(static_cast<float>(output_width) * 0.22f),
-                static_cast<int>(static_cast<float>(output_height) * 0.30f),
+                scaled(180),
+                static_cast<int>(static_cast<float>(renderer.width()) * 0.22f),
+                static_cast<int>(static_cast<float>(renderer.height()) * 0.30f),
             });
-            if (panel_size < 72) {
+            if (panel_size < scaled(72)) {
                 return;
             }
 
-            const int margin = 24;
-            const int panel_x = output_width - panel_size - margin;
-            const int panel_y = 88;
-            const int border = 4;
-            preview_border_sprite->drawSpriteRect(panel_x, panel_y, panel_size, border);
-            preview_border_sprite->drawSpriteRect(panel_x, panel_y + panel_size - border, panel_size, border);
-            preview_border_sprite->drawSpriteRect(panel_x, panel_y, border, panel_size);
-            preview_border_sprite->drawSpriteRect(panel_x + panel_size - border, panel_y, border, panel_size);
-            printText("Next", panel_x + 12, panel_y - 28, SDL_Color{255, 255, 255, 255});
+            const int margin = scaled(24);
+            const int panel_x = renderer.width() - panel_size - margin;
+            const int panel_y = scaled(88);
+            const int border = scaled(4);
+            const mxvk::MXCOLOR white = mxvk::MXVK_RGB(255, 255, 255);
+            renderer.draw_rectangle(panel_x, panel_y, panel_size, border, white);
+            renderer.draw_rectangle(panel_x, panel_y + panel_size - border, panel_size, border, white);
+            renderer.draw_rectangle(panel_x, panel_y, border, panel_size, white);
+            renderer.draw_rectangle(panel_x + panel_size - border, panel_y, border, panel_size, white);
+            renderer.draw_text(ui_font.get(), "Next", panel_x + scaled(12), panel_y - scaled(28), SDL_Color{255, 255, 255, 255});
 
             int min_x = next_piece.blocks[0].x;
             int max_x = next_piece.blocks[0].x;
@@ -769,24 +925,20 @@ namespace {
                 max_y = std::max(max_y, block.y);
             }
 
-            const float inner_padding = 28.0f;
+            const float inner_padding = static_cast<float>(scaled(28));
             const float inner_size = static_cast<float>(panel_size) - inner_padding * 2.0f;
             const int cells_wide = max_x - min_x + 1;
             const int cells_high = max_y - min_y + 1;
-            const int block_size = static_cast<int>(std::min(34.0f, inner_size / static_cast<float>(std::max(cells_wide, cells_high))));
+            const int block_size = static_cast<int>(std::min(static_cast<float>(scaled(34)), inner_size / static_cast<float>(std::max(cells_wide, cells_high))));
             const float piece_width = static_cast<float>(cells_wide * block_size);
             const float piece_height = static_cast<float>(cells_high * block_size);
             const float origin_x = static_cast<float>(panel_x) + static_cast<float>(panel_size) * 0.5f - piece_width * 0.5f;
             const float origin_y = static_cast<float>(panel_y) + static_cast<float>(panel_size) * 0.5f - piece_height * 0.5f;
 
             for (const Block &block : next_piece.blocks) {
-                const int index = texture_index(block.type);
-                if (index < 0 || index >= static_cast<int>(preview_block_sprites.size())) {
-                    continue;
-                }
                 const int x = static_cast<int>(origin_x + static_cast<float>(block.x - min_x) * static_cast<float>(block_size));
                 const int y = static_cast<int>(origin_y + static_cast<float>(block.y - min_y) * static_cast<float>(block_size));
-                preview_block_sprites[static_cast<std::size_t>(index)]->drawSpriteRect(x, y, block_size, block_size);
+                renderer.draw_block_image(block.type, x, y, block_size, block_size);
             }
         }
 
@@ -797,7 +949,18 @@ namespace {
             last_fall = now;
             last_process = now;
             last_input_update = now;
-            reset_held_input();
+            reset_held_piece_input();
+            reset_held_gamepad_input();
+        }
+
+        void randomize_wildcard_color() {
+            std::uniform_int_distribution<int> distribution(0, 254);
+            wildcard_color = {
+                static_cast<float>(distribution(rng)) / 255.0f,
+                static_cast<float>(distribution(rng)) / 255.0f,
+                static_cast<float>(distribution(rng)) / 255.0f,
+                1.0f,
+            };
         }
 
         void draw_scene() {
@@ -810,23 +973,19 @@ namespace {
             const float center_x = static_cast<float>(BOARD_WIDTH - 1) * 0.5f;
             const float center_y = static_cast<float>(BOARD_HEIGHT - 1) * 0.5f;
             const auto draw_cell = [&](BlockType type, int x, int y, float z = 0.0f) {
-                mxvk::vec4D tint(1.0f, 1.0f, 1.0f, 1.0f);
-                if (type == BlockType::Match) {
-                    const float time = static_cast<float>(SDL_GetTicks()) * 0.004f;
-                    tint = {
-                        0.65f + 0.35f * std::sin(time),
-                        0.65f + 0.35f * std::sin(time + 2.1f),
-                        0.65f + 0.35f * std::sin(time + 4.2f),
-                        1.0f,
-                    };
+                const float block_x = (static_cast<float>(x) - center_x) * BLOCK_SPACING;
+                const float block_y = (center_y - static_cast<float>(y)) * BLOCK_SPACING;
+                if (type == BlockType::Match || type == BlockType::Clear) {
+                    renderer.draw_wildcard(block_x, block_y, z, BLOCK_HALF_EXTENT, wildcard_color);
+                    return;
                 }
                 renderer.draw_block(
                     type,
-                    (static_cast<float>(x) - center_x) * BLOCK_SPACING,
-                    (center_y - static_cast<float>(y)) * BLOCK_SPACING,
+                    block_x,
+                    block_y,
                     z,
                     BLOCK_HALF_EXTENT,
-                    tint);
+                    {1.0f, 1.0f, 1.0f, 1.0f});
             };
 
             const float frame_x = center_x * BLOCK_SPACING + BLOCK_HALF_EXTENT + FRAME_HALF_EXTENT + FRAME_GAP;
@@ -878,55 +1037,64 @@ namespace {
 
         void handle_piece_controls(const bool *keys, float delta_seconds) {
             if (!game_started || game_over) {
-                reset_held_input();
+                reset_held_piece_input();
                 return;
             }
+
             const bool left = keys[SDL_SCANCODE_LEFT];
             const bool right = keys[SDL_SCANCODE_RIGHT];
-            const int direction = left == right ? 0 : (left ? -1 : 1);
+            const int direction = (left == right) ? 0 : (left ? -1 : 1);
             if (direction == 0) {
                 horizontal_move_direction = 0;
                 horizontal_move_timer = 0.0f;
-            } else if (horizontal_move_direction != direction) {
-                horizontal_move_direction = direction;
-                horizontal_move_timer = -0.16f;
-                move_piece_horizontal(direction);
             } else {
-                horizontal_move_timer += delta_seconds;
-                while (horizontal_move_timer >= 0.0f) {
-                    horizontal_move_timer -= 0.065f;
+                constexpr float INITIAL_DELAY_SECONDS = 0.16f;
+                constexpr float REPEAT_SECONDS = 0.065f;
+                if (horizontal_move_direction != direction) {
+                    horizontal_move_direction = direction;
+                    horizontal_move_timer = -INITIAL_DELAY_SECONDS;
                     move_piece_horizontal(direction);
+                } else {
+                    horizontal_move_timer += delta_seconds;
+                    while (horizontal_move_timer >= 0.0f) {
+                        horizontal_move_timer -= REPEAT_SECONDS;
+                        move_piece_horizontal(direction);
+                    }
                 }
             }
 
             if (keys[SDL_SCANCODE_DOWN]) {
+                constexpr float SOFT_DROP_REPEAT_SECONDS = 0.045f;
                 if (!soft_drop_held) {
                     soft_drop_held = true;
                     soft_drop_timer = 0.0f;
                     key_down();
+                    last_fall = std::chrono::steady_clock::now();
                 } else {
                     soft_drop_timer += delta_seconds;
-                    while (soft_drop_timer >= 0.045f) {
-                        soft_drop_timer -= 0.045f;
+                    while (soft_drop_timer >= SOFT_DROP_REPEAT_SECONDS) {
+                        soft_drop_timer -= SOFT_DROP_REPEAT_SECONDS;
                         key_down();
+                        last_fall = std::chrono::steady_clock::now();
                     }
                 }
-                last_fall = std::chrono::steady_clock::now();
             } else {
                 soft_drop_held = false;
                 soft_drop_timer = 0.0f;
             }
 
             if (keys[SDL_SCANCODE_UP]) {
+                constexpr float CYCLE_INITIAL_DELAY_SECONDS = 0.16f;
+                constexpr float CYCLE_REPEAT_SECONDS = 0.11f;
                 if (!cycle_held) {
                     cycle_held = true;
-                    cycle_timer = -0.16f;
-                    piece.shift(ShiftDirection::Up);
+                    cycle_timer = -CYCLE_INITIAL_DELAY_SECONDS;
+                    cycle_piece_blocks();
                 } else {
                     cycle_timer += delta_seconds;
                     while (cycle_timer >= 0.0f) {
-                        cycle_timer -= 0.11f;
-                        piece.shift(ShiftDirection::Up);
+                        cycle_timer -= CYCLE_REPEAT_SECONDS;
+                        cycle_piece_blocks();
                     }
                 }
             } else {
@@ -935,13 +1103,144 @@ namespace {
             }
         }
 
-        void reset_held_input() {
+        void handle_gamepad_input(float delta_seconds) {
+            if (gamepad == nullptr || !game_started || game_over) {
+                reset_held_gamepad_input();
+                return;
+            }
+
+            const Sint16 left_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+            const Sint16 left_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+            const Sint16 right_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+            const Sint16 right_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
+
+            const bool dpad_left = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+            const bool dpad_right = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+            const bool dpad_down = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+            const bool dpad_up = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+
+            const int move_direction = dpad_left == dpad_right
+                                           ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1
+                                                                                                              : 0)
+                                           : (dpad_left ? -1 : 1);
+            if (move_direction == 0) {
+                gamepad_move_direction = 0;
+                gamepad_move_held_seconds = 0.0f;
+                gamepad_move_repeat_timer = 0.0f;
+            } else if (move_direction != gamepad_move_direction) {
+                gamepad_move_direction = move_direction;
+                gamepad_move_held_seconds = 0.0f;
+                gamepad_move_repeat_timer = 0.0f;
+                move_piece_horizontal(gamepad_move_direction);
+            } else {
+                gamepad_move_held_seconds += delta_seconds;
+                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS)
+                                            ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS
+                                            : GAMEPAD_MOVE_REPEAT_SECONDS;
+                gamepad_move_repeat_timer += delta_seconds;
+                if (gamepad_move_repeat_timer >= threshold) {
+                    move_piece_horizontal(gamepad_move_direction);
+                    gamepad_move_repeat_timer = 0.0f;
+                }
+            }
+
+            const bool soft_drop_down = dpad_down || left_y > GAMEPAD_DEADZONE;
+            if (!soft_drop_down) {
+                gamepad_soft_drop_held = false;
+                gamepad_soft_drop_repeat_timer = 0.0f;
+            } else {
+                const float threshold = gamepad_soft_drop_held ? GAMEPAD_SOFT_DROP_REPEAT_SECONDS : GAMEPAD_SOFT_DROP_INITIAL_DELAY_SECONDS;
+                gamepad_soft_drop_repeat_timer += delta_seconds;
+                if (gamepad_soft_drop_repeat_timer >= threshold) {
+                    key_down();
+                    last_fall = std::chrono::steady_clock::now();
+                    gamepad_soft_drop_repeat_timer = 0.0f;
+                    gamepad_soft_drop_held = true;
+                }
+            }
+
+            if (!dpad_up) {
+                gamepad_cycle_held = false;
+                gamepad_cycle_repeat_timer = 0.0f;
+            } else {
+                const float threshold = gamepad_cycle_held ? GAMEPAD_CYCLE_REPEAT_SECONDS : GAMEPAD_CYCLE_INITIAL_DELAY_SECONDS;
+                gamepad_cycle_repeat_timer += delta_seconds;
+                if (gamepad_cycle_repeat_timer >= threshold) {
+                    cycle_piece_blocks();
+                    gamepad_cycle_repeat_timer = 0.0f;
+                    gamepad_cycle_held = true;
+                }
+            }
+
+            if (std::abs(right_x) > GAMEPAD_DEADZONE) {
+                grid_yaw += static_cast<float>(right_x) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_ROTATE_SPEED * delta_seconds;
+            }
+            if (std::abs(right_y) > GAMEPAD_DEADZONE) {
+                grid_pitch = std::clamp(
+                    grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds,
+                    -70.0f,
+                    70.0f);
+            }
+
+            constexpr float ZOOM_SPEED = 2.0f;
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+                camera_distance = std::min(7.0f, camera_distance + ZOOM_SPEED * delta_seconds);
+            }
+            if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+                camera_distance = std::max(2.7f, camera_distance - ZOOM_SPEED * delta_seconds);
+            }
+        }
+
+        void handle_gamepad_button_down(Uint8 button) {
+            if (intro_active) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    finish_intro();
+                }
+                return;
+            }
+
+            if (game_over) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
+                    reset_game();
+                    game_started = true;
+                } else if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                    exit();
+                }
+                return;
+            }
+
+            if (!game_started) {
+                return;
+            }
+
+            if (button == SDL_GAMEPAD_BUTTON_SOUTH) {
+                rotate_right();
+            } else if (button == SDL_GAMEPAD_BUTTON_WEST) {
+                rotate_left();
+            } else if (button == SDL_GAMEPAD_BUTTON_EAST) {
+                hard_drop();
+            } else if (button == SDL_GAMEPAD_BUTTON_BACK) {
+                exit();
+            }
+        }
+
+        void reset_held_piece_input() {
             horizontal_move_timer = 0.0f;
             soft_drop_timer = 0.0f;
             cycle_timer = 0.0f;
             horizontal_move_direction = 0;
             soft_drop_held = false;
             cycle_held = false;
+        }
+
+        void reset_held_gamepad_input() {
+            gamepad_move_repeat_timer = 0.0f;
+            gamepad_soft_drop_repeat_timer = 0.0f;
+            gamepad_cycle_repeat_timer = 0.0f;
+            gamepad_move_held_seconds = 0.0f;
+            gamepad_move_direction = 0;
+            gamepad_soft_drop_held = false;
+            gamepad_cycle_held = false;
         }
 
         void move_piece_horizontal(int direction) {
@@ -955,6 +1254,10 @@ namespace {
             }
         }
 
+        void cycle_piece_blocks() {
+            piece.shift(ShiftDirection::Up);
+        }
+
         void hard_drop() {
             if (!game_started || game_over) {
                 return;
@@ -966,8 +1269,46 @@ namespace {
             last_fall = std::chrono::steady_clock::now();
         }
 
+        bool open_gamepad(SDL_JoystickID id) {
+            if (gamepad != nullptr && gamepad_id == id) {
+                return true;
+            }
+            close_gamepad();
+            gamepad = SDL_OpenGamepad(id);
+            if (gamepad == nullptr) {
+                return false;
+            }
+            gamepad_id = id;
+            return true;
+        }
+
+        void close_gamepad() {
+            if (gamepad != nullptr) {
+                SDL_CloseGamepad(gamepad);
+                gamepad = nullptr;
+                gamepad_id = 0;
+            }
+        }
+
+        void try_open_first_gamepad() {
+            if (gamepad != nullptr) {
+                return;
+            }
+            int count = 0;
+            SDL_JoystickID *ids = SDL_GetGamepads(&count);
+            if (ids == nullptr || count <= 0) {
+                if (ids != nullptr) {
+                    SDL_free(ids);
+                }
+                return;
+            }
+            open_gamepad(ids[0]);
+            SDL_free(ids);
+        }
+
         void reset_game() {
-            reset_held_input();
+            reset_held_piece_input();
+            reset_held_gamepad_input();
             for (auto &row : board) {
                 for (Cell &cell : row) {
                     cell = {};
@@ -1065,10 +1406,7 @@ namespace {
                             if (check_sequence(x, y, direction[0], direction[1], one, two, three) ||
                                 check_sequence(x, y, direction[0], direction[1], three, two, one)) {
                                 mark_clear(x, y, direction[0], direction[1]);
-                                ++lines;
-                                if ((lines % 6) == 0 && level < 8) {
-                                    ++level;
-                                }
+                                add_score();
                                 return true;
                             }
                         }
@@ -1123,6 +1461,13 @@ namespace {
                 cell.type = BlockType::Clear;
                 cell.clear_value = 1;
                 cell.flash_counter = 0;
+            }
+        }
+
+        void add_score() {
+            ++lines;
+            if ((lines % 6) == 0 && level < LEVEL_COUNT) {
+                ++level;
             }
         }
     };
