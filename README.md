@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.23.0`. This release adds a native Perl configure/build/install helper with automatic Ninja selection, dependency diagnostics, configurable build directories and install prefixes, and direct forwarding of CMake feature options. It also expands CMake installation support with desktop launchers and platform-specific application icons for the examples, while retaining the multiplayer, rendering, and documentation improvements introduced in `0.21.0`.
+Current development is on version `0.24.0`. The current release expands the software 3D path with an optional Eigen backend, configurable internal framebuffers, PLG model loading, perspective-correct texture mapping, mipmaps and mip-bias control, and benchmarking support. It also adds the `knight`, `3dmath_texture_array`, `3dmath_pyramid`, `3dmath_plg_loader`, and `3dmath_pong` examples, alongside the installer, multiplayer, rendering, and documentation work from earlier releases.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -226,31 +226,35 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.23.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.24.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
 
 ## Command Line Arguments
 
-Most examples use the shared parser in `mxvk/argz.hpp` via `proc_args(...)`.
+Most examples include [`mxvk/include/mxvk/argz.hpp`](mxvk/include/mxvk/argz.hpp) and call `proc_args(argc, argv)`. The function returns an `Arguments` structure so window, asset, rendering, capture, and example-specific settings use the same command-line syntax.
 
 Supported options:
 
-- `-h`
-	- Show help and exit.
+- `-h`, `-v`
+	- Display the parser's option help and exit.
 - `-p <path>`, `--path <path>`
-	- Asset root path (defaults to `.` when omitted).
+	- Asset root path. An explicit path is converted to an absolute normalized path; when omitted, the executable's directory is used.
 - `-r <WxH>`, `--resolution <WxH>`
 	- Window resolution, e.g. `-r 1280x720`.
 	- For `compute_shader`, this also sets the compute canvas and recorded video size; source frames are scaled into that canvas before shader processing. When omitted for file playback, the window and compute canvas use the video frame size unless fullscreen is enabled.
 - `-f`, `--fullscreen`
 	- Launch in fullscreen mode.
+- `--fast`
+	- Enable an example's fast-processing mode.
 - `--filename <file>`
 	- Optional input/model/video filename used by examples that support external assets.
 	- For `model_example`, this overrides the default `data/pyramid.obj` mesh. You can point it at a custom `.obj`, `.mxmod`, or `.mxmod.z` file.
 	- When you provide a custom model, the loader no longer assumes the built-in pyramid asset set. If the model references external textures, use `--resource <file>` for a texture manifest and `--resource_path <dir>` for the texture directory.
 	- `run.pl` already passes the example asset root with `-p`, so `--filename` can usually be a relative path inside the repo or a full absolute path.
+- `--model <file>`
+	- Optional model filename for examples that distinguish a model from their main input file.
 - `-o <file>`, `--output <file>`
 	- Optional output filename for examples that export video.
 - `-c <value>`, `--crf <value>`
@@ -265,6 +269,10 @@ Supported options:
 	- Enable MXWrite low-latency/realtime encoder settings.
 - `--mxwrite-block`
 	- Make MXWrite block when its internal queue is full instead of dropping frames.
+- `--repeat`
+	- Enable repeat behavior, such as looping playback or wrapping texture coordinates.
+- `--binary`
+	- Use the binary-glyph rendering mode in examples that support it.
 - `--enable-crt`
 	- Start examples that support CRT post-processing with the effect enabled.
 - `--enable-vsync`
@@ -276,15 +284,57 @@ Supported options:
 	- Filenames use the executable basename from `argv[0]`, a dotted local date/time stamp, the current swapchain resolution, and a per-run index:
 	  `breakout.screenshot.2026.07.02.08.30.37.1280x720-0.png`.
 	- A trailing `.exe` or `.EXE` suffix is stripped from the executable name before it is used.
-- `--texture <file>`
-	- Optional texture filename.
+- `--disable-sound`
+	- Disable background music in examples that provide audio.
+- `--benchmark`
+	- Run an example's benchmark mode. For example, `3dmath_plg_loader` measures its CPU geometry pipeline and exits after reporting the result.
+- `--nowarpfix`
+	- Disable perspective-correct texture interpolation in the software 3D renderer, producing affine/PS1-style mapping.
+- `--framebuffer <WxH>`
+	- Set the internal software-rendering resolution independently of the window size.
+- `--disable-mipmap`
+	- Disable mipmap generation and selection in software-textured 3D examples.
+- `--mip-bias <value>`
+	- Adjust software mipmap level selection from `-16` (sharper) through `16` (softer).
+- `--fps <value>`
+	- Set a positive capture or playback FPS override.
+- `-z <pixels>`, `--font-size <pixels>`
+	- Set the Matrix-rain font size; the default is `22`.
+- `-j <file>`, `--font-path <file>`
+	- Set the Matrix-rain font file.
+- `-C <color>`, `--color <color>`
+	- Set the Matrix-rain tint as `#RRGGBB` or `R,G,B`.
+- `--resource <file>`
+	- Optional texture/resource manifest.
+- `--resource_path <dir>`
+	- Optional directory used to resolve resource files.
+- `--texture <file>`, `--textures <file>`
+	- Optional texture filename; `--textures` is an alias.
 - `-S <path>`, `--shader-path <path>`
 	- Shader SPIR-V folder path.
 	- For `shader_viewer`, this path must contain `index.txt`. The index may list compiled `.spv` fragment shaders directly, or `.glsl` source names when matching compiled files exist under a `spv/` subdirectory. Download a precompiled SPIR-V shader pack from https://lostsidedead.biz/packs/vk.shaders.2026.02.17.zip.
+- `--fragment <file>`
+	- Optional fragment-shader SPIR-V file.
+- `-i <index>`, `--index <index>`
+	- Initial Acidcam filter mode index.
 - `--shader-index <index>`
 	- Initial shader entry for examples that browse shader lists, such as `shader_viewer`.
 - `--camera <index>`
 	- Camera index for OpenCV capture examples.
+
+`Arguments` also reports `executable_name`, `resolutionSpecified`, and `framebufferSpecified`. These fields let applications distinguish parser defaults from values supplied by the user. Numeric values and `WxH` dimensions are validated; malformed values throw `ArgException<std::string>`.
+
+Minimal use in an example:
+
+```cpp
+#include "mxvk/argz.hpp"
+
+int main(int argc, char **argv) {
+    const Arguments args = proc_args(argc, argv);
+    // Use args.width, args.height, args.path, args.fullscreen, and other
+    // shared fields when constructing the application.
+}
+```
 
 General run pattern:
 
@@ -339,6 +389,10 @@ Examples:
 ./run.pl 3dmath_cube
 ./run.pl 3dmath_texture --filename ./examples/sprite_example/data/intro.png
 ./run.pl 3dmath_texture_array --filename ./examples/sprite_example/data/intro.png
+./run.pl 3dmath_pyramid
+./run.pl 3dmath_plg_loader --filename ./models/plg/cube.plg
+./run.pl 3dmath_pong
+./run.pl knight
 ./run.pl model_example
 ./run.pl viewer --filename ./models/moon.mxmod.z
 ./run.pl planet
@@ -468,6 +522,9 @@ These programs are not intended as standalone applications. They are small visua
 - `3dmath_cube` - rotating cube test for matrix transforms, backface culling, depth sorting, diffuse face shading, filled triangle rasterization, and line clipping. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Escape` quits.
 - `3dmath_texture` - textured rotating cube test for the same software 3D path plus PNG loading and software UV sampling. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** `Escape` quits.
 - `3dmath_texture_array` - spinning 3×3×3 textured cube lattice using the software 3D path, PNG loading, software UV sampling, and scene-wide face sorting. **Inputs:** common `-p`, `-r`, `-f`, plus `--filename <file.png>` or `--texture <file.png>`. **Controls:** mouse wheel zooms in/out, `Escape` quits.
+- `3dmath_pyramid` - indexed PLG pyramid rendered with smooth vertex-color gradients through the CPU-side pipeline. **Inputs:** common window arguments and optional `--framebuffer <WxH>`. **Controls:** mouse wheel zooms, `Escape` quits.
+- `3dmath_plg_loader` - interactive PLG model viewer and CPU geometry benchmark with optional PNG texturing, mipmaps, perspective-correct interpolation, and texture wrapping. **Inputs:** `--filename`, `--texture`, `--repeat`, `--framebuffer`, `--benchmark`, `--disable-mipmap`, `--mip-bias`, and `--nowarpfix`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` pauses automatic rotation, `Escape` quits.
+- `3dmath_pong` - software-rasterized 3D Pong game that can use the native or Eigen-backed math implementation. **Inputs:** common window arguments and optional `--framebuffer <WxH>`. **Controls:** `W` / `S`, `Up` / `Down`, or the mouse moves the paddle; `Space` pauses, `R` resets, `Escape` quits.
 - `3dmath_masterpiece` - MasterPiece variant that renders the board and falling blocks as CPU-rasterized spinning 3D cubes before uploading the frame through an MXVK sprite. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** arrow keys move, `Up` rotates forward, `Q` rotates backward, hold `W` / `A` / `S` / `D` to rotate the grid, hold `Page Up` / `Page Down` to zoom, `P` pauses, `Escape` returns to the menu.
 
 ### Shader And Effect Demos
@@ -498,6 +555,7 @@ These programs are not intended as standalone applications. They are small visua
 
 ### Games And Interactive Scenes
 
+- `knight` - animated Knight's Tour visualization with a board, move counter, sprite animation, and snapshot support. **Inputs:** common `-p`, `-r`, `-f`, and `--enable-vsync`. **Controls:** `Space` advances one move, `Enter` resets the tour, left click advances, `S` saves `screenshot.png`, and `Escape` quits.
 - `asteroids` - 2D Asteroids-style arcade shooter with physics, scoring, particles, and a fixed playfield. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** `Left` / `Right` rotate, `Up` thrust, `Space` fire, `Escape` quits.
 - `asteroids3d` - 3D Asteroids-style action game with ship, asteroids, projectiles, and console commands. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`. **Controls:** `Space` or `Enter` starts from the intro, `F1` toggles the debug HUD, `F2` toggles inverted controls, `F3` opens the console, `F8` toggles CRT post-processing, `Left` / `Right` yaw, `W` / `S` pitch, `A` / `D` roll, `Up` / `Down` speed, `Space` fires, `Escape` returns to the intro or quits.
 - `asteroids-net` - network multiplayer variant of the 3D Asteroids game for up to four players over UDP. Hosts receive an eight-character join code and automatically request a temporary router mapping through UPnP or NAT-PMP when the optional libraries are installed. **Inputs:** common `-p`, `-r`, `-f`, optional `--enable-crt`; host/join address, UDP port, pilot name, and join code are entered in the lobby. **Controls:** the same flight, camera, firing, console, and CRT controls as `asteroids3d`.
@@ -553,6 +611,10 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- July 23, 2026: version `0.24.0` expands the CPU-rendered 3D examples and shared math code. CMake can select the native scalar implementation or the optional Eigen-backed implementation with `-DWITH_EIGEN=AUTO|ON|OFF`, and the new `3dmath_pong` example exercises the same backend in a complete software-rasterized game.
+- July 23, 2026: `3dmath_texture_array`, `3dmath_pyramid`, and `3dmath_plg_loader` add a textured cube lattice, PLG geometry loading, interactive model rotation and zoom, configurable internal framebuffer resolution, benchmark timing, texture wrapping, perspective-correct or affine mapping, mipmap generation, and mip-bias control.
+- July 23, 2026: `proc_args(...)` now centralizes the new software-rendering switches `--benchmark`, `--framebuffer`, `--nowarpfix`, `--disable-mipmap`, and `--mip-bias`, in addition to the existing shared window, asset, shader, capture, encoder, and effect arguments documented above.
+- July 15, 2026: the `knight` example adds an animated Knight's Tour visualization with sprite, font, color-key, and fade assets.
 - July 13, 2026: version `0.22.0` adds a native Perl configure/build/install helper, expanded CMake installation support, desktop launchers, and platform-specific application icons for the examples. The installer validates required build tools, lets CMake check core and optional libraries, translates common missing-dependency failures into clear platform-specific package hints, supports custom build directories, prefixes, job counts, fresh configuration, build-only operation, and explicit `sudo` policy, and forwards project `-D` feature flags directly to CMake.
 - July 13, 2026: `install.pl` now prefers Ninja automatically for new or fresh build directories when `ninja` is installed. It preserves the cached generator for existing build directories, honors explicit `-G` or `--generator` selections, and reports which generator it selected.
 - July 11, 2026: version `0.21.0` adds the four-player `asteroids-net` mode, including richer host/join screens, player-state and projectile synchronization improvements, runtime asset-path handling, and an application icon. The release also adds model/texture-manifest support to `shader_viewer`, enlarges the Mutatris background-effect pack, and documents the `asteroids-net` public types and networking helpers with Doxygen.
