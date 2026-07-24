@@ -32,7 +32,7 @@ namespace {
     constexpr std::string_view MODEL_FORMAT = "OBJ";
     constexpr std::string_view DEFAULT_MODEL = "sphere.obj";
     constexpr std::string_view WINDOW_TITLE = "MXVK 3D Math OBJ Loader";
-    constexpr float MODEL_SCALE = 0.2f;
+    constexpr float MODEL_SCALE = 2.0f;
     constexpr mxvk::MXCOLOR BACKGROUND_COLOR = mxvk::MXVK_RGB(15, 22, 35);
 #else
     constexpr std::string_view APP_NAME = "3dmath_plg_loader";
