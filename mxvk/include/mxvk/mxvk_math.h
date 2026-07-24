@@ -14,7 +14,9 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <span>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -886,6 +888,20 @@ namespace mxvk {
         /// Transform a homogeneous 4D vector and write the result to @p out.
         void MulVec(const vec4D &in, vec4D &out) const {
             out = MulVec(in);
+        }
+
+        /**
+         * @brief Transform a batch of homogeneous 4D vectors.
+         * @param input Source vectors.
+         * @param output Destination vectors, with the same size as @p input.
+         */
+        void MulVec(std::span<const vec4D> input, std::span<vec4D> output) const {
+            if (input.size() != output.size()) {
+                throw std::invalid_argument("Mat4D::MulVec batch spans must have equal sizes");
+            }
+            for (std::size_t index = 0; index < input.size(); ++index) {
+                output[index] = MulVec(input[index]);
+            }
         }
 
         /// Transform a 3D point by this matrix using W = 1.

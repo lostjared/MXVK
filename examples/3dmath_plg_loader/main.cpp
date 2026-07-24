@@ -1,6 +1,7 @@
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_exception.hpp"
+#include "mxvk/mxvk_stopwatch.hpp"
 #if defined(MXVK_USE_EIGEN_MATH)
 #include "mxvk/mxvk_math_eigen.hpp"
 #else
@@ -267,12 +268,17 @@ namespace {
     constexpr float CAMERA_ZOOM_STEP = 0.45f;
     constexpr float MOUSE_ROTATION_SENSITIVITY = 0.35f;
     constexpr float MAX_PITCH_DEGREES = 89.0f;
+#if defined(MXVK_USE_EIGEN_MATH)
+    constexpr std::string_view BENCHMARK_NAME = "PLG geometry draw (Eigen backend, 600 frames)";
+#else
+    constexpr std::string_view BENCHMARK_NAME = "PLG geometry draw (native backend, 600 frames)";
+#endif
 } // namespace
 
 namespace example {
     class Math3DPlgLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer)
+        Math3DPlgLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
               texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
@@ -282,7 +288,8 @@ namespace example {
               warp_fix_enabled(!disable_warp_fix),
               mipmapping_enabled(!disable_mipmap),
               mip_level_bias(mip_bias),
-              texture_repeat_enabled(repeat_texture) {
+              texture_repeat_enabled(repeat_texture),
+              benchmark_enabled(benchmark) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -290,6 +297,26 @@ namespace example {
             if (!model.LoadPLG(path.string(), mxvk::vec4D(2.0f, 2.0f, 2.0f), mxvk::vec4D(0.0f, 0.0f, 4.5f), mxvk::vec4D())) {
                 throw mxvk::Exception(std::format("3dmath_plg_loader: failed to load PLG model '{}'", path.string()));
             }
+#if defined(MXVK_USE_EIGEN_MATH)
+            local_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
+            camera_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
+            projected_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
+            local_face_center_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
+            camera_face_center_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
+            local_face_normal_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
+            camera_face_normal_batch.resize(4, static_cast<Eigen::Index>(model.vlist.size()));
+            triangle_intensity.resize(static_cast<Eigen::Index>(model.vlist.size()));
+            triangle_visible.resize(static_cast<Eigen::Index>(model.vlist.size()));
+            for (std::size_t index = 0; index < model.local.size(); ++index) {
+                local_vertex_batch.col(static_cast<Eigen::Index>(index)) =
+                    Eigen::Vector4f(model.local[index].x, model.local[index].y, model.local[index].z, model.local[index].w);
+            }
+#else
+            camera_vertices.resize(model.local.size());
+            projected_vertices.resize(model.local.size());
+#endif
+            initialize_face_geometry();
+            visible_faces.reserve(model.vlist.size());
             std::cout << std::format("3dmath_plg_loader: loaded '{}' ({} vertices, {} triangles)\n", path.string(), model.num_vertices, model.num_polys);
         }
 
@@ -354,58 +381,30 @@ namespace example {
                 yaw_degrees = std::fmod(yaw_degrees + elapsed_seconds * 42.0f, 360.0f);
             }
 
+            if (benchmark_enabled && benchmark_frame_count == 0) {
+                benchmark_stopwatch = std::make_unique<StopWatch<HighResolutionClockPolicy>>(BENCHMARK_NAME);
+            }
+
             mxvk::Mat4D rotation;
             rotation.BuildXYZ(pitch_degrees, yaw_degrees, 0.0f);
-
-            std::vector<mxvk::vec4D> camera_vertices(model.local.size());
-            std::vector<mxvk::vec4D> projected(model.local.size());
-            for (std::size_t i = 0; i < model.local.size(); ++i) {
-                camera_vertices[i] = rotation.MulVec(model.local[i]);
-                camera_vertices[i].z += camera_distance;
-                projected[i] = project_to_screen(camera_vertices[i], frame_width, frame_height);
-            }
+            transform_and_project_vertices(rotation);
 
             mxvk::vec4D light_direction(-0.35f, -0.55f, -1.0f, 0.0f);
             light_direction.Normalize();
-            std::vector<FaceDraw> faces;
-            faces.reserve(model.vlist.size());
+            visible_faces.clear();
+            build_visible_faces(rotation, light_direction);
 
-            for (const mxvk::Triangle &triangle : model.vlist) {
-                const auto first = static_cast<std::size_t>(triangle.vert[0]);
-                const auto second = static_cast<std::size_t>(triangle.vert[1]);
-                const auto third = static_cast<std::size_t>(triangle.vert[2]);
-
-                const mxvk::vec4D &a = camera_vertices[first];
-                const mxvk::vec4D &b = camera_vertices[second];
-                const mxvk::vec4D &c = camera_vertices[third];
-                mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
-                normal.Normalize();
-
-                const mxvk::vec4D center = (a + b + c) * (1.0f / 3.0f);
-                const mxvk::vec4D view_direction(-center.x, -center.y, -center.z, 0.0f);
-                if (normal.DotProduct(view_direction) <= 0.0f) {
-                    continue;
-                }
-
-                const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
-                const float intensity = std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f);
-                std::array<mxvk::vec2D, 3> texcoords = {
-                    model.texcoords[first],
-                    model.texcoords[second],
-                    model.texcoords[third],
-                };
-                if (!texture.empty() && texture_repeat_enabled) {
-                    texcoords = unwrap_horizontal_texcoords(texcoords);
-                }
-                faces.push_back({
-                    {projected[first], projected[second], projected[third]},
-                    texcoords,
-                    intensity,
-                });
+            for (const FaceDraw &face : visible_faces) {
+                draw_gradient_triangle(face);
             }
 
-            for (const FaceDraw &face : faces) {
-                draw_gradient_triangle(face);
+            if (benchmark_stopwatch != nullptr) {
+                ++benchmark_frame_count;
+                if (benchmark_frame_count == BENCHMARK_FRAME_COUNT) {
+                    benchmark_stopwatch->Stop();
+                    benchmark_stopwatch.reset();
+                    exit();
+                }
             }
 
             frame_sprite->updateTexture(frame_surface->pixels, frame_width, frame_height, frame_surface->pitch);
@@ -416,6 +415,26 @@ namespace example {
         mxvk::mxObject model;
         Texture texture;
         SurfacePtr frame_surface;
+#if defined(MXVK_USE_EIGEN_MATH)
+        using VertexBatch = Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::RowMajor>;
+        VertexBatch local_vertex_batch;
+        VertexBatch camera_vertex_batch;
+        VertexBatch projected_vertex_batch;
+        VertexBatch local_face_center_batch;
+        VertexBatch camera_face_center_batch;
+        VertexBatch local_face_normal_batch;
+        VertexBatch camera_face_normal_batch;
+        Eigen::RowVectorXf triangle_intensity;
+        Eigen::Array<bool, 1, Eigen::Dynamic> triangle_visible;
+#else
+        std::vector<mxvk::vec4D> camera_vertices;
+        std::vector<mxvk::vec4D> projected_vertices;
+        std::vector<mxvk::vec4D> local_face_centers;
+        std::vector<mxvk::vec4D> camera_face_centers;
+        std::vector<mxvk::vec4D> local_face_normals;
+        std::vector<mxvk::vec4D> camera_face_normals;
+#endif
+        std::vector<FaceDraw> visible_faces;
         std::vector<float> depth_buffer;
         const SDL_PixelFormatDetails *frame_format = nullptr;
         mxvk::VK_Sprite *frame_sprite = nullptr;
@@ -435,6 +454,158 @@ namespace example {
         bool mipmapping_enabled = true;
         float mip_level_bias = 0.0f;
         bool texture_repeat_enabled = false;
+        bool benchmark_enabled = false;
+        std::size_t benchmark_frame_count = 0;
+        std::unique_ptr<StopWatch<HighResolutionClockPolicy>> benchmark_stopwatch;
+
+        static constexpr std::size_t BENCHMARK_FRAME_COUNT = 60 * 10;
+
+#if defined(MXVK_USE_EIGEN_MATH)
+        static void transform_eigen_batch(const mxvk::Mat4D &matrix, const VertexBatch &input, VertexBatch &output) {
+            for (int component = 0; component < 4; ++component) {
+                output.row(component).array() =
+                    input.row(0).array() * matrix.mat[0][component] +
+                    input.row(1).array() * matrix.mat[1][component] +
+                    input.row(2).array() * matrix.mat[2][component] +
+                    input.row(3).array() * matrix.mat[3][component];
+            }
+        }
+#endif
+
+        void initialize_face_geometry() {
+#if !defined(MXVK_USE_EIGEN_MATH)
+            local_face_centers.resize(model.vlist.size());
+            camera_face_centers.resize(model.vlist.size());
+            local_face_normals.resize(model.vlist.size());
+            camera_face_normals.resize(model.vlist.size());
+#endif
+            for (std::size_t index = 0; index < model.vlist.size(); ++index) {
+                const mxvk::Triangle &triangle = model.vlist[index];
+                const mxvk::vec4D &a = model.local[static_cast<std::size_t>(triangle.vert[0])];
+                const mxvk::vec4D &b = model.local[static_cast<std::size_t>(triangle.vert[1])];
+                const mxvk::vec4D &c = model.local[static_cast<std::size_t>(triangle.vert[2])];
+                const mxvk::vec4D center(
+                    (a.x + b.x + c.x) * (1.0f / 3.0f),
+                    (a.y + b.y + c.y) * (1.0f / 3.0f),
+                    (a.z + b.z + c.z) * (1.0f / 3.0f),
+                    1.0f);
+                mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
+                normal.Normalize();
+                normal.w = 0.0f;
+#if defined(MXVK_USE_EIGEN_MATH)
+                const Eigen::Index batch_index = static_cast<Eigen::Index>(index);
+                local_face_center_batch.col(batch_index) = Eigen::Vector4f(center.x, center.y, center.z, center.w);
+                local_face_normal_batch.col(batch_index) = Eigen::Vector4f(normal.x, normal.y, normal.z, normal.w);
+#else
+                local_face_centers[index] = center;
+                local_face_normals[index] = normal;
+#endif
+            }
+        }
+
+        void transform_and_project_vertices(const mxvk::Mat4D &rotation) {
+#if defined(MXVK_USE_EIGEN_MATH)
+            transform_eigen_batch(rotation, local_vertex_batch, camera_vertex_batch);
+            camera_vertex_batch.row(2).array() += camera_distance;
+
+            const float scale = static_cast<float>(std::min(frame_width, frame_height)) * 0.52f;
+            const float center_x = static_cast<float>(frame_width) * 0.5f;
+            const float center_y = static_cast<float>(frame_height) * 0.5f;
+            const auto safe_depth = camera_vertex_batch.row(2).array().max(0.001f);
+            projected_vertex_batch.row(0).array() = center_x + camera_vertex_batch.row(0).array() / safe_depth * scale;
+            projected_vertex_batch.row(1).array() = center_y - camera_vertex_batch.row(1).array() / safe_depth * scale;
+            projected_vertex_batch.row(2) = camera_vertex_batch.row(2);
+            projected_vertex_batch.row(3).setOnes();
+#else
+            rotation.MulVec(model.local, camera_vertices);
+            for (std::size_t index = 0; index < model.local.size(); ++index) {
+                camera_vertices[index].z += camera_distance;
+                projected_vertices[index] = project_to_screen(camera_vertices[index], frame_width, frame_height);
+            }
+#endif
+        }
+
+        [[nodiscard]] mxvk::vec4D projected_vertex(std::size_t index) const {
+#if defined(MXVK_USE_EIGEN_MATH)
+            const Eigen::Index batch_index = static_cast<Eigen::Index>(index);
+            return {
+                projected_vertex_batch(0, batch_index),
+                projected_vertex_batch(1, batch_index),
+                projected_vertex_batch(2, batch_index),
+                projected_vertex_batch(3, batch_index),
+            };
+#else
+            return projected_vertices[index];
+#endif
+        }
+
+        void append_visible_face(std::size_t first, std::size_t second, std::size_t third, float intensity) {
+            std::array<mxvk::vec2D, 3> texcoords = {
+                model.texcoords[first],
+                model.texcoords[second],
+                model.texcoords[third],
+            };
+            if (!texture.empty() && texture_repeat_enabled) {
+                texcoords = unwrap_horizontal_texcoords(texcoords);
+            }
+            visible_faces.push_back({
+                {projected_vertex(first), projected_vertex(second), projected_vertex(third)},
+                texcoords,
+                intensity,
+            });
+        }
+
+        void build_visible_faces(const mxvk::Mat4D &rotation_matrix, const mxvk::vec4D &light_direction) {
+#if defined(MXVK_USE_EIGEN_MATH)
+            transform_eigen_batch(rotation_matrix, local_face_center_batch, camera_face_center_batch);
+            transform_eigen_batch(rotation_matrix, local_face_normal_batch, camera_face_normal_batch);
+            camera_face_center_batch.row(2).array() += camera_distance;
+            triangle_visible =
+                (-camera_face_normal_batch.row(0).array() * camera_face_center_batch.row(0).array() -
+                 camera_face_normal_batch.row(1).array() * camera_face_center_batch.row(1).array() -
+                 camera_face_normal_batch.row(2).array() * camera_face_center_batch.row(2).array()) >
+                0.0f;
+
+            const auto diffuse =
+                (camera_face_normal_batch.row(0).array() * light_direction.x +
+                 camera_face_normal_batch.row(1).array() * light_direction.y +
+                 camera_face_normal_batch.row(2).array() * light_direction.z)
+                    .max(0.0f);
+            triangle_intensity.array() = (0.35f + diffuse * 0.65f).min(1.0f);
+
+            for (std::size_t index = 0; index < model.vlist.size(); ++index) {
+                const Eigen::Index batch_index = static_cast<Eigen::Index>(index);
+                if (!triangle_visible(batch_index)) {
+                    continue;
+                }
+                const mxvk::Triangle &triangle = model.vlist[index];
+                append_visible_face(
+                    static_cast<std::size_t>(triangle.vert[0]),
+                    static_cast<std::size_t>(triangle.vert[1]),
+                    static_cast<std::size_t>(triangle.vert[2]),
+                    triangle_intensity(batch_index));
+            }
+#else
+            rotation_matrix.MulVec(local_face_centers, camera_face_centers);
+            rotation_matrix.MulVec(local_face_normals, camera_face_normals);
+            for (std::size_t index = 0; index < model.vlist.size(); ++index) {
+                const mxvk::Triangle &triangle = model.vlist[index];
+                const auto first = static_cast<std::size_t>(triangle.vert[0]);
+                const auto second = static_cast<std::size_t>(triangle.vert[1]);
+                const auto third = static_cast<std::size_t>(triangle.vert[2]);
+                mxvk::vec4D &center = camera_face_centers[index];
+                center.z += camera_distance;
+                const mxvk::vec4D &normal = camera_face_normals[index];
+                const mxvk::vec4D view_direction(-center.x, -center.y, -center.z, 0.0f);
+                if (normal.DotProduct(view_direction) <= 0.0f) {
+                    continue;
+                }
+
+                const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
+                append_visible_face(first, second, third, std::clamp(0.35f + diffuse * 0.65f, 0.0f, 1.0f));
+            }
+#endif
+        }
 
         void ensure_framebuffer() {
             if (frame_surface != nullptr) {
@@ -662,7 +833,12 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, args.framebuffer);
+        FramebufferDimensions framebuffer = args.framebuffer;
+        if (args.benchmark && !args.framebufferSpecified) {
+            framebuffer = {320, 180};
+            std::cout << "3dmath_plg_loader: benchmark framebuffer defaults to 320x180; use --framebuffer to override\n";
+        }
+        example::Math3DPlgLoaderWindow window(args.filename, args.texture, args.path, "MXVK 3D Math PLG Loader", args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, framebuffer, args.benchmark);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

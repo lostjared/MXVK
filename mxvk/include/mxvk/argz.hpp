@@ -750,10 +750,12 @@ struct Arguments {
     bool enable_vsync = false;            ///< Enable FIFO present mode / v-sync (@c --enable-vsync).
     bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
     bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
+    bool benchmark = false;               ///< Enable application benchmark mode (@c --benchmark).
     bool nowarpfix = false;               ///< Disable perspective-correct texture mapping (@c --nowarpfix).
     bool disable_mipmap = false;          ///< Disable mipmap generation and selection (@c --disable-mipmap).
     float mip_bias = 0.0f;                ///< Mipmap level-of-detail bias requested by @c --mip-bias.
     FramebufferDimensions framebuffer;    ///< Software framebuffer size requested by @c --framebuffer.
+    bool framebufferSpecified = false;    ///< Whether @c --framebuffer was provided.
     double fps = 0.0;                     ///< Optional FPS override (@c --fps); non-positive means unspecified.
     int font_size = 22;                   ///< Matrix rain font size in pixels (@c --font-size).
     std::string font_path;                ///< Optional font file path (@c --font-path).
@@ -845,6 +847,7 @@ struct Arguments {
  * |      | --enable-vsync     | Enable FIFO present mode / v-sync             |
  * |      | --enable-screenshot| Enable F10 screenshot capture                 |
  * |      | --disable-sound    | Disable application background music          |
+ * |      | --benchmark        | Enable application benchmark mode             |
  * |      | --nowarpfix        | Disable perspective-correct texture mapping    |
  * |      | --disable-mipmap   | Disable mipmap generation and selection        |
  * |      | --mip-bias         | Mipmap level-of-detail bias                    |
@@ -894,6 +897,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(320, "enable-vsync", "enable FIFO present mode / v-sync")
         .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
         .addOptionDouble(325, "disable-sound", "disable background music")
+        .addOptionDouble(330, "benchmark", "enable application benchmark mode")
         .addOptionDouble(326, "nowarpfix", "3dmath - disable perspective-correct texture mapping")
         .addOptionDoubleValue(327, "framebuffer", "3dmath - software framebuffer size WidthxHeight")
         .addOptionDouble(328, "disable-mipmap", "3dmath - disable mipmap generation and selection")
@@ -939,10 +943,12 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool enable_vsync = false;
     bool enable_screenshot = false;
     bool disable_sound = false;
+    bool benchmark = false;
     bool nowarpfix = false;
     bool disable_mipmap = false;
     float mip_bias = 0.0f;
     FramebufferDimensions framebuffer;
+    bool framebufferSpecified = false;
     double fps = 0.0;
     int font_size = 22;
     std::string font_path;
@@ -1010,6 +1016,9 @@ inline Arguments proc_args(int &argc, char **argv) {
         case 325:
             disable_sound = true;
             break;
+        case 330:
+            benchmark = true;
+            break;
         case 326:
             nowarpfix = true;
             break;
@@ -1023,6 +1032,7 @@ inline Arguments proc_args(int &argc, char **argv) {
             if (framebuffer.width <= 0 || framebuffer.height <= 0) {
                 throw ArgException<std::string>("Invalid framebuffer size: " + arg.arg_value);
             }
+            framebufferSpecified = true;
         } break;
         case 328:
             disable_mipmap = true;
@@ -1143,10 +1153,12 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.enable_vsync = enable_vsync;
     args.enable_screenshot = enable_screenshot;
     args.disable_sound = disable_sound;
+    args.benchmark = benchmark;
     args.nowarpfix = nowarpfix;
     args.disable_mipmap = disable_mipmap;
     args.mip_bias = mip_bias;
     args.framebuffer = framebuffer;
+    args.framebufferSpecified = framebufferSpecified;
     mxvk::setDefaultEnableScreenshot(enable_screenshot);
     args.fps = fps;
     args.font_size = font_size;

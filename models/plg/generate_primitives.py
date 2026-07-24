@@ -274,6 +274,7 @@ def main() -> None:
         "cylinder": (cylinder(), "Unit-height cylinder with 24 radial segments."),
         "cone": (cone(), "Unit-height cone with 24 radial segments."),
         "sphere": (uv_sphere(), "Unit-radius UV sphere with 24 segments and 12 latitude bands."),
+        "heavy_sphere": (uv_sphere(segments=256, rings=128), "High-density unit-radius UV sphere with 256 segments and 128 latitude bands."),
         "capsule": (capsule(), "Y-axis capsule with radius 0.5 and total height 2."),
         "torus": (torus(), "Y-axis torus with major radius 0.65 and tube radius 0.25."),
     }

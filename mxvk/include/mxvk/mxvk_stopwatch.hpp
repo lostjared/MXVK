@@ -25,10 +25,14 @@ public:
     }
     
     void echo(std::string_view name) const {
+        const auto elapsed = stop_time - start_time;
         std::cout << "Stopwatch [" << name << "]\n"
                   << "Timer was active for : " 
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time).count() 
-                  << " Milliseconds\n";
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
+                  << " Milliseconds\n"
+                  << "Timer was active for : "
+                  << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()
+                  << " Nanoseconds\n";
     }
     
     unsigned long timePassed() const {
@@ -52,9 +56,13 @@ public:
     }
     
     void echo(std::string_view name) const {
+        const auto elapsed = stop_time - start_time;
         std::cout << "Stopwatch [" << name << "]\n"
                   << "Timer was active for : " 
-                  << std::chrono::duration_cast<std::chrono::nanoseconds>(stop_time - start_time).count() 
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
+                  << " Milliseconds\n"
+                  << "Timer was active for : "
+                  << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()
                   << " Nanoseconds\n";
     }
     

@@ -26,6 +26,29 @@ Run the bundled sphere from the repository root:
 ./run.pl 3dmath_plg_loader
 ```
 
+Benchmark the CPU geometry pipeline over 60 frames:
+
+```bash
+./run.pl 3dmath_plg_loader --benchmark
+```
+
+The reported time covers matrix setup, vertex transformation, face lighting
+and culling, and triangle rasterization. It excludes framebuffer clearing,
+texture upload, sprite drawing, and presentation. Benchmark mode exits after
+the result is printed. To keep shared scalar rasterization from hiding math
+backend differences, benchmark mode uses a 320x180 software framebuffer unless
+`--framebuffer` is explicitly supplied. Use `--framebuffer 1280x720` for an
+end-to-end comparison at the normal rendering resolution.
+
+For a heavier comparison, the generated `models/plg/heavy_sphere.plg` contains
+32,514 vertices and 65,024 triangles:
+
+```bash
+./run.pl 3dmath_plg_loader \
+    --benchmark \
+    --filename "$(pwd)/models/plg/heavy_sphere.plg"
+```
+
 Load another PLG file:
 
 ```bash

@@ -15,8 +15,11 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <span>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -477,34 +480,40 @@ namespace mxvk {
 
         /// Add two vectors component-wise.
         [[nodiscard]] vec4D operator+(const vec4D &v) const {
-            return FromEigen(ToEigen() + v.ToEigen());
+            return {x + v.x, y + v.y, z + v.z, w + v.w};
         }
 
         /// Add another vector to this vector.
         vec4D &operator+=(const vec4D &v) {
-            FromEigen(ToEigen() + v.ToEigen(), *this);
+            x += v.x;
+            y += v.y;
+            z += v.z;
+            w += v.w;
             return *this;
         }
 
         /// Subtract two vectors component-wise.
         [[nodiscard]] vec4D operator-(const vec4D &v) const {
-            return FromEigen(ToEigen() - v.ToEigen());
+            return {x - v.x, y - v.y, z - v.z, w - v.w};
         }
 
         /// Subtract another vector from this vector.
         vec4D &operator-=(const vec4D &v) {
-            FromEigen(ToEigen() - v.ToEigen(), *this);
+            x -= v.x;
+            y -= v.y;
+            z -= v.z;
+            w -= v.w;
             return *this;
         }
 
         /// Scale this vector by a scalar.
         [[nodiscard]] vec4D operator*(float k) const {
-            return FromEigen(ToEigen() * k);
+            return {x * k, y * k, z * k, w * k};
         }
 
         /// Multiply two vectors component-wise.
         [[nodiscard]] vec4D operator*(const vec4D &v) const {
-            return FromEigen(ToEigen().cwiseProduct(v.ToEigen()));
+            return {x * v.x, y * v.y, z * v.z, w * v.w};
         }
 
         /// Return a scaled copy of this vector.
@@ -514,23 +523,30 @@ namespace mxvk {
 
         /// Scale this vector in place.
         void ScaleThis(float k) {
-            FromEigen(ToEigen() * k, *this);
+            x *= k;
+            y *= k;
+            z *= k;
+            w *= k;
         }
 
         /// Compute the 3D dot product, ignoring the W component.
         [[nodiscard]] float DotProduct(const vec4D &v) const {
-            return ToEigen3().dot(v.ToEigen3());
+            return x * v.x + y * v.y + z * v.z;
         }
 
         /// Compute the 3D cross product and return it as a direction with W set to 0.
         [[nodiscard]] vec4D CrossProduct(const vec4D &v) const {
-            const Eigen::Vector3f result = ToEigen3().cross(v.ToEigen3());
-            return {result.x(), result.y(), result.z(), 0.0f};
+            return {
+                y * v.z - z * v.y,
+                z * v.x - x * v.z,
+                x * v.y - y * v.x,
+                0.0f,
+            };
         }
 
         /// Compute the 3D Euclidean length, ignoring the W component.
         [[nodiscard]] float Length() const {
-            return ToEigen3().norm();
+            return std::sqrt(DotProduct(*this));
         }
 
         /// Normalize the 3D components in place while preserving W.
@@ -540,8 +556,9 @@ namespace mxvk {
                 x = y = z = 0.0f;
                 return;
             }
-            const Eigen::Vector3f normalized = ToEigen3().normalized();
-            Set(normalized.x(), normalized.y(), normalized.z(), w);
+            x /= len;
+            y /= len;
+            z /= len;
         }
 
         /// Write a normalized copy of this vector to @p v.
@@ -563,8 +580,7 @@ namespace mxvk {
 
         /// Build a direction vector from @p from to @p to with W set to 0.
         [[nodiscard]] vec4D Build(const vec4D &from, const vec4D &to) const {
-            const Eigen::Vector3f direction = to.ToEigen3() - from.ToEigen3();
-            return {direction.x(), direction.y(), direction.z(), 0.0f};
+            return {to.x - from.x, to.y - from.y, to.z - from.z, 0.0f};
         }
 
         /// Format this vector as a named angle-bracket tuple.
@@ -572,23 +588,6 @@ namespace mxvk {
             std::ostringstream out;
             out << name << '<' << x << ',' << y << ',' << z << ',' << w << '>';
             return out.str();
-        }
-
-      private:
-        [[nodiscard]] Eigen::Vector4f ToEigen() const {
-            return {x, y, z, w};
-        }
-
-        [[nodiscard]] Eigen::Vector3f ToEigen3() const {
-            return {x, y, z};
-        }
-
-        [[nodiscard]] static vec4D FromEigen(const Eigen::Vector4f &v) {
-            return {v.x(), v.y(), v.z(), v.w()};
-        }
-
-        static void FromEigen(const Eigen::Vector4f &v, vec4D &out) {
-            out.Set(v.x(), v.y(), v.z(), v.w());
         }
     };
 
@@ -893,6 +892,32 @@ namespace mxvk {
         /// Transform a homogeneous 4D vector and write the result to @p out.
         void MulVec(const vec4D &in, vec4D &out) const {
             out = MulVec(in);
+        }
+
+        /**
+         * @brief Transform a batch of homogeneous 4D vectors.
+         * @param input Source vectors.
+         * @param output Destination vectors, with the same size as @p input.
+         *
+         * Processing the vectors as a 4xN matrix lets Eigen use packetized SIMD
+         * across the complete batch instead of evaluating one small expression
+         * per vertex.
+         */
+        void MulVec(std::span<const vec4D> input, std::span<vec4D> output) const {
+            if (input.size() != output.size()) {
+                throw std::invalid_argument("Mat4D::MulVec batch spans must have equal sizes");
+            }
+            if (input.empty()) {
+                return;
+            }
+
+            static_assert(std::is_standard_layout_v<vec4D>);
+            static_assert(sizeof(vec4D) == sizeof(float) * 4);
+            using VertexMatrix = Eigen::Matrix<float, 4, Eigen::Dynamic, Eigen::ColMajor>;
+            const Eigen::Index vertex_count = static_cast<Eigen::Index>(input.size());
+            const Eigen::Map<const VertexMatrix, Eigen::Unaligned> input_matrix(&input.front().x, 4, vertex_count);
+            Eigen::Map<VertexMatrix, Eigen::Unaligned> output_matrix(&output.front().x, 4, vertex_count);
+            output_matrix.noalias() = ToEigen().transpose() * input_matrix;
         }
 
         /// Transform a 3D point by this matrix using W = 1.
