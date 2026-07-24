@@ -7,6 +7,7 @@ outward-facing triangle winding, and the active, visible `0x0003` state.
 The collection includes:
 
 - cube
+- cubeaf (8×8 subdivisions per face for reduced affine texture warping)
 - pyramid
 - tetrahedron
 - octahedron

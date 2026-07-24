@@ -80,6 +80,50 @@ def cube() -> Mesh:
     return Mesh(vertices, triangles)
 
 
+def subdivided_cube(subdivisions: int = 8) -> Mesh:
+    """Build a cube with a face-local grid to reduce affine texture warping."""
+
+    if subdivisions < 1:
+        raise ValueError("cube subdivisions must be positive")
+
+    faces = [
+        ((-0.5, -0.5, -0.5), (0.0, 1.0, 0.0), (1.0, 0.0, 0.0)),
+        ((-0.5, -0.5, 0.5), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)),
+        ((-0.5, -0.5, -0.5), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0)),
+        ((0.5, -0.5, -0.5), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+        ((-0.5, 0.5, -0.5), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0)),
+        ((-0.5, -0.5, -0.5), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0)),
+    ]
+    vertices: list[tuple[float, float, float, float, float]] = []
+    triangles: list[tuple[int, int, int]] = []
+
+    for origin, u_axis, v_axis in faces:
+        first = len(vertices)
+        for row in range(subdivisions + 1):
+            v = row / subdivisions
+            for column in range(subdivisions + 1):
+                u = column / subdivisions
+                point = tuple(
+                    origin[axis] + u * u_axis[axis] + v * v_axis[axis]
+                    for axis in range(3)
+                )
+                vertices.append((*point, u, 1.0 - v))
+
+        stride = subdivisions + 1
+        for row in range(subdivisions):
+            for column in range(subdivisions):
+                top_left = first + row * stride + column
+                top_right = top_left + 1
+                bottom_left = top_left + stride
+                bottom_right = bottom_left + 1
+                triangles.extend([
+                    (top_left, bottom_left, bottom_right),
+                    (top_left, bottom_right, top_right),
+                ])
+
+    return orient_outward(Mesh(vertices, triangles))
+
+
 def square_pyramid() -> Mesh:
     points = [
         (-0.5, -0.5, -0.5),
@@ -266,6 +310,7 @@ def main() -> None:
     output_directory = Path(__file__).resolve().parent
     primitives = {
         "cube": (cube(), "Unit cube with independent planar UVs on each face."),
+        "cubeaf": (subdivided_cube(), "Unit cube with 8x8 face grids to reduce affine texture warping."),
         "pyramid": (square_pyramid(), "Square-based unit pyramid."),
         "tetrahedron": (tetrahedron(), "Regular tetrahedron with unit-radius corners."),
         "octahedron": (octahedron(), "Regular octahedron with unit-radius corners."),
