@@ -304,9 +304,9 @@ namespace {
 namespace example {
     class Math3DModelLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DModelLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark)
+        Math3DModelLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark, bool wireframe)
             : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              override_texture(load_texture(texture_filename, asset_path, !disable_mipmap)),
+              override_texture(wireframe ? Texture{} : load_texture(texture_filename, asset_path, !disable_mipmap)),
               frame_width(framebuffer.width),
               frame_height(framebuffer.height),
               fallback_width(width),
@@ -315,7 +315,8 @@ namespace example {
               mipmapping_enabled(!disable_mipmap),
               mip_level_bias(mip_bias),
               texture_repeat_enabled(repeat_texture),
-              benchmark_enabled(benchmark) {
+              benchmark_enabled(benchmark),
+              wireframe_enabled(wireframe) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -336,7 +337,9 @@ namespace example {
 #if defined(MXVK_OBJ_LOADER)
             filter_auxiliary_objects();
             fit_model_to_view();
-            load_material_textures(asset_path, !disable_mipmap);
+            if (!wireframe_enabled) {
+                load_material_textures(asset_path, !disable_mipmap);
+            }
 #endif
 #if defined(MXVK_USE_EIGEN_MATH)
             local_vertex_batch.resize(4, static_cast<Eigen::Index>(model.local.size()));
@@ -442,7 +445,11 @@ namespace example {
             build_visible_faces(rotation, light_direction);
 
             for (const FaceDraw &face : visible_faces) {
-                draw_gradient_triangle(face);
+                if (wireframe_enabled) {
+                    draw_wireframe_triangle(face);
+                } else {
+                    draw_gradient_triangle(face);
+                }
             }
 
             if (benchmark_stopwatch != nullptr) {
@@ -504,6 +511,7 @@ namespace example {
         float mip_level_bias = 0.0f;
         bool texture_repeat_enabled = false;
         bool benchmark_enabled = false;
+        bool wireframe_enabled = false;
         std::size_t benchmark_frame_count = 0;
         std::string benchmark_name =
             std::format("{} geometry draw ({} backend, {} frames)", MODEL_FORMAT, BACKEND_NAME, BENCHMARK_FRAME_COUNT);
@@ -1001,6 +1009,48 @@ namespace example {
             }
         }
 
+        void draw_wireframe_edge(const mxvk::vec4D &first, const mxvk::vec4D &second, mxvk::MXCOLOR color) {
+            const float delta_x = second.x - first.x;
+            const float delta_y = second.y - first.y;
+            const int steps = std::max(1, static_cast<int>(std::ceil(std::max(std::abs(delta_x), std::abs(delta_y)))));
+            const float first_reciprocal_depth = 1.0f / first.z;
+            const float second_reciprocal_depth = 1.0f / second.z;
+
+            for (int step = 0; step <= steps; ++step) {
+                const float fraction = static_cast<float>(step) / static_cast<float>(steps);
+                const int x = static_cast<int>(std::lround(first.x + delta_x * fraction));
+                const int y = static_cast<int>(std::lround(first.y + delta_y * fraction));
+                if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
+                    continue;
+                }
+
+                const float reciprocal_depth =
+                    first_reciprocal_depth +
+                    (second_reciprocal_depth - first_reciprocal_depth) * fraction;
+                if (reciprocal_depth <= mxvk::EPSILON) {
+                    continue;
+                }
+
+                const float depth = 1.0f / reciprocal_depth;
+                const std::size_t pixel_index =
+                    static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) +
+                    static_cast<std::size_t>(x);
+                if (depth >= depth_buffer[pixel_index]) {
+                    continue;
+                }
+
+                depth_buffer[pixel_index] = depth;
+                put_pixel(x, y, color);
+            }
+        }
+
+        void draw_wireframe_triangle(const FaceDraw &face) {
+            const mxvk::MXCOLOR color = mxvk::shade_color(face.material_color, face.intensity);
+            draw_wireframe_edge(face.points[0], face.points[1], color);
+            draw_wireframe_edge(face.points[1], face.points[2], color);
+            draw_wireframe_edge(face.points[2], face.points[0], color);
+        }
+
         [[nodiscard]] static mxvk::MXCOLOR gradient_color(float u, float v) {
             u = std::clamp(u, 0.0f, 1.0f);
             v = std::clamp(v, 0.0f, 1.0f);
@@ -1043,7 +1093,7 @@ int main(int argc, char **argv) {
             framebuffer = {320, 180};
             std::cout << APP_NAME << ": benchmark framebuffer defaults to 320x180; use --framebuffer to override\n";
         }
-        example::Math3DModelLoaderWindow window(args.filename, args.texture, args.path, std::string(WINDOW_TITLE), args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, framebuffer, args.benchmark);
+        example::Math3DModelLoaderWindow window(args.filename, args.texture, args.path, std::string(WINDOW_TITLE), args.width, args.height, args.fullscreen, args.enable_vsync, args.repeat, args.nowarpfix, args.disable_mipmap, args.mip_bias, framebuffer, args.benchmark, args.wireframe);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

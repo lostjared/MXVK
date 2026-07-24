@@ -751,6 +751,7 @@ struct Arguments {
     bool enable_screenshot = false;       ///< Enable F10 screenshot capture (@c --enable-screenshot).
     bool disable_sound = false;           ///< Disable application background music (@c --disable-sound).
     bool benchmark = false;               ///< Enable application benchmark mode (@c --benchmark).
+    bool wireframe = false;               ///< Render supported 3D models as wireframes (@c --wireframe).
     bool nowarpfix = false;               ///< Disable perspective-correct texture mapping (@c --nowarpfix).
     bool disable_mipmap = false;          ///< Disable mipmap generation and selection (@c --disable-mipmap).
     float mip_bias = 0.0f;                ///< Mipmap level-of-detail bias requested by @c --mip-bias.
@@ -848,6 +849,7 @@ struct Arguments {
  * |      | --enable-screenshot| Enable F10 screenshot capture                 |
  * |      | --disable-sound    | Disable application background music          |
  * |      | --benchmark        | Enable application benchmark mode             |
+ * |      | --wireframe        | Render supported 3D models as wireframes       |
  * |      | --nowarpfix        | Disable perspective-correct texture mapping    |
  * |      | --disable-mipmap   | Disable mipmap generation and selection        |
  * |      | --mip-bias         | Mipmap level-of-detail bias                    |
@@ -898,6 +900,7 @@ inline Arguments proc_args(int &argc, char **argv) {
         .addOptionDouble(322, "enable-screenshot", "enable F10 screenshot capture")
         .addOptionDouble(325, "disable-sound", "disable background music")
         .addOptionDouble(330, "benchmark", "enable application benchmark mode")
+        .addOptionDouble(331, "wireframe", "render supported 3D models as wireframes")
         .addOptionDouble(326, "nowarpfix", "3dmath - disable perspective-correct texture mapping")
         .addOptionDoubleValue(327, "framebuffer", "3dmath - software framebuffer size WidthxHeight")
         .addOptionDouble(328, "disable-mipmap", "3dmath - disable mipmap generation and selection")
@@ -944,6 +947,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     bool enable_screenshot = false;
     bool disable_sound = false;
     bool benchmark = false;
+    bool wireframe = false;
     bool nowarpfix = false;
     bool disable_mipmap = false;
     float mip_bias = 0.0f;
@@ -1018,6 +1022,9 @@ inline Arguments proc_args(int &argc, char **argv) {
             break;
         case 330:
             benchmark = true;
+            break;
+        case 331:
+            wireframe = true;
             break;
         case 326:
             nowarpfix = true;
@@ -1154,6 +1161,7 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.enable_screenshot = enable_screenshot;
     args.disable_sound = disable_sound;
     args.benchmark = benchmark;
+    args.wireframe = wireframe;
     args.nowarpfix = nowarpfix;
     args.disable_mipmap = disable_mipmap;
     args.mip_bias = mip_bias;

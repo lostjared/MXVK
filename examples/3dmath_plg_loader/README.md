@@ -26,6 +26,14 @@ Run the bundled sphere from the repository root:
 ./run.pl 3dmath_plg_loader
 ```
 
+Render only the model's depth-tested triangle edges, without filling or
+texturing its faces:
+
+```bash
+./run.pl 3dmath_plg_loader --wireframe
+./run.pl 3dmath_obj_loader --wireframe
+```
+
 Benchmark the CPU geometry pipeline over 60 frames:
 
 ```bash
