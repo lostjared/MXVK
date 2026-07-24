@@ -11,8 +11,34 @@ animated fragment shader. The block cubes use the original `puzzle_drop` PNG
 textures. The background, board, status text, and next-piece panel are composed
 inside the selected software framebuffer, then displayed together with nearest
 filtering so `--framebuffer` consistently controls the resolution of the whole
-scene. Wildcard blocks use the original game's rapidly changing neon color
-effect.
+scene and retains the PS1-style presentation. Cube edges use four subpixel
+coverage samples to reduce stair-stepping without smoothing the framebuffer or
+changing the existing texture treatment. Wildcard blocks use the original
+game's rapidly changing neon color effect.
+
+## Rendering quality
+
+Block textures use mipmaps by default. `--mip-bias` adjusts their selected
+level-of-detail: negative values such as `--mip-bias -0.75` preserve a sharper
+retro texture, while small positive values reduce texture shimmer. Use
+`--disable-mipmap` for a fully unmipmapped comparison.
+
+Texture coordinates use perspective-correct interpolation by default. Add
+`--nowarpfix` to disable that correction and use optional affine texture
+mapping, which produces the characteristic PS1-style texture warping on angled
+cube faces.
+
+For a 1280x720 software framebuffer with the sharper mip bias:
+
+```bash
+./run.pl 3dmath_puzzle_drop --framebuffer 1280x720 --mip-bias -0.75
+```
+
+Add the affine texture effect when desired:
+
+```bash
+./run.pl 3dmath_puzzle_drop --framebuffer 1280x720 --mip-bias -0.75 --nowarpfix
+```
 
 ## Controls
 

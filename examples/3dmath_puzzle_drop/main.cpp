@@ -340,18 +340,22 @@ namespace {
 
     class SoftwareRenderer {
       public:
-        SoftwareRenderer(int width, int height, const std::string &data_root)
+        SoftwareRenderer(int width, int height, const std::string &data_root, bool enable_warp_fix, bool enable_mipmapping, float mip_bias)
             : frame_width(width),
               frame_height(height),
-              depth_buffer(static_cast<std::size_t>(width * height)),
+              depth_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT),
+              color_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT),
               background(load_texture(data_root + "/level1.png")),
-              intro(load_texture(data_root + "/intro1.png")) {
+              intro(load_texture(data_root + "/intro1.png")),
+              warp_fix_enabled(enable_warp_fix),
+              mipmapping_enabled(enable_mipmapping),
+              mip_level_bias(mip_bias) {
             frame_surface.reset(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
             if (!frame_surface) {
                 throw mxvk::Exception(std::format("3dmath_puzzle_drop: failed to create framebuffer: {}", SDL_GetError()));
             }
             for (const char *filename : BLOCK_TEXTURE_FILES) {
-                block_textures.push_back(load_texture(data_root + "/" + filename, true));
+                block_textures.push_back(load_texture(data_root + "/" + filename, mipmapping_enabled));
             }
         }
 
@@ -377,6 +381,38 @@ namespace {
             draw_flat_image(show_intro ? intro : background);
             if (!show_intro) {
                 fill_translucent_rectangle(0, 0, frame_width, frame_height, mxvk::MXVK_RGB(3, 8, 16), 150);
+            }
+        }
+
+        void resolve_multisampling() {
+            for (int y = 0; y < frame_height; ++y) {
+                auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y * frame_surface->pitch);
+                for (int x = 0; x < frame_width; ++x) {
+                    auto *pixel = row + static_cast<std::size_t>(x * 4);
+                    const mxvk::MXCOLOR background_color =
+                        (0xFFU << 24U) |
+                        (static_cast<mxvk::MXCOLOR>(pixel[0]) << 16U) |
+                        (static_cast<mxvk::MXCOLOR>(pixel[1]) << 8U) |
+                        static_cast<mxvk::MXCOLOR>(pixel[2]);
+                    const std::size_t pixel_index = static_cast<std::size_t>(y * frame_width + x);
+                    const std::size_t first_sample = pixel_index * MSAA_SAMPLE_COUNT;
+                    std::uint32_t red = 0;
+                    std::uint32_t green = 0;
+                    std::uint32_t blue = 0;
+                    for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
+                        const std::size_t sample_index = first_sample + sample;
+                        const mxvk::MXCOLOR color = std::isfinite(depth_buffer[sample_index])
+                                                        ? color_buffer[sample_index]
+                                                        : background_color;
+                        red += mxvk::color_r(color);
+                        green += mxvk::color_g(color);
+                        blue += mxvk::color_b(color);
+                    }
+                    pixel[0] = static_cast<std::uint8_t>((red + MSAA_SAMPLE_COUNT / 2U) / MSAA_SAMPLE_COUNT);
+                    pixel[1] = static_cast<std::uint8_t>((green + MSAA_SAMPLE_COUNT / 2U) / MSAA_SAMPLE_COUNT);
+                    pixel[2] = static_cast<std::uint8_t>((blue + MSAA_SAMPLE_COUNT / 2U) / MSAA_SAMPLE_COUNT);
+                    pixel[3] = 255;
+                }
             }
         }
 
@@ -459,11 +495,23 @@ namespace {
         int frame_width = 0;
         int frame_height = 0;
         std::vector<float> depth_buffer;
+        std::vector<mxvk::MXCOLOR> color_buffer;
         Texture background;
         Texture intro;
         std::vector<Texture> block_textures;
+        bool warp_fix_enabled = true;
+        bool mipmapping_enabled = true;
+        float mip_level_bias = 0.0f;
         mxvk::Mat4D camera_rotation;
         float camera_distance = CAMERA_DISTANCE;
+
+        static constexpr std::size_t MSAA_SAMPLE_COUNT = 4;
+        static constexpr std::array<std::array<float, 2>, MSAA_SAMPLE_COUNT> MSAA_SAMPLE_OFFSETS{{
+            {{0.375f, 0.125f}},
+            {{0.875f, 0.375f}},
+            {{0.125f, 0.625f}},
+            {{0.625f, 0.875f}},
+        }};
 
         static constexpr std::array<mxvk::vec4D, 8> CUBE_VERTICES{{
             {-1.0f, -1.0f, -1.0f, 1.0f},
@@ -616,7 +664,7 @@ namespace {
             const float inverse_z1 = 1.0f / b.position.z;
             const float inverse_z2 = 1.0f / c.position.z;
             float texture_lod = 0.0f;
-            if (texture != nullptr) {
+            if (texture != nullptr && mipmapping_enabled) {
                 const auto texels_per_pixel = [texture](const RasterVertex &first, const RasterVertex &second) {
                     const float screen_width = second.position.x - first.position.x;
                     const float screen_height = second.position.y - first.position.y;
@@ -631,42 +679,86 @@ namespace {
                     texels_per_pixel(c, a),
                     1.0f,
                 });
-                constexpr float MIP_SHARPNESS_BIAS = 0.75f;
-                texture_lod = std::max(0.0f, std::log2(minification) - MIP_SHARPNESS_BIAS);
+                texture_lod = std::max(0.0f, std::log2(minification) + mip_level_bias);
             }
 
             for (int y = min_y; y <= max_y; ++y) {
                 for (int x = min_x; x <= max_x; ++x) {
-                    const mxvk::vec2D point(static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f);
-                    const float edge0 = mxvk::edge_function(p1, p2, point);
-                    const float edge1 = mxvk::edge_function(p2, p0, point);
-                    const float edge2 = mxvk::edge_function(p0, p1, point);
-                    if ((area > 0.0f && (edge0 < 0.0f || edge1 < 0.0f || edge2 < 0.0f)) ||
-                        (area < 0.0f && (edge0 > 0.0f || edge1 > 0.0f || edge2 > 0.0f))) {
+                    const std::size_t pixel_index = static_cast<std::size_t>(y * frame_width + x);
+                    const std::size_t first_sample = pixel_index * MSAA_SAMPLE_COUNT;
+                    std::array<float, MSAA_SAMPLE_COUNT> sample_depths{};
+                    std::uint8_t passing_samples = 0;
+                    float centroid_x = 0.0f;
+                    float centroid_y = 0.0f;
+                    int passing_sample_count = 0;
+                    for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
+                        const mxvk::vec2D point(
+                            static_cast<float>(x) + MSAA_SAMPLE_OFFSETS[sample][0],
+                            static_cast<float>(y) + MSAA_SAMPLE_OFFSETS[sample][1]);
+                        const float edge0 = mxvk::edge_function(p1, p2, point);
+                        const float edge1 = mxvk::edge_function(p2, p0, point);
+                        const float edge2 = mxvk::edge_function(p0, p1, point);
+                        if ((area > 0.0f && (edge0 < 0.0f || edge1 < 0.0f || edge2 < 0.0f)) ||
+                            (area < 0.0f && (edge0 > 0.0f || edge1 > 0.0f || edge2 > 0.0f))) {
+                            continue;
+                        }
+                        const float weight0 = edge0 * inverse_area;
+                        const float weight1 = edge1 * inverse_area;
+                        const float weight2 = edge2 * inverse_area;
+                        const float inverse_z = weight0 * inverse_z0 + weight1 * inverse_z1 + weight2 * inverse_z2;
+                        const float depth = 1.0f / inverse_z;
+                        const std::size_t sample_index = first_sample + sample;
+                        if (depth >= depth_buffer[sample_index]) {
+                            continue;
+                        }
+                        sample_depths[sample] = depth;
+                        passing_samples |= static_cast<std::uint8_t>(1U << sample);
+                        centroid_x += point.x;
+                        centroid_y += point.y;
+                        ++passing_sample_count;
+                    }
+                    if (passing_samples == 0) {
                         continue;
                     }
+
+                    const mxvk::vec2D shading_point(
+                        centroid_x / static_cast<float>(passing_sample_count),
+                        centroid_y / static_cast<float>(passing_sample_count));
+                    const float edge0 = mxvk::edge_function(p1, p2, shading_point);
+                    const float edge1 = mxvk::edge_function(p2, p0, shading_point);
+                    const float edge2 = mxvk::edge_function(p0, p1, shading_point);
                     const float weight0 = edge0 * inverse_area;
                     const float weight1 = edge1 * inverse_area;
                     const float weight2 = edge2 * inverse_area;
                     const float inverse_z = weight0 * inverse_z0 + weight1 * inverse_z1 + weight2 * inverse_z2;
-                    const float depth = 1.0f / inverse_z;
-                    const std::size_t pixel_index = static_cast<std::size_t>(y * frame_width + x);
-                    if (depth >= depth_buffer[pixel_index]) {
-                        continue;
-                    }
-                    depth_buffer[pixel_index] = depth;
                     mxvk::MXCOLOR color = mxvk::MXVK_RGB(255, 255, 255);
                     if (texture != nullptr) {
-                        const float u = (weight0 * a.uv.x * inverse_z0 + weight1 * b.uv.x * inverse_z1 + weight2 * c.uv.x * inverse_z2) / inverse_z;
-                        const float v = (weight0 * a.uv.y * inverse_z0 + weight1 * b.uv.y * inverse_z1 + weight2 * c.uv.y * inverse_z2) / inverse_z;
+                        const float texture_weight0 = warp_fix_enabled ? weight0 * inverse_z0 / inverse_z : weight0;
+                        const float texture_weight1 = warp_fix_enabled ? weight1 * inverse_z1 / inverse_z : weight1;
+                        const float texture_weight2 = warp_fix_enabled ? weight2 * inverse_z2 / inverse_z : weight2;
+                        const float u =
+                            texture_weight0 * a.uv.x +
+                            texture_weight1 * b.uv.x +
+                            texture_weight2 * c.uv.x;
+                        const float v =
+                            texture_weight0 * a.uv.y +
+                            texture_weight1 * b.uv.y +
+                            texture_weight2 * c.uv.y;
                         color = texture->sample_filtered(u, v, texture_lod);
                     }
-                    auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y * frame_surface->pitch);
-                    auto *pixel = row + static_cast<std::size_t>(x * 4);
-                    pixel[0] = static_cast<std::uint8_t>(std::clamp(static_cast<float>(mxvk::color_r(color)) * tint.x * intensity, 0.0f, 255.0f));
-                    pixel[1] = static_cast<std::uint8_t>(std::clamp(static_cast<float>(mxvk::color_g(color)) * tint.y * intensity, 0.0f, 255.0f));
-                    pixel[2] = static_cast<std::uint8_t>(std::clamp(static_cast<float>(mxvk::color_b(color)) * tint.z * intensity, 0.0f, 255.0f));
-                    pixel[3] = 255;
+                    const mxvk::MXCOLOR shaded_color =
+                        (0xFFU << 24U) |
+                        (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_r(color)) * tint.x * intensity, 0.0f, 255.0f)) << 16U) |
+                        (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_g(color)) * tint.y * intensity, 0.0f, 255.0f)) << 8U) |
+                        static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_b(color)) * tint.z * intensity, 0.0f, 255.0f));
+                    for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
+                        if ((passing_samples & static_cast<std::uint8_t>(1U << sample)) == 0) {
+                            continue;
+                        }
+                        const std::size_t sample_index = first_sample + sample;
+                        depth_buffer[sample_index] = sample_depths[sample];
+                        color_buffer[sample_index] = shaded_color;
+                    }
                 }
             }
         }
@@ -686,7 +778,7 @@ namespace {
         PuzzleDropWindow(const Arguments &args, const FramebufferDimensions &framebuffer)
             : mxvk::VK_Window("MXVK 3D Math Puzzle Drop", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
               data_root(((args.path.empty() || args.path == ".") ? std::string(math3d_puzzle_drop_ASSET_DIR) : args.path) + "/data"),
-              renderer(framebuffer.width, framebuffer.height, data_root),
+              renderer(framebuffer.width, framebuffer.height, data_root, !args.nowarpfix, !args.disable_mipmap, args.mip_bias),
               ui_font(data_root + "/font.ttf", std::max(8, static_cast<int>(std::round(22.0f * framebuffer_scale(framebuffer))))) {
             setClearColor(0.01f, 0.02f, 0.03f, 1.0f);
             mxvk::BuildTables();
@@ -1012,6 +1104,7 @@ namespace {
                     draw_cell(block.type, block.x, block.y, -0.03f);
                 }
             }
+            renderer.resolve_multisampling();
         }
 
         void handle_view_controls(const bool *keys, float delta_seconds) {
