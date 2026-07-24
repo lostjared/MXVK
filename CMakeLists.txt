@@ -628,6 +628,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(math3d_cube)
     add_subdirectory(examples/3dmath_pong)
     mxvk_configure_mingw_target(math3d_pong)
+    add_subdirectory(examples/3dmath_puzzle_drop)
+    mxvk_configure_mingw_target(math3d_puzzle_drop)
     add_subdirectory(examples/3dmath_pyramid)
     mxvk_configure_mingw_target(math3d_pyramid)
     add_subdirectory(examples/3dmath_plg_loader)
@@ -815,6 +817,7 @@ if(EXAMPLES)
         sprite_example
         math3d
         math3d_cube
+        math3d_puzzle_drop
         math3d_pyramid
         math3d_texture
         math3d_texture_array

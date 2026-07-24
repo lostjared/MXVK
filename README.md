@@ -392,6 +392,7 @@ Examples:
 ./run.pl 3dmath_pyramid
 ./run.pl 3dmath_plg_loader --filename ./models/plg/cube.plg
 ./run.pl 3dmath_pong
+./run.pl 3dmath_puzzle_drop
 ./run.pl knight
 ./run.pl model_example
 ./run.pl viewer --filename ./models/moon.mxmod.z
@@ -525,6 +526,7 @@ These programs are not intended as standalone applications. They are small visua
 - `3dmath_pyramid` - indexed PLG pyramid rendered with smooth vertex-color gradients through the CPU-side pipeline. **Inputs:** common window arguments and optional `--framebuffer <WxH>`. **Controls:** mouse wheel zooms, `Escape` quits.
 - `3dmath_plg_loader` - interactive PLG model viewer and CPU geometry benchmark with optional PNG texturing, mipmaps, perspective-correct interpolation, and texture wrapping. **Inputs:** `--filename`, `--texture`, `--repeat`, `--framebuffer`, `--benchmark`, `--disable-mipmap`, `--mip-bias`, and `--nowarpfix`. **Controls:** left mouse drag rotates, mouse wheel zooms, `Space` pauses automatic rotation, `Escape` quits.
 - `3dmath_pong` - software-rasterized 3D Pong game that can use the native or Eigen-backed math implementation. **Inputs:** common window arguments and optional `--framebuffer <WxH>`. **Controls:** `W` / `S`, `Up` / `Down`, or the mouse moves the paddle; `Space` pauses, `R` resets, `Escape` quits.
+- `3dmath_puzzle_drop` - software-rasterized 3D version of `puzzle_drop` with the same board, pieces, matching rules, and difficulty flow. It reuses the original block textures and presents a CPU-rendered framebuffer over a flat, unshaded level image. **Inputs:** common window arguments and optional `--framebuffer <WxH>`. **Controls:** arrows move, soft-drop, and cycle blocks; `Z` / `X` rotate the piece; `Space` hard drops; `1` / `2` / `3` select difficulty; `W` / `A` / `S` / `D` rotate the view; `Page Up` / `Page Down` zoom; `Escape` quits.
 - `3dmath_masterpiece` - MasterPiece variant that renders the board and falling blocks as CPU-rasterized spinning 3D cubes before uploading the frame through an MXVK sprite. **Inputs:** common `-p`, `-r`, `-f`. **Controls:** arrow keys move, `Up` rotates forward, `Q` rotates backward, hold `W` / `A` / `S` / `D` to rotate the grid, hold `Page Up` / `Page Down` to zoom, `P` pauses, `Escape` returns to the menu.
 
 ### Shader And Effect Demos
