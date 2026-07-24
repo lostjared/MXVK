@@ -5,8 +5,7 @@
  * mxvk::VK_Capture (Vulkan variant) wraps cv::VideoCapture and feeds decoded
  * frames into a VK_Sprite for display within a VK_Window.
  */
-#ifndef __VK_OPENCV__H_
-#define __VK_OPENCV__H_
+#pragma once
 
 #include "mxvk.hpp"
 #include "mxvk_sprite.hpp"
@@ -179,5 +178,3 @@ namespace mxvk {
 #endif
     };
 } // namespace mxvk
-
-#endif

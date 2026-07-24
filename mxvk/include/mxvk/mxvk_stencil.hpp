@@ -2,8 +2,7 @@
  * @file mxvk_stencil.hpp
  * @brief Reusable dynamic-rendering stencil image and fullscreen stencil pipelines.
  */
-#ifndef MXVK_STENCIL_HPP
-#define MXVK_STENCIL_HPP
+#pragma once
 
 #include "mxvk_context.hpp"
 #include "mxvk_resource.hpp"
@@ -176,5 +175,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

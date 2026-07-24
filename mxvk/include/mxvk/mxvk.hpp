@@ -1,5 +1,4 @@
-#ifndef _MXVK_MXVK_H_
-#define _MXVK_MXVK_H_
+#pragma once
 
 #include "mxvk_context.hpp"
 #include "mxvk_runtime_options.hpp"
@@ -579,5 +578,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

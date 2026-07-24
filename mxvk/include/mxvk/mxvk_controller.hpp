@@ -2,8 +2,7 @@
  * @file mxvk_controller.hpp
  * @brief SDL3 joystick and gamepad RAII wrappers.
  */
-#ifndef _MXVK_CONTROLLER_H_
-#define _MXVK_CONTROLLER_H_
+#pragma once
 
 #include <SDL3/SDL.h>
 
@@ -218,5 +217,3 @@ namespace mx {
     using Controller = mxvk::VK_Controller;
     using Joystick = mxvk::VK_Joystick;
 } // namespace mx
-
-#endif

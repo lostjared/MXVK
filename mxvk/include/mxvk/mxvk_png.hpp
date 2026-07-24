@@ -2,8 +2,7 @@
  * @file mxvk_png.hpp
  * @brief PNG image loading and saving utilities via SDL3.
  */
-#ifndef __LOADPNG_H__
-#define __LOADPNG_H__
+#pragma once
 
 #include <SDL3/SDL.h>
 #include <cstddef>
@@ -58,4 +57,3 @@ namespace mxvk {
      */
     bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h);
 } // namespace mxvk
-#endif

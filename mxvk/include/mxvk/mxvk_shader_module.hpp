@@ -1,5 +1,4 @@
-#ifndef MXVK_SHADER_MODULE_H
-#define MXVK_SHADER_MODULE_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -23,5 +22,3 @@ namespace mxvk {
      */
     [[nodiscard]] VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &spv_bytes);
 } // namespace mxvk
-
-#endif

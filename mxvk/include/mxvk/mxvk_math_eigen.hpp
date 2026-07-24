@@ -1,5 +1,4 @@
-#ifndef MXVK_MXVK_MATH_H
-#define MXVK_MXVK_MATH_H
+#pragma once
 
 #include "mxvk_sprite.hpp"
 
@@ -2399,5 +2398,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

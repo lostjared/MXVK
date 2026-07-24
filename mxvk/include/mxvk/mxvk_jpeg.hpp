@@ -2,8 +2,7 @@
  * @file mxvk_jpeg.hpp
  * @brief JPEG image loading and saving utilities.
  */
-#ifndef _MXVK_JPEG_H_
-#define _MXVK_JPEG_H_
+#pragma once
 
 #if defined(MXVK_WITH_JPEG) || defined(WITH_JPEG)
 
@@ -61,5 +60,4 @@ namespace jpeg {
     }
 } // namespace jpeg
 
-#endif
 #endif

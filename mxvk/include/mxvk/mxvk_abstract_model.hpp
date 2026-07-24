@@ -2,8 +2,7 @@
  * @file mxvk_abstract_model.hpp
  * @brief High-level model wrapper integrated with MXVK dynamic rendering.
  */
-#ifndef _MXVK_ABSTRACT_MODEL_H_
-#define _MXVK_ABSTRACT_MODEL_H_
+#pragma once
 
 #include <volk/volk.h>
 
@@ -306,5 +305,3 @@ namespace mxvk {
     using VK_AbstractModel = VKAbstractModel;
 
 } // namespace mxvk
-
-#endif

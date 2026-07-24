@@ -5,8 +5,7 @@
  * Wrapper<T> holds an optional pointer value and provides panic-on-null
  * accessors similar to Rust's unwrap() / expect() semantics.
  */
-#ifndef _MXVK_WRAPPER_H_
-#define _MXVK_WRAPPER_H_
+#pragma once
 
 #include "mxvk_exception.hpp"
 
@@ -150,5 +149,3 @@ namespace mx {
     template <mxvk::WrapType T>
     using Wrapper = mxvk::Wrapper<T>;
 } // namespace mx
-
-#endif

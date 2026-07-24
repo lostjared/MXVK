@@ -5,8 +5,7 @@
  * VK_Config parses simple section/key/value configuration files and
  * provides random-access retrieval and modification of settings.
  */
-#ifndef _MXVK_CFG_HPP_
-#define _MXVK_CFG_HPP_
+#pragma once
 
 #include <fstream>
 #include <iostream>
@@ -99,5 +98,3 @@ namespace mxvk {
     using Item = VK_ConfigItem;
     using ConfigFile = VK_Config;
 } // namespace mxvk
-
-#endif

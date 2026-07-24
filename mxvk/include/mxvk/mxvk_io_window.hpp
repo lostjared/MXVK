@@ -1,5 +1,4 @@
-#ifndef _MXVK_IO_WINDOW_H_
-#define _MXVK_IO_WINDOW_H_
+#pragma once
 
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_console.hpp"
@@ -43,5 +42,3 @@ namespace mxvk {
         VK_Console console;
     };
 } // namespace mxvk
-
-#endif

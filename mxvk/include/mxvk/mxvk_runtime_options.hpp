@@ -1,5 +1,4 @@
-#ifndef _MXVK_RUNTIME_OPTIONS_H_
-#define _MXVK_RUNTIME_OPTIONS_H_
+#pragma once
 
 #include <string>
 
@@ -30,5 +29,3 @@ namespace mxvk {
         return defaultExecutableNameStorage();
     }
 } // namespace mxvk
-
-#endif

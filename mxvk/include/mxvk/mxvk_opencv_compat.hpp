@@ -5,8 +5,7 @@
  * Keeping these helpers in one place limits the blast radius when OpenCV
  * changes CUDA stream or HostMem APIs in future releases.
  */
-#ifndef MXVK_OPENCV_COMPAT_HPP
-#define MXVK_OPENCV_COMPAT_HPP
+#pragma once
 
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
@@ -28,6 +27,4 @@ namespace mxvk {
     }
 
 } // namespace mxvk
-#endif
-
 #endif

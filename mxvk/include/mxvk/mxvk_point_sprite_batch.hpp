@@ -2,8 +2,7 @@
  * @file mxvk_point_sprite_batch.hpp
  * @brief Reusable point-sprite renderer for particle and starfield effects.
  */
-#ifndef MXVK_POINT_SPRITE_BATCH_HPP
-#define MXVK_POINT_SPRITE_BATCH_HPP
+#pragma once
 
 #include "mxvk/mxvk_context.hpp"
 #include "mxvk/mxvk_resource.hpp"
@@ -223,5 +222,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

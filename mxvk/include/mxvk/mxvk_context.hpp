@@ -2,8 +2,7 @@
  * @file mxvk_context.hpp
  * @brief Minimal Vulkan handles shared across MXVK helpers.
  */
-#ifndef MXVK_CONTEXT_HPP
-#define MXVK_CONTEXT_HPP
+#pragma once
 
 #include <volk/volk.h>
 
@@ -27,5 +26,3 @@ namespace mxvk {
     };
 
 }
-
-#endif

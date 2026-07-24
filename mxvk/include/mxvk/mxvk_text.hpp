@@ -7,8 +7,7 @@
  * during the render pass.  Each printTextG_Solid() call adds one TextQuad
  * to the pending queue, which is flushed by renderText().
  */
-#ifndef __MXTEXT__
-#define __MXTEXT__
+#pragma once
 
 #include <volk/volk.h>
 
@@ -314,5 +313,3 @@ namespace mxvk {
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
     };
 } // namespace mxvk
-
-#endif

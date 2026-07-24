@@ -1,5 +1,4 @@
-#ifndef _MXVK_EXCEPTION_
-#define _MXVK_EXCEPTION_
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -14,5 +13,3 @@ namespace mxvk {
         std::string txt;
     };
 } // namespace mxvk
-
-#endif

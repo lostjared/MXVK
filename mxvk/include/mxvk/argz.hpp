@@ -21,8 +21,7 @@
  * the options common to all libmx2 applications (-p path, -r resolution, -f fullscreen, …).
  */
 
-#ifndef _ARGZ_HPP_X
-#define _ARGZ_HPP_X
+#pragma once
 
 #include "mxvk_runtime_options.hpp"
 #include <algorithm>
@@ -1163,5 +1162,3 @@ inline Arguments proc_args(int &argc, char **argv) {
     args.resource_path = resource_path;
     return args;
 }
-
-#endif

@@ -2,8 +2,7 @@
  * @file mxvk_console.hpp
  * @brief In-game command console for MXVK / Vulkan windows.
  */
-#ifndef _MXVK_CONSOLE_H_
-#define _MXVK_CONSOLE_H_
+#pragma once
 
 #include <SDL3/SDL.h>
 
@@ -188,5 +187,3 @@ namespace mxvk {
 namespace console {
     using Console = mxvk::VK_Console;
 } // namespace console
-
-#endif

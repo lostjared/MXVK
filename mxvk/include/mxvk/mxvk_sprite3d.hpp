@@ -5,8 +5,7 @@
  * VK_Sprite3D manages a textured quad in world space, with per-frame camera
  * uniforms, depth-tested rendering, and a draw queue for billboard sprites.
  */
-#ifndef __MXVK_SPRITE3D__
-#define __MXVK_SPRITE3D__
+#pragma once
 
 #include <volk/volk.h>
 
@@ -279,5 +278,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

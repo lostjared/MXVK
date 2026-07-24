@@ -2,8 +2,7 @@
  * @file mxvk_model.hpp
  * @brief Vulkan mesh loader and GPU buffer manager for MXVK.
  */
-#ifndef _MXVK_MODEL_H_
-#define _MXVK_MODEL_H_
+#pragma once
 
 #include <volk/volk.h>
 
@@ -190,5 +189,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

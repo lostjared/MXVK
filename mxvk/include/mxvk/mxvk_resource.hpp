@@ -2,8 +2,7 @@
  * @file mxvk_resource.hpp
  * @brief Reusable Vulkan buffer, image, upload, and one-shot command helpers.
  */
-#ifndef MXVK_RESOURCE_HPP
-#define MXVK_RESOURCE_HPP
+#pragma once
 
 #include "mxvk_context.hpp"
 
@@ -243,5 +242,3 @@ namespace mxvk {
     void destroy_texture(VkDevice device, TextureResource &texture);
 
 } // namespace mxvk
-
-#endif

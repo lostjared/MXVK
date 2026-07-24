@@ -2,8 +2,7 @@
  * @file mxvk_ff_capture.hpp
  * @brief FFmpeg video-file capture with optional CUDA hardware decoding.
  */
-#ifndef MXVK_FF_CAPTURE_HPP
-#define MXVK_FF_CAPTURE_HPP
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -115,5 +114,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

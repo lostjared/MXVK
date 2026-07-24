@@ -9,8 +9,7 @@
  * - GPU instancing for large batches of identical sprites.
  * - Extended UBO with mouse state and four custom vec4 uniforms.
  */
-#ifndef __MXSPRITE__
-#define __MXSPRITE__
+#pragma once
 
 #include <volk/volk.h>
 
@@ -424,5 +423,3 @@ namespace mxvk {
     };
 
 } // namespace mxvk
-
-#endif

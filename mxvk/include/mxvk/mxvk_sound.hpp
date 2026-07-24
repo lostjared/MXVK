@@ -2,8 +2,7 @@
  * @file mxvk_sound.hpp
  * @brief SDL3_mixer audio subsystem wrapper.
  */
-#ifndef _MXVK_SOUND_H_
-#define _MXVK_SOUND_H_
+#pragma once
 
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
 
@@ -117,5 +116,4 @@ namespace mx {
     using Mixer = mxvk::VK_Mixer;
 } // namespace mx
 
-#endif
 #endif
