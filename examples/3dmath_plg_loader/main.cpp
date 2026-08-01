@@ -263,7 +263,8 @@ namespace {
             [](const mxvk::vec2D &first, const mxvk::vec2D &second) {
                 return first.x < second.x;
             });
-        return maximum->x - minimum->x > 0.5f;
+        const float span = maximum->x - minimum->x;
+        return span > 0.5f && span < 1.0f - mxvk::EPSILON;
     }
 
     [[nodiscard]] std::array<mxvk::vec2D, 3> unwrap_horizontal_texcoords(std::array<mxvk::vec2D, 3> texcoords) {
@@ -750,7 +751,7 @@ namespace example {
 #endif
             const bool repeat_horizontal =
                 face_texture(triangle.material_index) != nullptr &&
-                (texture_repeat_enabled || crosses_horizontal_texture_seam(texcoords));
+                texture_repeat_enabled;
             if (repeat_horizontal) {
                 texcoords = unwrap_horizontal_texcoords(texcoords);
             }
