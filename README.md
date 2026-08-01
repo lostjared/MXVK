@@ -15,6 +15,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [What This Project Is](#what-this-project-is)
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
+- [Build and Run with pcons](#build-and-run-with-pcons)
 - [Documentation](#documentation)
 - [Command Line Arguments](#command-line-arguments)
 - [VK_Window Post-Processing](#vk-window-post-processing)
@@ -95,6 +96,127 @@ From repository root:
 cmake -S . -B build
 cmake --build build -j
 ```
+
+<a id="build-and-run-with-pcons"></a>
+
+### Build and Run with pcons
+
+MXVK also provides a native pcons build in [`pcons-build.py`](pcons-build.py).
+It uses C++20, generates Ninja files under `build/pcons/`, builds the core
+libraries and examples, compiles the Vulkan shaders, and stages each example's
+runtime files under `build/pcons/runtime/<program>/`.
+
+Install the normal MXVK dependencies listed above, plus:
+
+- `uv`, which runs pcons in an isolated tool environment
+- Ninja
+- `glslc` from the Vulkan shader tools
+- GCC or Clang with C++20 support
+
+There is no separate repository-local pcons installation step. `uvx` downloads
+and caches a compatible pcons release automatically. From the repository root,
+configure and build the standard targets with GCC using:
+
+```bash
+CC=gcc CXX=g++ uvx --from 'pcons>=0.24' pcons \
+    -B build/pcons --reconfigure all
+```
+
+To select a versioned GCC installation, change the compiler names, for example:
+
+```bash
+CC=gcc-16 CXX=g++-16 uvx --from 'pcons>=0.24' pcons \
+    -B build/pcons --reconfigure all
+```
+
+The pcons build accepts feature settings as `NAME=value` arguments rather than
+CMake's `-DNAME=value` form. Build all examples, including the OpenCV/compute
+and fractal examples, with:
+
+```bash
+CC=gcc CXX=g++ uvx --from 'pcons>=0.24' pcons \
+    -B build/pcons --reconfigure \
+    CV=1 FRACTAL_ZOOM=1 all
+```
+
+Common pcons variables are:
+
+- `DEBUG_MODE=1` builds the debug configuration.
+- `VALIDATION=1` enables Vulkan validation layers.
+- `CV=1` enables OpenCV, compute-shader, shader-viewer, and OpenCV model examples.
+- `JPEG=1` enables JPEG support.
+- `FRACTAL_ZOOM=1` builds the fractal example.
+- `EXAMPLES=0` builds only the libraries and tools.
+- `WITH_CUDA=AUTO|ON|OFF` controls CUDA support.
+- `WITH_EIGEN=AUTO|ON|OFF` controls the Eigen math backend.
+- `WITH_MXWRITE=AUTO|ON|OFF` controls the FFmpeg writer.
+- `WITH_MIXER=AUTO|ON|OFF` controls SDL3_mixer support.
+- `OPENCV_PACKAGE=<pkg-config-name>` overrides the default `opencv5` package name.
+- `PREFIX=/path/one:/path/two` adds dependency search prefixes.
+
+After configuration, Ninja can perform incremental builds without rerunning
+pcons:
+
+```bash
+ninja -C build/pcons
+ninja -C build/pcons mutatris
+```
+
+To clean generated targets while retaining the configured build directory and
+the `uv` tool cache, use:
+
+```bash
+uvx --from 'pcons>=0.24' pcons clean -B build/pcons
+```
+
+Use [`pcons-run.py`](pcons-run.py) to launch examples from the flat pcons binary
+layout. The launcher selects the matching staged runtime tree, passes it as the
+asset path, and forwards remaining arguments to the example:
+
+```bash
+# Show all examples present in the pcons build
+./pcons-run.py --list
+
+# Run one example
+./pcons-run.py hello_world
+
+# Forward normal MXVK arguments
+./pcons-run.py mutatris --fullscreen --enable-crt
+
+# Run under GDB
+./pcons-run.py --debug hello_world
+
+# Briefly launch every available example
+./pcons-run.py --all --timeout=5
+```
+
+Some examples require an input file, model, camera, or other hardware. Arguments
+such as `--filename` and `--model` may be passed after the program name. Relative
+file arguments are resolved from the directory where `pcons-run.py` was invoked.
+
+To build, stage, and install with one script, use
+[`build-install-pcons.sh`](build-install-pcons.sh). It defaults to GCC, C++20,
+`/usr/local`, and automatically uses `sudo` when the destination is not writable:
+
+```bash
+# Standard build and installation
+./build-install-pcons.sh
+
+# Include all optional OpenCV and fractal examples
+./build-install-pcons.sh CV=1 FRACTAL_ZOOM=1
+
+# Install without elevated privileges
+MXVK_INSTALL_PREFIX="$HOME/.local" ./build-install-pcons.sh
+
+# Use versioned GCC and a fixed job count
+CC=gcc-16 CXX=g++-16 MXVK_JOBS=12 ./build-install-pcons.sh
+```
+
+`MXVK_DESTDIR` may be set to stage a package root, and `VARIANT=debug` selects a
+debug build. Run `./build-install-pcons.sh --help` for the complete environment
+variable reference. The installed example executables are placed under
+`<prefix>/libexec/mxvk/`; `pcons-run.py` runs the repository build-tree copies so
+that their compiled shader and data trees are selected automatically.
 
 ### Automated configure, build, and install
 
