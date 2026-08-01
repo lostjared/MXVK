@@ -16,6 +16,7 @@ WITH_CUDA, WITH_EIGEN, WITH_MXWRITE, and WITH_MIXER.
 """
 
 import os
+import shlex
 from pathlib import Path
 
 from pcons import (
@@ -167,6 +168,10 @@ def header_only(name: str, probe: str, *, required: bool = True) -> ImportedTarg
     return None
 
 
+def quoted(path: Path) -> str:
+    return shlex.quote(str(path))
+
+
 sdl3 = system_headers(project.find_package("sdl3"))
 vulkan = system_headers(project.find_package("vulkan"))
 libpng = system_headers(project.find_package("libpng"))
@@ -259,6 +264,83 @@ for shader in sorted((project_dir / "mxvk" / "shaders").glob("*")):
             command=f"mkdir -p {shader_output_dir} && glslc {shader} -o {output}",
         )
     )
+
+# Mutatris has its own post-processing shader pack. CMake generates these
+# under examples/mutatris and copies them beside the executable; pcons uses a
+# dedicated runtime tree because its executables are emitted flat.
+mutatris_source_dir = project_dir / "examples" / "mutatris"
+mutatris_runtime_dir = (
+    project_dir / project.build_dir / "runtime" / "mutatris"
+).resolve()
+mutatris_shader_dir = mutatris_runtime_dir / "shaders"
+mutatris_runtime_targets: list[Target] = []
+mutatris_runtime_outputs: list[Path] = []
+
+mutatris_shader_sources = [
+    (project_dir / "mxvk" / "shaders" / "sprite.vert", "background.vert.spv", ""),
+    (mutatris_source_dir / "shaders" / "background.frag", "background.frag.spv", ""),
+    (mutatris_source_dir / "shaders" / "fade.frag", "fade.frag.spv", ""),
+    (mutatris_source_dir / "shaders" / "crt.frag", "crt.frag.spv", ""),
+]
+for shader, output_name, extra_flags in mutatris_shader_sources:
+    output = mutatris_shader_dir / output_name
+    mutatris_runtime_outputs.append(output)
+    mutatris_runtime_targets.append(
+        project.Command(
+            f"mutatris-shader-{output_name}",
+            env,
+            target=output,
+            source=shader,
+            command=(
+                f"mkdir -p {mutatris_shader_dir} && "
+                f"glslc {extra_flags} {shader} -o {output}"
+            ),
+        )
+    )
+
+mutatris_effect_dir = mutatris_shader_dir / "effects"
+for shader in sorted((mutatris_source_dir / "shaders" / "effects").glob("*.glsl")):
+    output = mutatris_effect_dir / f"{shader.name}.spv"
+    mutatris_runtime_outputs.append(output)
+    mutatris_runtime_targets.append(
+        project.Command(
+            f"mutatris-effect-{shader.stem}",
+            env,
+            target=output,
+            source=shader,
+            command=(
+                f"mkdir -p {mutatris_effect_dir} && "
+                f"glslc -fshader-stage=frag {shader} -o {output}"
+            ),
+        )
+    )
+
+mutatris_data_files = sorted(
+    path for path in (mutatris_source_dir / "data").rglob("*") if path.is_file()
+)
+mutatris_data_marker = mutatris_runtime_dir / "data" / ".pcons-assets"
+mutatris_runtime_targets.append(
+    project.Command(
+        "mutatris-runtime-data",
+        env,
+        target=mutatris_data_marker,
+        source=mutatris_data_files,
+        command=(
+            f"mkdir -p {mutatris_runtime_dir / 'data'} && "
+            f"cp -a {mutatris_source_dir / 'data'}/. "
+            f"{mutatris_runtime_dir / 'data'}/ && touch {mutatris_data_marker}"
+        ),
+    )
+)
+mutatris_runtime_outputs.append(mutatris_data_marker)
+mutatris_shader_marker = mutatris_runtime_dir / ".pcons-shaders"
+mutatris_runtime_target = project.Command(
+    "mutatris-runtime",
+    env,
+    target=mutatris_shader_marker,
+    source=mutatris_runtime_outputs,
+    command=f"touch {quoted(mutatris_shader_marker)}",
+)
 
 volk = project.StaticLibrary("volk", env, sources=[project_dir / "volk" / "volk.cpp"])
 volk.public.include_dirs.append(project_dir)
@@ -473,6 +555,352 @@ asset_defines = {
     "opencv_model": "opencv_model_ASSET_DIR",
 }
 
+# =============================================================================
+# Per-example shader and runtime trees
+# =============================================================================
+
+# These are legacy OpenGL/OpenGL ES shaders retained as source assets. They
+# are not valid Vulkan GLSL and are not compiled by the CMake build either.
+LEGACY_NON_VULKAN_SHADERS = {
+    "examples/asteroids-net/data/text.frag",
+    "examples/asteroids-net/data/text.vert",
+    "examples/asteroids3d/data/text.frag",
+    "examples/asteroids3d/data/text.vert",
+    "examples/breakout/data/text.frag",
+    "examples/breakout/data/text.vert",
+    "examples/breakout/data/tri.frag",
+    "examples/breakout/data/tri.vert",
+    "examples/glitch_cube/data/tri.frag",
+    "examples/glitch_cube/data/tri.vert",
+    "examples/walk/data/text.frag",
+    "examples/walk/data/text.vert",
+    "examples/walk_post/data/text.frag",
+    "examples/walk_post/data/text.vert",
+}
+
+# Some demos intentionally reuse shaders owned by another directory.
+EXTRA_DEMO_SHADER_SOURCES = {
+    "defender": [
+        "examples/asteroids3d/shaders/model.vert",
+        "examples/asteroids3d/shaders/model.frag",
+        "examples/asteroids3d/shaders/flame.vert",
+        "examples/asteroids3d/shaders/flame.frag",
+        "examples/asteroids3d/shaders/intro.frag",
+        "examples/asteroids3d/shaders/fade_overlay.frag",
+        "examples/asteroids3d/shaders/crt.frag",
+    ],
+    "moon": [
+        "examples/model_example/shaders/model.vert",
+        "examples/model_example/shaders/model.frag",
+    ],
+    "shader_viewer": [
+        "examples/opencv_example/shaders/vertex.vert",
+        "examples/opencv_example/shaders/fragment.frag",
+    ],
+    "tetris": ["mxvk/shaders/sprite.vert"],
+}
+
+# Runtime files that CMake copies from another demo or a shared repository
+# directory. Local data/ and shaders/ directories are staged automatically.
+EXTRA_DEMO_RUNTIME_DIRECTORIES = {
+    "3dmath_puzzle_drop": [("examples/puzzle_drop/data", "data")],
+    "defender": [("examples/asteroids3d/data", "data")],
+    "shader_viewer": [("examples/opencv_example/data", "data")],
+}
+
+EXTRA_DEMO_RUNTIME_FILES = {
+    "3dmath_obj_loader": [
+        ("models/obj/sphere.obj", "data/sphere.obj"),
+        ("models/obj/sphere.mtl", "data/sphere.mtl"),
+    ],
+    "3dmath_puzzle_drop": [
+        ("examples/tictactoe/data/font.ttf", "data/font.ttf")
+    ],
+    "asteroids": [("examples/asteroids/font.ttf", "data/font.ttf")],
+    "asteroids3d": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+        ("examples/defender/data/crash.wav", "data/crash.wav"),
+        ("examples/defender/data/asteroid.wav", "data/asteroid.wav"),
+    ],
+    "asteroids-net": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+        ("examples/defender/data/crash.wav", "data/crash.wav"),
+        ("examples/defender/data/asteroid.wav", "data/asteroid.wav"),
+    ],
+    "binary_matrix": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+        ("examples/rain/data/LICENSE.noto-fonts-cjk.txt", "data/LICENSE.noto-fonts-cjk.txt"),
+        ("examples/matrix/data/bg.png", "data/bg.png"),
+    ],
+    "compute_shader": [("examples/compute_shader/font.ttf", "data/font.ttf")],
+    "defender": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+    ],
+    "matrix": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+    ],
+    "model_example": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+    ],
+    "moon": [("examples/asteroids3d/data/star.png", "data/star.png")],
+    "planet": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+    ],
+    "pool_demo": [("examples/pool_demo/font.ttf", "font.ttf")],
+    "puzzle_drop": [
+        ("examples/rain/data/NotoSansCJK-Bold.ttc", "data/NotoSansCJK-Bold.ttc"),
+        ("examples/rain/data/NotoSansCJK-Regular.ttc", "data/NotoSansCJK-Regular.ttc"),
+        ("examples/tictactoe/data/font.ttf", "data/font.ttf"),
+        ("examples/tetris/data/cube.mxmod.z", "data/cube.mxmod.z"),
+        ("examples/tetris/data/manifest_gray.txt", "data/manifest_gray.txt"),
+        ("examples/tetris/data/block_gray.png", "data/block_gray.png"),
+    ],
+    "starship": [("examples/pong/data/star.png", "data/star.png")],
+    "tetris": [("examples/tictactoe/data/font.ttf", "data/font.ttf")],
+    "walk": [
+        ("models/cube.mxmod.z", "data/cube.mxmod.z"),
+        ("models/sphere.mxmod.z", "data/sphere.mxmod.z"),
+    ],
+    "walk_post": [
+        ("models/cube.mxmod.z", "data/cube.mxmod.z"),
+        ("models/sphere.mxmod.z", "data/sphere.mxmod.z"),
+    ],
+}
+
+# CMake gives these shaders a runtime name different from source-name + .spv.
+# The generic pipeline also emits the normal name, which is useful to shader
+# viewers and keeps every source independently addressable.
+SPECIAL_SHADER_OUTPUTS = {
+    ("breakout", "examples/breakout/data/model.vert"): ["shaders/breakout_model.vert.spv"],
+    ("breakout", "examples/breakout/data/model.frag"): ["shaders/breakout_model.frag.spv"],
+    ("breakout", "examples/breakout/data/background.frag"): ["shaders/breakout_background.frag.spv"],
+    ("compute_shader", "examples/compute_shader/data/compute.comp"): ["compute.spv"],
+    ("compute_shader", "examples/compute_shader/data/xorblend.comp"): ["xorblend.spv"],
+    ("compute_shader", "examples/compute_shader/data/metalmedianblend.comp"): ["metalmedianblend.spv"],
+    ("compute_shader", "examples/compute_shader/data/square_block_resize_dir.comp"): ["square_block_resize_dir.spv"],
+    ("compute_shader", "examples/compute_shader/data/acidcam_filters.comp"): ["acidcam_filters.spv"],
+    ("dark", "examples/dark/shaders/beam3d.frag"): ["shaders/beam.frag.spv"],
+    ("opencv_model", "examples/opencv_model/shaders/vertex.vert"): ["shaders/model.vert.spv"],
+    ("opencv_model", "examples/opencv_model/shaders/fragment.frag"): ["shaders/model.frag.spv"],
+    ("pool_demo", "examples/pool_demo/data/vertex.vert"): ["shaders/model.vert.spv"],
+    ("pool_demo", "examples/pool_demo/data/fragment.frag"): ["shaders/model.frag.spv"],
+    ("pool_demo", "examples/pool_demo/data/sprite_vertex.vert"): ["shaders/sprite.vert.spv"],
+    ("pong", "examples/pong/data/model.vert"): ["shaders/pong_model.vert.spv"],
+    ("pong", "examples/pong/data/model.frag"): ["shaders/pong_model.frag.spv"],
+    ("sprite_example", "examples/sprite_example/shaders/vertex.vert"): ["shaders/sprite.vert.spv"],
+    ("stencil", "examples/stencil/shaders/fullscreen.vert"): [
+        "shaders/content_fullscreen.vert.spv"
+    ],
+    ("tetris", "examples/tetris/data/model.vert"): ["shaders/tetris_model.vert.spv"],
+    ("tetris", "examples/tetris/data/model.frag"): ["shaders/tetris_model.frag.spv"],
+    ("tetris", "examples/tetris/data/tetris_piece.vert"): ["shaders/tetris_piece.vert.spv"],
+    ("tetris", "examples/tetris/data/tetris_piece.frag"): ["shaders/tetris_piece.frag.spv"],
+    ("tetris", "mxvk/shaders/sprite.vert"): ["shaders/tetris_intro.vert.spv"],
+    ("tetris", "examples/tetris/data/intro.frag"): ["shaders/tetris_intro.frag.spv"],
+    ("tetris", "examples/tetris/data/screen_fade.frag"): [
+        "shaders/tetris_screen_fade.frag.spv"
+    ],
+    ("tetris", "examples/tetris/data/background_transition.frag"): [
+        "shaders/tetris_background_transition.frag.spv"
+    ],
+}
+
+
+def unique_paths(paths: list[Path]) -> list[Path]:
+    result = []
+    seen = set()
+    for path in paths:
+        key = str(path)
+        if key not in seen:
+            seen.add(key)
+            result.append(path)
+    return result
+
+
+demo_runtime_dirs: dict[str, Path] = {}
+demo_runtime_targets: dict[str, list[Target]] = {"mutatris": [mutatris_runtime_target]}
+selected_example_dirs = {directory for directory, unused, sources in EXAMPLES}
+
+for demo_name in sorted(selected_example_dirs - {"mutatris"}):
+    demo_source_dir = project_dir / "examples" / demo_name
+    runtime_dir = (project_dir / project.build_dir / "runtime" / demo_name).resolve()
+    demo_runtime_dirs[demo_name] = runtime_dir
+
+    asset_roots = [
+        directory
+        for directory in (demo_source_dir / "data", demo_source_dir / "shaders")
+        if directory.is_dir()
+    ]
+    asset_files = sorted(
+        path for directory in asset_roots for path in directory.rglob("*") if path.is_file()
+    )
+    extra_asset_directories = [
+        (project_dir / source, runtime_dir / destination)
+        for source, destination in EXTRA_DEMO_RUNTIME_DIRECTORIES.get(demo_name, [])
+    ]
+    extra_asset_files = [
+        (project_dir / source, runtime_dir / destination)
+        for source, destination in EXTRA_DEMO_RUNTIME_FILES.get(demo_name, [])
+    ]
+    asset_files.extend(
+        path
+        for source, destination in extra_asset_directories
+        for path in source.rglob("*")
+        if path.is_file()
+    )
+    asset_files.extend(source for source, destination in extra_asset_files)
+    asset_marker = runtime_dir / ".pcons-assets"
+    asset_commands = [f"mkdir -p {quoted(runtime_dir)}"]
+    for directory in asset_roots:
+        destination = runtime_dir / directory.name
+        asset_commands.extend(
+            [
+                f"mkdir -p {quoted(destination)}",
+                f"cp -a {quoted(directory)}/. {quoted(destination)}/",
+            ]
+        )
+    for source, destination in extra_asset_directories:
+        asset_commands.extend(
+            [
+                f"mkdir -p {quoted(destination)}",
+                f"cp -a {quoted(source)}/. {quoted(destination)}/",
+            ]
+        )
+    for source, destination in extra_asset_files:
+        asset_commands.extend(
+            [
+                f"mkdir -p {quoted(destination.parent)}",
+                f"cp {quoted(source)} {quoted(destination)}",
+            ]
+        )
+    asset_commands.append(f"touch {quoted(asset_marker)}")
+    asset_target = project.Command(
+        f"runtime-assets-{demo_name}",
+        env,
+        target=asset_marker,
+        source=asset_files or [demo_source_dir / "CMakeLists.txt"],
+        command=" && ".join(asset_commands),
+    )
+
+    core_marker = runtime_dir / "data" / ".pcons-core-assets"
+    core_commands = [
+        f"mkdir -p {quoted(runtime_dir / 'data')} {quoted(runtime_dir / 'shaders')}"
+    ]
+    core_aliases = (
+        ("sprite.vert.spv", ("sprite.vert.spv", "sprite_vert.spv")),
+        ("sprite.frag.spv", ("sprite.frag.spv", "sprite_frag.spv")),
+        ("text.vert.spv", ("text.vert.spv", "text_vert.spv")),
+        ("text.frag.spv", ("text.frag.spv", "text_frag.spv")),
+        ("sprite3d.vert.spv", ("sprite3d.vert.spv",)),
+        ("sprite3d.frag.spv", ("sprite3d.frag.spv",)),
+    )
+    for source_name, aliases in core_aliases:
+        for alias in aliases:
+            for destination in (
+                runtime_dir / alias,
+                runtime_dir / "data" / alias,
+                runtime_dir / "shaders" / alias,
+            ):
+                core_commands.append(
+                    f"cp {quoted(shader_output_dir / source_name)} "
+                    f"{quoted(destination)}"
+                )
+    core_commands.extend(
+        [
+            f"cp {quoted(project_dir / 'mxvk' / 'data' / 'default.ttf')} "
+            f"{quoted(runtime_dir / 'data' / 'default.ttf')}",
+            f"touch {quoted(core_marker)}",
+        ]
+    )
+    core_target = project.Command(
+        f"runtime-core-{demo_name}",
+        env,
+        target=core_marker,
+        source=[project_dir / "mxvk" / "data" / "default.ttf"]
+        + [shader_output_dir / source_name for source_name, aliases in core_aliases],
+        command=" && ".join(core_commands),
+    )
+
+    local_shader_sources = sorted(
+        path
+        for path in demo_source_dir.rglob("*")
+        if path.suffix in (".vert", ".frag", ".comp", ".glsl")
+        and path.relative_to(project_dir).as_posix() not in LEGACY_NON_VULKAN_SHADERS
+    )
+    shared_shader_sources = [
+        project_dir / relative
+        for relative in EXTRA_DEMO_SHADER_SOURCES.get(demo_name, [])
+    ]
+    runtime_shader_sources = unique_paths(local_shader_sources + shared_shader_sources)
+    compile_targets = []
+    compiled_outputs: list[tuple[Path, Path, str]] = []
+    for shader_index, shader in enumerate(runtime_shader_sources):
+        source_key = shader.relative_to(project_dir).as_posix()
+        compiled = runtime_dir / ".compiled" / f"{shader_index}-{shader.name}.spv"
+        flags = "-fshader-stage=frag" if shader.suffix == ".glsl" else ""
+        compile_target = project.Command(
+            f"runtime-shader-{demo_name}-{shader_index}",
+            env,
+            target=compiled,
+            source=shader,
+            command=(
+                f"mkdir -p {quoted(compiled.parent)} && glslc {flags} "
+                f"{quoted(shader)} -o {quoted(compiled)}"
+            ),
+        )
+        compile_targets.append(compile_target)
+        compiled_outputs.append((shader, compiled, source_key))
+
+    shader_marker = runtime_dir / ".pcons-shaders"
+    shader_commands = [f"mkdir -p {quoted(runtime_dir)}"]
+    for shader, compiled, source_key in compiled_outputs:
+        if shader.is_relative_to(demo_source_dir):
+            relative_shader = shader.relative_to(demo_source_dir)
+        else:
+            relative_shader = Path("shared") / shader.name
+        destinations = [
+            runtime_dir / Path(f"{relative_shader}.spv"),
+            runtime_dir / "data" / f"{shader.name}.spv",
+            runtime_dir / "shaders" / f"{shader.name}.spv",
+        ]
+        for special_output in SPECIAL_SHADER_OUTPUTS.get(
+            (demo_name, source_key), []
+        ):
+            special_path = runtime_dir / special_output
+            destinations.extend(
+                [
+                    special_path,
+                    runtime_dir / "data" / special_path.name,
+                    runtime_dir / "shaders" / special_path.name,
+                ]
+            )
+        for destination in unique_paths(destinations):
+            shader_commands.extend(
+                [
+                    f"mkdir -p {quoted(destination.parent)}",
+                    f"cp {quoted(compiled)} {quoted(destination)}",
+                ]
+            )
+    shader_commands.append(f"touch {quoted(shader_marker)}")
+    shader_target = project.Command(
+        f"runtime-shaders-{demo_name}",
+        env,
+        target=shader_marker,
+        source=[asset_marker, core_marker]
+        + [compiled for shader, compiled, source_key in compiled_outputs],
+        command=" && ".join(shader_commands),
+    )
+    demo_runtime_targets[demo_name] = [shader_target]
+
+demo_runtime_dirs["mutatris"] = mutatris_runtime_dir
+
 programs: list[tuple[str, Target]] = []
 if with_examples:
     rain = project.StaticLibrary(
@@ -507,6 +935,7 @@ if with_examples:
             program.link(eigen)
         if directory == "3dmath_obj_loader":
             program.private.defines.append("MXVK_OBJ_LOADER")
+        program.add_dependency(*demo_runtime_targets.get(directory, []))
         if directory == "asteroids-net":
             if (Path("/usr/include/miniupnpc/miniupnpc.h")).exists():
                 program.private.defines.append("ASTEROIDS_NET_HAS_MINIUPNPC=1")
@@ -514,7 +943,7 @@ if with_examples:
             if (Path("/usr/include/natpmp.h")).exists():
                 program.private.defines.append("ASTEROIDS_NET_HAS_NATPMP=1")
                 program.private.link_libs.append("natpmp")
-        asset_dir = source_dir
+        asset_dir = demo_runtime_dirs.get(directory, source_dir)
         if directory in asset_defines:
             program.private.defines.append(f'{asset_defines[directory]}="{asset_dir}"')
         if directory in ("sprite_example", "text_example"):

@@ -172,7 +172,17 @@ def run_program(
         )
         return MISSING_EXECUTABLE_EXIT_CODE
 
-    command = [str(executable), "-p", str(source_path), *arguments]
+    pcons_runtime_path = BUILD_DIR / "runtime" / program_name
+    runtime_marker = pcons_runtime_path / ".pcons-shaders"
+    if not runtime_marker.is_file():
+        print(
+            f"Error: pcons runtime shaders are incomplete for {program_name!r}; "
+            "rebuild the example with pcons",
+            file=sys.stderr,
+        )
+        return MISSING_EXECUTABLE_EXIT_CODE
+    runtime_path = pcons_runtime_path
+    command = [str(executable), "-p", str(runtime_path), *arguments]
     if debug:
         if not shutil.which("gdb"):
             print("Error: gdb was not found", file=sys.stderr)
@@ -184,7 +194,7 @@ def run_program(
     environment.setdefault("MXVK_QUIET_MISSING_VALIDATION", "1")
     process = subprocess.Popen(
         command,
-        cwd=BUILD_DIR,
+        cwd=runtime_path,
         env=environment,
         start_new_session=True,
     )
@@ -242,10 +252,10 @@ def parse_arguments(arguments: list[str]) -> tuple[str | None, list[str], float 
 
 
 def show_usage() -> int:
-    print("Usage: ./run.py <program_name> [extra args...]")
-    print("       ./run.py <program_name> --timeout[=seconds] [extra args...]")
-    print("       ./run.py --debug <program_name> [extra args...]")
-    print("       ./run.py --all --timeout[=seconds] [extra args...]\n")
+    print("Usage: ./pcons-run.py <program_name> [extra args...]")
+    print("       ./pcons-run.py <program_name> --timeout[=seconds] [extra args...]")
+    print("       ./pcons-run.py --debug <program_name> [extra args...]")
+    print("       ./pcons-run.py --all --timeout[=seconds] [extra args...]\n")
     print("Available pcons programs:")
     programs = available_programs()
     for program in programs:
@@ -260,7 +270,8 @@ def run_all(
     successful = 0
     skipped = 0
     failures = []
-    for program in TEST_PROGRAMS:
+    programs = list(dict.fromkeys((*TEST_PROGRAMS, *available_programs())))
+    for program in programs:
         result = run_program(program, forwarded, timeout_seconds, debug=debug)
         if result == MISSING_EXECUTABLE_EXIT_CODE:
             skipped += 1

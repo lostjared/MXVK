@@ -1544,8 +1544,6 @@ namespace example {
 #else
             double;
 #endif
-        ;
-
         struct FractalPushConstants {
             PushScalar center_x;
             PushScalar center_y;
