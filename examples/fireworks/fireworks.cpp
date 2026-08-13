@@ -26,6 +26,8 @@ namespace {
     constexpr float MAX_LIFETIME = 2.0f;
     constexpr float PARTICLE_SPEED = 1.0f;
     constexpr float PARTICLE_SIZE = 25.0f;
+    constexpr float SCENE_REFERENCE_ASPECT = 16.0f / 9.0f;
+    constexpr float VERTICAL_FIELD_OF_VIEW_DEGREES = 45.0f;
 
     struct Particle {
         glm::vec3 position{};
@@ -201,8 +203,15 @@ namespace example {
 
         [[nodiscard]] glm::mat4 make_mvp() const {
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = extent.height > 0U ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 16.0f / 9.0f;
-            glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+            const float aspect = extent.height > 0U ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : SCENE_REFERENCE_ASPECT;
+
+            float vertical_field_of_view = glm::radians(VERTICAL_FIELD_OF_VIEW_DEGREES);
+            if (aspect < SCENE_REFERENCE_ASPECT) {
+                const float reference_half_width = std::tan(vertical_field_of_view * 0.5f) * SCENE_REFERENCE_ASPECT;
+                vertical_field_of_view = 2.0f * std::atan(reference_half_width / aspect);
+            }
+
+            glm::mat4 projection = glm::perspective(vertical_field_of_view, aspect, 0.1f, 100.0f);
             projection[1][1] *= -1.0f;
             const glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             const glm::mat4 model(1.0f);
