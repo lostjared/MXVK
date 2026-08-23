@@ -3739,6 +3739,9 @@ namespace mxvk {
         if (!vertexShaderPath.empty()) {
             sprite->setVertexShaderPath(vertexShaderPath);
         }
+        if (!fragmentShaderPath.empty()) {
+            sprite->enableExtendedUBO();
+        }
 
         sprite->loadSprite(surface, fragmentShaderPath);
 
@@ -3771,6 +3774,9 @@ namespace mxvk {
         sprite->setDescriptorSetLayout(sprite_descriptor_set_layout);
         sprite->setColorAttachmentFormat(swapchain_format);
         sprite->setDepthAttachmentFormat(depth_format);
+        if (!fragmentShaderPath.empty()) {
+            sprite->enableExtendedUBO();
+        }
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
 
