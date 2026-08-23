@@ -193,6 +193,10 @@ namespace mxvk {
         extendedUBOData.u3 = glm::vec4(x, y, z, w);
     }
 
+    void VK_Sprite::setAudioBands(float low, float mid, float high, float reserved) {
+        extendedUBOData.audio_bands = glm::vec4(low, mid, high, reserved);
+    }
+
     void VK_Sprite::setCustomUniforms(const std::vector<float> &values) {
         if (values.size() > MAX_CUSTOM_UNIFORMS) {
             throw mxvk::Exception(std::format(

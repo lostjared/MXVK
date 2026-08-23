@@ -277,6 +277,19 @@ namespace mxvk {
         void setUniform3(float x, float y, float z, float w);
 
         /**
+         * @brief Upload audio frequency-band energy to the extended UBO.
+         *
+         * The values are appended after the custom-uniform array to preserve
+         * the existing SpriteExtended prefix and custom-uniform offsets.
+         *
+         * @param low Energy below 300 Hz.
+         * @param mid Energy from 300 through 3000 Hz.
+         * @param high Energy above 3000 Hz.
+         * @param reserved Reserved channel.
+         */
+        void setAudioBands(float low, float mid, float high, float reserved = 0.0f);
+
+        /**
          * @brief Upload ordered custom float values to the extended UBO.
          *
          * Custom shaders can append @c vec4 custom_uniforms[16] after @c u3 in
@@ -464,6 +477,7 @@ namespace mxvk {
             glm::vec4 u2;
             glm::vec4 u3;
             std::array<glm::vec4, MAX_CUSTOM_UNIFORMS / 4> custom_uniforms;
+            glm::vec4 audio_bands;
         };
         bool extendedUBOEnabled = false;
         SpriteExtendedUBO extendedUBOData{};
