@@ -55,6 +55,8 @@ namespace mxvk {
      */
     class VK_Sprite {
       public:
+        static constexpr std::size_t MAX_CUSTOM_UNIFORMS = 64;
+
         /**
          * @brief Construct and record Vulkan context handles.
          * @param device         Logical device.
@@ -275,6 +277,19 @@ namespace mxvk {
         void setUniform3(float x, float y, float z, float w);
 
         /**
+         * @brief Upload ordered custom float values to the extended UBO.
+         *
+         * Custom shaders can append @c vec4 custom_uniforms[16] after @c u3 in
+         * their binding-1 SpriteExtended block. Value N is available at
+         * @c custom_uniforms[N/4][N%4]. Existing shaders that use only the
+         * original SpriteExtended prefix remain compatible.
+         *
+         * @param values Up to MAX_CUSTOM_UNIFORMS values. Unused slots are zeroed.
+         * @throws mxvk::Exception when too many values are supplied.
+         */
+        void setCustomUniforms(const std::vector<float> &values);
+
+        /**
          * @brief Allocate a shader-readable RGBA history texture array.
          *
          * Enables extended descriptors and exposes the array as a combined image
@@ -425,6 +440,7 @@ namespace mxvk {
             glm::vec4 u1;
             glm::vec4 u2;
             glm::vec4 u3;
+            std::array<glm::vec4, MAX_CUSTOM_UNIFORMS / 4> custom_uniforms;
         };
         bool extendedUBOEnabled = false;
         SpriteExtendedUBO extendedUBOData{};

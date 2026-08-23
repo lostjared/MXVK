@@ -192,6 +192,19 @@ namespace mxvk {
         extendedUBOData.u3 = glm::vec4(x, y, z, w);
     }
 
+    void VK_Sprite::setCustomUniforms(const std::vector<float> &values) {
+        if (values.size() > MAX_CUSTOM_UNIFORMS) {
+            throw mxvk::Exception(std::format(
+                "VKSprite::setCustomUniforms supports at most {} values",
+                MAX_CUSTOM_UNIFORMS));
+        }
+
+        extendedUBOData.custom_uniforms.fill(glm::vec4(0.0f));
+        for (std::size_t index = 0; index < values.size(); ++index) {
+            extendedUBOData.custom_uniforms[index / 4][index % 4] = values[index];
+        }
+    }
+
     void VK_Sprite::enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers) {
         if (width == 0 || height == 0 || layers == 0) {
             throw mxvk::Exception("VKSprite::enableHistoryTexture requires positive dimensions and layer count");
