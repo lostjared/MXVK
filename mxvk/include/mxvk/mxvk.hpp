@@ -533,6 +533,7 @@ namespace mxvk {
         bool swapchain_supports_transfer_src = false;
 
         bool sdl_initialized = false;
+        bool vulkan_library_loaded = false;
         bool active = false;
         bool screenshot_enabled = defaultEnableScreenshot();
         std::string screenshot_prefix = defaultExecutableName();

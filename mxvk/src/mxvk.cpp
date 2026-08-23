@@ -307,6 +307,12 @@ namespace mxvk {
         std::cout << "SDL3: destroying SDL window handle\n";
         window.reset();
 
+        if (vulkan_library_loaded) {
+            std::cout << "SDL3: unloading Vulkan loader library\n";
+            SDL_Vulkan_UnloadLibrary();
+            vulkan_library_loaded = false;
+        }
+
         if (sdl_initialized) {
             std::cout << "SDL3: shutting down SDL video/gamepad subsystems\n";
             SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
@@ -331,11 +337,15 @@ namespace mxvk {
             return true;
         }
 
-        std::cout << "vk: initializing volk loader\n";
-        if (volkInitialize() != VK_SUCCESS) {
-            std::cerr << "mxvk: Failed to initialize volk\n";
+        std::cout << "vk: initializing volk from SDL's Vulkan loader\n";
+        const auto get_instance_proc_addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+            SDL_Vulkan_GetVkGetInstanceProcAddr());
+        if (get_instance_proc_addr == nullptr) {
+            std::cerr << std::format(
+                "mxvk: SDL did not provide vkGetInstanceProcAddr: {}\n", SDL_GetError());
             return false;
         }
+        volkInitializeCustom(get_instance_proc_addr);
 
         unsigned int extension_count = 0;
         std::cout << "SDL3: querying Vulkan instance extensions required by SDL\n";
@@ -1197,6 +1207,18 @@ namespace mxvk {
             std::cout << "SDL3: video/gamepad subsystems initialized\n";
         }
 
+        if (!vulkan_library_loaded) {
+            std::cout << "SDL3: loading the Vulkan loader library\n";
+            if (!SDL_Vulkan_LoadLibrary(nullptr)) {
+                std::cerr << std::format(
+                    "mxvk: SDL_Vulkan_LoadLibrary failed: {}\n", SDL_GetError());
+                SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
+                sdl_initialized = false;
+                return false;
+            }
+            vulkan_library_loaded = true;
+        }
+
         const bool fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0;
         const SDL_DisplayMode *fullscreen_mode = nullptr;
         if (fullscreen) {
@@ -1213,6 +1235,8 @@ namespace mxvk {
         SDL_Window *raw_window = SDL_CreateWindow(title.c_str(), width, height, flags);
         if (raw_window == nullptr) {
             std::cerr << std::format("Error creating window: {}\n", SDL_GetError());
+            SDL_Vulkan_UnloadLibrary();
+            vulkan_library_loaded = false;
             std::cout << "SDL3: rolling back SDL video/gamepad subsystems after window creation failure\n";
             SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
             sdl_initialized = false;
