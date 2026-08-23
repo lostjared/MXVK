@@ -224,6 +224,8 @@ namespace mxvk {
             vkDeviceWaitIdle(device);
         }
 
+        destroyFrameReadbackResources();
+
         post_process_sprite = nullptr;
         owned_post_process_sprite = nullptr;
         post_process_sprites.clear();
@@ -597,6 +599,13 @@ namespace mxvk {
         clear_color.float32[3] = std::clamp(a, 0.0f, 1.0f);
     }
 
+    void VK_Window::setEnableScreenshot(bool enabled) noexcept {
+        screenshot_enabled = enabled;
+        if (enabled) {
+            frame_readback_enabled = true;
+        }
+    }
+
     void VK_Window::loop() {
         SDL_Event e;
         active = true;
@@ -798,6 +807,12 @@ namespace mxvk {
     }
 
     void VK_Window::captureSnapshotPixels(std::vector<std::uint8_t> &rgba_pixels, uint32_t &width, uint32_t &height) {
+        if (!latest_frame_readback_rgba.empty()) {
+            rgba_pixels = latest_frame_readback_rgba;
+            width = latest_frame_readback_width;
+            height = latest_frame_readback_height;
+            return;
+        }
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
             throw mxvk::Exception("captureSnapshotPixels called before Vulkan render resources are ready");
         }
@@ -1033,6 +1048,112 @@ namespace mxvk {
         }
 
         cleanup();
+    }
+
+    void VK_Window::onFrameReadback(
+        [[maybe_unused]] std::vector<std::uint8_t> &rgba_pixels,
+        [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
+    }
+
+    void VK_Window::ensureFrameReadbackResources() {
+        if (!frame_readback_enabled) {
+            return;
+        }
+        if (!swapchain_supports_transfer_src) {
+            throw mxvk::Exception("frame readback requires swapchain transfer-source support");
+        }
+
+        const VkDeviceSize required_size =
+            static_cast<VkDeviceSize>(swapchain_extent.width) * swapchain_extent.height * 4U;
+        if (required_size == 0U) {
+            throw mxvk::Exception("frame readback cannot use an empty swapchain extent");
+        }
+        if (frame_readback_buffer != VK_NULL_HANDLE && frame_readback_mapped != nullptr &&
+            frame_readback_size >= required_size) {
+            return;
+        }
+
+        if (device != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
+        }
+        destroyFrameReadbackResources();
+
+        VkBufferCreateInfo buffer_info{};
+        buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        buffer_info.size = required_size;
+        buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        if (vkCreateBuffer(device, &buffer_info, nullptr, &frame_readback_buffer) != VK_SUCCESS) {
+            throw mxvk::Exception("failed to create persistent frame-readback buffer");
+        }
+
+        VkMemoryRequirements memory_requirements{};
+        vkGetBufferMemoryRequirements(device, frame_readback_buffer, &memory_requirements);
+
+        VkPhysicalDeviceMemoryProperties memory_properties{};
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+        uint32_t memory_type_index = invalid_queue_index;
+        constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        for (uint32_t index = 0; index < memory_properties.memoryTypeCount; ++index) {
+            const bool type_matches =
+                (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+            const bool properties_match =
+                (memory_properties.memoryTypes[index].propertyFlags & REQUIRED_PROPERTIES) ==
+                REQUIRED_PROPERTIES;
+            if (type_matches && properties_match) {
+                memory_type_index = index;
+                break;
+            }
+        }
+        if (memory_type_index == invalid_queue_index) {
+            destroyFrameReadbackResources();
+            throw mxvk::Exception("failed to find host-visible frame-readback memory");
+        }
+
+        VkMemoryAllocateInfo allocation_info{};
+        allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocation_info.allocationSize = memory_requirements.size;
+        allocation_info.memoryTypeIndex = memory_type_index;
+        if (vkAllocateMemory(device, &allocation_info, nullptr, &frame_readback_memory) !=
+            VK_SUCCESS) {
+            destroyFrameReadbackResources();
+            throw mxvk::Exception("failed to allocate frame-readback memory");
+        }
+        if (vkBindBufferMemory(device, frame_readback_buffer, frame_readback_memory, 0) !=
+            VK_SUCCESS) {
+            destroyFrameReadbackResources();
+            throw mxvk::Exception("failed to bind frame-readback memory");
+        }
+        if (vkMapMemory(device, frame_readback_memory, 0, required_size, 0,
+                        &frame_readback_mapped) != VK_SUCCESS) {
+            destroyFrameReadbackResources();
+            throw mxvk::Exception("failed to map frame-readback memory");
+        }
+        frame_readback_size = required_size;
+        latest_frame_readback_rgba.clear();
+        latest_frame_readback_width = 0;
+        latest_frame_readback_height = 0;
+    }
+
+    void VK_Window::destroyFrameReadbackResources() {
+        if (device != VK_NULL_HANDLE && frame_readback_mapped != nullptr &&
+            frame_readback_memory != VK_NULL_HANDLE) {
+            vkUnmapMemory(device, frame_readback_memory);
+        }
+        frame_readback_mapped = nullptr;
+        if (device != VK_NULL_HANDLE && frame_readback_buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, frame_readback_buffer, nullptr);
+        }
+        frame_readback_buffer = VK_NULL_HANDLE;
+        if (device != VK_NULL_HANDLE && frame_readback_memory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, frame_readback_memory, nullptr);
+        }
+        frame_readback_memory = VK_NULL_HANDLE;
+        frame_readback_size = 0;
+        latest_frame_readback_rgba.clear();
+        latest_frame_readback_width = 0;
+        latest_frame_readback_height = 0;
     }
 
     void VK_Window::proc() {
@@ -2383,6 +2504,10 @@ namespace mxvk {
             return;
         }
 
+        if (frame_readback_enabled) {
+            ensureFrameReadbackResources();
+        }
+
         uint32_t image_index = 0;
         const uint64_t acquire_timeout_ns = 100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
         const VkResult acquire_result =
@@ -2766,13 +2891,54 @@ namespace mxvk {
             }
         }
 
+        if (frame_readback_enabled) {
+            VkImageMemoryBarrier2 to_readback_barrier{};
+            to_readback_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_readback_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_readback_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_readback_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            to_readback_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+            to_readback_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_readback_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            to_readback_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_readback_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_readback_barrier.image = swapchain_images[image_index];
+            to_readback_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            to_readback_barrier.subresourceRange.baseMipLevel = 0;
+            to_readback_barrier.subresourceRange.levelCount = 1;
+            to_readback_barrier.subresourceRange.baseArrayLayer = 0;
+            to_readback_barrier.subresourceRange.layerCount = 1;
+
+            VkDependencyInfo to_readback_dependency{};
+            to_readback_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_readback_dependency.imageMemoryBarrierCount = 1;
+            to_readback_dependency.pImageMemoryBarriers = &to_readback_barrier;
+            vkCmdPipelineBarrier2(cmd, &to_readback_dependency);
+
+            VkBufferImageCopy readback_region{};
+            readback_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            readback_region.imageSubresource.mipLevel = 0;
+            readback_region.imageSubresource.baseArrayLayer = 0;
+            readback_region.imageSubresource.layerCount = 1;
+            readback_region.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
+            vkCmdCopyImageToBuffer(cmd, swapchain_images[image_index],
+                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                   frame_readback_buffer, 1, &readback_region);
+        }
+
         VkImageMemoryBarrier2 to_present_barrier{};
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        to_present_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        to_present_barrier.srcStageMask = frame_readback_enabled
+                                              ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
+                                              : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        to_present_barrier.srcAccessMask = frame_readback_enabled
+                                               ? VK_ACCESS_2_TRANSFER_READ_BIT
+                                               : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
-        to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        to_present_barrier.oldLayout = frame_readback_enabled
+                                           ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -2811,7 +2977,7 @@ namespace mxvk {
         signal_semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         signal_semaphore_info.semaphore = present_semaphore;
         signal_semaphore_info.value = 0;
-        signal_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+        signal_semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         signal_semaphore_info.deviceIndex = 0;
 
         VkSubmitInfo2 submit_info{};
@@ -2851,6 +3017,38 @@ namespace mxvk {
         image_fences[image_index] = frame_fence;
         swapchain_image_initialized[image_index] = true;
 
+        std::vector<std::uint8_t> completed_readback;
+        if (frame_readback_enabled) {
+            const VkResult readback_wait_result =
+                vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
+            if (readback_wait_result != VK_SUCCESS) {
+                throw mxvk::Exception(std::format(
+                    "frame readback failed waiting for rendering (VkResult={})",
+                    static_cast<int>(readback_wait_result)));
+            }
+
+            const auto *source = static_cast<const std::uint8_t *>(frame_readback_mapped);
+            const std::size_t pixel_bytes =
+                static_cast<std::size_t>(swapchain_extent.width) * swapchain_extent.height * 4U;
+            completed_readback.resize(pixel_bytes);
+            const bool format_is_bgra =
+                swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
+                swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
+            for (std::size_t offset = 0; offset < pixel_bytes; offset += 4U) {
+                if (format_is_bgra) {
+                    completed_readback[offset + 0U] = source[offset + 2U];
+                    completed_readback[offset + 1U] = source[offset + 1U];
+                    completed_readback[offset + 2U] = source[offset + 0U];
+                    completed_readback[offset + 3U] = source[offset + 3U];
+                } else {
+                    completed_readback[offset + 0U] = source[offset + 0U];
+                    completed_readback[offset + 1U] = source[offset + 1U];
+                    completed_readback[offset + 2U] = source[offset + 2U];
+                    completed_readback[offset + 3U] = source[offset + 3U];
+                }
+            }
+        }
+
         VkPresentInfoKHR present_info{};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present_info.waitSemaphoreCount = 1;
@@ -2862,6 +3060,13 @@ namespace mxvk {
         const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
         if (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR) {
             last_presented_image_index = image_index;
+            if (frame_readback_enabled && !completed_readback.empty()) {
+                latest_frame_readback_rgba = std::move(completed_readback);
+                latest_frame_readback_width = swapchain_extent.width;
+                latest_frame_readback_height = swapchain_extent.height;
+                onFrameReadback(latest_frame_readback_rgba, latest_frame_readback_width,
+                                latest_frame_readback_height);
+            }
         }
 
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {

@@ -156,10 +156,19 @@ namespace mxvk {
         void setClearColor(float r, float g, float b, float a = 1.0f);
 
         /** @brief Enable or disable F10 screenshot capture. */
-        void setEnableScreenshot(bool enabled) noexcept { screenshot_enabled = enabled; }
+        void setEnableScreenshot(bool enabled) noexcept;
 
         /** @brief Check whether F10 screenshot capture is enabled. */
         [[nodiscard]] bool screenshotEnabled() const noexcept { return screenshot_enabled; }
+
+        /**
+         * @brief Enable or disable readback of each rendered swapchain frame.
+         *
+         * Readback is recorded while the swapchain image is acquired and delivered
+         * through onFrameReadback() after presentation. Enabling it synchronizes each
+         * frame with the CPU and is intended for recording and diagnostics.
+         */
+        void setFrameReadbackEnabled(bool enabled) noexcept { frame_readback_enabled = enabled; }
 
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
@@ -405,6 +414,15 @@ namespace mxvk {
         void captureSnapshotPixels(std::vector<std::uint8_t> &rgba_pixels, uint32_t &width, uint32_t &height);
 
         /**
+         * @brief Receive one tightly packed RGBA8 copy of the rendered frame.
+         * @param rgba_pixels Frame pixels in top-to-bottom row order.
+         * @param width Frame width in pixels.
+         * @param height Frame height in pixels.
+         */
+        virtual void onFrameReadback(std::vector<std::uint8_t> &rgba_pixels,
+                                     uint32_t width, uint32_t height);
+
+        /**
          * @brief Render one standalone sprite using the window's shared sprite pipeline.
          *
          * This is intended for derived classes that want to draw a sprite before or after
@@ -528,6 +546,16 @@ namespace mxvk {
         std::deque<ScreenshotSaveTask> screenshot_save_queue;
         std::thread screenshot_worker;
         bool screenshot_worker_stop = false;
+        bool frame_readback_enabled = false;
+        VkBuffer frame_readback_buffer = VK_NULL_HANDLE;
+        VkDeviceMemory frame_readback_memory = VK_NULL_HANDLE;
+        void *frame_readback_mapped = nullptr;
+        VkDeviceSize frame_readback_size = 0;
+        std::vector<std::uint8_t> latest_frame_readback_rgba{};
+        uint32_t latest_frame_readback_width = 0;
+        uint32_t latest_frame_readback_height = 0;
+        void ensureFrameReadbackResources();
+        void destroyFrameReadbackResources();
         bool validation_enabled = false;
         PresentModePreference present_mode_preference = PresentModePreference::LowLatency;
         bool framebuffer_resized = false;
