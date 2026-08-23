@@ -250,14 +250,16 @@ namespace mxvk {
          * @param height Texture height in pixels.
          * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
          * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @param spectrumBinCount Optional binding-3 1-D spectrum size to create before the pipeline.
          * @return Non-owning pointer to the created sprite.
          */
-        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
+        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "", uint32_t spectrumBinCount = 0);
 
         struct PostProcessingEffect {
             std::string fragmentShaderPath{};
             std::array<float, 4> params{};
             bool timeEnabled = false;
+            uint32_t spectrumBinCount = 0;
         };
 
         /**

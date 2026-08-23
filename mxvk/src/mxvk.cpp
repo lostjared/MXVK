@@ -1291,7 +1291,8 @@ namespace mxvk {
                 1,
                 1,
                 resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR),
-                effect.fragmentShaderPath);
+                effect.fragmentShaderPath,
+                effect.spectrumBinCount);
             const uint32_t black_pixel = 0xFF000000u;
             sprite->updateTexture(&black_pixel, 1, 1);
             sprite->setShaderParams(effect.params[0], effect.params[1], effect.params[2], effect.params[3]);
@@ -3751,7 +3752,7 @@ namespace mxvk {
         return sprite_ptr;
     }
 
-    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("Sprite dimensions must be positive");
         }
@@ -3776,6 +3777,9 @@ namespace mxvk {
         sprite->setDepthAttachmentFormat(depth_format);
         if (!fragmentShaderPath.empty()) {
             sprite->enableExtendedUBO();
+        }
+        if (spectrumBinCount > 0) {
+            sprite->enableSpectrumTexture(spectrumBinCount);
         }
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);

@@ -323,6 +323,27 @@ namespace mxvk {
         /** @return Number of allocated texture-history layers. */
         [[nodiscard]] uint32_t getHistoryLayerCount() const { return historyLayers; }
 
+        /**
+         * @brief Allocate a shader-readable 1-D floating-point spectrum texture.
+         *
+         * Enables extended descriptors and exposes the texture as a combined
+         * image sampler at set 0, binding 3. The texture is initialized to zero.
+         *
+         * @param bins Number of R32_SFLOAT frequency bins.
+         * @throws mxvk::Exception when @p bins is zero.
+         */
+        void enableSpectrumTexture(uint32_t bins);
+
+        /**
+         * @brief Replace the current floating-point spectrum data.
+         * @param magnitudes Pointer to @p bins frequency magnitudes.
+         * @param bins Number of values; must match enableSpectrumTexture().
+         */
+        void updateSpectrumTexture(const float *magnitudes, uint32_t bins);
+
+        /** @return Number of allocated spectrum bins. */
+        [[nodiscard]] uint32_t getSpectrumBinCount() const { return spectrumBins; }
+
       private:
         struct SpriteVertex {
             float pos[2];
@@ -404,7 +425,9 @@ namespace mxvk {
                                    uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                          VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkImage &image, VkDeviceMemory &imageMemory, uint32_t arrayLayers = 1);
+                         VkImage &image, VkDeviceMemory &imageMemory,
+                         uint32_t arrayLayers = 1,
+                         VkImageType imageType = VK_IMAGE_TYPE_2D);
         VkImageView createImageView(VkImage image, VkFormat format,
                                     VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D,
                                     uint32_t layerCount = 1);
@@ -466,6 +489,13 @@ namespace mxvk {
         uint32_t historyLayers = 0;
         uint32_t historyHead = 0;
         void destroyHistoryTexture();
+
+        bool spectrumTextureEnabled = false;
+        VkImage spectrumImage = VK_NULL_HANDLE;
+        VkDeviceMemory spectrumImageMemory = VK_NULL_HANDLE;
+        VkImageView spectrumImageView = VK_NULL_HANDLE;
+        uint32_t spectrumBins = 0;
+        void destroySpectrumTexture();
         void recreateExtendedDescriptorLayout();
 
         struct SpriteInstanceData {
