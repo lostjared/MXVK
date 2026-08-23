@@ -330,6 +330,23 @@ namespace mxvk {
          */
         void updateHistoryTexture(const void *pixels, int width, int height, int pitch = 0);
 
+#ifdef MXVK_CUDA
+        /**
+         * @brief Upload a CUDA RGBA frame into the next history layer.
+         *
+         * Copies device-to-device into the Vulkan history array and advances
+         * the write head after a successful upload. Dimensions and format must
+         * match the active RGBA8 history texture.
+         *
+         * @param rgba CUDA RGBA8 source image.
+         * @param stream CUDA stream used for the asynchronous copy.
+         * @return @c true on success, or @c false for invalid input or when
+         * direct CUDA/Vulkan history interop is unavailable.
+         */
+        [[nodiscard]] bool updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba,
+                                                    cv::cuda::Stream &stream);
+#endif
+
         /** @return The logical oldest-layer index for a circular history sampler. */
         [[nodiscard]] uint32_t getHistoryHead() const { return historyHead; }
 
@@ -480,12 +497,23 @@ namespace mxvk {
         void updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height);
 #ifdef MXVK_CUDA
         void destroyCudaInterop();
+        void destroyCudaHistoryInterop();
         bool ensureCudaInterop();
+        bool ensureCudaHistoryInterop();
         bool transitionCudaImageForWrite();
         bool transitionCudaImageForShaderRead();
+        void transitionCudaHistoryLayer(VkImageLayout oldLayout,
+                                        VkImageLayout newLayout,
+                                        VkAccessFlags sourceAccess,
+                                        VkAccessFlags destinationAccess,
+                                        VkPipelineStageFlags sourceStage,
+                                        VkPipelineStageFlags destinationStage);
         bool updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch);
         void recordCudaReadyBarrier(VkCommandBuffer cmdBuffer);
-        void createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory);
+        void createCudaExportableImage(uint32_t width, uint32_t height,
+                                       uint32_t arrayLayers, VkImage &image,
+                                       VkDeviceMemory &imageMemory,
+                                       VkDeviceSize &exportMemorySize);
         VkDeviceSize cudaExportMemorySize = 0;
         cudaExternalMemory_t cudaExternalMemory = nullptr;
         cudaMipmappedArray_t cudaMipmappedArray = nullptr;
@@ -497,6 +525,13 @@ namespace mxvk {
         bool cudaSampleBarrierLogged = false;
         bool cudaImageNeedsShaderBarrier = false;
         VkImageLayout cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkDeviceSize cudaHistoryExportMemorySize = 0;
+        cudaExternalMemory_t cudaHistoryExternalMemory = nullptr;
+        cudaMipmappedArray_t cudaHistoryMipmappedArray = nullptr;
+        cudaArray_t cudaHistoryArray = nullptr;
+        bool cudaHistoryInteropEnabled = false;
+        bool cudaHistoryInteropUnavailableLogged = false;
+        bool cudaHistoryUploadLogged = false;
 #endif
         std::vector<char> readShaderFile(const std::string &filename);
 

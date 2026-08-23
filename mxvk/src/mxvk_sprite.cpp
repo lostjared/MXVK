@@ -231,9 +231,32 @@ namespace mxvk {
         historyHeight = height;
         historyLayers = layers;
         historyHead = 0;
-        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage, historyImageMemory, layers);
+#ifdef MXVK_CUDA
+        try {
+            createCudaExportableImage(width, height, layers, historyImage,
+                                      historyImageMemory,
+                                      cudaHistoryExportMemorySize);
+            cudaHistoryInteropUnavailableLogged = false;
+        } catch (const std::exception &exception) {
+            std::cout << std::format(
+                "mxvk: CUDA exportable history image unavailable: {}; using "
+                "CPU staging uploads\n",
+                exception.what());
+            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
+                        VK_IMAGE_TILING_OPTIMAL,
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
+                        historyImageMemory, layers);
+        }
+#else
+        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                        VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
+                    historyImageMemory, layers);
+#endif
 
         const VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * 4;
         const VkDeviceSize imageSize = layerSize * layers;
@@ -849,6 +872,9 @@ namespace mxvk {
     }
 
     void VK_Sprite::destroyHistoryTexture() {
+#ifdef MXVK_CUDA
+        destroyCudaHistoryInterop();
+#endif
         if (historyImageView != VK_NULL_HANDLE) {
             vkDestroyImageView(device, historyImageView, nullptr);
             historyImageView = VK_NULL_HANDLE;
@@ -1532,7 +1558,10 @@ namespace mxvk {
 
 #ifdef MXVK_CUDA
         try {
-            createCudaExportableImage(width, height, spriteImage, spriteImageMemory);
+            createCudaExportableImage(width, height, 1, spriteImage,
+                                      spriteImageMemory,
+                                      cudaExportMemorySize);
+            cudaInteropUnavailableLogged = false;
         } catch (const std::exception &ex) {
             std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
             createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
@@ -1806,8 +1835,13 @@ namespace mxvk {
         cudaSampleBarrierLogged = false;
     }
 
-    void VK_Sprite::createCudaExportableImage(uint32_t width, uint32_t height, VkImage &image, VkDeviceMemory &imageMemory) {
-        std::cout << std::format("mxvk: CUDA interop init: requesting exportable Vulkan image {}x{} RGBA8 OPAQUE_FD\n", width, height);
+    void VK_Sprite::createCudaExportableImage(
+        uint32_t width, uint32_t height, uint32_t arrayLayers, VkImage &image,
+        VkDeviceMemory &imageMemory, VkDeviceSize &exportMemorySize) {
+        std::cout << std::format(
+            "mxvk: CUDA interop init: requesting exportable Vulkan image "
+            "{}x{}x{} RGBA8 OPAQUE_FD\n",
+            width, height, arrayLayers);
         if (image != VK_NULL_HANDLE) {
             vkDestroyImage(device, image, nullptr);
             image = VK_NULL_HANDLE;
@@ -1829,7 +1863,7 @@ namespace mxvk {
         imageInfo.extent.height = height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
-        imageInfo.arrayLayers = 1;
+        imageInfo.arrayLayers = arrayLayers;
         imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1855,11 +1889,11 @@ namespace mxvk {
             allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
             VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
             VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
-            cudaExportMemorySize = memRequirements.size;
-            cudaInteropUnavailableLogged = false;
+            exportMemorySize = memRequirements.size;
             std::cout << std::format(
                 "mxvk: CUDA interop init: exportable Vulkan image allocated (memorySize={} bytes, memoryType={})\n",
-                static_cast<unsigned long long>(cudaExportMemorySize), allocInfo.memoryTypeIndex);
+                static_cast<unsigned long long>(exportMemorySize),
+                allocInfo.memoryTypeIndex);
         } catch (...) {
             if (imageMemory != VK_NULL_HANDLE) {
                 vkFreeMemory(device, imageMemory, nullptr);
@@ -1869,7 +1903,7 @@ namespace mxvk {
                 vkDestroyImage(device, image, nullptr);
                 image = VK_NULL_HANDLE;
             }
-            cudaExportMemorySize = 0;
+            exportMemorySize = 0;
             throw;
         }
     }
@@ -1961,6 +1995,157 @@ namespace mxvk {
         cudaInteropEnabled = true;
         std::cout << "mxvk: CUDA interop init: direct CUDA-to-Vulkan texture upload is ready\n";
         return true;
+    }
+
+    void VK_Sprite::destroyCudaHistoryInterop() {
+        if (cudaHistoryInteropEnabled ||
+            cudaHistoryExternalMemory != nullptr ||
+            cudaHistoryMipmappedArray != nullptr) {
+            std::cout << "mxvk: CUDA interop: destroying imported history "
+                         "texture resources\n";
+        }
+        if (cudaHistoryMipmappedArray != nullptr) {
+            cudaFreeMipmappedArray(cudaHistoryMipmappedArray);
+            cudaHistoryMipmappedArray = nullptr;
+            cudaHistoryArray = nullptr;
+        }
+        if (cudaHistoryExternalMemory != nullptr) {
+            cudaDestroyExternalMemory(cudaHistoryExternalMemory);
+            cudaHistoryExternalMemory = nullptr;
+        }
+        cudaHistoryInteropEnabled = false;
+        cudaHistoryExportMemorySize = 0;
+        cudaHistoryUploadLogged = false;
+    }
+
+    bool VK_Sprite::ensureCudaHistoryInterop() {
+        if (cudaHistoryInteropEnabled) {
+            return true;
+        }
+        if (historyImage == VK_NULL_HANDLE ||
+            historyImageMemory == VK_NULL_HANDLE ||
+            cudaHistoryExportMemorySize == 0) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA history interop: history image is not "
+                             "exportable\n";
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+        if (vkGetMemoryFdKHR == nullptr) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA history interop: vkGetMemoryFdKHR was "
+                             "not loaded\n";
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetFdInfoKHR fdInfo{};
+        fdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+        fdInfo.memory = historyImageMemory;
+        fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        int memoryFd = -1;
+        const VkResult fdResult =
+            vkGetMemoryFdKHR(device, &fdInfo, &memoryFd);
+        if (fdResult != VK_SUCCESS) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format(
+                    "mxvk: CUDA history interop: vkGetMemoryFdKHR failed "
+                    "({})\n",
+                    static_cast<int>(fdResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+        externalMemoryDesc.handle.fd = memoryFd;
+        externalMemoryDesc.size = cudaHistoryExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(
+            &cudaHistoryExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            close(memoryFd);
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format(
+                    "mxvk: CUDA history interop: import failed: {}\n",
+                    cudaGetErrorString(cudaResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            cudaHistoryExternalMemory = nullptr;
+            return false;
+        }
+
+        cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
+        arrayDesc.offset = 0;
+        arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
+        arrayDesc.extent = make_cudaExtent(
+            static_cast<size_t>(historyWidth),
+            static_cast<size_t>(historyHeight),
+            static_cast<size_t>(historyLayers));
+        arrayDesc.flags = cudaArrayColorAttachment | cudaArrayLayered;
+        arrayDesc.numLevels = 1;
+
+        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(
+            &cudaHistoryMipmappedArray, cudaHistoryExternalMemory, &arrayDesc);
+        if (cudaResult != cudaSuccess) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format(
+                    "mxvk: CUDA history interop: array mapping failed: {}\n",
+                    cudaGetErrorString(cudaResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            destroyCudaHistoryInterop();
+            return false;
+        }
+
+        cudaResult = cudaGetMipmappedArrayLevel(
+            &cudaHistoryArray, cudaHistoryMipmappedArray, 0);
+        if (cudaResult != cudaSuccess) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format(
+                    "mxvk: CUDA history interop: array lookup failed: {}\n",
+                    cudaGetErrorString(cudaResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            destroyCudaHistoryInterop();
+            return false;
+        }
+
+        cudaHistoryInteropEnabled = true;
+        cudaHistoryInteropUnavailableLogged = false;
+        std::cout << std::format(
+            "mxvk: CUDA history interop: direct {}-layer upload is ready\n",
+            historyLayers);
+        return true;
+    }
+
+    void VK_Sprite::transitionCudaHistoryLayer(
+        VkImageLayout oldLayout, VkImageLayout newLayout,
+        VkAccessFlags sourceAccess, VkAccessFlags destinationAccess,
+        VkPipelineStageFlags sourceStage,
+        VkPipelineStageFlags destinationStage) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = historyImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = historyHead;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = sourceAccess;
+        barrier.dstAccessMask = destinationAccess;
+        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0,
+                             nullptr, 0, nullptr, 1, &barrier);
+        endSingleTimeCommands(commandBuffer);
     }
 
     bool VK_Sprite::transitionCudaImageForWrite() {
@@ -2077,8 +2262,11 @@ namespace mxvk {
             spriteWidth = rgba.cols;
             spriteHeight = rgba.rows;
             try {
-                createCudaExportableImage(static_cast<uint32_t>(spriteWidth), static_cast<uint32_t>(spriteHeight),
-                                          spriteImage, spriteImageMemory);
+                createCudaExportableImage(
+                    static_cast<uint32_t>(spriteWidth),
+                    static_cast<uint32_t>(spriteHeight), 1, spriteImage,
+                    spriteImageMemory, cudaExportMemorySize);
+                cudaInteropUnavailableLogged = false;
                 spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
             } catch (const std::exception &ex) {
                 if (!cudaInteropUnavailableLogged) {
@@ -2123,6 +2311,63 @@ namespace mxvk {
         return transitionCudaImageForShaderRead();
     }
 
+    bool VK_Sprite::updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba,
+                                             cv::cuda::Stream &stream) {
+        if (!historyTextureEnabled || rgba.empty() || rgba.type() != CV_8UC4 ||
+            rgba.cols <= 0 || rgba.rows <= 0 ||
+            static_cast<uint32_t>(rgba.cols) != historyWidth ||
+            static_cast<uint32_t>(rgba.rows) != historyHeight ||
+            !ensureCudaHistoryInterop()) {
+            return false;
+        }
+
+        transitionCudaHistoryLayer(
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+            VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_MEMORY_WRITE_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+
+        cudaMemcpy3DParms copyParameters{};
+        copyParameters.srcPtr = make_cudaPitchedPtr(
+            const_cast<unsigned char *>(rgba.ptr()), rgba.step,
+            static_cast<size_t>(rgba.cols),
+            static_cast<size_t>(rgba.rows));
+        copyParameters.dstArray = cudaHistoryArray;
+        copyParameters.dstPos = make_cudaPos(0, 0, historyHead);
+        copyParameters.extent = make_cudaExtent(
+            static_cast<size_t>(rgba.cols), static_cast<size_t>(rgba.rows), 1);
+        copyParameters.kind = cudaMemcpyDeviceToDevice;
+
+        cudaStream_t cudaStream = cuda_stream_handle(stream);
+        cudaError_t cudaResult =
+            cudaMemcpy3DAsync(&copyParameters, cudaStream);
+        if (cudaResult == cudaSuccess) {
+            cudaResult = cudaStreamSynchronize(cudaStream);
+        }
+
+        transitionCudaHistoryLayer(
+            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+        if (cudaResult != cudaSuccess) {
+            std::cout << std::format(
+                "mxvk: CUDA history interop upload failed: {}\n",
+                cudaGetErrorString(cudaResult));
+            return false;
+        }
+        if (!cudaHistoryUploadLogged) {
+            std::cout << std::format(
+                "mxvk: CUDA history interop: copying {}x{} RGBA GpuMat into "
+                "the Vulkan history array\n",
+                rgba.cols, rgba.rows);
+            cudaHistoryUploadLogged = true;
+        }
+        historyHead = (historyHead + 1) % historyLayers;
+        return true;
+    }
+
     bool VK_Sprite::updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch) {
         if (pixels == nullptr || width == 0 || height == 0) {
             return false;
@@ -2159,7 +2404,10 @@ namespace mxvk {
     void VK_Sprite::createSpriteTexture(SDL_Surface *surface) {
 #ifdef MXVK_CUDA
         try {
-            createCudaExportableImage(surface->w, surface->h, spriteImage, spriteImageMemory);
+            createCudaExportableImage(surface->w, surface->h, 1, spriteImage,
+                                      spriteImageMemory,
+                                      cudaExportMemorySize);
+            cudaInteropUnavailableLogged = false;
         } catch (const std::exception &ex) {
             std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
             createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
