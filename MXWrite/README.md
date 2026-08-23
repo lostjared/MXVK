@@ -16,7 +16,6 @@ This repository provides a C++ class (`Writer`) that uses the [FFmpeg](https://f
 
 ---
 
-@anchor overview
 ## Overview
 
 `Writer` is a C++ class that simplifies encoding and writing video frames to a container file. You can:
@@ -31,7 +30,6 @@ It can handle both:
 
 ---
 
-@anchor dependencies
 ## Dependencies
 
 ### Required Libraries
@@ -58,20 +56,17 @@ To install FFmpeg development libraries on your platform:
   ```
 
 ---
-@anchor building
 ## Building
 
-Configure and build:
-
-```bash
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
-```
+ **Configure and build**:
+   ```bash
+   mkdir -p build
+   cd build
+   cmake ..
+   cmake --build .
+   ```
 ---
 
-@anchor usage
 ## Usage
 
 You can include the `mxwrite.hpp` header in your own C++ files and link against the library. Below is a quick example:
@@ -100,24 +95,45 @@ int main() {
 }
 ```
 
-### Basic Initialization (`open`/`write`)
-@anchor basic-initialization-openwrite
+For explicit HEVC NVENC configuration, use `EncodeOptions`. Extra parameters use
+FFmpeg command-line spelling and override the built-in preset/tune defaults:
 
-Use `Writer::open(...)` to configure the output file, then call `write(...)` once per RGBA frame. This mode is the simplest path when you already know the target frame rate and are generating frames in a steady loop.
+```cpp
+EncodeOptions options;
+options.codec = "hevc_nvenc";
+options.ffmpeg_options =
+    "-preset p6 -tune lossless -profile:v rext -pix_fmt yuv444p";
 
-### Timestamp-Based Writing (`open_ts`/`write_ts`)
-@anchor timestamp-based-writing-open_tswrite_ts
+Writer writer;
+if (!writer.open("output_hardware_lossless.mkv", 1920, 1080, 60.0f, options)) {
+    return 1;
+}
+```
 
-Use `Writer::open_ts(...)` and `write_ts(...)` when frames arrive at irregular intervals and you want the encoder to preserve capture timing. The writer records timestamps internally and maps them into the stream's time base before muxing.
+MXWrite uses the FFmpeg libraries directly, so the parameter string contains
+video encoder/muxer options only; input and output filenames are supplied to
+`Writer::open()`.
 
-## Key Implementation Details
-@anchor key-implementation-details
+`EncodeOptions::codec` also accepts any exact video encoder name registered by
+the linked FFmpeg libraries. For example, `libx264` and `libx265` remain
+separate selections, and codecs such as `libsvtav1`, `libvpx-vp9`, `prores_ks`,
+`ffv1`, `h264_qsv`, `hevc_vaapi`, and `h264_videotoolbox` can be selected when
+present. MXWrite automatically chooses a compatible system-memory pixel format;
+hardware-frame-only encoders use FFmpeg's device and frame-pool APIs.
 
-- `Writer` can accept host RGBA buffers and, when CUDA support is enabled, device buffers for direct ingestion.
-- `EncodeOptions` centralizes preset, tune, codec selection, CRF, realtime mode, queue backpressure, and HDR metadata. `codec` accepts `auto`, `software`, `nvenc`, `h264_nvenc`, and `hevc_nvenc`.
-- The header is intended to be included directly by consumer code that links against the `mxwrite` target.
+Applications can populate encoder controls without maintaining a hard-coded
+list:
 
-## License
-@anchor license
+```cpp
+for (const EncoderInfo &encoder : available_video_encoders()) {
+    std::cout << encoder.name << " (" << encoder.codec_name << ")\n";
+}
 
-MXWrite is distributed under the GNU General Public License v3.0. See the root [`LICENSE`](../LICENSE) file for the full text.
+for (const EncoderOptionInfo &option : video_encoder_options("libx265")) {
+    std::cout << "-" << option.name << ": " << option.help << "\n";
+}
+```
+
+An encoder being registered does not guarantee that its hardware is usable.
+Device-backed encoders return a clear open error when the required GPU, driver,
+or operating-system device is unavailable.
