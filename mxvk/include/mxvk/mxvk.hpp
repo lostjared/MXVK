@@ -255,11 +255,27 @@ namespace mxvk {
          */
         VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "", uint32_t spectrumBinCount = 0);
 
+        /**
+         * @brief Create a blank sprite with live FFT and FFT-history descriptors.
+         * @param width Texture width in pixels.
+         * @param height Texture height in pixels.
+         * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
+         * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
+         * @param spectrumBinCount Binding-3 1-D spectrum size.
+         * @param spectrumHistoryLayerCount Requested binding-4 history depth.
+         * @return Non-owning pointer to the created sprite.
+         */
+        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath,
+                                const std::string &fragmentShaderPath,
+                                uint32_t spectrumBinCount,
+                                uint32_t spectrumHistoryLayerCount);
+
         struct PostProcessingEffect {
             std::string fragmentShaderPath{};
             std::array<float, 4> params{};
             bool timeEnabled = false;
             uint32_t spectrumBinCount = 0;
+            uint32_t spectrumHistoryLayerCount = 0;
         };
 
         /**

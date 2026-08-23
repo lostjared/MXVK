@@ -109,6 +109,7 @@ namespace mxvk {
         destroyExtendedUBO();
         destroyHistoryTexture();
         destroySpectrumTexture();
+        destroySpectrumHistoryTexture();
         destroyInstanceResources();
     }
 
@@ -478,6 +479,162 @@ namespace mxvk {
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
     }
 
+    uint32_t VK_Sprite::enableSpectrumHistoryTexture(uint32_t bins, uint32_t layers) {
+        if (bins == 0 || layers == 0) {
+            throw mxvk::Exception(
+                "VKSprite::enableSpectrumHistoryTexture requires positive bin and layer counts");
+        }
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+        const uint32_t allocatedLayers =
+            std::min(layers, properties.limits.maxImageArrayLayers);
+        if (allocatedLayers == 0) {
+            throw mxvk::Exception(
+                "VKSprite::enableSpectrumHistoryTexture is unavailable on this device");
+        }
+        if (spectrumHistoryTextureEnabled && spectrumHistoryBins == bins &&
+            spectrumHistoryLayers == allocatedLayers) {
+            return spectrumHistoryLayers;
+        }
+        if (!extendedUBOEnabled) {
+            enableExtendedUBO();
+        }
+
+        vkDeviceWaitIdle(device);
+        destroySpectrumHistoryTexture();
+
+        if (allocatedLayers != layers) {
+            std::cerr << "vk: spectrum history clamped to device array-layer limit "
+                      << allocatedLayers << " (was " << layers << ")\n";
+        }
+        spectrumHistoryBins = bins;
+        spectrumHistoryLayers = allocatedLayers;
+        spectrumHistoryHead = 0;
+        spectrumHistoryWriteIndex = 0;
+        extendedUBOData.audio_history =
+            glm::vec4(0.0f, static_cast<float>(allocatedLayers),
+                      static_cast<float>(bins), 0.0f);
+
+        createImage(bins, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spectrumHistoryImage,
+                    spectrumHistoryImageMemory, allocatedLayers, VK_IMAGE_TYPE_1D);
+
+        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) *
+                                       static_cast<VkDeviceSize>(allocatedLayers) *
+                                       sizeof(float);
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     stagingBuffer, stagingMemory);
+
+        void *data = nullptr;
+        VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
+        memset(data, 0, static_cast<std::size_t>(imageSize));
+        vkUnmapMemory(device, stagingMemory);
+
+        transitionImageLayout(spectrumHistoryImage, VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                              allocatedLayers);
+        copyBufferToImage(stagingBuffer, spectrumHistoryImage, bins, 1, 0,
+                          allocatedLayers);
+        transitionImageLayout(spectrumHistoryImage,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0,
+                              allocatedLayers);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingMemory, nullptr);
+
+        spectrumHistoryImageView =
+            createImageView(spectrumHistoryImage, VK_FORMAT_R32_SFLOAT,
+                            VK_IMAGE_VIEW_TYPE_1D_ARRAY, allocatedLayers);
+        spectrumHistoryTextureEnabled = true;
+        recreateExtendedDescriptorLayout();
+        return allocatedLayers;
+    }
+
+    void VK_Sprite::updateSpectrumHistoryTexture(const float *magnitudes, uint32_t bins) {
+        if (!spectrumHistoryTextureEnabled || spectrumHistoryImage == VK_NULL_HANDLE) {
+            throw mxvk::Exception(
+                "VKSprite::updateSpectrumHistoryTexture called before enableSpectrumHistoryTexture");
+        }
+        if (magnitudes == nullptr) {
+            throw mxvk::Exception(
+                "VKSprite::updateSpectrumHistoryTexture called with null data");
+        }
+        if (bins != spectrumHistoryBins) {
+            throw mxvk::Exception(
+                "VKSprite::updateSpectrumHistoryTexture bin count does not match the history texture");
+        }
+
+        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) * sizeof(float);
+        createStagingResources(imageSize);
+        VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
+        VK_CHECK_RESULT(vkResetFences(device, 1, &uploadFence));
+        memcpy(persistentStagingMapped, magnitudes, static_cast<std::size_t>(imageSize));
+
+        VK_CHECK_RESULT(vkResetCommandBuffer(uploadCmdBuffer, 0));
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VK_CHECK_RESULT(vkBeginCommandBuffer(uploadCmdBuffer, &beginInfo));
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = spectrumHistoryImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = spectrumHistoryWriteIndex;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                             nullptr, 1, &barrier);
+
+        VkBufferImageCopy region{};
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = spectrumHistoryWriteIndex;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent = {bins, 1, 1};
+        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer,
+                               spectrumHistoryImage,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
+                             0, nullptr, 1, &barrier);
+
+        VK_CHECK_RESULT(vkEndCommandBuffer(uploadCmdBuffer));
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &uploadCmdBuffer;
+        VK_CHECK_RESULT(vkQueueSubmit(graphicsQueue, 1, &submitInfo, uploadFence));
+        VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
+
+        spectrumHistoryHead = spectrumHistoryWriteIndex;
+        spectrumHistoryWriteIndex =
+            (spectrumHistoryWriteIndex + 1) % spectrumHistoryLayers;
+        extendedUBOData.audio_history =
+            glm::vec4(static_cast<float>(spectrumHistoryHead),
+                      static_cast<float>(spectrumHistoryLayers),
+                      static_cast<float>(spectrumHistoryBins), 0.0f);
+    }
+
     void VK_Sprite::createExtendedUBO() {
         if (extendedUBOBuffer != VK_NULL_HANDLE)
             return;
@@ -527,6 +684,15 @@ namespace mxvk {
             spectrumBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
             bindings.push_back(spectrumBinding);
         }
+        if (spectrumHistoryTextureEnabled) {
+            VkDescriptorSetLayoutBinding spectrumHistoryBinding{};
+            spectrumHistoryBinding.binding = 4;
+            spectrumHistoryBinding.descriptorType =
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            spectrumHistoryBinding.descriptorCount = 1;
+            spectrumHistoryBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            bindings.push_back(spectrumHistoryBinding);
+        }
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -541,7 +707,9 @@ namespace mxvk {
         if (extendedDescriptorSetLayout == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE ||
             spriteSampler == VK_NULL_HANDLE || extendedUBOBuffer == VK_NULL_HANDLE ||
             (historyTextureEnabled && historyImageView == VK_NULL_HANDLE) ||
-            (spectrumTextureEnabled && spectrumImageView == VK_NULL_HANDLE))
+            (spectrumTextureEnabled && spectrumImageView == VK_NULL_HANDLE) ||
+            (spectrumHistoryTextureEnabled &&
+             spectrumHistoryImageView == VK_NULL_HANDLE))
             return;
 
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
@@ -554,7 +722,8 @@ namespace mxvk {
         std::array<VkDescriptorPoolSize, 2> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[0].descriptorCount = 1U + static_cast<uint32_t>(historyTextureEnabled) +
-                                       static_cast<uint32_t>(spectrumTextureEnabled);
+                                       static_cast<uint32_t>(spectrumTextureEnabled) +
+                                       static_cast<uint32_t>(spectrumHistoryTextureEnabled);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[1].descriptorCount = 1;
 
@@ -594,6 +763,12 @@ namespace mxvk {
         spectrumImageInfo.imageView = spectrumImageView;
         spectrumImageInfo.sampler = spriteSampler;
 
+        VkDescriptorImageInfo spectrumHistoryImageInfo{};
+        spectrumHistoryImageInfo.imageLayout =
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        spectrumHistoryImageInfo.imageView = spectrumHistoryImageView;
+        spectrumHistoryImageInfo.sampler = spriteSampler;
+
         std::vector<VkWriteDescriptorSet> writes(2);
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = extendedDescriptorSet;
@@ -630,6 +805,17 @@ namespace mxvk {
             spectrumWrite.descriptorCount = 1;
             spectrumWrite.pImageInfo = &spectrumImageInfo;
             writes.push_back(spectrumWrite);
+        }
+        if (spectrumHistoryTextureEnabled) {
+            VkWriteDescriptorSet spectrumHistoryWrite{};
+            spectrumHistoryWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            spectrumHistoryWrite.dstSet = extendedDescriptorSet;
+            spectrumHistoryWrite.dstBinding = 4;
+            spectrumHistoryWrite.descriptorType =
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            spectrumHistoryWrite.descriptorCount = 1;
+            spectrumHistoryWrite.pImageInfo = &spectrumHistoryImageInfo;
+            writes.push_back(spectrumHistoryWrite);
         }
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
@@ -697,6 +883,27 @@ namespace mxvk {
         }
         spectrumTextureEnabled = false;
         spectrumBins = 0;
+    }
+
+    void VK_Sprite::destroySpectrumHistoryTexture() {
+        if (spectrumHistoryImageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, spectrumHistoryImageView, nullptr);
+            spectrumHistoryImageView = VK_NULL_HANDLE;
+        }
+        if (spectrumHistoryImage != VK_NULL_HANDLE) {
+            vkDestroyImage(device, spectrumHistoryImage, nullptr);
+            spectrumHistoryImage = VK_NULL_HANDLE;
+        }
+        if (spectrumHistoryImageMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, spectrumHistoryImageMemory, nullptr);
+            spectrumHistoryImageMemory = VK_NULL_HANDLE;
+        }
+        spectrumHistoryTextureEnabled = false;
+        spectrumHistoryBins = 0;
+        spectrumHistoryLayers = 0;
+        spectrumHistoryHead = 0;
+        spectrumHistoryWriteIndex = 0;
+        extendedUBOData.audio_history = glm::vec4(0.0f);
     }
 
     void VK_Sprite::destroyExtendedUBO() {
@@ -2417,7 +2624,9 @@ namespace mxvk {
         endSingleTimeCommands(commandBuffer);
     }
 
-    void VK_Sprite::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+    void VK_Sprite::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
+                                      uint32_t height, uint32_t baseArrayLayer,
+                                      uint32_t layerCount) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
@@ -2426,8 +2635,8 @@ namespace mxvk {
         region.bufferImageHeight = 0;
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         region.imageSubresource.mipLevel = 0;
-        region.imageSubresource.baseArrayLayer = 0;
-        region.imageSubresource.layerCount = 1;
+        region.imageSubresource.baseArrayLayer = baseArrayLayer;
+        region.imageSubresource.layerCount = layerCount;
         region.imageOffset = {0, 0, 0};
         region.imageExtent = {width, height, 1};
 

@@ -357,6 +357,35 @@ namespace mxvk {
         /** @return Number of allocated spectrum bins. */
         [[nodiscard]] uint32_t getSpectrumBinCount() const { return spectrumBins; }
 
+        /**
+         * @brief Allocate a shader-readable FFT spectrum-history array.
+         *
+         * Enables extended descriptors and exposes the history as a combined
+         * image sampler at set 0, binding 4. The R32_SFLOAT 1-D array is
+         * initialized to zero and uses a circular write head.
+         *
+         * @param bins Number of frequency bins in every history layer.
+         * @param layers Requested number of history layers. The active GPU's
+         * maximum image-array-layer limit is applied automatically.
+         * @return Number of history layers actually allocated.
+         * @throws mxvk::Exception when either requested dimension is zero.
+         */
+        uint32_t enableSpectrumHistoryTexture(uint32_t bins, uint32_t layers);
+
+        /**
+         * @brief Upload one FFT spectrum into the next history layer.
+         *
+         * @param magnitudes Pointer to @p bins frequency magnitudes.
+         * @param bins Number of values; must match the configured history.
+         */
+        void updateSpectrumHistoryTexture(const float *magnitudes, uint32_t bins);
+
+        /** @return Physical array layer containing the newest FFT spectrum. */
+        [[nodiscard]] uint32_t getSpectrumHistoryHead() const { return spectrumHistoryHead; }
+
+        /** @return Number of allocated FFT spectrum-history layers. */
+        [[nodiscard]] uint32_t getSpectrumHistoryLayerCount() const { return spectrumHistoryLayers; }
+
       private:
         struct SpriteVertex {
             float pos[2];
@@ -431,7 +460,8 @@ namespace mxvk {
                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
                           VkDeviceMemory &bufferMemory);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height,
+                               uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
         void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
@@ -478,6 +508,7 @@ namespace mxvk {
             glm::vec4 u3;
             std::array<glm::vec4, MAX_CUSTOM_UNIFORMS / 4> custom_uniforms;
             glm::vec4 audio_bands;
+            glm::vec4 audio_history;
         };
         bool extendedUBOEnabled = false;
         SpriteExtendedUBO extendedUBOData{};
@@ -510,6 +541,16 @@ namespace mxvk {
         VkImageView spectrumImageView = VK_NULL_HANDLE;
         uint32_t spectrumBins = 0;
         void destroySpectrumTexture();
+
+        bool spectrumHistoryTextureEnabled = false;
+        VkImage spectrumHistoryImage = VK_NULL_HANDLE;
+        VkDeviceMemory spectrumHistoryImageMemory = VK_NULL_HANDLE;
+        VkImageView spectrumHistoryImageView = VK_NULL_HANDLE;
+        uint32_t spectrumHistoryBins = 0;
+        uint32_t spectrumHistoryLayers = 0;
+        uint32_t spectrumHistoryHead = 0;
+        uint32_t spectrumHistoryWriteIndex = 0;
+        void destroySpectrumHistoryTexture();
         void recreateExtendedDescriptorLayout();
 
         struct SpriteInstanceData {

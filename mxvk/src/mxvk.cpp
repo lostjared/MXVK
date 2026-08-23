@@ -1316,7 +1316,8 @@ namespace mxvk {
                 1,
                 resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR),
                 effect.fragmentShaderPath,
-                effect.spectrumBinCount);
+                effect.spectrumBinCount,
+                effect.spectrumHistoryLayerCount);
             const uint32_t black_pixel = 0xFF000000u;
             sprite->updateTexture(&black_pixel, 1, 1);
             sprite->setShaderParams(effect.params[0], effect.params[1], effect.params[2], effect.params[3]);
@@ -3777,6 +3778,15 @@ namespace mxvk {
     }
 
     VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount) {
+        return createSprite(width, height, vertexShaderPath, fragmentShaderPath,
+                            spectrumBinCount, 0);
+    }
+
+    VK_Sprite *VK_Window::createSprite(int width, int height,
+                                       const std::string &vertexShaderPath,
+                                       const std::string &fragmentShaderPath,
+                                       uint32_t spectrumBinCount,
+                                       uint32_t spectrumHistoryLayerCount) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("Sprite dimensions must be positive");
         }
@@ -3804,6 +3814,14 @@ namespace mxvk {
         }
         if (spectrumBinCount > 0) {
             sprite->enableSpectrumTexture(spectrumBinCount);
+        }
+        if (spectrumHistoryLayerCount > 0) {
+            if (spectrumBinCount == 0) {
+                throw mxvk::Exception(
+                    "Spectrum history requires a positive spectrum bin count");
+            }
+            sprite->enableSpectrumHistoryTexture(
+                spectrumBinCount, spectrumHistoryLayerCount);
         }
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
