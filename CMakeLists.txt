@@ -994,8 +994,20 @@ if(EXAMPLES)
     endforeach()
 
     if(UNIX AND NOT APPLE)
-        set(MXVK_INSTALLED_APPLICATION_TARGETS "${mxvk_generic_install_targets}")
-        list(REMOVE_ITEM MXVK_INSTALLED_APPLICATION_TARGETS math3d_obj_loader)
+        set(MXVK_INSTALLED_APPLICATION_TARGETS)
+        foreach(example_target IN LISTS mxvk_generic_install_targets)
+            if(example_target STREQUAL "math3d_obj_loader")
+                continue()
+            endif()
+
+            set(mxvk_example_icon "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}.png")
+            set(mxvk_example_icon_256 "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}-256.png")
+            if(EXISTS "${mxvk_example_icon}" AND EXISTS "${mxvk_example_icon_256}")
+                list(APPEND MXVK_INSTALLED_APPLICATION_TARGETS ${example_target})
+            else()
+                message(STATUS "Skipping desktop entry for ${example_target}: icon files are missing")
+            endif()
+        endforeach()
         configure_file(
             ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-install-user-desktop.cmake.in
             ${CMAKE_CURRENT_BINARY_DIR}/mxvk-install-user-desktop.cmake

@@ -274,6 +274,40 @@ namespace mxvk {
         /** @brief Upload user uniform 3 to the extended UBO. @param x,y,z,w Components. */
         void setUniform3(float x, float y, float z, float w);
 
+        /**
+         * @brief Allocate a shader-readable RGBA history texture array.
+         *
+         * Enables extended descriptors and exposes the array as a combined image
+         * sampler at set 0, binding 2. Replaces any previously allocated history
+         * texture. The texture is initialized to transparent black.
+         *
+         * @param width  Width of every history layer in pixels.
+         * @param height Height of every history layer in pixels.
+         * @param layers Number of layers in the circular history buffer.
+         * @throws mxvk::Exception when any dimension is zero.
+         */
+        void enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers);
+
+        /**
+         * @brief Upload one RGBA frame into the next history layer.
+         *
+         * The write head advances after a successful upload. Input dimensions
+         * must match those passed to enableHistoryTexture().
+         *
+         * @param pixels RGBA8 source pixels.
+         * @param width  Source width in pixels.
+         * @param height Source height in pixels.
+         * @param pitch  Source row stride in bytes, or zero for tightly packed data.
+         * @throws mxvk::Exception for null data, invalid dimensions, or an inactive cache.
+         */
+        void updateHistoryTexture(const void *pixels, int width, int height, int pitch = 0);
+
+        /** @return The logical oldest-layer index for a circular history sampler. */
+        [[nodiscard]] uint32_t getHistoryHead() const { return historyHead; }
+
+        /** @return Number of allocated texture-history layers. */
+        [[nodiscard]] uint32_t getHistoryLayerCount() const { return historyLayers; }
+
       private:
         struct SpriteVertex {
             float pos[2];
@@ -351,11 +385,14 @@ namespace mxvk {
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-        void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+        void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
+                                   uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
         void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                          VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkImage &image, VkDeviceMemory &imageMemory);
-        VkImageView createImageView(VkImage image, VkFormat format);
+                         VkImage &image, VkDeviceMemory &imageMemory, uint32_t arrayLayers = 1);
+        VkImageView createImageView(VkImage image, VkFormat format,
+                                    VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D,
+                                    uint32_t layerCount = 1);
         void createSampler();
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
         void createSpriteTexture(SDL_Surface *surface);
@@ -403,6 +440,17 @@ namespace mxvk {
         void createExtendedDescriptorSetLayout();
         void createExtendedDescriptorSet();
         void destroyExtendedUBO();
+
+        bool historyTextureEnabled = false;
+        VkImage historyImage = VK_NULL_HANDLE;
+        VkDeviceMemory historyImageMemory = VK_NULL_HANDLE;
+        VkImageView historyImageView = VK_NULL_HANDLE;
+        uint32_t historyWidth = 0;
+        uint32_t historyHeight = 0;
+        uint32_t historyLayers = 0;
+        uint32_t historyHead = 0;
+        void destroyHistoryTexture();
+        void recreateExtendedDescriptorLayout();
 
         struct SpriteInstanceData {
             float posX, posY, sizeW, sizeH;
