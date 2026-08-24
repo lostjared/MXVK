@@ -6,7 +6,12 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.26.0`. This release extends FFmpeg and OpenCV video capture with efficient decode-and-discard operations for external media-clock synchronization. It also includes explicit CUDA/NVDEC device selection, reusable decoder contexts for in-place video looping, and an asynchronous decoder-surface copy barrier. It builds on the software 3D, installer, multiplayer, rendering, and documentation work from earlier releases.
+Current development is on version `0.27.0`. This release adds a preview-only
+text queue that renders after frame readback, allowing applications to display
+runtime HUD information without embedding it in recordings or screenshots. It
+builds on the FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device
+selection, reusable decoder contexts, software 3D, installer, multiplayer,
+rendering, and documentation work from earlier releases.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -348,7 +353,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.26.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.27.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -474,8 +479,14 @@ To run a compiled example from the repository root, use `run.pl`:
 passes the example's asset directory with `-p` automatically.
 
 All examples based on `mxvk::VK_Window` also support `F12` to toggle the
-framework FPS counter. The overlay is disabled by default and uses the copied
-`data/default.ttf` font from the example's build output directory.
+framework FPS counter. The overlay is disabled by default, uses the copied
+`data/default.ttf` font from the example's build output directory, and is
+rendered through the preview-only queue after screenshot/frame readback.
+
+Applications can use `printText(...)` for overlays that belong in captured
+output and `printPreviewText(...)` for window-only status information. Both
+queues use the configured font, but preview-only text is composited after the
+readback copy and before presentation.
 
 When `--enable-screenshot` is provided, those same window-based examples also
 support `F10` screenshots. The capture path uses the most recently presented
@@ -735,6 +746,9 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 24, 2026: version `0.27.0` adds preview-only Vulkan text that is
+  composited after frame readback and therefore excluded from recordings and
+  screenshots.
 - August 24, 2026: version `0.26.0` adds efficient decode-and-discard capture operations for media-clock catch-up, explicit CUDA/NVDEC device selection, reusable decoder contexts for in-place video loops, and a CUDA event barrier for asynchronous copies from FFmpeg-owned decode surfaces.
 - July 23, 2026: version `0.24.0` expands the CPU-rendered 3D examples and shared math code. CMake can select the native scalar implementation or the optional Eigen-backed implementation with `-DWITH_EIGEN=AUTO|ON|OFF`, and the new `3dmath_pong` example exercises the same backend in a complete software-rasterized game.
 - July 23, 2026: `3dmath_texture_array`, `3dmath_pyramid`, and `3dmath_plg_loader` add a textured cube lattice, PLG geometry loading, interactive model rotation and zoom, configurable internal framebuffer resolution, benchmark timing, texture wrapping, perspective-correct or affine mapping, mipmap generation, and mip-bias control.

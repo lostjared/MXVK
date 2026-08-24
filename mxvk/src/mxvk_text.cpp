@@ -526,6 +526,9 @@ namespace mxvk {
     }
 
     void VK_Text::clearQueue() {
+        if (textQuads.empty()) {
+            return;
+        }
         if (device == VK_NULL_HANDLE) {
             textQuads.clear();
             return;

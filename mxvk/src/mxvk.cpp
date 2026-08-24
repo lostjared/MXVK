@@ -252,6 +252,10 @@ namespace mxvk {
         if (text_renderer) {
             text_renderer.reset();
         }
+        if (preview_text_renderer) {
+            preview_text_renderer.reset();
+        }
+        preview_text_queued = false;
         text_state_dirty = false;
         destroyTextPipeline();
         if (text_descriptor_set_layout != VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
@@ -2504,8 +2508,15 @@ namespace mxvk {
             updateFpsCounter();
         }
 
-        if (text_state_dirty && text_renderer && swapchain_format != VK_FORMAT_UNDEFINED) {
-            text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
+        if (text_state_dirty && (text_renderer || preview_text_renderer) &&
+            swapchain_format != VK_FORMAT_UNDEFINED) {
+            if (text_renderer) {
+                text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
+            }
+            if (preview_text_renderer) {
+                preview_text_renderer->setDescriptorSetLayout(
+                    text_descriptor_set_layout);
+            }
             try {
                 createTextPipeline();
             } catch (const std::exception &ex) {
@@ -2998,17 +3009,87 @@ namespace mxvk {
                                    frame_readback_buffer, 1, &readback_region);
         }
 
+        const bool render_preview_text =
+            preview_text_queued && preview_text_renderer &&
+            text_pipeline != VK_NULL_HANDLE;
+        if (render_preview_text) {
+            VkImageMemoryBarrier2 to_preview_barrier{};
+            to_preview_barrier.sType =
+                VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_preview_barrier.srcStageMask =
+                frame_readback_enabled
+                    ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
+                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_preview_barrier.srcAccessMask =
+                frame_readback_enabled
+                    ? VK_ACCESS_2_TRANSFER_READ_BIT
+                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_preview_barrier.dstStageMask =
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_preview_barrier.dstAccessMask =
+                VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_preview_barrier.oldLayout =
+                frame_readback_enabled
+                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_preview_barrier.newLayout =
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_preview_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_preview_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_preview_barrier.image = swapchain_images[image_index];
+            to_preview_barrier.subresourceRange.aspectMask =
+                VK_IMAGE_ASPECT_COLOR_BIT;
+            to_preview_barrier.subresourceRange.levelCount = 1;
+            to_preview_barrier.subresourceRange.layerCount = 1;
+            VkDependencyInfo to_preview_dependency{};
+            to_preview_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_preview_dependency.imageMemoryBarrierCount = 1;
+            to_preview_dependency.pImageMemoryBarriers = &to_preview_barrier;
+            vkCmdPipelineBarrier2(cmd, &to_preview_dependency);
+
+            VkRenderingAttachmentInfo preview_attachment{};
+            preview_attachment.sType =
+                VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            preview_attachment.imageView = swapchain_image_views[image_index];
+            preview_attachment.imageLayout =
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            preview_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            preview_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            VkRenderingInfo preview_info{};
+            preview_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            preview_info.renderArea.extent = swapchain_extent;
+            preview_info.layerCount = 1;
+            preview_info.colorAttachmentCount = 1;
+            preview_info.pColorAttachments = &preview_attachment;
+            vkCmdBeginRendering(cmd, &preview_info);
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              text_pipeline);
+            preview_text_renderer->renderText(
+                cmd, text_pipeline_layout, swapchain_extent.width,
+                swapchain_extent.height);
+            vkCmdEndRendering(cmd);
+        }
+
         VkImageMemoryBarrier2 to_present_barrier{};
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        to_present_barrier.srcStageMask = frame_readback_enabled
+        to_present_barrier.srcStageMask = render_preview_text
+                                              ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                                          : frame_readback_enabled
                                               ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                                               : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        to_present_barrier.srcAccessMask = frame_readback_enabled
+        to_present_barrier.srcAccessMask = render_preview_text
+                                               ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                           : frame_readback_enabled
                                                ? VK_ACCESS_2_TRANSFER_READ_BIT
                                                : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
-        to_present_barrier.oldLayout = frame_readback_enabled
+        to_present_barrier.oldLayout = render_preview_text
+                                           ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                                       : frame_readback_enabled
                                            ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -3175,6 +3256,10 @@ namespace mxvk {
         if (text_renderer) {
             text_renderer->clearQueue();
         }
+        if (preview_text_renderer) {
+            preview_text_renderer->clearQueue();
+        }
+        preview_text_queued = false;
 
         current_frame = (current_frame + 1U) % max_frames_in_flight;
         if (!retired_swapchains.empty() && (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR)) {
@@ -3289,6 +3374,9 @@ namespace mxvk {
         } else {
             text_renderer->setFont(font_path, font_size);
         }
+        if (preview_text_renderer) {
+            preview_text_renderer->setFont(font_path, font_size);
+        }
         text_state_dirty = true;
     }
 
@@ -3341,6 +3429,46 @@ namespace mxvk {
         if (text_renderer) {
             text_renderer->clearQueue();
         }
+        if (preview_text_renderer) {
+            preview_text_renderer->clearQueue();
+        }
+        preview_text_queued = false;
+    }
+
+    void VK_Window::printPreviewText(const std::string &text, int x, int y,
+                                     const SDL_Color &col) {
+        if (text.empty()) {
+            return;
+        }
+        if (!font_configured) {
+            throw mxvk::Exception(
+                "printPreviewText requires setFont() to be called first");
+        }
+        ensurePreviewTextRenderer();
+        if (!preview_text_renderer) {
+            throw mxvk::Exception(
+                "printPreviewText could not initialize the text renderer");
+        }
+        preview_text_renderer->printTextG_Solid(text, x, y, col);
+        preview_text_queued = true;
+    }
+
+    void VK_Window::printPreviewText(const std::string &text, int x, int y,
+                                     const SDL_Color &col, const Font &font) {
+        if (text.empty()) {
+            return;
+        }
+        if (!font) {
+            throw mxvk::Exception(
+                "printPreviewText requires a valid mxvk::Font");
+        }
+        ensurePreviewTextRenderer(font.path(), font.size());
+        if (!preview_text_renderer) {
+            throw mxvk::Exception(
+                "printPreviewText could not initialize the text renderer");
+        }
+        preview_text_renderer->printTextG_Solid(text, x, y, col, font);
+        preview_text_queued = true;
     }
 
     bool VK_Window::getTextDimensions(const std::string &text, int &width, int &height) {
@@ -3416,6 +3544,63 @@ namespace mxvk {
 
         text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, font_path, font_size);
         text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
+        text_state_dirty = true;
+    }
+
+    void VK_Window::ensurePreviewTextRenderer() {
+        if (preview_text_renderer) {
+            return;
+        }
+        if (!font_configured || font_path.empty() || font_size <= 0 ||
+            device == VK_NULL_HANDLE) {
+            return;
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            return;
+        }
+        if (text_descriptor_set_layout == VK_NULL_HANDLE) {
+            createTextDescriptorSetLayout();
+        }
+        preview_text_renderer = std::make_unique<VK_Text>(
+            device, physical_device, graphics_queue, command_pool, font_path,
+            font_size);
+        preview_text_renderer->setDescriptorSetLayout(
+            text_descriptor_set_layout);
+        text_state_dirty = true;
+    }
+
+    void VK_Window::ensurePreviewTextRenderer(
+        const std::string &fallbackFontPath, int fallbackFontSize) {
+        if (preview_text_renderer) {
+            return;
+        }
+        if (device == VK_NULL_HANDLE) {
+            return;
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            createDevice();
+        }
+        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+            return;
+        }
+        const std::string renderer_font_path =
+            font_configured ? font_path : fallbackFontPath;
+        const int renderer_font_size =
+            font_configured ? font_size : fallbackFontSize;
+        if (renderer_font_path.empty() || renderer_font_size <= 0) {
+            return;
+        }
+        if (text_descriptor_set_layout == VK_NULL_HANDLE) {
+            createTextDescriptorSetLayout();
+        }
+        preview_text_renderer = std::make_unique<VK_Text>(
+            device, physical_device, graphics_queue, command_pool,
+            renderer_font_path, renderer_font_size);
+        preview_text_renderer->setDescriptorSetLayout(
+            text_descriptor_set_layout);
         text_state_dirty = true;
     }
 
@@ -3529,7 +3714,8 @@ namespace mxvk {
             fps_counter_text = std::format("FPS: {:.1f}", fps);
         }
 
-        printText(fps_counter_text, 12, 10, SDL_Color{255, 255, 255, 255}, fps_counter_font);
+        printPreviewText(fps_counter_text, 12, 10,
+                         SDL_Color{255, 255, 255, 255}, fps_counter_font);
     }
 
     void VK_Window::createTextDescriptorSetLayout() {

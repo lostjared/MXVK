@@ -143,6 +143,16 @@ namespace mxvk {
         void printText(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *font);
         void printText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font);
 
+        /**
+         * @brief Queue preview-only text after frame readback.
+         *
+         * Unlike printText(), this text is visible in the presentation window
+         * but excluded from screenshots and frame-readback consumers.
+         */
+        void printPreviewText(const std::string &text, int x, int y, const SDL_Color &col);
+        void printPreviewText(const std::string &text, int x, int y,
+                              const SDL_Color &col, const Font &font);
+
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
 
@@ -486,6 +496,9 @@ namespace mxvk {
         void createPostProcessTargets();
         void destroyPostProcessTargets();
         void ensureTextRenderer();
+        void ensurePreviewTextRenderer();
+        void ensurePreviewTextRenderer(const std::string &fallbackFontPath,
+                                       int fallbackFontSize);
         void createTextDescriptorSetLayout();
         void createTextPipeline();
         void destroyTextPipeline();
@@ -607,10 +620,12 @@ namespace mxvk {
         std::vector<std::vector<bool>> post_process_initialized{};
 
         std::unique_ptr<VK_Text> text_renderer{};
+        std::unique_ptr<VK_Text> preview_text_renderer{};
         VkDescriptorSetLayout text_descriptor_set_layout = VK_NULL_HANDLE;
         VkPipelineLayout text_pipeline_layout = VK_NULL_HANDLE;
         VkPipeline text_pipeline = VK_NULL_HANDLE;
         bool text_state_dirty = false;
+        bool preview_text_queued = false;
         bool font_configured = false;
         std::string font_path{};
         int font_size = 24;
