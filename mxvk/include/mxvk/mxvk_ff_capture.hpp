@@ -16,6 +16,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 #ifdef MXVK_CUDA
+#include <cuda_runtime_api.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudaimgproc.hpp>
 #endif
@@ -128,6 +129,8 @@ namespace mxvk {
         cv::cuda::GpuMat gpuRgb{};
         cv::cuda::GpuMat gpuRgba{};
         cv::cuda::GpuMat gpuFlippedRgba{};
+        cudaEvent_t decoder_surface_copy_event = nullptr;
+        bool decoder_surface_barrier_logged = false;
 #endif
     };
 

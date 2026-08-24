@@ -172,6 +172,13 @@ namespace mxvk {
     }
 
     void VK_FF_Capture::close() {
+#ifdef MXVK_CUDA
+        if (decoder_surface_copy_event != nullptr) {
+            cudaEventDestroy(decoder_surface_copy_event);
+            decoder_surface_copy_event = nullptr;
+        }
+        decoder_surface_barrier_logged = false;
+#endif
         if (swsCtx != nullptr) {
             sws_freeContext(swsCtx);
             swsCtx = nullptr;
@@ -379,6 +386,36 @@ namespace mxvk {
 
                 gpuNv12.create(height + (height / 2), width, CV_8UC1);
                 cudaStream_t cudaStream = mxvk::cuda_stream_handle(stream);
+                if (decoder_surface_copy_event == nullptr) {
+                    const cudaError_t event_result = cudaEventCreateWithFlags(
+                        &decoder_surface_copy_event, cudaEventDisableTiming);
+                    if (event_result != cudaSuccess) {
+                        std::cout << "mxvk_ff_capture: CUDA decoder-surface event creation failed: "
+                                  << cudaGetErrorString(event_result) << "\n";
+                        return false;
+                    }
+                }
+
+                const auto synchronize_decoder_surface_copy = [&]() {
+                    cudaError_t result =
+                        cudaEventSynchronize(decoder_surface_copy_event);
+                    if (result != cudaSuccess) {
+                        std::cout << "mxvk_ff_capture: CUDA decoder-surface copy barrier failed: "
+                                  << cudaGetErrorString(result) << "\n";
+                        result = cudaStreamSynchronize(cudaStream);
+                        if (result != cudaSuccess) {
+                            std::cout << "mxvk_ff_capture: CUDA capture-stream synchronization failed: "
+                                      << cudaGetErrorString(result) << "\n";
+                            return false;
+                        }
+                    }
+                    if (!decoder_surface_barrier_logged) {
+                        std::cout << "mxvk_ff_capture: asynchronous NVDEC surface-copy barrier active\n";
+                        decoder_surface_barrier_logged = true;
+                    }
+                    return true;
+                };
+
                 cudaError_t result = cudaMemcpy2DAsync(
                     gpuNv12.ptr(),
                     gpuNv12.step,
@@ -390,6 +427,7 @@ namespace mxvk {
                     cudaStream);
                 if (result != cudaSuccess) {
                     std::cout << "mxvk_ff_capture: CUDA NV12 luma copy failed: " << cudaGetErrorString(result) << "\n";
+                    cudaStreamSynchronize(cudaStream);
                     return false;
                 }
 
@@ -404,6 +442,15 @@ namespace mxvk {
                     cudaStream);
                 if (result != cudaSuccess) {
                     std::cout << "mxvk_ff_capture: CUDA NV12 chroma copy failed: " << cudaGetErrorString(result) << "\n";
+                    cudaStreamSynchronize(cudaStream);
+                    return false;
+                }
+
+                result = cudaEventRecord(decoder_surface_copy_event, cudaStream);
+                if (result != cudaSuccess) {
+                    std::cout << "mxvk_ff_capture: CUDA decoder-surface event record failed: "
+                              << cudaGetErrorString(result) << "\n";
+                    cudaStreamSynchronize(cudaStream);
                     return false;
                 }
 
@@ -426,6 +473,7 @@ namespace mxvk {
                     nppContext);
                 if (nppStatus != NPP_SUCCESS) {
                     std::cout << "mxvk_ff_capture: NPP NV12 to RGB conversion failed: " << static_cast<int>(nppStatus) << "\n";
+                    synchronize_decoder_surface_copy();
                     return false;
                 }
 
@@ -441,6 +489,7 @@ namespace mxvk {
                     nppContext);
                 if (nppStatus != NPP_SUCCESS) {
                     std::cout << "mxvk_ff_capture: NPP RGB to RGBA conversion failed: " << static_cast<int>(nppStatus) << "\n";
+                    synchronize_decoder_surface_copy();
                     return false;
                 }
 
@@ -449,6 +498,9 @@ namespace mxvk {
                     rgba = gpuFlippedRgba;
                 } else {
                     rgba = gpuRgba;
+                }
+                if (!synchronize_decoder_surface_copy()) {
+                    return false;
                 }
                 return true;
 #else
@@ -460,8 +512,14 @@ namespace mxvk {
                     } else {
                         rgba = gpuRgba;
                     }
+                    if (!synchronize_decoder_surface_copy()) {
+                        return false;
+                    }
                     return true;
                 } catch (const cv::Exception &e) {
+                    if (!synchronize_decoder_surface_copy()) {
+                        return false;
+                    }
                     std::cout << "mxvk_ff_capture: CUDA NV12 to RGBA conversion failed; falling back to host conversion: " << e.what() << "\n";
                 }
 #endif
