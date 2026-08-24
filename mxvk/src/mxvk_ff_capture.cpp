@@ -60,6 +60,10 @@ namespace mxvk {
     }
 
     bool VK_FF_Capture::open(const std::string &filename) {
+        return open(filename, -1);
+    }
+
+    bool VK_FF_Capture::open(const std::string &filename, int cuda_device) {
         close();
 
         if (avformat_open_input(&formatCtx, filename.c_str(), nullptr, nullptr) < 0) {
@@ -99,7 +103,7 @@ namespace mxvk {
         }
 
         codecCtx->opaque = this;
-        if (initHardwareDevice(decoder)) {
+        if (initHardwareDevice(decoder, cuda_device)) {
             codecCtx->get_format = &VK_FF_Capture::chooseHwFormat;
             codecCtx->hw_device_ctx = av_buffer_ref(hwDeviceCtx);
             hardwareDecode = codecCtx->hw_device_ctx != nullptr;
@@ -130,13 +134,18 @@ namespace mxvk {
             frameFps = 30.0;
         }
 
+        const std::string decodeMode =
+            hardwareDecode && hardwareDecodeDevice >= 0
+                ? std::format("cuda:{}", hardwareDecodeDevice)
+            : hardwareDecode ? "cuda"
+                             : "software";
         std::cout << std::format(
             "mxvk_ff_capture: opened {} ({}x{}, {:.3f} fps, decode={})\n",
             filename,
             frameWidth,
             frameHeight,
             frameFps,
-            hardwareDecode ? "cuda" : "software");
+            decodeMode);
         return true;
     }
 
@@ -169,6 +178,7 @@ namespace mxvk {
         frameFps = 30.0;
         hwPixFmt = AV_PIX_FMT_NONE;
         hardwareDecode = false;
+        hardwareDecodeDevice = -1;
     }
 
     bool VK_FF_Capture::readRgba(std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
@@ -255,7 +265,8 @@ namespace mxvk {
         return formats[0];
     }
 
-    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder) {
+    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder,
+                                           int cuda_device) {
         const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
         if (deviceType == AV_HWDEVICE_TYPE_NONE) {
             return false;
@@ -273,11 +284,15 @@ namespace mxvk {
             }
         }
 
-        if (av_hwdevice_ctx_create(&hwDeviceCtx, deviceType, nullptr, nullptr, 0) < 0) {
+        const std::string deviceName =
+            cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
+        const char *device = deviceName.empty() ? nullptr : deviceName.c_str();
+        if (av_hwdevice_ctx_create(&hwDeviceCtx, deviceType, device, nullptr, 0) < 0) {
             hwPixFmt = AV_PIX_FMT_NONE;
             return false;
         }
 
+        hardwareDecodeDevice = cuda_device;
         return true;
     }
 

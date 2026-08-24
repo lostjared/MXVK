@@ -46,6 +46,14 @@ namespace mxvk {
          * @return true on success.
          */
         bool open(const std::string &filename);
+        /**
+         * @brief Open a video file on a selected CUDA decode device.
+         * @param filename Path to the input video file.
+         * @param cuda_device CUDA device index used for hardware decode; a negative
+         * value lets FFmpeg select its default device.
+         * @return true on success.
+         */
+        bool open(const std::string &filename, int cuda_device);
         /** @brief Close the active file and release decoder resources. */
         void close();
         /** @brief Check whether a decoder is open. */
@@ -80,11 +88,13 @@ namespace mxvk {
         [[nodiscard]] double fps() const { return frameFps; }
         /** @brief True when CUDA hardware decode is active. */
         [[nodiscard]] bool using_hardware_decode() const { return hardwareDecode; }
+        /** @brief Selected CUDA hardware-decode device, or -1 for FFmpeg's default. */
+        [[nodiscard]] int hardware_decode_device() const { return hardwareDecodeDevice; }
 
       private:
         static AVPixelFormat chooseHwFormat(AVCodecContext *ctx, const AVPixelFormat *formats);
         [[nodiscard]] AVPixelFormat selectHwFormat(const AVPixelFormat *formats) const;
-        bool initHardwareDevice(const AVCodec *decoder);
+        bool initHardwareDevice(const AVCodec *decoder, int cuda_device);
         bool decodeNextFrame();
         bool convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY);
 #ifdef MXVK_CUDA
@@ -105,6 +115,7 @@ namespace mxvk {
         double frameFps = 30.0;
         AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
         bool hardwareDecode = false;
+        int hardwareDecodeDevice = -1;
 #ifdef MXVK_CUDA
         cv::cuda::GpuMat gpuNv12{};
         cv::cuda::GpuMat gpuRgb{};
