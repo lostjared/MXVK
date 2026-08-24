@@ -149,6 +149,28 @@ namespace mxvk {
         return true;
     }
 
+    bool VK_FF_Capture::seek_start() {
+        if (!is_open() || videoStream < 0) {
+            return false;
+        }
+
+        AVStream *stream = formatCtx->streams[videoStream];
+        const int64_t timestamp = stream->start_time == AV_NOPTS_VALUE
+                                      ? 0
+                                      : stream->start_time;
+        if (av_seek_frame(formatCtx, videoStream, timestamp,
+                          AVSEEK_FLAG_BACKWARD) < 0) {
+            std::cout << "mxvk_ff_capture: failed to seek to start\n";
+            return false;
+        }
+
+        avcodec_flush_buffers(codecCtx);
+        av_packet_unref(packet);
+        av_frame_unref(frame);
+        av_frame_unref(swFrame);
+        return true;
+    }
+
     void VK_FF_Capture::close() {
         if (swsCtx != nullptr) {
             sws_freeContext(swsCtx);

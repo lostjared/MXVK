@@ -54,6 +54,13 @@ namespace mxvk {
          * @return true on success.
          */
         bool open(const std::string &filename, int cuda_device);
+        /**
+         * @brief Seek the active video stream back to its beginning.
+         *
+         * The decoder and optional hardware-device context remain active.
+         * @return true when the input was sought and the decoder was flushed.
+         */
+        bool seek_start();
         /** @brief Close the active file and release decoder resources. */
         void close();
         /** @brief Check whether a decoder is open. */
