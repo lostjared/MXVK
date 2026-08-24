@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.24.0`. The current release expands the software 3D path with an optional Eigen backend, configurable internal framebuffers, PLG model loading, perspective-correct texture mapping, mipmaps and mip-bias control, and benchmarking support. It also adds the `knight`, `3dmath_texture_array`, `3dmath_pyramid`, `3dmath_plg_loader`, and `3dmath_pong` examples, alongside the installer, multiplayer, rendering, and documentation work from earlier releases.
+Current development is on version `0.25.0`. This release extends FFmpeg video capture with explicit CUDA/NVDEC device selection, reusable decoder contexts for in-place video looping, and an asynchronous decoder-surface copy barrier. It builds on the software 3D, installer, multiplayer, rendering, and documentation work from earlier releases.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -348,7 +348,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.24.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.25.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -735,6 +735,7 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 24, 2026: version `0.25.0` adds explicit CUDA/NVDEC device selection to FFmpeg capture, preserves decoder and hardware-device contexts across in-place video loops, and protects asynchronous copies from FFmpeg-owned decode surfaces with a CUDA event barrier.
 - July 23, 2026: version `0.24.0` expands the CPU-rendered 3D examples and shared math code. CMake can select the native scalar implementation or the optional Eigen-backed implementation with `-DWITH_EIGEN=AUTO|ON|OFF`, and the new `3dmath_pong` example exercises the same backend in a complete software-rasterized game.
 - July 23, 2026: `3dmath_texture_array`, `3dmath_pyramid`, and `3dmath_plg_loader` add a textured cube lattice, PLG geometry loading, interactive model rotation and zoom, configurable internal framebuffer resolution, benchmark timing, texture wrapping, perspective-correct or affine mapping, mipmap generation, and mip-bias control.
 - July 23, 2026: `proc_args(...)` now centralizes the new software-rendering switches `--benchmark`, `--framebuffer`, `--nowarpfix`, `--disable-mipmap`, and `--mip-bias`, in addition to the existing shared window, asset, shader, capture, encoder, and effect arguments documented above.
