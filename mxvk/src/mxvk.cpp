@@ -2799,7 +2799,7 @@ namespace mxvk {
             }
         }
 
-        if (text_renderer && text_pipeline != VK_NULL_HANDLE) {
+        if (!use_post_process && text_renderer && text_pipeline != VK_NULL_HANDLE) {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
             text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
         }
@@ -2915,6 +2915,52 @@ namespace mxvk {
                     source_target = destination_target;
                 }
             }
+        }
+
+        // Post-processing owns the final swapchain color until this point. Draw
+        // queued text in a load-preserving pass so HUD and watermark text stay
+        // crisp and are included in the final readback without being sampled by
+        // the effect chain.
+        if (use_post_process && text_renderer && text_pipeline != VK_NULL_HANDLE) {
+            VkImageMemoryBarrier2 to_text_barrier{};
+            to_text_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_text_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_text_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_text_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_text_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_text_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_text_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_text_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_text_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_text_barrier.image = swapchain_images[image_index];
+            to_text_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            to_text_barrier.subresourceRange.levelCount = 1;
+            to_text_barrier.subresourceRange.layerCount = 1;
+            VkDependencyInfo to_text_dependency{};
+            to_text_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_text_dependency.imageMemoryBarrierCount = 1;
+            to_text_dependency.pImageMemoryBarriers = &to_text_barrier;
+            vkCmdPipelineBarrier2(cmd, &to_text_dependency);
+
+            VkRenderingAttachmentInfo text_attachment{};
+            text_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            text_attachment.imageView = swapchain_image_views[image_index];
+            text_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            text_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            text_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            VkRenderingInfo text_info{};
+            text_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            text_info.renderArea.extent = swapchain_extent;
+            text_info.layerCount = 1;
+            text_info.colorAttachmentCount = 1;
+            text_info.pColorAttachments = &text_attachment;
+            vkCmdBeginRendering(cmd, &text_info);
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
+            text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+            vkCmdEndRendering(cmd);
         }
 
         if (frame_readback_enabled) {
