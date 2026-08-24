@@ -62,6 +62,15 @@ namespace mxvk {
          * @return true when the input was sought and the decoder was flushed.
          */
         bool seek_start();
+        /**
+         * @brief Decode and discard the next video frame.
+         *
+         * Hardware frames remain on the decoder device and no RGBA conversion
+         * or host transfer is performed. This is intended for media-clock
+         * catch-up when a late source frame must not be rendered.
+         * @return true when a frame was decoded and discarded.
+         */
+        bool skip();
         /** @brief Close the active file and release decoder resources. */
         void close();
         /** @brief Check whether a decoder is open. */

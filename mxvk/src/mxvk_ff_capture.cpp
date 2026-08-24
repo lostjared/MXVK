@@ -171,6 +171,14 @@ namespace mxvk {
         return true;
     }
 
+    bool VK_FF_Capture::skip() {
+        if (!is_open() || !decodeNextFrame()) {
+            return false;
+        }
+        av_frame_unref(frame);
+        return true;
+    }
+
     void VK_FF_Capture::close() {
 #ifdef MXVK_CUDA
         if (decoder_surface_copy_event != nullptr) {

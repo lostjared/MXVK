@@ -71,6 +71,10 @@ namespace mxvk {
         return cap.read(frame);
     }
 
+    bool VK_Capture::grab() {
+        return cap.grab();
+    }
+
     bool VK_Capture::readRgba(cv::Mat &rgba, bool flipY) {
 #ifdef MXVK_CUDA
         cv::Mat cpuFallbackFrame;

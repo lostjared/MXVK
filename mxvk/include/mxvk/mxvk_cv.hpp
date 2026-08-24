@@ -123,6 +123,11 @@ namespace mxvk {
          * @return @c true if a frame was available.
          */
         bool read();
+        /**
+         * @brief Decode and discard the next capture frame without conversion.
+         * @return @c true when the backend advanced to another frame.
+         */
+        bool grab();
         bool readRgba(cv::Mat &rgba, bool flipY = false);
         bool readToSprite(VK_Sprite &targetSprite);
         bool readToSprite(VK_Sprite &targetSprite, bool flipY);
