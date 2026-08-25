@@ -106,6 +106,12 @@ namespace mxvk {
             vkDestroyPipelineLayout(device, customPipelineLayout, nullptr);
         }
 
+        destroyComputePipeline();
+        if (computeShaderModule != VK_NULL_HANDLE) {
+            vkDestroyShaderModule(device, computeShaderModule, nullptr);
+            computeShaderModule = VK_NULL_HANDLE;
+        }
+
         destroyExtendedUBO();
         destroyHistoryTexture();
         destroySpectrumTexture();
@@ -683,20 +689,23 @@ namespace mxvk {
         bindings[0].binding = 0;
         bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[0].descriptorCount = 1;
-        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[0].stageFlags =
+            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
         bindings[0].pImmutableSamplers = nullptr;
         // binding 1: uniform buffer for extended data
         bindings[1].binding = 1;
         bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         bindings[1].descriptorCount = 1;
-        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[1].stageFlags =
+            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
         bindings[1].pImmutableSamplers = nullptr;
         if (historyTextureEnabled) {
             VkDescriptorSetLayoutBinding historyBinding{};
             historyBinding.binding = 2;
             historyBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             historyBinding.descriptorCount = 1;
-            historyBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            historyBinding.stageFlags =
+                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(historyBinding);
         }
         if (spectrumTextureEnabled) {
@@ -704,7 +713,8 @@ namespace mxvk {
             spectrumBinding.binding = 3;
             spectrumBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             spectrumBinding.descriptorCount = 1;
-            spectrumBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            spectrumBinding.stageFlags =
+                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(spectrumBinding);
         }
         if (spectrumHistoryTextureEnabled) {
@@ -713,8 +723,17 @@ namespace mxvk {
             spectrumHistoryBinding.descriptorType =
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             spectrumHistoryBinding.descriptorCount = 1;
-            spectrumHistoryBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+            spectrumHistoryBinding.stageFlags =
+                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(spectrumHistoryBinding);
+        }
+        if (computeShaderModule != VK_NULL_HANDLE) {
+            VkDescriptorSetLayoutBinding outputBinding{};
+            outputBinding.binding = 5;
+            outputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            outputBinding.descriptorCount = 1;
+            outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            bindings.push_back(outputBinding);
         }
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -732,7 +751,9 @@ namespace mxvk {
             (historyTextureEnabled && historyImageView == VK_NULL_HANDLE) ||
             (spectrumTextureEnabled && spectrumImageView == VK_NULL_HANDLE) ||
             (spectrumHistoryTextureEnabled &&
-             spectrumHistoryImageView == VK_NULL_HANDLE))
+             spectrumHistoryImageView == VK_NULL_HANDLE) ||
+            (computeShaderModule != VK_NULL_HANDLE &&
+             computeOutputImageView == VK_NULL_HANDLE))
             return;
 
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
@@ -742,17 +763,22 @@ namespace mxvk {
             extendedDescriptorSet = VK_NULL_HANDLE;
         }
 
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[0].descriptorCount = 1U + static_cast<uint32_t>(historyTextureEnabled) +
                                        static_cast<uint32_t>(spectrumTextureEnabled) +
                                        static_cast<uint32_t>(spectrumHistoryTextureEnabled);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[1].descriptorCount = 1;
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        poolSizes[2].descriptorCount =
+            computeShaderModule != VK_NULL_HANDLE ? 1U : 0U;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.poolSizeCount = computeShaderModule != VK_NULL_HANDLE
+                                     ? static_cast<uint32_t>(poolSizes.size())
+                                     : 2U;
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 1;
 
@@ -791,6 +817,10 @@ namespace mxvk {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         spectrumHistoryImageInfo.imageView = spectrumHistoryImageView;
         spectrumHistoryImageInfo.sampler = spriteSampler;
+
+        VkDescriptorImageInfo outputImageInfo{};
+        outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        outputImageInfo.imageView = computeOutputImageView;
 
         std::vector<VkWriteDescriptorSet> writes(2);
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -840,6 +870,16 @@ namespace mxvk {
             spectrumHistoryWrite.pImageInfo = &spectrumHistoryImageInfo;
             writes.push_back(spectrumHistoryWrite);
         }
+        if (computeShaderModule != VK_NULL_HANDLE) {
+            VkWriteDescriptorSet outputWrite{};
+            outputWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            outputWrite.dstSet = extendedDescriptorSet;
+            outputWrite.dstBinding = 5;
+            outputWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            outputWrite.descriptorCount = 1;
+            outputWrite.pImageInfo = &outputImageInfo;
+            writes.push_back(outputWrite);
+        }
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
                                nullptr);
@@ -856,6 +896,7 @@ namespace mxvk {
             vkDestroyPipelineLayout(device, customPipelineLayout, nullptr);
             customPipelineLayout = VK_NULL_HANDLE;
         }
+        destroyComputePipeline();
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
             vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
             extendedDescriptorPool = VK_NULL_HANDLE;
@@ -869,6 +910,7 @@ namespace mxvk {
 
         createExtendedDescriptorSetLayout();
         rebuildPipeline();
+        createComputePipeline();
     }
 
     void VK_Sprite::destroyHistoryTexture() {
@@ -1460,6 +1502,120 @@ namespace mxvk {
         if (colorAttachmentFormat != VK_FORMAT_UNDEFINED && descriptorSetLayout != VK_NULL_HANDLE) {
             createCustomPipeline();
         }
+    }
+
+    void VK_Sprite::destroyComputePipeline() {
+        if (computePipeline != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite compute pipeline\n";
+            vkDestroyPipeline(device, computePipeline, nullptr);
+            computePipeline = VK_NULL_HANDLE;
+        }
+        if (computePipelineLayout != VK_NULL_HANDLE) {
+            std::cout << "vk: destroying sprite compute pipeline layout\n";
+            vkDestroyPipelineLayout(device, computePipelineLayout, nullptr);
+            computePipelineLayout = VK_NULL_HANDLE;
+        }
+    }
+
+    void VK_Sprite::createComputePipeline() {
+        if (computeShaderModule == VK_NULL_HANDLE ||
+            extendedDescriptorSetLayout == VK_NULL_HANDLE) {
+            return;
+        }
+
+        destroyComputePipeline();
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = 1;
+        layoutInfo.pSetLayouts = &extendedDescriptorSetLayout;
+        VK_CHECK_RESULT(vkCreatePipelineLayout(
+            device, &layoutInfo, nullptr, &computePipelineLayout));
+
+        VkPipelineShaderStageCreateInfo stageInfo{};
+        stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        stageInfo.module = computeShaderModule;
+        stageInfo.pName = "main";
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.stage = stageInfo;
+        pipelineInfo.layout = computePipelineLayout;
+        VK_CHECK_RESULT(vkCreateComputePipelines(
+            device, pipelineCache, 1, &pipelineInfo, nullptr,
+            &computePipeline));
+        std::cout << "mxvk: Compute pipeline rebuilt\n";
+    }
+
+    void VK_Sprite::enableComputeShader(const std::string &path,
+                                        uint32_t localSizeX,
+                                        uint32_t localSizeY,
+                                        uint32_t localSizeZ) {
+        if (path.empty() || localSizeX == 0 || localSizeY == 0 ||
+            localSizeZ == 0) {
+            throw mxvk::Exception(
+                "VKSprite::enableComputeShader requires a shader and positive local size");
+        }
+
+        vkDeviceWaitIdle(device);
+        destroyComputePipeline();
+        if (computeShaderModule != VK_NULL_HANDLE) {
+            vkDestroyShaderModule(device, computeShaderModule, nullptr);
+            computeShaderModule = VK_NULL_HANDLE;
+        }
+        computeShaderModule =
+            mxvk::create_shader_module(device, readShaderFile(path));
+        computeLocalSizeX = localSizeX;
+        computeLocalSizeY = localSizeY;
+
+        if (!extendedUBOEnabled) {
+            enableExtendedUBO();
+            createComputePipeline();
+        } else {
+            recreateExtendedDescriptorLayout();
+        }
+    }
+
+    void VK_Sprite::dispatchCompute(VkCommandBuffer cmdBuffer,
+                                    VkImageView inputView,
+                                    VkImageView outputView, uint32_t width,
+                                    uint32_t height) {
+        if (computePipeline == VK_NULL_HANDLE ||
+            computePipelineLayout == VK_NULL_HANDLE || inputView == VK_NULL_HANDLE ||
+            outputView == VK_NULL_HANDLE || width == 0 || height == 0) {
+            throw mxvk::Exception(
+                "VKSprite::dispatchCompute received an incomplete compute pass");
+        }
+
+        setExternalTexture(inputView, static_cast<int>(width),
+                           static_cast<int>(height));
+        if (computeOutputImageView != outputView) {
+            if (extendedDescriptorPool != VK_NULL_HANDLE) {
+                vkDeviceWaitIdle(device);
+                vkDestroyDescriptorPool(device, extendedDescriptorPool, nullptr);
+                extendedDescriptorPool = VK_NULL_HANDLE;
+                extendedDescriptorSet = VK_NULL_HANDLE;
+            }
+            computeOutputImageView = outputView;
+        }
+        updateExtendedUBO();
+        if (extendedDescriptorSet == VK_NULL_HANDLE) {
+            createExtendedDescriptorSet();
+        }
+        if (extendedDescriptorSet == VK_NULL_HANDLE) {
+            throw mxvk::Exception(
+                "VKSprite::dispatchCompute could not create its descriptor set");
+        }
+
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                          computePipeline);
+        vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                computePipelineLayout, 0, 1,
+                                &extendedDescriptorSet, 0, nullptr);
+        vkCmdDispatch(cmdBuffer,
+                      (width + computeLocalSizeX - 1U) / computeLocalSizeX,
+                      (height + computeLocalSizeY - 1U) / computeLocalSizeY,
+                      1U);
     }
 
     void VK_Sprite::rebuildInstancedPipeline() {

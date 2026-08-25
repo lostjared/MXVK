@@ -4,8 +4,19 @@
 
 #include <fstream>
 #include <iterator>
+#include <span>
 
 namespace mxvk {
+    namespace {
+        constexpr uint32_t SPIRV_MAGIC = 0x07230203U;
+        constexpr uint16_t OP_ENTRY_POINT = 15U;
+        constexpr uint16_t OP_EXECUTION_MODE = 16U;
+        constexpr uint32_t EXECUTION_MODEL_VERTEX = 0U;
+        constexpr uint32_t EXECUTION_MODEL_FRAGMENT = 4U;
+        constexpr uint32_t EXECUTION_MODEL_COMPUTE = 5U;
+        constexpr uint32_t EXECUTION_MODE_LOCAL_SIZE = 17U;
+    } // namespace
+
     std::vector<char> load_spv(const std::string &path) {
         if (path.empty()) {
             throw mxvk::Exception("SPIR-V path is empty");
@@ -25,6 +36,71 @@ namespace mxvk {
         }
 
         return bytes;
+    }
+
+    ShaderModuleInfo inspect_spirv(const std::vector<char> &spv_bytes) {
+        if (spv_bytes.size() < 5U * sizeof(uint32_t) ||
+            (spv_bytes.size() % sizeof(uint32_t)) != 0U) {
+            throw mxvk::Exception("Invalid SPIR-V shader data");
+        }
+
+        const auto *word_data =
+            reinterpret_cast<const uint32_t *>(spv_bytes.data());
+        const std::span<const uint32_t> words(
+            word_data, spv_bytes.size() / sizeof(uint32_t));
+        if (words.front() != SPIRV_MAGIC) {
+            throw mxvk::Exception("Invalid SPIR-V magic word");
+        }
+
+        ShaderModuleInfo info{};
+        uint32_t entry_point_id = 0;
+        for (std::size_t offset = 5; offset < words.size();) {
+            const uint16_t word_count =
+                static_cast<uint16_t>(words[offset] >> 16U);
+            const uint16_t opcode =
+                static_cast<uint16_t>(words[offset] & 0xFFFFU);
+            if (word_count == 0 || offset + word_count > words.size()) {
+                throw mxvk::Exception("Malformed SPIR-V instruction stream");
+            }
+            if (opcode == OP_ENTRY_POINT && word_count >= 3U &&
+                entry_point_id == 0U) {
+                entry_point_id = words[offset + 2U];
+                switch (words[offset + 1U]) {
+                case EXECUTION_MODEL_VERTEX:
+                    info.stage = ShaderStage::Vertex;
+                    break;
+                case EXECUTION_MODEL_FRAGMENT:
+                    info.stage = ShaderStage::Fragment;
+                    break;
+                case EXECUTION_MODEL_COMPUTE:
+                    info.stage = ShaderStage::Compute;
+                    break;
+                default:
+                    info.stage = ShaderStage::Unknown;
+                    break;
+                }
+            }
+            offset += word_count;
+        }
+
+        if (info.stage == ShaderStage::Compute && entry_point_id != 0U) {
+            for (std::size_t offset = 5; offset < words.size();) {
+                const uint16_t word_count =
+                    static_cast<uint16_t>(words[offset] >> 16U);
+                const uint16_t opcode =
+                    static_cast<uint16_t>(words[offset] & 0xFFFFU);
+                if (opcode == OP_EXECUTION_MODE && word_count >= 6U &&
+                    words[offset + 1U] == entry_point_id &&
+                    words[offset + 2U] == EXECUTION_MODE_LOCAL_SIZE) {
+                    info.localSizeX = words[offset + 3U];
+                    info.localSizeY = words[offset + 4U];
+                    info.localSizeZ = words[offset + 5U];
+                    break;
+                }
+                offset += word_count;
+            }
+        }
+        return info;
     }
 
     VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &spv_bytes) {

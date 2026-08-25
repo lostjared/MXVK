@@ -6,10 +6,10 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.28.1`. This release pipelines swapchain
-frame readback across the frames in flight and selects host-cached readback
-memory when the device provides it, so recording avoids both same-frame GPU
-waits and slow CPU reads from uncached discrete-GPU mappings. It builds on the preview-only text,
+Current development is on version `0.29.0`. This release adds mixed fragment
+and compute post-processing chains, SPIR-V stage/local-size inspection, and
+RGBA8 storage-image ping-pong targets. It retains pipelined, host-cached frame
+readback and builds on the preview-only text,
 FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device selection,
 reusable decoder contexts, software 3D, installer, multiplayer, rendering, and
 documentation work from earlier releases.
@@ -354,7 +354,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.28.1`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.29.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -747,6 +747,9 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 25, 2026: version `0.29.0` adds SPIR-V compute shaders to ordered
+  post-processing chains. Fragment and compute passes share the extended sprite
+  uniform/history/audio ABI and alternate through synchronized RGBA8 images.
 - August 25, 2026: version `0.28.1` prefers host-cached Vulkan memory for
   swapchain and snapshot readback, with a coherent-memory fallback for devices
   that do not expose it. MXWrite also performs host-frame conversion and upload

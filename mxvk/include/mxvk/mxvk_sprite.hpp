@@ -225,6 +225,27 @@ namespace mxvk {
         /** @brief Replace the fragment shader path and rebuild the custom pipeline. */
         void setFragmentShaderPath(const std::string &path);
 
+        /**
+         * @brief Build a compute image-effect pipeline for this sprite.
+         *
+         * Compute shaders use the extended sprite descriptor ABI: binding 0 is
+         * the sampled input image, binding 1 is SpriteExtended, optional
+         * history/audio textures remain at bindings 2-4, and binding 5 is a
+         * write-only RGBA8 storage image.
+         */
+        void enableComputeShader(const std::string &path, uint32_t localSizeX,
+                                 uint32_t localSizeY, uint32_t localSizeZ = 1);
+
+        /** @return Whether this sprite owns an executable compute pipeline. */
+        [[nodiscard]] bool hasComputePipeline() const {
+            return computePipeline != VK_NULL_HANDLE;
+        }
+
+        /** @brief Dispatch the compute effect between two full-frame images. */
+        void dispatchCompute(VkCommandBuffer cmdBuffer, VkImageView inputView,
+                             VkImageView outputView, uint32_t width,
+                             uint32_t height);
+
         /** @return @c true if a custom pipeline has been built. */
         bool hasOwnPipeline() const { return customPipeline != VK_NULL_HANDLE; }
         /** @return The custom VkPipeline handle (may be VK_NULL_HANDLE). */
@@ -428,6 +449,14 @@ namespace mxvk {
         bool spriteLoaded = false;
         bool externalTexture = false;
         VkShaderModule fragmentShaderModule = VK_NULL_HANDLE;
+        VkShaderModule computeShaderModule = VK_NULL_HANDLE;
+        VkPipeline computePipeline = VK_NULL_HANDLE;
+        VkPipelineLayout computePipelineLayout = VK_NULL_HANDLE;
+        VkImageView computeOutputImageView = VK_NULL_HANDLE;
+        uint32_t computeLocalSizeX = 1;
+        uint32_t computeLocalSizeY = 1;
+        void createComputePipeline();
+        void destroyComputePipeline();
         bool hasCustomShader = false;
         glm::vec4 shaderParams = glm::vec4(0.0f);
         bool effectsEnabled = true;

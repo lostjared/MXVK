@@ -2,6 +2,7 @@
 
 #include "mxvk_context.hpp"
 #include "mxvk_runtime_options.hpp"
+#include "mxvk_shader_module.hpp"
 #include "mxvk_sprite.hpp"
 #include "mxvk_sprite3d.hpp"
 #include "mxvk_text.hpp"
@@ -287,6 +288,7 @@ namespace mxvk {
             bool timeEnabled = false;
             uint32_t spectrumBinCount = 0;
             uint32_t spectrumHistoryLayerCount = 0;
+            ShaderStage stage = ShaderStage::Unknown;
         };
 
         /**
@@ -636,6 +638,8 @@ namespace mxvk {
         std::chrono::steady_clock::time_point post_process_start_time = std::chrono::steady_clock::now();
         std::vector<VK_Sprite *> post_process_sprites{};
         std::vector<VK_Sprite *> owned_post_process_sprites{};
+        VK_Sprite *post_process_present_sprite = nullptr;
+        std::vector<ShaderStage> post_process_effect_stages{};
         std::vector<std::array<float, 4>> post_process_effect_params{};
         std::vector<bool> post_process_effect_time_enabled{};
         std::vector<std::chrono::steady_clock::time_point> post_process_effect_start_times{};
@@ -643,6 +647,8 @@ namespace mxvk {
         std::vector<std::vector<VkDeviceMemory>> post_process_memories{};
         std::vector<std::vector<VkImageView>> post_process_views{};
         std::vector<std::vector<bool>> post_process_initialized{};
+        static constexpr VkFormat post_process_compute_format =
+            VK_FORMAT_R8G8B8A8_UNORM;
 
         std::unique_ptr<VK_Text> text_renderer{};
         std::unique_ptr<VK_Text> preview_text_renderer{};
