@@ -102,8 +102,20 @@ namespace mxvk {
         }
 
         for (uint32_t id = 0; id < id_bound; ++id) {
-            if (descriptor_sets[id] == 0U && descriptor_bindings[id] == 2U) {
+            if (descriptor_sets[id] != 0U) {
+                continue;
+            }
+            switch (descriptor_bindings[id]) {
+            case 2U:
                 info.usesHistoryTexture = true;
+                break;
+            case 3U:
+                info.usesSpectrumTexture = true;
+                break;
+            case 4U:
+                info.usesSpectrumHistoryTexture = true;
+                break;
+            default:
                 break;
             }
         }

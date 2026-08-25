@@ -19,6 +19,8 @@ namespace mxvk {
         uint32_t localSizeY = 1;
         uint32_t localSizeZ = 1;
         bool usesHistoryTexture = false;
+        bool usesSpectrumTexture = false;
+        bool usesSpectrumHistoryTexture = false;
     };
 
     /**

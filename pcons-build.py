@@ -30,7 +30,7 @@ from pcons import (
     get_var,
 )
 
-VERSION = "0.31.0"
+VERSION = "0.31.1"
 project_dir = Path(__file__).parent.resolve()
 platform = get_platform()
 

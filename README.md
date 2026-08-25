@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.31.0`. This release adds non-owning shared
+Current development is on version `0.31.1`. This release adds non-owning shared
 sprite-history descriptors for fragment/compute post-processing passes and
 SPIR-V reflection for set 0, binding 2. It retains the fixed native render
 extent, source-sized processing and frame readback, aspect-preserving preview
@@ -757,6 +757,9 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 25, 2026: version `0.31.1` extends SPIR-V descriptor reflection to
+  current-spectrum binding 3 and spectrum-history binding 4, allowing clients
+  to create every optional shader resource before pipeline construction.
 - August 25, 2026: version `0.31.0` lets fragment and compute post-processing
   passes share a source sprite's frame-history array without taking ownership
   or allocating duplicate rings. SPIR-V inspection reports set 0, binding 2 so
