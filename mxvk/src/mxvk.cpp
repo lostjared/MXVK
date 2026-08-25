@@ -891,14 +891,25 @@ namespace mxvk {
             VkPhysicalDeviceMemoryProperties memory_properties{};
             vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
             uint32_t memory_type_index = invalid_queue_index;
-            constexpr VkMemoryPropertyFlags required_properties =
+            constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
-                const bool type_matches = (memory_requirements.memoryTypeBits & (1U << i)) != 0U;
-                const bool properties_match =
-                    (memory_properties.memoryTypes[i].propertyFlags & required_properties) == required_properties;
-                if (type_matches && properties_match) {
-                    memory_type_index = i;
+            constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES =
+                REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+            for (VkMemoryPropertyFlags properties :
+                 {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
+                for (uint32_t index = 0;
+                     index < memory_properties.memoryTypeCount; ++index) {
+                    const bool type_matches =
+                        (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+                    const bool properties_match =
+                        (memory_properties.memoryTypes[index].propertyFlags &
+                         properties) == properties;
+                    if (type_matches && properties_match) {
+                        memory_type_index = index;
+                        break;
+                    }
+                }
+                if (memory_type_index != invalid_queue_index) {
                     break;
                 }
             }
@@ -1170,6 +1181,9 @@ namespace mxvk {
         vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
         constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES =
+            REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+        bool memory_type_logged = false;
         try {
             for (FrameReadbackSlot &slot : frame_readback_slots) {
                 if (vkCreateBuffer(device, &buffer_info, nullptr, &slot.buffer) !=
@@ -1182,21 +1196,40 @@ namespace mxvk {
                 vkGetBufferMemoryRequirements(device, slot.buffer,
                                               &memory_requirements);
                 uint32_t memory_type_index = invalid_queue_index;
-                for (uint32_t index = 0;
-                     index < memory_properties.memoryTypeCount; ++index) {
-                    const bool type_matches =
-                        (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
-                    const bool properties_match =
-                        (memory_properties.memoryTypes[index].propertyFlags &
-                         REQUIRED_PROPERTIES) == REQUIRED_PROPERTIES;
-                    if (type_matches && properties_match) {
-                        memory_type_index = index;
+                for (VkMemoryPropertyFlags properties :
+                     {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
+                    for (uint32_t index = 0;
+                         index < memory_properties.memoryTypeCount; ++index) {
+                        const bool type_matches =
+                            (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+                        const bool properties_match =
+                            (memory_properties.memoryTypes[index].propertyFlags &
+                             properties) == properties;
+                        if (type_matches && properties_match) {
+                            memory_type_index = index;
+                            break;
+                        }
+                    }
+                    if (memory_type_index != invalid_queue_index) {
                         break;
                     }
                 }
                 if (memory_type_index == invalid_queue_index) {
                     throw mxvk::Exception(
                         "failed to find host-visible frame-readback memory");
+                }
+                if (!memory_type_logged) {
+                    const VkMemoryPropertyFlags selected_properties =
+                        memory_properties.memoryTypes[memory_type_index]
+                            .propertyFlags;
+                    std::cout << std::format(
+                        "mxvk: frame readback memory type {} ({})\n",
+                        memory_type_index,
+                        (selected_properties & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) !=
+                                0U
+                            ? "host cached"
+                            : "host coherent fallback");
+                    memory_type_logged = true;
                 }
 
                 VkMemoryAllocateInfo allocation_info{};
