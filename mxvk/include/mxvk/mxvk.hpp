@@ -133,6 +133,9 @@ namespace mxvk {
          */
         void setFont(const std::string &fontPath, int fontSize = 24);
 
+        /** @brief Set the preview-only HUD font independently of output text. */
+        void setPreviewFont(const std::string &fontPath, int fontSize = 24);
+
         /**
          * @brief Queue a text string for rendering during the current frame.
          * @param text UTF-8 text.
@@ -205,6 +208,17 @@ namespace mxvk {
 
         /** @brief Get the current swapchain extent. */
         [[nodiscard]] VkExtent2D getSwapchainExtent() const noexcept { return swapchain_extent; }
+
+        /**
+         * @brief Render post-processing at a fixed extent independent of the preview window.
+         *
+         * The final source-sized image is read back before a fitted copy is presented
+         * to the swapchain. Pass zero dimensions to return to swapchain-sized rendering.
+         */
+        void setRenderExtent(uint32_t width, uint32_t height);
+
+        /** @brief Get the active scene/post-processing extent. */
+        [[nodiscard]] VkExtent2D getRenderExtent() const noexcept;
 
         /** @brief Get the depth format used for dynamic rendering attachments. */
         [[nodiscard]] VkFormat getDepthFormat() const noexcept { return depth_format; }
@@ -475,6 +489,8 @@ namespace mxvk {
          * their own scene content without registering it in the window-managed sprite list.
          */
         void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd);
+        void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd,
+                                    VkExtent2D extent);
 
       private:
         static constexpr uint32_t invalid_queue_index = std::numeric_limits<uint32_t>::max();
@@ -571,6 +587,7 @@ namespace mxvk {
         VkFormat swapchain_format = VK_FORMAT_UNDEFINED;
         VkFormat depth_format = VK_FORMAT_UNDEFINED;
         VkExtent2D swapchain_extent{};
+        VkExtent2D render_extent_override{};
         std::vector<VkImage> swapchain_images{};
         std::vector<VkImageView> swapchain_image_views{};
         std::vector<bool> swapchain_image_initialized{};
@@ -639,6 +656,7 @@ namespace mxvk {
         std::vector<VK_Sprite *> post_process_sprites{};
         std::vector<VK_Sprite *> owned_post_process_sprites{};
         VK_Sprite *post_process_present_sprite = nullptr;
+        VK_Sprite *post_process_composite_sprite = nullptr;
         std::vector<ShaderStage> post_process_effect_stages{};
         std::vector<std::array<float, 4>> post_process_effect_params{};
         std::vector<bool> post_process_effect_time_enabled{};

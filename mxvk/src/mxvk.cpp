@@ -229,6 +229,7 @@ namespace mxvk {
         post_process_sprite = nullptr;
         owned_post_process_sprite = nullptr;
         post_process_present_sprite = nullptr;
+        post_process_composite_sprite = nullptr;
         post_process_sprites.clear();
         owned_post_process_sprites.clear();
         post_process_effect_stages.clear();
@@ -1154,8 +1155,10 @@ namespace mxvk {
             throw mxvk::Exception("frame readback requires swapchain transfer-source support");
         }
 
+        const VkExtent2D readback_extent = getRenderExtent();
         const VkDeviceSize required_size =
-            static_cast<VkDeviceSize>(swapchain_extent.width) * swapchain_extent.height * 4U;
+            static_cast<VkDeviceSize>(readback_extent.width) *
+            readback_extent.height * 4U;
         if (required_size == 0U) {
             throw mxvk::Exception("frame readback cannot use an empty swapchain extent");
         }
@@ -1407,7 +1410,12 @@ namespace mxvk {
                                                        [[maybe_unused]] uint32_t image_index) {}
 
     void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) {
-        if (device == VK_NULL_HANDLE || swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
+        renderStandaloneSprite(sprite, cmd, swapchain_extent);
+    }
+
+    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd,
+                                           VkExtent2D extent) {
+        if (device == VK_NULL_HANDLE || extent.width == 0U || extent.height == 0U) {
             return;
         }
 
@@ -1415,7 +1423,38 @@ namespace mxvk {
             return;
         }
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
-        sprite.renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+        sprite.renderSprites(cmd, sprite_pipeline_layout, extent.width, extent.height);
+    }
+
+    void VK_Window::setRenderExtent(uint32_t width, uint32_t height) {
+        if ((width == 0U) != (height == 0U)) {
+            throw mxvk::Exception("render extent requires two positive dimensions or two zeros");
+        }
+        if (render_extent_override.width == width &&
+            render_extent_override.height == height) {
+            return;
+        }
+        if (device != VK_NULL_HANDLE && swapchain != VK_NULL_HANDLE) {
+            vkDeviceWaitIdle(device);
+            destroyFrameReadbackResources();
+            destroyPostProcessTargets();
+        }
+        render_extent_override = {width, height};
+        sprite_state_dirty = true;
+        if (device != VK_NULL_HANDLE && !swapchain_images.empty() &&
+            !post_process_sprites.empty()) {
+            createPostProcessTargets();
+        }
+        std::cout << std::format("mxvk: fixed render extent {}\n",
+                                 width > 0U ? std::format("{}x{}", width, height)
+                                            : "disabled");
+    }
+
+    VkExtent2D VK_Window::getRenderExtent() const noexcept {
+        return render_extent_override.width > 0U &&
+                       render_extent_override.height > 0U
+                   ? render_extent_override
+                   : swapchain_extent;
     }
 
     VK_Sprite *VK_Window::attachPostProcessingShader(const std::string &fragmentShaderPath, float p1, float p2, float p3, float p4) {
@@ -1482,12 +1521,15 @@ namespace mxvk {
             post_process_effect_stages.push_back(stage);
         }
 
-        if (!post_process_effect_stages.empty() &&
-            post_process_effect_stages.back() == ShaderStage::Compute) {
+        if (!post_process_effect_stages.empty()) {
             post_process_present_sprite = createSprite(1, 1);
             const uint32_t black_pixel = 0xFF000000u;
             post_process_present_sprite->updateTexture(&black_pixel, 1, 1);
             owned_post_process_sprites.push_back(post_process_present_sprite);
+
+            post_process_composite_sprite = createSprite(1, 1);
+            post_process_composite_sprite->updateTexture(&black_pixel, 1, 1);
+            owned_post_process_sprites.push_back(post_process_composite_sprite);
         }
 
         post_process_sprite = attachedSprites.empty() ? nullptr : attachedSprites.front();
@@ -1510,6 +1552,7 @@ namespace mxvk {
         post_process_sprite = nullptr;
         destroyPostProcessTargets();
         post_process_present_sprite = nullptr;
+        post_process_composite_sprite = nullptr;
         post_process_time_enabled = false;
 
         if (!owned_post_process_sprites.empty()) {
@@ -1608,6 +1651,7 @@ namespace mxvk {
     bool VK_Window::isPostProcessSprite(const VK_Sprite *sprite) const {
         return sprite != nullptr &&
                (sprite == post_process_present_sprite ||
+                sprite == post_process_composite_sprite ||
                 std::ranges::find(post_process_sprites, sprite) !=
                     post_process_sprites.end());
     }
@@ -1620,6 +1664,9 @@ namespace mxvk {
         }
         if (post_process_present_sprite != nullptr) {
             post_process_present_sprite->clearExternalTextureDescriptors();
+        }
+        if (post_process_composite_sprite != nullptr) {
+            post_process_composite_sprite->clearExternalTextureDescriptors();
         }
         for (const std::vector<VkImageView> &views : post_process_views) {
             for (VkImageView view : views) {
@@ -1657,8 +1704,13 @@ namespace mxvk {
                                      post_process_effect_stages,
                                      ShaderStage::Compute) !=
                                  post_process_effect_stages.end();
-        const size_t target_count =
-            has_compute || post_process_sprites.size() > 1 ? 3U : 1U;
+        const bool detached_render = render_extent_override.width > 0U &&
+                                     render_extent_override.height > 0U;
+        const size_t target_count = detached_render || has_compute ||
+                                            post_process_sprites.size() > 1
+                                        ? 3U
+                                        : 1U;
+        const VkExtent2D render_extent = getRenderExtent();
         if (has_compute) {
             VkFormatProperties format_properties{};
             vkGetPhysicalDeviceFormatProperties(
@@ -1686,7 +1738,7 @@ namespace mxvk {
                     VkImageCreateInfo image_info{};
                     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                     image_info.imageType = VK_IMAGE_TYPE_2D;
-                    image_info.extent = {swapchain_extent.width, swapchain_extent.height, 1};
+                    image_info.extent = {render_extent.width, render_extent.height, 1};
                     image_info.mipLevels = 1;
                     image_info.arrayLayers = 1;
                     image_info.format = target == 0U
@@ -1695,7 +1747,8 @@ namespace mxvk {
                     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
                     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                     image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                       VK_IMAGE_USAGE_SAMPLED_BIT;
+                                       VK_IMAGE_USAGE_SAMPLED_BIT |
+                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
                     if (target != 0U && has_compute) {
                         image_info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
                     }
@@ -2273,13 +2326,14 @@ namespace mxvk {
         depth_image_views.resize(max_frames_in_flight, VK_NULL_HANDLE);
         depth_image_initialized.assign(max_frames_in_flight, false);
 
+        const VkExtent2D render_extent = getRenderExtent();
         for (size_t i = 0; i < depth_images.size(); ++i) {
             std::cout << std::format("vk: creating depth image for frame {}\n", i);
             VkImageCreateInfo imageInfo{};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
-            imageInfo.extent.width = swapchain_extent.width;
-            imageInfo.extent.height = swapchain_extent.height;
+            imageInfo.extent.width = render_extent.width;
+            imageInfo.extent.height = render_extent.height;
             imageInfo.extent.depth = 1;
             imageInfo.mipLevels = 1;
             imageInfo.arrayLayers = 1;
@@ -2689,7 +2743,9 @@ namespace mxvk {
                     const size_t effect_index = static_cast<size_t>(
                         std::distance(post_process_sprites.begin(),
                                       post_process_match));
-                    if (effect_index + 1U < post_process_sprites.size()) {
+                    if (effect_index + 1U < post_process_sprites.size() ||
+                        (render_extent_override.width > 0U &&
+                         render_extent_override.height > 0U)) {
                         sprite_color_format = post_process_compute_format;
                     }
                 }
@@ -2853,6 +2909,9 @@ namespace mxvk {
 
         VkClearValue clear_value{};
         clear_value.color = clear_color;
+        const bool detached_render = render_extent_override.width > 0U &&
+                                     render_extent_override.height > 0U;
+        const VkExtent2D render_extent = getRenderExtent();
         const bool use_post_process = post_process_enabled &&
                                       !post_process_sprites.empty() &&
                                       !post_process_images.empty() &&
@@ -2861,6 +2920,7 @@ namespace mxvk {
                                       image_index < post_process_images.front().size() &&
                                       image_index < post_process_views.front().size() &&
                                       image_index < post_process_initialized.front().size();
+        const bool use_offscreen_target = use_post_process || detached_render;
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -2886,7 +2946,7 @@ namespace mxvk {
         pre_render_dependency.pImageMemoryBarriers = &to_color_barrier;
         vkCmdPipelineBarrier2(cmd, &pre_render_dependency);
 
-        if (use_post_process) {
+        if (use_offscreen_target) {
             VkImageMemoryBarrier2 post_target_barrier{};
             post_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             post_target_barrier.srcStageMask = post_process_initialized[0][image_index]
@@ -2950,7 +3010,9 @@ namespace mxvk {
 
         VkRenderingAttachmentInfo color_attachment{};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        color_attachment.imageView = use_post_process ? post_process_views[0][image_index] : swapchain_image_views[image_index];
+        color_attachment.imageView = use_offscreen_target
+                                         ? post_process_views[0][image_index]
+                                         : swapchain_image_views[image_index];
         color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         color_attachment.resolveImageView = VK_NULL_HANDLE;
@@ -2979,7 +3041,9 @@ namespace mxvk {
         VkRenderingInfo rendering_info{};
         rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         rendering_info.renderArea.offset = {0, 0};
-        rendering_info.renderArea.extent = swapchain_extent;
+        rendering_info.renderArea.extent = use_offscreen_target
+                                               ? render_extent
+                                               : swapchain_extent;
         rendering_info.layerCount = 1;
         rendering_info.viewMask = 0;
         rendering_info.colorAttachmentCount = 1;
@@ -2992,15 +3056,15 @@ namespace mxvk {
         VkViewport viewport{};
         viewport.x = 0.0F;
         viewport.y = 0.0F;
-        viewport.width = static_cast<float>(swapchain_extent.width);
-        viewport.height = static_cast<float>(swapchain_extent.height);
+        viewport.width = static_cast<float>(rendering_info.renderArea.extent.width);
+        viewport.height = static_cast<float>(rendering_info.renderArea.extent.height);
         viewport.minDepth = 0.0F;
         viewport.maxDepth = 1.0F;
         vkCmdSetViewport(cmd, 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
-        scissor.extent = swapchain_extent;
+        scissor.extent = rendering_info.renderArea.extent;
         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
         onRecordCustomRendering(cmd, image_index);
@@ -3014,13 +3078,17 @@ namespace mxvk {
                 if (sprite_pipeline != VK_NULL_HANDLE) {
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
                 }
-                sprite->renderSprites(cmd, sprite_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+                sprite->renderSprites(cmd, sprite_pipeline_layout,
+                                      rendering_info.renderArea.extent.width,
+                                      rendering_info.renderArea.extent.height);
             }
         }
 
         if (!use_post_process && text_renderer && text_pipeline != VK_NULL_HANDLE) {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
-            text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+            text_renderer->renderText(cmd, text_pipeline_layout,
+                                      rendering_info.renderArea.extent.width,
+                                      rendering_info.renderArea.extent.height);
         }
 
         vkCmdEndRendering(cmd);
@@ -3117,7 +3185,7 @@ namespace mxvk {
                     effect_sprite->dispatchCompute(
                         cmd, post_process_views[source_target][image_index],
                         post_process_views[destination_target][image_index],
-                        swapchain_extent.width, swapchain_extent.height);
+                        render_extent.width, render_extent.height);
 
                     VkImageMemoryBarrier2 sampled_target_barrier{};
                     sampled_target_barrier.sType =
@@ -3154,7 +3222,8 @@ namespace mxvk {
                     post_process_initialized[destination_target][image_index] = true;
                     source_target = destination_target;
 
-                    if (final_effect && post_process_present_sprite != nullptr) {
+                    if (final_effect && !detached_render &&
+                        post_process_present_sprite != nullptr) {
                         VkRenderingAttachmentInfo post_attachment{};
                         post_attachment.sType =
                             VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -3185,10 +3254,10 @@ namespace mxvk {
                 }
 
                 const VkImageView destination_view =
-                    final_effect
+                    final_effect && !detached_render
                         ? swapchain_image_views[image_index]
                         : post_process_views[destination_target][image_index];
-                if (!final_effect) {
+                if (!final_effect || detached_render) {
                     VkImageMemoryBarrier2 next_target_barrier{};
                     next_target_barrier.sType =
                         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -3240,7 +3309,9 @@ namespace mxvk {
                 post_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo post_info{};
                 post_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-                post_info.renderArea.extent = swapchain_extent;
+                post_info.renderArea.extent = detached_render
+                                                  ? render_extent
+                                                  : swapchain_extent;
                 post_info.layerCount = 1;
                 post_info.colorAttachmentCount = 1;
                 post_info.pColorAttachments = &post_attachment;
@@ -3248,15 +3319,17 @@ namespace mxvk {
 
                 effect_sprite->setExternalTexture(
                     post_process_views[source_target][image_index],
-                    static_cast<int>(swapchain_extent.width),
-                    static_cast<int>(swapchain_extent.height));
+                    static_cast<int>(render_extent.width),
+                    static_cast<int>(render_extent.height));
                 effect_sprite->drawSpriteRect(
-                    0, 0, static_cast<int>(swapchain_extent.width),
-                    static_cast<int>(swapchain_extent.height));
-                renderStandaloneSprite(*effect_sprite, cmd);
+                    0, 0, static_cast<int>(render_extent.width),
+                    static_cast<int>(render_extent.height));
+                renderStandaloneSprite(*effect_sprite, cmd,
+                                       detached_render ? render_extent
+                                                       : swapchain_extent);
                 vkCmdEndRendering(cmd);
 
-                if (!final_effect) {
+                if (!final_effect || detached_render) {
                     VkImageMemoryBarrier2 sampled_target_barrier{};
                     sampled_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     sampled_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -3282,6 +3355,69 @@ namespace mxvk {
                     source_target = destination_target;
                 }
             }
+
+            if (detached_render && post_process_composite_sprite != nullptr) {
+                VkImageMemoryBarrier2 composite_target_barrier{};
+                composite_target_barrier.sType =
+                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                composite_target_barrier.srcStageMask =
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                composite_target_barrier.srcAccessMask =
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                composite_target_barrier.dstStageMask =
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                composite_target_barrier.dstAccessMask =
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                composite_target_barrier.oldLayout =
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                composite_target_barrier.newLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                composite_target_barrier.srcQueueFamilyIndex =
+                    VK_QUEUE_FAMILY_IGNORED;
+                composite_target_barrier.dstQueueFamilyIndex =
+                    VK_QUEUE_FAMILY_IGNORED;
+                composite_target_barrier.image =
+                    post_process_images[0][image_index];
+                composite_target_barrier.subresourceRange.aspectMask =
+                    VK_IMAGE_ASPECT_COLOR_BIT;
+                composite_target_barrier.subresourceRange.levelCount = 1;
+                composite_target_barrier.subresourceRange.layerCount = 1;
+                VkDependencyInfo composite_dependency{};
+                composite_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                composite_dependency.imageMemoryBarrierCount = 1;
+                composite_dependency.pImageMemoryBarriers =
+                    &composite_target_barrier;
+                vkCmdPipelineBarrier2(cmd, &composite_dependency);
+
+                VkRenderingAttachmentInfo composite_attachment{};
+                composite_attachment.sType =
+                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                composite_attachment.imageView =
+                    post_process_views[0][image_index];
+                composite_attachment.imageLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                composite_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                composite_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                VkRenderingInfo composite_info{};
+                composite_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                composite_info.renderArea.extent = render_extent;
+                composite_info.layerCount = 1;
+                composite_info.colorAttachmentCount = 1;
+                composite_info.pColorAttachments = &composite_attachment;
+                vkCmdBeginRendering(cmd, &composite_info);
+                post_process_composite_sprite->setExternalTexture(
+                    post_process_views[source_target][image_index],
+                    static_cast<int>(render_extent.width),
+                    static_cast<int>(render_extent.height));
+                post_process_composite_sprite->drawSpriteRect(
+                    0, 0, static_cast<int>(render_extent.width),
+                    static_cast<int>(render_extent.height));
+                renderStandaloneSprite(*post_process_composite_sprite, cmd,
+                                       render_extent);
+                post_process_composite_sprite->clearQueue();
+                vkCmdEndRendering(cmd);
+            }
         }
 
         // Post-processing owns the final swapchain color until this point. Draw
@@ -3300,7 +3436,9 @@ namespace mxvk {
             to_text_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_text_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_text_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_text_barrier.image = swapchain_images[image_index];
+            to_text_barrier.image = detached_render
+                                        ? post_process_images[0][image_index]
+                                        : swapchain_images[image_index];
             to_text_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_text_barrier.subresourceRange.levelCount = 1;
             to_text_barrier.subresourceRange.layerCount = 1;
@@ -3312,13 +3450,17 @@ namespace mxvk {
 
             VkRenderingAttachmentInfo text_attachment{};
             text_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            text_attachment.imageView = swapchain_image_views[image_index];
+            text_attachment.imageView = detached_render
+                                            ? post_process_views[0][image_index]
+                                            : swapchain_image_views[image_index];
             text_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             text_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             text_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             VkRenderingInfo text_info{};
             text_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-            text_info.renderArea.extent = swapchain_extent;
+            text_info.renderArea.extent = detached_render
+                                              ? render_extent
+                                              : swapchain_extent;
             text_info.layerCount = 1;
             text_info.colorAttachmentCount = 1;
             text_info.pColorAttachments = &text_attachment;
@@ -3326,7 +3468,9 @@ namespace mxvk {
             vkCmdSetViewport(cmd, 0, 1, &viewport);
             vkCmdSetScissor(cmd, 0, 1, &scissor);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
-            text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
+            text_renderer->renderText(cmd, text_pipeline_layout,
+                                      text_info.renderArea.extent.width,
+                                      text_info.renderArea.extent.height);
             vkCmdEndRendering(cmd);
         }
 
@@ -3341,7 +3485,9 @@ namespace mxvk {
             to_readback_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_readback_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_readback_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_readback_barrier.image = swapchain_images[image_index];
+            to_readback_barrier.image = detached_render
+                                            ? post_process_images[0][image_index]
+                                            : swapchain_images[image_index];
             to_readback_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_readback_barrier.subresourceRange.baseMipLevel = 0;
             to_readback_barrier.subresourceRange.levelCount = 1;
@@ -3359,11 +3505,93 @@ namespace mxvk {
             readback_region.imageSubresource.mipLevel = 0;
             readback_region.imageSubresource.baseArrayLayer = 0;
             readback_region.imageSubresource.layerCount = 1;
-            readback_region.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
-            vkCmdCopyImageToBuffer(cmd, swapchain_images[image_index],
+            readback_region.imageExtent = {
+                detached_render ? render_extent.width : swapchain_extent.width,
+                detached_render ? render_extent.height : swapchain_extent.height,
+                1};
+            vkCmdCopyImageToBuffer(cmd,
+                                   detached_render
+                                       ? post_process_images[0][image_index]
+                                       : swapchain_images[image_index],
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                    frame_readback_slots[current_frame].buffer, 1,
                                    &readback_region);
+        }
+
+        if (detached_render && post_process_present_sprite != nullptr) {
+            VkImageMemoryBarrier2 to_sample_barrier{};
+            to_sample_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_sample_barrier.srcStageMask =
+                frame_readback_enabled
+                    ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
+                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_sample_barrier.srcAccessMask =
+                frame_readback_enabled
+                    ? VK_ACCESS_2_TRANSFER_READ_BIT
+                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_sample_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            to_sample_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            to_sample_barrier.oldLayout =
+                frame_readback_enabled
+                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_sample_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            to_sample_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_sample_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            to_sample_barrier.image = post_process_images[0][image_index];
+            to_sample_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            to_sample_barrier.subresourceRange.levelCount = 1;
+            to_sample_barrier.subresourceRange.layerCount = 1;
+            VkDependencyInfo to_sample_dependency{};
+            to_sample_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            to_sample_dependency.imageMemoryBarrierCount = 1;
+            to_sample_dependency.pImageMemoryBarriers = &to_sample_barrier;
+            vkCmdPipelineBarrier2(cmd, &to_sample_dependency);
+
+            VkRenderingAttachmentInfo present_attachment{};
+            present_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            present_attachment.imageView = swapchain_image_views[image_index];
+            present_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            present_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            present_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            present_attachment.clearValue = clear_value;
+            VkRenderingInfo present_info{};
+            present_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            present_info.renderArea.extent = swapchain_extent;
+            present_info.layerCount = 1;
+            present_info.colorAttachmentCount = 1;
+            present_info.pColorAttachments = &present_attachment;
+            vkCmdBeginRendering(cmd, &present_info);
+
+            VkViewport present_viewport{};
+            present_viewport.width = static_cast<float>(swapchain_extent.width);
+            present_viewport.height = static_cast<float>(swapchain_extent.height);
+            present_viewport.maxDepth = 1.0F;
+            vkCmdSetViewport(cmd, 0, 1, &present_viewport);
+            VkRect2D present_scissor{};
+            present_scissor.extent = swapchain_extent;
+            vkCmdSetScissor(cmd, 0, 1, &present_scissor);
+
+            const double preview_scale = std::min(
+                static_cast<double>(swapchain_extent.width) / render_extent.width,
+                static_cast<double>(swapchain_extent.height) / render_extent.height);
+            const int preview_width = std::max(
+                1, static_cast<int>(std::lround(render_extent.width * preview_scale)));
+            const int preview_height = std::max(
+                1, static_cast<int>(std::lround(render_extent.height * preview_scale)));
+            const int preview_x =
+                (static_cast<int>(swapchain_extent.width) - preview_width) / 2;
+            const int preview_y =
+                (static_cast<int>(swapchain_extent.height) - preview_height) / 2;
+            post_process_present_sprite->setExternalTexture(
+                post_process_views[0][image_index],
+                static_cast<int>(render_extent.width),
+                static_cast<int>(render_extent.height));
+            post_process_present_sprite->drawSpriteRect(
+                preview_x, preview_y, preview_width, preview_height);
+            renderStandaloneSprite(*post_process_present_sprite, cmd);
+            post_process_present_sprite->clearQueue();
+            vkCmdEndRendering(cmd);
         }
 
         const bool render_preview_text =
@@ -3374,11 +3602,11 @@ namespace mxvk {
             to_preview_barrier.sType =
                 VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_preview_barrier.srcStageMask =
-                frame_readback_enabled
+                frame_readback_enabled && !detached_render
                     ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                     : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             to_preview_barrier.srcAccessMask =
-                frame_readback_enabled
+                frame_readback_enabled && !detached_render
                     ? VK_ACCESS_2_TRANSFER_READ_BIT
                     : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_preview_barrier.dstStageMask =
@@ -3387,7 +3615,7 @@ namespace mxvk {
                 VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_preview_barrier.oldLayout =
-                frame_readback_enabled
+                frame_readback_enabled && !detached_render
                     ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_preview_barrier.newLayout =
@@ -3420,6 +3648,9 @@ namespace mxvk {
             preview_info.colorAttachmentCount = 1;
             preview_info.pColorAttachments = &preview_attachment;
             vkCmdBeginRendering(cmd, &preview_info);
+            viewport.width = static_cast<float>(swapchain_extent.width);
+            viewport.height = static_cast<float>(swapchain_extent.height);
+            scissor.extent = swapchain_extent;
             vkCmdSetViewport(cmd, 0, 1, &viewport);
             vkCmdSetScissor(cmd, 0, 1, &scissor);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -3434,19 +3665,19 @@ namespace mxvk {
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         to_present_barrier.srcStageMask = render_preview_text
                                               ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-                                          : frame_readback_enabled
+                                          : frame_readback_enabled && !detached_render
                                               ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                                               : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         to_present_barrier.srcAccessMask = render_preview_text
                                                ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                           : frame_readback_enabled
+                                           : frame_readback_enabled && !detached_render
                                                ? VK_ACCESS_2_TRANSFER_READ_BIT
                                                : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
         to_present_barrier.oldLayout = render_preview_text
                                            ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                       : frame_readback_enabled
+                                       : frame_readback_enabled && !detached_render
                                            ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -3540,8 +3771,10 @@ namespace mxvk {
             last_presented_image_index = image_index;
             if (frame_readback_enabled) {
                 FrameReadbackSlot &slot = frame_readback_slots[current_frame];
-                slot.width = swapchain_extent.width;
-                slot.height = swapchain_extent.height;
+                slot.width = detached_render ? render_extent.width
+                                             : swapchain_extent.width;
+                slot.height = detached_render ? render_extent.height
+                                              : swapchain_extent.height;
                 slot.format = swapchain_format;
                 slot.pending = true;
                 onFrameReadbackScheduled();
@@ -3703,6 +3936,25 @@ namespace mxvk {
         if (preview_text_renderer) {
             preview_text_renderer->setFont(font_path, font_size);
         }
+        text_state_dirty = true;
+    }
+
+    void VK_Window::setPreviewFont(const std::string &fontPath, int fontSize) {
+        if (fontPath.empty() || fontSize <= 0) {
+            throw mxvk::Exception(
+                "setPreviewFont requires a non-empty path and positive font size");
+        }
+        if (device == VK_NULL_HANDLE) {
+            throw mxvk::Exception(
+                "Cannot set preview font before Vulkan device initialization");
+        }
+        if (!preview_text_renderer) {
+            ensurePreviewTextRenderer(fontPath, fontSize);
+        }
+        if (!preview_text_renderer) {
+            throw mxvk::Exception("Cannot initialize preview text renderer");
+        }
+        preview_text_renderer->setFont(fontPath, fontSize);
         text_state_dirty = true;
     }
 
