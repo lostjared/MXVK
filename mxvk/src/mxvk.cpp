@@ -240,6 +240,7 @@ namespace mxvk {
         if (!sprites.empty()) {
             std::cout << std::format("vk: releasing {} sprite(s)\n", sprites.size());
             sprites.clear();
+            std::cout << "vk: sprite resources released\n";
         }
         if (!sprites3d.empty()) {
             std::cout << std::format("vk: releasing {} 3D sprite batch(es)\n", sprites3d.size());

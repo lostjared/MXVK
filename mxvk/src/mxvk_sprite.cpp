@@ -89,6 +89,7 @@ namespace mxvk {
         if (!externalTexture && spriteImage != VK_NULL_HANDLE) {
             std::cout << "vk: destroying sprite image\n";
             vkDestroyImage(device, spriteImage, nullptr);
+            std::cout << "vk: freeing sprite image memory\n";
             vkFreeMemory(device, spriteImageMemory, nullptr);
         }
 
@@ -145,6 +146,7 @@ namespace mxvk {
             spriteImage = VK_NULL_HANDLE;
         }
         if (!externalTexture && spriteImageMemory != VK_NULL_HANDLE) {
+            std::cout << "vk: freeing sprite image memory\n";
             vkFreeMemory(device, spriteImageMemory, nullptr);
             spriteImageMemory = VK_NULL_HANDLE;
         }
