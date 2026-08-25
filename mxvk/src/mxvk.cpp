@@ -1069,6 +1069,70 @@ namespace mxvk {
         [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
     }
 
+    void VK_Window::onFrameReadbackScheduled() {
+    }
+
+    void VK_Window::dispatchFrameReadback(FrameReadbackSlot &slot) {
+        if (!slot.pending) {
+            return;
+        }
+        if (slot.mapped == nullptr || slot.width == 0U || slot.height == 0U) {
+            slot.pending = false;
+            return;
+        }
+
+        const auto *source = static_cast<const std::uint8_t *>(slot.mapped);
+        const std::size_t pixel_bytes =
+            static_cast<std::size_t>(slot.width) * slot.height * 4U;
+        latest_frame_readback_rgba.resize(pixel_bytes);
+        const bool format_is_bgra =
+            slot.format == VK_FORMAT_B8G8R8A8_UNORM ||
+            slot.format == VK_FORMAT_B8G8R8A8_SRGB;
+        for (std::size_t offset = 0; offset < pixel_bytes; offset += 4U) {
+            if (format_is_bgra) {
+                latest_frame_readback_rgba[offset + 0U] = source[offset + 2U];
+                latest_frame_readback_rgba[offset + 1U] = source[offset + 1U];
+                latest_frame_readback_rgba[offset + 2U] = source[offset + 0U];
+                latest_frame_readback_rgba[offset + 3U] = source[offset + 3U];
+            } else {
+                latest_frame_readback_rgba[offset + 0U] = source[offset + 0U];
+                latest_frame_readback_rgba[offset + 1U] = source[offset + 1U];
+                latest_frame_readback_rgba[offset + 2U] = source[offset + 2U];
+                latest_frame_readback_rgba[offset + 3U] = source[offset + 3U];
+            }
+        }
+
+        latest_frame_readback_width = slot.width;
+        latest_frame_readback_height = slot.height;
+        slot.pending = false;
+        onFrameReadback(latest_frame_readback_rgba, latest_frame_readback_width,
+                        latest_frame_readback_height);
+    }
+
+    void VK_Window::flushFrameReadbacks() {
+        if (device == VK_NULL_HANDLE) {
+            return;
+        }
+        const bool has_pending = std::ranges::any_of(
+            frame_readback_slots,
+            [](const FrameReadbackSlot &slot) { return slot.pending; });
+        if (!has_pending) {
+            return;
+        }
+
+        const VkResult wait_result = vkDeviceWaitIdle(device);
+        if (wait_result != VK_SUCCESS) {
+            throw mxvk::Exception(std::format(
+                "frame readback flush failed waiting for the device (VkResult={})",
+                static_cast<int>(wait_result)));
+        }
+        for (uint32_t offset = 0; offset < max_frames_in_flight; ++offset) {
+            const uint32_t slot_index =
+                (current_frame + offset) % max_frames_in_flight;
+            dispatchFrameReadback(frame_readback_slots[slot_index]);
+        }
+    }
+
     void VK_Window::ensureFrameReadbackResources() {
         if (!frame_readback_enabled) {
             return;
@@ -1082,12 +1146,17 @@ namespace mxvk {
         if (required_size == 0U) {
             throw mxvk::Exception("frame readback cannot use an empty swapchain extent");
         }
-        if (frame_readback_buffer != VK_NULL_HANDLE && frame_readback_mapped != nullptr &&
-            frame_readback_size >= required_size) {
+        const bool resources_ready = std::ranges::all_of(
+            frame_readback_slots, [&](const FrameReadbackSlot &slot) {
+                return slot.buffer != VK_NULL_HANDLE && slot.mapped != nullptr &&
+                       slot.size >= required_size;
+            });
+        if (resources_ready) {
             return;
         }
 
         if (device != VK_NULL_HANDLE) {
+            flushFrameReadbacks();
             vkDeviceWaitIdle(device);
         }
         destroyFrameReadbackResources();
@@ -1097,74 +1166,88 @@ namespace mxvk {
         buffer_info.size = required_size;
         buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        if (vkCreateBuffer(device, &buffer_info, nullptr, &frame_readback_buffer) != VK_SUCCESS) {
-            throw mxvk::Exception("failed to create persistent frame-readback buffer");
-        }
-
-        VkMemoryRequirements memory_requirements{};
-        vkGetBufferMemoryRequirements(device, frame_readback_buffer, &memory_requirements);
-
         VkPhysicalDeviceMemoryProperties memory_properties{};
         vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-        uint32_t memory_type_index = invalid_queue_index;
         constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        for (uint32_t index = 0; index < memory_properties.memoryTypeCount; ++index) {
-            const bool type_matches =
-                (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
-            const bool properties_match =
-                (memory_properties.memoryTypes[index].propertyFlags & REQUIRED_PROPERTIES) ==
-                REQUIRED_PROPERTIES;
-            if (type_matches && properties_match) {
-                memory_type_index = index;
-                break;
-            }
-        }
-        if (memory_type_index == invalid_queue_index) {
-            destroyFrameReadbackResources();
-            throw mxvk::Exception("failed to find host-visible frame-readback memory");
-        }
+        try {
+            for (FrameReadbackSlot &slot : frame_readback_slots) {
+                if (vkCreateBuffer(device, &buffer_info, nullptr, &slot.buffer) !=
+                    VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "failed to create pipelined frame-readback buffer");
+                }
 
-        VkMemoryAllocateInfo allocation_info{};
-        allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocation_info.allocationSize = memory_requirements.size;
-        allocation_info.memoryTypeIndex = memory_type_index;
-        if (vkAllocateMemory(device, &allocation_info, nullptr, &frame_readback_memory) !=
-            VK_SUCCESS) {
+                VkMemoryRequirements memory_requirements{};
+                vkGetBufferMemoryRequirements(device, slot.buffer,
+                                              &memory_requirements);
+                uint32_t memory_type_index = invalid_queue_index;
+                for (uint32_t index = 0;
+                     index < memory_properties.memoryTypeCount; ++index) {
+                    const bool type_matches =
+                        (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+                    const bool properties_match =
+                        (memory_properties.memoryTypes[index].propertyFlags &
+                         REQUIRED_PROPERTIES) == REQUIRED_PROPERTIES;
+                    if (type_matches && properties_match) {
+                        memory_type_index = index;
+                        break;
+                    }
+                }
+                if (memory_type_index == invalid_queue_index) {
+                    throw mxvk::Exception(
+                        "failed to find host-visible frame-readback memory");
+                }
+
+                VkMemoryAllocateInfo allocation_info{};
+                allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocation_info.allocationSize = memory_requirements.size;
+                allocation_info.memoryTypeIndex = memory_type_index;
+                if (vkAllocateMemory(device, &allocation_info, nullptr,
+                                     &slot.memory) != VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "failed to allocate frame-readback memory");
+                }
+                if (vkBindBufferMemory(device, slot.buffer, slot.memory, 0) !=
+                    VK_SUCCESS) {
+                    throw mxvk::Exception("failed to bind frame-readback memory");
+                }
+                if (vkMapMemory(device, slot.memory, 0, required_size, 0,
+                                &slot.mapped) != VK_SUCCESS) {
+                    throw mxvk::Exception("failed to map frame-readback memory");
+                }
+                slot.size = required_size;
+            }
+        } catch (...) {
             destroyFrameReadbackResources();
-            throw mxvk::Exception("failed to allocate frame-readback memory");
+            throw;
         }
-        if (vkBindBufferMemory(device, frame_readback_buffer, frame_readback_memory, 0) !=
-            VK_SUCCESS) {
-            destroyFrameReadbackResources();
-            throw mxvk::Exception("failed to bind frame-readback memory");
-        }
-        if (vkMapMemory(device, frame_readback_memory, 0, required_size, 0,
-                        &frame_readback_mapped) != VK_SUCCESS) {
-            destroyFrameReadbackResources();
-            throw mxvk::Exception("failed to map frame-readback memory");
-        }
-        frame_readback_size = required_size;
         latest_frame_readback_rgba.clear();
         latest_frame_readback_width = 0;
         latest_frame_readback_height = 0;
     }
 
     void VK_Window::destroyFrameReadbackResources() {
-        if (device != VK_NULL_HANDLE && frame_readback_mapped != nullptr &&
-            frame_readback_memory != VK_NULL_HANDLE) {
-            vkUnmapMemory(device, frame_readback_memory);
+        for (FrameReadbackSlot &slot : frame_readback_slots) {
+            if (device != VK_NULL_HANDLE && slot.mapped != nullptr &&
+                slot.memory != VK_NULL_HANDLE) {
+                vkUnmapMemory(device, slot.memory);
+            }
+            slot.mapped = nullptr;
+            if (device != VK_NULL_HANDLE && slot.buffer != VK_NULL_HANDLE) {
+                vkDestroyBuffer(device, slot.buffer, nullptr);
+            }
+            slot.buffer = VK_NULL_HANDLE;
+            if (device != VK_NULL_HANDLE && slot.memory != VK_NULL_HANDLE) {
+                vkFreeMemory(device, slot.memory, nullptr);
+            }
+            slot.memory = VK_NULL_HANDLE;
+            slot.size = 0;
+            slot.width = 0;
+            slot.height = 0;
+            slot.format = VK_FORMAT_UNDEFINED;
+            slot.pending = false;
         }
-        frame_readback_mapped = nullptr;
-        if (device != VK_NULL_HANDLE && frame_readback_buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, frame_readback_buffer, nullptr);
-        }
-        frame_readback_buffer = VK_NULL_HANDLE;
-        if (device != VK_NULL_HANDLE && frame_readback_memory != VK_NULL_HANDLE) {
-            vkFreeMemory(device, frame_readback_memory, nullptr);
-        }
-        frame_readback_memory = VK_NULL_HANDLE;
-        frame_readback_size = 0;
         latest_frame_readback_rgba.clear();
         latest_frame_readback_width = 0;
         latest_frame_readback_height = 0;
@@ -2541,6 +2624,8 @@ namespace mxvk {
             return;
         }
 
+        dispatchFrameReadback(frame_readback_slots[current_frame]);
+
         if (frame_readback_enabled) {
             ensureFrameReadbackResources();
         }
@@ -3006,7 +3091,8 @@ namespace mxvk {
             readback_region.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
             vkCmdCopyImageToBuffer(cmd, swapchain_images[image_index],
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   frame_readback_buffer, 1, &readback_region);
+                                   frame_readback_slots[current_frame].buffer, 1,
+                                   &readback_region);
         }
 
         const bool render_preview_text =
@@ -3170,38 +3256,6 @@ namespace mxvk {
         image_fences[image_index] = frame_fence;
         swapchain_image_initialized[image_index] = true;
 
-        std::vector<std::uint8_t> completed_readback;
-        if (frame_readback_enabled) {
-            const VkResult readback_wait_result =
-                vkWaitForFences(device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
-            if (readback_wait_result != VK_SUCCESS) {
-                throw mxvk::Exception(std::format(
-                    "frame readback failed waiting for rendering (VkResult={})",
-                    static_cast<int>(readback_wait_result)));
-            }
-
-            const auto *source = static_cast<const std::uint8_t *>(frame_readback_mapped);
-            const std::size_t pixel_bytes =
-                static_cast<std::size_t>(swapchain_extent.width) * swapchain_extent.height * 4U;
-            completed_readback.resize(pixel_bytes);
-            const bool format_is_bgra =
-                swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
-                swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
-            for (std::size_t offset = 0; offset < pixel_bytes; offset += 4U) {
-                if (format_is_bgra) {
-                    completed_readback[offset + 0U] = source[offset + 2U];
-                    completed_readback[offset + 1U] = source[offset + 1U];
-                    completed_readback[offset + 2U] = source[offset + 0U];
-                    completed_readback[offset + 3U] = source[offset + 3U];
-                } else {
-                    completed_readback[offset + 0U] = source[offset + 0U];
-                    completed_readback[offset + 1U] = source[offset + 1U];
-                    completed_readback[offset + 2U] = source[offset + 2U];
-                    completed_readback[offset + 3U] = source[offset + 3U];
-                }
-            }
-        }
-
         VkPresentInfoKHR present_info{};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         present_info.waitSemaphoreCount = 1;
@@ -3213,12 +3267,13 @@ namespace mxvk {
         const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
         if (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR) {
             last_presented_image_index = image_index;
-            if (frame_readback_enabled && !completed_readback.empty()) {
-                latest_frame_readback_rgba = std::move(completed_readback);
-                latest_frame_readback_width = swapchain_extent.width;
-                latest_frame_readback_height = swapchain_extent.height;
-                onFrameReadback(latest_frame_readback_rgba, latest_frame_readback_width,
-                                latest_frame_readback_height);
+            if (frame_readback_enabled) {
+                FrameReadbackSlot &slot = frame_readback_slots[current_frame];
+                slot.width = swapchain_extent.width;
+                slot.height = swapchain_extent.height;
+                slot.format = swapchain_format;
+                slot.pending = true;
+                onFrameReadbackScheduled();
             }
         }
 

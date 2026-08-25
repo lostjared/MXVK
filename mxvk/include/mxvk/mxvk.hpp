@@ -175,8 +175,9 @@ namespace mxvk {
          * @brief Enable or disable readback of each rendered swapchain frame.
          *
          * Readback is recorded while the swapchain image is acquired and delivered
-         * through onFrameReadback() after presentation. Enabling it synchronizes each
-         * frame with the CPU and is intended for recording and diagnostics.
+         * through onFrameReadback() after the corresponding frame-in-flight fence
+         * completes. Readbacks are pipelined so recording does not add a same-frame
+         * GPU wait.
          */
         void setFrameReadbackEnabled(bool enabled) noexcept { frame_readback_enabled = enabled; }
 
@@ -442,6 +443,21 @@ namespace mxvk {
         void captureSnapshotPixels(std::vector<std::uint8_t> &rgba_pixels, uint32_t &width, uint32_t &height);
 
         /**
+         * @brief Wait for and deliver all pending pipelined frame readbacks.
+         *
+         * Derived recorders should call this before closing their output writer.
+         */
+        void flushFrameReadbacks();
+
+        /**
+         * @brief Called after a presented frame has scheduled a readback.
+         *
+         * Derived classes can use this hook to queue frame-specific metadata that
+         * must remain associated with the later onFrameReadback() callback.
+         */
+        virtual void onFrameReadbackScheduled();
+
+        /**
          * @brief Receive one tightly packed RGBA8 copy of the rendered frame.
          * @param rgba_pixels Frame pixels in top-to-bottom row order.
          * @param width Frame width in pixels.
@@ -468,6 +484,17 @@ namespace mxvk {
             VkSurfaceCapabilitiesKHR capabilities{};
             std::vector<VkSurfaceFormatKHR> formats{};
             std::vector<VkPresentModeKHR> present_modes{};
+        };
+
+        struct FrameReadbackSlot {
+            VkBuffer buffer = VK_NULL_HANDLE;
+            VkDeviceMemory memory = VK_NULL_HANDLE;
+            void *mapped = nullptr;
+            VkDeviceSize size = 0;
+            uint32_t width = 0;
+            uint32_t height = 0;
+            VkFormat format = VK_FORMAT_UNDEFINED;
+            bool pending = false;
         };
 
         static SwapchainSupport querySwapchainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
@@ -579,14 +606,12 @@ namespace mxvk {
         std::thread screenshot_worker;
         bool screenshot_worker_stop = false;
         bool frame_readback_enabled = false;
-        VkBuffer frame_readback_buffer = VK_NULL_HANDLE;
-        VkDeviceMemory frame_readback_memory = VK_NULL_HANDLE;
-        void *frame_readback_mapped = nullptr;
-        VkDeviceSize frame_readback_size = 0;
+        std::array<FrameReadbackSlot, max_frames_in_flight> frame_readback_slots{};
         std::vector<std::uint8_t> latest_frame_readback_rgba{};
         uint32_t latest_frame_readback_width = 0;
         uint32_t latest_frame_readback_height = 0;
         void ensureFrameReadbackResources();
+        void dispatchFrameReadback(FrameReadbackSlot &slot);
         void destroyFrameReadbackResources();
         bool validation_enabled = false;
         PresentModePreference present_mode_preference = PresentModePreference::LowLatency;

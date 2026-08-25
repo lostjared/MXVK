@@ -6,12 +6,12 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.27.0`. This release adds a preview-only
-text queue that renders after frame readback, allowing applications to display
-runtime HUD information without embedding it in recordings or screenshots. It
-builds on the FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device
-selection, reusable decoder contexts, software 3D, installer, multiplayer,
-rendering, and documentation work from earlier releases.
+Current development is on version `0.28.0`. This release pipelines swapchain
+frame readback across the frames in flight so recording no longer waits for the
+GPU immediately after every submission. It builds on the preview-only text,
+FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device selection,
+reusable decoder contexts, software 3D, installer, multiplayer, rendering, and
+documentation work from earlier releases.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -353,7 +353,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.27.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.28.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -746,6 +746,10 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 25, 2026: version `0.28.0` adds per-frame-in-flight swapchain
+  readback buffers. Rendered frames are delivered after their existing fence
+  completes instead of forcing a same-frame CPU wait, and recorders can flush
+  the remaining delayed frames before closing.
 - August 24, 2026: version `0.27.0` adds preview-only Vulkan text that is
   composited after frame readback and therefore excluded from recordings and
   screenshots.
