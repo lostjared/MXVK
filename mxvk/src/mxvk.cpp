@@ -1495,15 +1495,21 @@ namespace mxvk {
                 1,
                 1,
                 resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR),
-                stage == ShaderStage::Fragment ? effect.fragmentShaderPath : "",
+                "",
                 effect.spectrumBinCount,
                 effect.spectrumHistoryLayerCount);
+            sprite->enableExtendedUBO();
+            if (effect.historySource != nullptr) {
+                sprite->shareHistoryTexture(*effect.historySource);
+            }
             const bool final_fragment =
                 stage == ShaderStage::Fragment &&
                 effect_index + 1U == effects.size();
-            if (stage == ShaderStage::Fragment && !final_fragment) {
-                sprite->setColorAttachmentFormat(post_process_compute_format);
-                sprite->rebuildPipeline();
+            if (stage == ShaderStage::Fragment) {
+                if (!final_fragment) {
+                    sprite->setColorAttachmentFormat(post_process_compute_format);
+                }
+                sprite->setFragmentShaderPath(effect.fragmentShaderPath);
             } else if (stage == ShaderStage::Compute) {
                 sprite->enableComputeShader(
                     effect.fragmentShaderPath, module_info.localSizeX,

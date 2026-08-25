@@ -303,6 +303,7 @@ namespace mxvk {
             uint32_t spectrumBinCount = 0;
             uint32_t spectrumHistoryLayerCount = 0;
             ShaderStage stage = ShaderStage::Unknown;
+            VK_Sprite *historySource = nullptr;
         };
 
         /**

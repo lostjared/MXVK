@@ -306,6 +306,39 @@ namespace mxvk {
         historyImageView = createImageView(historyImage, VK_FORMAT_R8G8B8A8_UNORM,
                                            VK_IMAGE_VIEW_TYPE_2D_ARRAY, layers);
         historyTextureEnabled = true;
+        historyTextureShared = false;
+        recreateExtendedDescriptorLayout();
+    }
+
+    void VK_Sprite::shareHistoryTexture(const VK_Sprite &source) {
+        if (source.device != device) {
+            throw mxvk::Exception(
+                "VKSprite::shareHistoryTexture requires sprites on the same Vulkan device");
+        }
+        if (!source.historyTextureEnabled ||
+            source.historyImageView == VK_NULL_HANDLE ||
+            source.historyLayers == 0) {
+            throw mxvk::Exception(
+                "VKSprite::shareHistoryTexture source has no enabled history texture");
+        }
+        if (&source == this) {
+            throw mxvk::Exception(
+                "VKSprite::shareHistoryTexture cannot share a sprite with itself");
+        }
+
+        if (!extendedUBOEnabled) {
+            enableExtendedUBO();
+        }
+
+        vkDeviceWaitIdle(device);
+        destroyHistoryTexture();
+        historyImageView = source.historyImageView;
+        historyWidth = source.historyWidth;
+        historyHeight = source.historyHeight;
+        historyLayers = source.historyLayers;
+        historyHead = source.historyHead;
+        historyTextureEnabled = true;
+        historyTextureShared = true;
         recreateExtendedDescriptorLayout();
     }
 
@@ -917,12 +950,14 @@ namespace mxvk {
 
     void VK_Sprite::destroyHistoryTexture() {
 #ifdef MXVK_CUDA
-        destroyCudaHistoryInterop();
-#endif
-        if (historyImageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, historyImageView, nullptr);
-            historyImageView = VK_NULL_HANDLE;
+        if (!historyTextureShared) {
+            destroyCudaHistoryInterop();
         }
+#endif
+        if (!historyTextureShared && historyImageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, historyImageView, nullptr);
+        }
+        historyImageView = VK_NULL_HANDLE;
         if (historyImage != VK_NULL_HANDLE) {
             vkDestroyImage(device, historyImage, nullptr);
             historyImage = VK_NULL_HANDLE;
@@ -932,6 +967,7 @@ namespace mxvk {
             historyImageMemory = VK_NULL_HANDLE;
         }
         historyTextureEnabled = false;
+        historyTextureShared = false;
         historyWidth = 0;
         historyHeight = 0;
         historyLayers = 0;

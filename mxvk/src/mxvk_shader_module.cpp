@@ -11,10 +11,13 @@ namespace mxvk {
         constexpr uint32_t SPIRV_MAGIC = 0x07230203U;
         constexpr uint16_t OP_ENTRY_POINT = 15U;
         constexpr uint16_t OP_EXECUTION_MODE = 16U;
+        constexpr uint16_t OP_DECORATE = 71U;
         constexpr uint32_t EXECUTION_MODEL_VERTEX = 0U;
         constexpr uint32_t EXECUTION_MODEL_FRAGMENT = 4U;
         constexpr uint32_t EXECUTION_MODEL_COMPUTE = 5U;
         constexpr uint32_t EXECUTION_MODE_LOCAL_SIZE = 17U;
+        constexpr uint32_t DECORATION_BINDING = 33U;
+        constexpr uint32_t DECORATION_DESCRIPTOR_SET = 34U;
     } // namespace
 
     std::vector<char> load_spv(const std::string &path) {
@@ -54,6 +57,12 @@ namespace mxvk {
 
         ShaderModuleInfo info{};
         uint32_t entry_point_id = 0;
+        const uint32_t id_bound = words[3];
+        if (id_bound == 0U || id_bound > words.size()) {
+            throw mxvk::Exception("Invalid SPIR-V identifier bound");
+        }
+        std::vector<uint32_t> descriptor_sets(id_bound, UINT32_MAX);
+        std::vector<uint32_t> descriptor_bindings(id_bound, UINT32_MAX);
         for (std::size_t offset = 5; offset < words.size();) {
             const uint16_t word_count =
                 static_cast<uint16_t>(words[offset] >> 16U);
@@ -79,8 +88,24 @@ namespace mxvk {
                     info.stage = ShaderStage::Unknown;
                     break;
                 }
+            } else if (opcode == OP_DECORATE && word_count >= 4U &&
+                       words[offset + 1U] < id_bound) {
+                const uint32_t target_id = words[offset + 1U];
+                const uint32_t decoration = words[offset + 2U];
+                if (decoration == DECORATION_BINDING) {
+                    descriptor_bindings[target_id] = words[offset + 3U];
+                } else if (decoration == DECORATION_DESCRIPTOR_SET) {
+                    descriptor_sets[target_id] = words[offset + 3U];
+                }
             }
             offset += word_count;
+        }
+
+        for (uint32_t id = 0; id < id_bound; ++id) {
+            if (descriptor_sets[id] == 0U && descriptor_bindings[id] == 2U) {
+                info.usesHistoryTexture = true;
+                break;
+            }
         }
 
         if (info.stage == ShaderStage::Compute && entry_point_id != 0U) {

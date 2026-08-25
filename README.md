@@ -6,10 +6,11 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.30.0`. This release adds a fixed native
-render extent independent of the presentation swapchain, source-sized
-fragment/compute processing and frame readback, aspect-preserving preview
-composition, and independently sized output and preview fonts. It retains
+Current development is on version `0.31.0`. This release adds non-owning shared
+sprite-history descriptors for fragment/compute post-processing passes and
+SPIR-V reflection for set 0, binding 2. It retains the fixed native render
+extent, source-sized processing and frame readback, aspect-preserving preview
+composition, independently sized output and preview fonts, and
 pipelined, host-cached frame readback and builds on mixed fragment/compute
 post-processing, preview-only text,
 FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device selection,
@@ -571,6 +572,13 @@ Examples:
 
 The multi-effect path uses intermediate render targets between passes, so post-processing no longer has to sample directly from the swapchain image. This allows effects such as invert, scanline, blur, CRT, color grading, or other sprite-compatible full-screen shaders to be composed in sequence.
 
+Set `PostProcessingEffect::historySource` to a sprite with an enabled history
+texture when a pass declares `sampler2DArray` at set 0, binding 2. MXVK binds
+the source image view without taking ownership, so the source must outlive the
+post-processing chain. All passes may share the same ring without allocating
+or copying one history array per pass. `inspect_spirv()` reports this resource
+through `ShaderModuleInfo::usesHistoryTexture`.
+
 The `postprocess` example demonstrates this flow. It reads `examples/postprocess/data/shaders.txt`, loads each listed SPIR-V fragment shader, and attaches the resulting list as a post-processing chain. The example currently ships with `invert.frag` and `scanline.frag`.
 
 `walk_post` is an interactive post-processing browser built from the `walk` first-person sample. Pass `--shader-path <dir>` to a directory containing `index.txt`, optionally select the starting shader with `--shader-index <index>`, then press `R` and `T` while running to switch to the previous or next full-screen effect. Its post-processing sprite uses extended uniforms for elapsed time, frame timing, frame count, resolution, and mouse state.
@@ -749,6 +757,10 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 25, 2026: version `0.31.0` lets fragment and compute post-processing
+  passes share a source sprite's frame-history array without taking ownership
+  or allocating duplicate rings. SPIR-V inspection reports set 0, binding 2 so
+  applications can enable history before constructing compatible pipelines.
 - August 25, 2026: version `0.30.0` separates native scene/post-processing
   resolution from preview-window resolution. Fixed-extent rendering keeps
   shader uniforms, fragment/compute targets, output text, and pipelined

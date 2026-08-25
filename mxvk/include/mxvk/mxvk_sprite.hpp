@@ -338,6 +338,19 @@ namespace mxvk {
         void enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers);
 
         /**
+         * @brief Bind another sprite's history array without taking ownership.
+         *
+         * The source sprite must outlive this sprite. This is intended for
+         * post-processing passes which read one shared input history ring.
+         * No image, memory, or image view is allocated or freed by this sprite.
+         *
+         * @param source Sprite which owns an enabled history texture.
+         * @throws mxvk::Exception when the source has no history texture or
+         * belongs to a different Vulkan device.
+         */
+        void shareHistoryTexture(const VK_Sprite &source);
+
+        /**
          * @brief Upload one RGBA frame into the next history layer.
          *
          * The write head advances after a successful upload. Input dimensions
@@ -590,6 +603,7 @@ namespace mxvk {
         void destroyExtendedUBO();
 
         bool historyTextureEnabled = false;
+        bool historyTextureShared = false;
         VkImage historyImage = VK_NULL_HANDLE;
         VkDeviceMemory historyImageMemory = VK_NULL_HANDLE;
         VkImageView historyImageView = VK_NULL_HANDLE;
