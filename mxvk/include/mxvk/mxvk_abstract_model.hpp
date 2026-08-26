@@ -11,6 +11,7 @@
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <string>
 #include <vector>
 #ifdef MXVK_CUDA
@@ -54,6 +55,9 @@ namespace mxvk {
         glm::vec4 u1{0.0f};
         glm::vec4 u2{0.0f};
         glm::vec4 u3{0.0f};
+        std::array<glm::vec4, 16> custom_uniforms{};
+        glm::vec4 audio_bands{0.0f};
+        glm::vec4 audio_history{0.0f};
     };
 
     /**

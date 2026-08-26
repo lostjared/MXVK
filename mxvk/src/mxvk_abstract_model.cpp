@@ -407,16 +407,18 @@ namespace mxvk {
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         updateUBO(imageIndex, ubo);
-        const ModelPushConstants pushConstants{
-            .model = ubo.model,
-            .fx = ubo.fx,
-        };
-        vkCmdPushConstants(cmd,
-                           pipelineLayout,
-                           VK_SHADER_STAGE_VERTEX_BIT,
-                           0,
-                           sizeof(ModelPushConstants),
-                           &pushConstants);
+        if (!extendedFragmentUniformsEnabled) {
+            const ModelPushConstants pushConstants{
+                .model = ubo.model,
+                .fx = ubo.fx,
+            };
+            vkCmdPushConstants(cmd,
+                               pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT,
+                               0,
+                               sizeof(ModelPushConstants),
+                               &pushConstants);
+        }
         if (extendedFragmentUniformsEnabled) {
             vkCmdPushConstants(cmd,
                                pipelineLayout,
@@ -1843,20 +1845,20 @@ namespace mxvk {
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
             layoutInfo.pSetLayouts = &descriptorSetLayout;
-            const std::array<VkPushConstantRange, 2> pushConstantRanges = {
-                VkPushConstantRange{
-                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-                    .offset = 0,
-                    .size = sizeof(ModelPushConstants),
-                },
-                VkPushConstantRange{
-                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-                    .offset = 0,
-                    .size = sizeof(ModelFragmentPushConstants),
-                },
+            const VkPushConstantRange vertexPushConstantRange{
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .offset = 0,
+                .size = sizeof(ModelPushConstants),
             };
-            layoutInfo.pushConstantRangeCount = extendedFragmentUniformsEnabled ? static_cast<uint32_t>(pushConstantRanges.size()) : 1U;
-            layoutInfo.pPushConstantRanges = pushConstantRanges.data();
+            const VkPushConstantRange fragmentPushConstantRange{
+                .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .offset = 0,
+                .size = sizeof(ModelFragmentPushConstants),
+            };
+            layoutInfo.pushConstantRangeCount = 1U;
+            layoutInfo.pPushConstantRanges = extendedFragmentUniformsEnabled
+                                                 ? &fragmentPushConstantRange
+                                                 : &vertexPushConstantRange;
 
             if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");
