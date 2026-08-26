@@ -1406,6 +1406,12 @@ namespace mxvk {
 
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
+    void VK_Window::onRecordPostProcessingTexture(
+        [[maybe_unused]] VkCommandBuffer cmd,
+        [[maybe_unused]] uint32_t image_index,
+        [[maybe_unused]] VkImageView texture_view,
+        [[maybe_unused]] VkExtent2D texture_extent) {}
+
     void VK_Window::onConfigureDepthStencilAttachments([[maybe_unused]] VkRenderingAttachmentInfo &depth_attachment,
                                                        [[maybe_unused]] VkRenderingAttachmentInfo &stencil_attachment,
                                                        [[maybe_unused]] uint32_t image_index) {}
@@ -2928,6 +2934,8 @@ namespace mxvk {
                                       image_index < post_process_views.front().size() &&
                                       image_index < post_process_initialized.front().size();
         const bool use_offscreen_target = use_post_process || detached_render;
+        const bool consume_post_process =
+            use_post_process && post_process_texture_consumer_enabled;
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -3230,6 +3238,7 @@ namespace mxvk {
                     source_target = destination_target;
 
                     if (final_effect && !detached_render &&
+                        !consume_post_process &&
                         post_process_present_sprite != nullptr) {
                         VkRenderingAttachmentInfo post_attachment{};
                         post_attachment.sType =
@@ -3261,10 +3270,10 @@ namespace mxvk {
                 }
 
                 const VkImageView destination_view =
-                    final_effect && !detached_render
+                    final_effect && !detached_render && !consume_post_process
                         ? swapchain_image_views[image_index]
                         : post_process_views[destination_target][image_index];
-                if (!final_effect || detached_render) {
+                if (!final_effect || detached_render || consume_post_process) {
                     VkImageMemoryBarrier2 next_target_barrier{};
                     next_target_barrier.sType =
                         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -3336,7 +3345,7 @@ namespace mxvk {
                                                        : swapchain_extent);
                 vkCmdEndRendering(cmd);
 
-                if (!final_effect || detached_render) {
+                if (!final_effect || detached_render || consume_post_process) {
                     VkImageMemoryBarrier2 sampled_target_barrier{};
                     sampled_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     sampled_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -3412,17 +3421,59 @@ namespace mxvk {
                 composite_info.layerCount = 1;
                 composite_info.colorAttachmentCount = 1;
                 composite_info.pColorAttachments = &composite_attachment;
+                composite_info.pDepthAttachment =
+                    consume_post_process &&
+                            depth_attachment.imageView != VK_NULL_HANDLE
+                        ? &depth_attachment
+                        : nullptr;
                 vkCmdBeginRendering(cmd, &composite_info);
-                post_process_composite_sprite->setExternalTexture(
+                if (consume_post_process) {
+                    vkCmdSetViewport(cmd, 0, 1, &viewport);
+                    vkCmdSetScissor(cmd, 0, 1, &scissor);
+                    onRecordPostProcessingTexture(
+                        cmd, image_index,
+                        post_process_views[source_target][image_index],
+                        render_extent);
+                } else {
+                    post_process_composite_sprite->setExternalTexture(
+                        post_process_views[source_target][image_index],
+                        static_cast<int>(render_extent.width),
+                        static_cast<int>(render_extent.height));
+                    post_process_composite_sprite->drawSpriteRect(
+                        0, 0, static_cast<int>(render_extent.width),
+                        static_cast<int>(render_extent.height));
+                    renderStandaloneSprite(*post_process_composite_sprite, cmd,
+                                           render_extent);
+                    post_process_composite_sprite->clearQueue();
+                }
+                vkCmdEndRendering(cmd);
+            } else if (consume_post_process) {
+                VkRenderingAttachmentInfo consumer_attachment{};
+                consumer_attachment.sType =
+                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                consumer_attachment.imageView =
+                    swapchain_image_views[image_index];
+                consumer_attachment.imageLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                consumer_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                VkRenderingInfo consumer_info{};
+                consumer_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                consumer_info.renderArea.extent = swapchain_extent;
+                consumer_info.layerCount = 1;
+                consumer_info.colorAttachmentCount = 1;
+                consumer_info.pColorAttachments = &consumer_attachment;
+                consumer_info.pDepthAttachment =
+                    depth_attachment.imageView != VK_NULL_HANDLE
+                        ? &depth_attachment
+                        : nullptr;
+                vkCmdBeginRendering(cmd, &consumer_info);
+                vkCmdSetViewport(cmd, 0, 1, &viewport);
+                vkCmdSetScissor(cmd, 0, 1, &scissor);
+                onRecordPostProcessingTexture(
+                    cmd, image_index,
                     post_process_views[source_target][image_index],
-                    static_cast<int>(render_extent.width),
-                    static_cast<int>(render_extent.height));
-                post_process_composite_sprite->drawSpriteRect(
-                    0, 0, static_cast<int>(render_extent.width),
-                    static_cast<int>(render_extent.height));
-                renderStandaloneSprite(*post_process_composite_sprite, cmd,
-                                       render_extent);
-                post_process_composite_sprite->clearQueue();
+                    render_extent);
                 vkCmdEndRendering(cmd);
             }
         }

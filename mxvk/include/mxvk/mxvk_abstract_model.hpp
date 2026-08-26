@@ -172,6 +172,13 @@ namespace mxvk {
                                      const UniformBufferObject &ubo,
                                      bool wireframe = false);
 
+        /** Render using a non-owning shader-readable image view as texture slot zero. */
+        void renderWithExternalTexture(VkCommandBuffer cmd,
+                                       uint32_t imageIndex,
+                                       VkImageView textureView,
+                                       const UniformBufferObject &ubo,
+                                       bool wireframe = false);
+
         /**
          * @brief Rebuild swapchain-dependent resources after resize.
          * @param window Active MXVK window.
@@ -299,6 +306,8 @@ namespace mxvk {
         void destroyUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
+        void updateTextureDescriptor(VkDescriptorSet descriptorSet,
+                                     VkImageView imageView) const;
         void createPipelines();
 
         void destroyPipelines();

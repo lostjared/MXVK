@@ -404,6 +404,8 @@ namespace mxvk {
         if (setIndex >= descriptorSets.size()) {
             return;
         }
+        updateTextureDescriptor(descriptorSets[setIndex],
+                                textures[textureIndex].view);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         updateUBO(imageIndex, ubo);
@@ -436,6 +438,52 @@ namespace mxvk {
                                 0,
                                 nullptr);
 
+        obj.draw(cmd);
+    }
+
+    void VKAbstractModel::renderWithExternalTexture(
+        VkCommandBuffer cmd, uint32_t imageIndex, VkImageView textureView,
+        const UniformBufferObject &ubo, bool wireframe) {
+        if (cmd == VK_NULL_HANDLE || textureView == VK_NULL_HANDLE ||
+            imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
+            return;
+        }
+
+        const VkPipeline pipeline =
+            (wireframe && pipelineWireframe != VK_NULL_HANDLE)
+                ? pipelineWireframe
+                : pipelineFill;
+        if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
+            return;
+        }
+
+        const size_t textureCount = std::max<size_t>(1, textures.size());
+        const size_t setIndex = static_cast<size_t>(imageIndex) * textureCount;
+        if (setIndex >= descriptorSets.size()) {
+            return;
+        }
+        updateTextureDescriptor(descriptorSets[setIndex], textureView);
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        updateUBO(imageIndex, ubo);
+        if (!extendedFragmentUniformsEnabled) {
+            const ModelPushConstants pushConstants{
+                .model = ubo.model,
+                .fx = ubo.fx,
+            };
+            vkCmdPushConstants(cmd, pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT, 0,
+                               sizeof(ModelPushConstants), &pushConstants);
+        }
+        if (extendedFragmentUniformsEnabled) {
+            vkCmdPushConstants(cmd, pipelineLayout,
+                               VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                               sizeof(ModelFragmentPushConstants),
+                               &fragmentPushConstants);
+        }
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipelineLayout, 0, 1,
+                                &descriptorSets[setIndex], 0, nullptr);
         obj.draw(cmd);
     }
 
@@ -1714,6 +1762,28 @@ namespace mxvk {
                 vkUpdateDescriptorSets(windowPtr->getDevice(), writeCount, writes.data(), 0, nullptr);
             }
         }
+    }
+
+    void VKAbstractModel::updateTextureDescriptor(
+        VkDescriptorSet descriptorSet, VkImageView imageView) const {
+        if (descriptorSet == VK_NULL_HANDLE || imageView == VK_NULL_HANDLE ||
+            textureSampler == VK_NULL_HANDLE) {
+            return;
+        }
+        const VkDescriptorImageInfo imageInfo{
+            .sampler = textureSampler,
+            .imageView = imageView,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
+        const VkWriteDescriptorSet write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = descriptorSet,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo = &imageInfo,
+        };
+        vkUpdateDescriptorSets(windowPtr->getDevice(), 1, &write, 0, nullptr);
     }
 
     void VKAbstractModel::createPipelines() {

@@ -338,6 +338,11 @@ namespace mxvk {
 
         void setPostProcessingEnabled(bool enabled) { post_process_enabled = enabled; }
 
+        /** Route the completed effect chain to a derived renderer as a sampled texture. */
+        void setPostProcessingTextureConsumerEnabled(bool enabled) noexcept {
+            post_process_texture_consumer_enabled = enabled;
+        }
+
         /**
          * @brief Create a world-space billboard sprite from a PNG file.
          * @param pngPath Path to the PNG file.
@@ -440,6 +445,17 @@ namespace mxvk {
          * @param image_index Current swapchain image index.
          */
         virtual void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index);
+
+        /**
+         * @brief Render a completed post-processing chain as custom scene input.
+         *
+         * Called inside a fresh final-color rendering scope when texture-consumer
+         * mode is enabled. The supplied view is in shader-read-only layout.
+         */
+        virtual void onRecordPostProcessingTexture(VkCommandBuffer cmd,
+                                                   uint32_t image_index,
+                                                   VkImageView texture_view,
+                                                   VkExtent2D texture_extent);
 
         /**
          * @brief Allow derived classes to customize depth/stencil attachments for the main dynamic rendering pass.
@@ -651,6 +667,7 @@ namespace mxvk {
         VK_Sprite *post_process_sprite = nullptr;
         VK_Sprite *owned_post_process_sprite = nullptr;
         bool post_process_enabled = true;
+        bool post_process_texture_consumer_enabled = false;
         bool post_process_time_enabled = false;
         std::array<float, 4> post_process_params{};
         std::chrono::steady_clock::time_point post_process_start_time = std::chrono::steady_clock::now();
