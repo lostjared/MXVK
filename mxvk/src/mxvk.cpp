@@ -834,15 +834,36 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
             throw mxvk::Exception("captureSnapshotPixels called before Vulkan render resources are ready");
         }
-        if (!swapchain_supports_transfer_src) {
-            throw mxvk::Exception("captureSnapshotPixels requires swapchain transfer-source support");
-        }
         if (last_presented_image_index == invalid_queue_index ||
             last_presented_image_index >= swapchain_images.size() ||
             last_presented_image_index >= image_fences.size()) {
             throw mxvk::Exception("captureSnapshotPixels called before a frame has been presented");
         }
-        if (swapchain_extent.width == 0U || swapchain_extent.height == 0U) {
+        const bool capture_offscreen =
+            render_extent_override.width > 0U &&
+            render_extent_override.height > 0U &&
+            !post_process_images.empty() &&
+            !post_process_initialized.empty() &&
+            last_presented_image_index < post_process_images.front().size() &&
+            last_presented_image_index <
+                post_process_initialized.front().size() &&
+            post_process_images.front()[last_presented_image_index] !=
+                VK_NULL_HANDLE &&
+            post_process_initialized.front()[last_presented_image_index];
+        if (!capture_offscreen && !swapchain_supports_transfer_src) {
+            throw mxvk::Exception(
+                "captureSnapshotPixels requires swapchain transfer-source support");
+        }
+        const VkExtent2D source_extent =
+            capture_offscreen ? getRenderExtent() : swapchain_extent;
+        const VkImage source_image =
+            capture_offscreen
+                ? post_process_images.front()[last_presented_image_index]
+                : swapchain_images[last_presented_image_index];
+        const VkImageLayout source_layout =
+            capture_offscreen ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                              : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        if (source_extent.width == 0U || source_extent.height == 0U) {
             throw mxvk::Exception("captureSnapshotPixels cannot capture an empty swapchain extent");
         }
 
@@ -856,8 +877,10 @@ namespace mxvk {
             throw mxvk::Exception(std::format("captureSnapshotPixels unsupported swapchain format: {}", static_cast<int>(swapchain_format)));
         }
 
-        const VkDeviceSize row_bytes = static_cast<VkDeviceSize>(swapchain_extent.width) * 4U;
-        const VkDeviceSize image_bytes = row_bytes * static_cast<VkDeviceSize>(swapchain_extent.height);
+        const VkDeviceSize row_bytes =
+            static_cast<VkDeviceSize>(source_extent.width) * 4U;
+        const VkDeviceSize image_bytes =
+            row_bytes * static_cast<VkDeviceSize>(source_extent.height);
 
         VkBuffer readback_buffer = VK_NULL_HANDLE;
         VkDeviceMemory readback_memory = VK_NULL_HANDLE;
@@ -969,15 +992,19 @@ namespace mxvk {
 
             VkImageMemoryBarrier2 to_transfer_barrier{};
             to_transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_transfer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
-            to_transfer_barrier.srcAccessMask = VK_ACCESS_2_NONE;
+            to_transfer_barrier.srcStageMask =
+                capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+                                  : VK_PIPELINE_STAGE_2_NONE;
+            to_transfer_barrier.srcAccessMask =
+                capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                                  : VK_ACCESS_2_NONE;
             to_transfer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_transfer_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            to_transfer_barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_transfer_barrier.oldLayout = source_layout;
             to_transfer_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_transfer_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_transfer_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_transfer_barrier.image = swapchain_images[last_presented_image_index];
+            to_transfer_barrier.image = source_image;
             to_transfer_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_transfer_barrier.subresourceRange.baseMipLevel = 0;
             to_transfer_barrier.subresourceRange.levelCount = 1;
@@ -999,9 +1026,10 @@ namespace mxvk {
             copy_region.imageSubresource.baseArrayLayer = 0;
             copy_region.imageSubresource.layerCount = 1;
             copy_region.imageOffset = {0, 0, 0};
-            copy_region.imageExtent = {swapchain_extent.width, swapchain_extent.height, 1};
+            copy_region.imageExtent = {source_extent.width, source_extent.height,
+                                       1};
             vkCmdCopyImageToBuffer(command_buffer,
-                                   swapchain_images[last_presented_image_index],
+                                   source_image,
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                    readback_buffer,
                                    1,
@@ -1011,13 +1039,17 @@ namespace mxvk {
             to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_present_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
-            to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
+            to_present_barrier.dstStageMask =
+                capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+                                  : VK_PIPELINE_STAGE_2_NONE;
+            to_present_barrier.dstAccessMask =
+                capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                                  : VK_ACCESS_2_NONE;
             to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            to_present_barrier.newLayout = source_layout;
             to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_present_barrier.image = swapchain_images[last_presented_image_index];
+            to_present_barrier.image = source_image;
             to_present_barrier.subresourceRange = to_transfer_barrier.subresourceRange;
 
             VkDependencyInfo to_present_dependency{};
@@ -1069,8 +1101,8 @@ namespace mxvk {
                 }
             }
             vkUnmapMemory(device, readback_memory);
-            width = swapchain_extent.width;
-            height = swapchain_extent.height;
+            width = source_extent.width;
+            height = source_extent.height;
         } catch (...) {
             cleanup();
             throw;
