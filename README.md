@@ -6,16 +6,15 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.31.1`. This release adds non-owning shared
-sprite-history descriptors for fragment/compute post-processing passes and
-SPIR-V reflection for set 0, binding 2. It retains the fixed native render
-extent, source-sized processing and frame readback, aspect-preserving preview
-composition, independently sized output and preview fonts, and
-pipelined, host-cached frame readback and builds on mixed fragment/compute
-post-processing, preview-only text,
-FFmpeg/OpenCV media-clock synchronization, CUDA/NVDEC device selection,
-reusable decoder contexts, software 3D, installer, multiplayer, rendering, and
-documentation work from earlier releases.
+Current development is on version `0.33.1`. This release captures snapshots
+from the source-sized offscreen effect target whenever a fixed render extent is
+active, preserving native output dimensions independently of the preview
+window. It builds on 0.33.0's non-owning post-processing texture-consumer path
+and external model textures, 0.32.0's extended model fragment uniforms, and
+the shared history/audio descriptor reflection, mixed fragment/compute
+post-processing, media-clock synchronization, CUDA/NVDEC, software 3D,
+installer, multiplayer, rendering, and documentation work from earlier
+releases.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -357,7 +356,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.30.0`. Recent public API comments cover `VK_Window`, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.33.1`. Recent public API comments cover `VK_Window`, the post-processing texture-consumer hook, external model-texture rendering, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -757,6 +756,16 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- August 27, 2026: version `0.33.1` captures snapshots from the initialized
+  source-sized offscreen post-processing image when a fixed render extent is
+  active, while retaining swapchain capture for the normal presentation path.
+- August 26, 2026: version `0.33.0` lets derived renderers consume the completed
+  post-processing chain as a non-owning sampled texture. `VKAbstractModel` can
+  bind that image as texture slot zero so fragment, compute, and multipass
+  effects can become model textures instead of being composited over the model.
+- August 26, 2026: version `0.32.0` extends model fragment uniforms with the
+  shared custom-uniform and audio vectors and separates the mutually exclusive
+  vertex and extended-fragment push-constant layouts.
 - August 25, 2026: version `0.31.1` extends SPIR-V descriptor reflection to
   current-spectrum binding 3 and spectrum-history binding 4, allowing clients
   to create every optional shader resource before pipeline construction.
