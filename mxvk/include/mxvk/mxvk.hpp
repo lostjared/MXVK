@@ -32,14 +32,20 @@ namespace mxvk {
     /**
      * @brief Main Vulkan window wrapper for MXVK.
      *
-     * The class owns SDL window resources and a minimal Vulkan bootstrap
-     * (instance + presentation surface).
+     * In windowed mode the class owns SDL window and Vulkan presentation
+     * resources. Headless mode renders to owned Vulkan images without
+     * initializing SDL video or creating a surface/swapchain.
      */
     class VK_Window {
       public:
         enum class PresentModePreference {
             LowLatency,
             Vsync
+        };
+
+        enum class RuntimeMode {
+            Windowed,
+            Headless
         };
 
         /**
@@ -67,8 +73,13 @@ namespace mxvk {
          * @param full Enables fullscreen mode when true.
          * @param validiation Enables validation-related behavior when true.
          * @param presentModePreference Preferred swapchain present-mode policy.
+         * @param runtimeMode Selects windowed presentation or surface-free rendering.
          */
-        VK_Window(const std::string &title, int width, int height, bool full = false, bool validiation = true, PresentModePreference presentModePreference = PresentModePreference::LowLatency);
+        VK_Window(const std::string &title, int width, int height, bool full = false,
+                  bool validiation = true,
+                  PresentModePreference presentModePreference =
+                      PresentModePreference::LowLatency,
+                  RuntimeMode runtimeMode = RuntimeMode::Windowed);
         VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync);
 
         // no copy
@@ -187,6 +198,11 @@ namespace mxvk {
 
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
+
+        /** @brief Return true when rendering without SDL video, a surface, or presentation. */
+        [[nodiscard]] bool headless() const noexcept {
+            return runtime_mode == RuntimeMode::Headless;
+        }
 
         /** @brief Get the Vulkan logical device handle. */
         [[nodiscard]] VkDevice getDevice() const noexcept { return device; }
@@ -541,6 +557,8 @@ namespace mxvk {
         void setupDebugMessenger();
         void cleanupDebugMessenger();
         bool createSwapchain(VkSwapchainKHR old_swapchain);
+        bool createHeadlessTargets();
+        [[nodiscard]] bool renderTargetsReady() const noexcept;
         bool createRenderResources();
         bool createSyncObjects();
         void cleanupSyncObjects();
@@ -606,6 +624,7 @@ namespace mxvk {
         VkExtent2D swapchain_extent{};
         VkExtent2D render_extent_override{};
         std::vector<VkImage> swapchain_images{};
+        std::vector<VkDeviceMemory> headless_image_memories{};
         std::vector<VkImageView> swapchain_image_views{};
         std::vector<bool> swapchain_image_initialized{};
         std::vector<VkImage> depth_images{};
@@ -650,6 +669,9 @@ namespace mxvk {
         void dispatchFrameReadback(FrameReadbackSlot &slot);
         void destroyFrameReadbackResources();
         bool validation_enabled = false;
+        RuntimeMode runtime_mode = RuntimeMode::Windowed;
+        VkExtent2D requested_headless_extent{};
+        uint32_t next_headless_image = 0;
         PresentModePreference present_mode_preference = PresentModePreference::LowLatency;
         bool framebuffer_resized = false;
         bool force_swapchain_recreate = false;

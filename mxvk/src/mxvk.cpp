@@ -183,21 +183,38 @@ namespace mxvk {
         throw mxvk::Exception(std::format("Failed to locate shader file '{}'", shaderFileName));
     }
 
-    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, PresentModePreference presentModePreference) : present_mode_preference(presentModePreference) {
+    VK_Window::VK_Window(const std::string &title, int width, int height,
+                         bool full, bool validiation,
+                         PresentModePreference presentModePreference,
+                         RuntimeMode runtimeMode)
+        : runtime_mode(runtimeMode),
+          requested_headless_extent{
+              width > 0 ? static_cast<uint32_t>(width) : 0U,
+              height > 0 ? static_cast<uint32_t>(height) : 0U},
+          present_mode_preference(presentModePreference) {
+        if (width <= 0 || height <= 0) {
+            throw mxvk::Exception("Render dimensions must be positive");
+        }
         setEnableScreenshot(defaultEnableScreenshot());
         screenshot_prefix = defaultExecutableName();
-        std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={})\n", title, width, height, full, validiation);
+        std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={}, mode={})\n",
+                                 title, width, height, full, validiation,
+                                 headless() ? "headless" : "windowed");
         SDL_WindowFlags flags = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (full) {
             std::cout << "SDL3: enabling fullscreen window flag\n";
             flags = static_cast<SDL_WindowFlags>(flags | SDL_WINDOW_FULLSCREEN);
         }
 
-        std::cout << "mxvk: initializing window subsystem and creating SDL window\n";
-        if (!initWindow(title, width, height, flags)) {
-            throw mxvk::Exception("Error on init of Window");
+        if (!headless()) {
+            std::cout << "mxvk: initializing window subsystem and creating SDL window\n";
+            if (!initWindow(title, width, height, flags)) {
+                throw mxvk::Exception("Error on init of Window");
+            }
+            showCursor(!full);
+        } else {
+            std::cout << "mxvk: surface-free headless mode; SDL video and window creation skipped\n";
         }
-        showCursor(!full);
 
         std::cout << "mxvk: initializing Vulkan runtime and rendering resources\n";
         if (!initVulkan(validiation)) {
@@ -312,8 +329,10 @@ namespace mxvk {
             instance = VK_NULL_HANDLE;
         }
 
-        std::cout << "SDL3: destroying SDL window handle\n";
-        window.reset();
+        if (window != nullptr) {
+            std::cout << "SDL3: destroying SDL window handle\n";
+            window.reset();
+        }
 
         if (vulkan_library_loaded) {
             std::cout << "SDL3: unloading Vulkan loader library\n";
@@ -335,7 +354,7 @@ namespace mxvk {
         std::cout << std::format("mxvk: entering initVulkan (validation={})\n", validiation);
         validation_enabled = validiation;
 
-        if (window == nullptr) {
+        if (!headless() && window == nullptr) {
             std::cerr << "mxvk: Cannot initialize Vulkan without an SDL window\n";
             return false;
         }
@@ -345,26 +364,41 @@ namespace mxvk {
             return true;
         }
 
-        std::cout << "vk: initializing volk from SDL's Vulkan loader\n";
-        const auto get_instance_proc_addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
-            SDL_Vulkan_GetVkGetInstanceProcAddr());
-        if (get_instance_proc_addr == nullptr) {
-            std::cerr << std::format(
-                "mxvk: SDL did not provide vkGetInstanceProcAddr: {}\n", SDL_GetError());
-            return false;
-        }
-        volkInitializeCustom(get_instance_proc_addr);
+        std::vector<const char *> enabled_extensions{};
+        if (headless()) {
+            std::cout << "vk: initializing volk directly from the Vulkan loader\n";
+            if (volkInitialize() != VK_SUCCESS) {
+                std::cerr << "mxvk: failed to initialize the Vulkan loader\n";
+                return false;
+            }
+        } else {
+            std::cout << "vk: initializing volk from SDL's Vulkan loader\n";
+            const auto get_instance_proc_addr =
+                reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+                    SDL_Vulkan_GetVkGetInstanceProcAddr());
+            if (get_instance_proc_addr == nullptr) {
+                std::cerr << std::format(
+                    "mxvk: SDL did not provide vkGetInstanceProcAddr: {}\n",
+                    SDL_GetError());
+                return false;
+            }
+            volkInitializeCustom(get_instance_proc_addr);
 
-        unsigned int extension_count = 0;
-        std::cout << "SDL3: querying Vulkan instance extensions required by SDL\n";
-        const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extension_count);
-        if (extensions == nullptr || extension_count == 0U) {
-            std::cerr << std::format("mxvk: Failed to get Vulkan instance extensions: {}\n", SDL_GetError());
-            return false;
+            unsigned int extension_count = 0;
+            std::cout << "SDL3: querying Vulkan instance extensions required by SDL\n";
+            const char *const *extensions =
+                SDL_Vulkan_GetInstanceExtensions(&extension_count);
+            if (extensions == nullptr || extension_count == 0U) {
+                std::cerr << std::format(
+                    "mxvk: Failed to get Vulkan instance extensions: {}\n",
+                    SDL_GetError());
+                return false;
+            }
+            std::cout << std::format(
+                "vk: SDL provided {} required instance extension(s)\n",
+                extension_count);
+            enabled_extensions.assign(extensions, extensions + extension_count);
         }
-        std::cout << std::format("vk: SDL provided {} required instance extension(s)\n", extension_count);
-
-        std::vector<const char *> enabled_extensions(extensions, extensions + extension_count);
 
 #if defined(MXVK_USE_MOLTENVK)
         const auto append_instance_extension_if_missing = [&enabled_extensions](const char *extension_name) {
@@ -415,7 +449,8 @@ namespace mxvk {
         VkInstanceCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         create_info.pApplicationInfo = &app_info;
-        create_info.enabledExtensionCount = extension_count;
+        create_info.enabledExtensionCount =
+            static_cast<uint32_t>(enabled_extensions.size());
         create_info.ppEnabledExtensionNames = enabled_extensions.data();
         create_info.enabledLayerCount = static_cast<uint32_t>(enabled_layers.size());
         create_info.ppEnabledLayerNames = enabled_layers.empty() ? nullptr : enabled_layers.data();
@@ -451,20 +486,25 @@ namespace mxvk {
                   << MXVK_VERSION_CODE_MINOR << "."
                   << MXVK_VERSION_CODE_PATCH << "\n";
 
-        std::cout << "SDL3: creating Vulkan presentation surface from SDL window\n";
-        if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr, &surface)) {
-            std::cerr << std::format("mxvk: Failed to create Vulkan surface: {}\n", SDL_GetError());
-            cleanupDebugMessenger();
-            vkDestroyInstance(instance, nullptr);
-            instance = VK_NULL_HANDLE;
-            surface = VK_NULL_HANDLE;
-            return false;
+        if (!headless()) {
+            std::cout << "SDL3: creating Vulkan presentation surface from SDL window\n";
+            if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr,
+                                          &surface)) {
+                std::cerr << std::format(
+                    "mxvk: Failed to create Vulkan surface: {}\n",
+                    SDL_GetError());
+                cleanupDebugMessenger();
+                vkDestroyInstance(instance, nullptr);
+                instance = VK_NULL_HANDLE;
+                surface = VK_NULL_HANDLE;
+                return false;
+            }
         }
 
         std::cout << "mxvk: selecting suitable physical device\n";
         pickDevice();
         if (physical_device == VK_NULL_HANDLE) {
-            std::cerr << "mxvk: Failed to find a Vulkan physical device with present support\n";
+            std::cerr << "mxvk: Failed to find a suitable Vulkan physical device\n";
             return false;
         }
 
@@ -625,6 +665,17 @@ namespace mxvk {
     }
 
     void VK_Window::loop() {
+        if (headless()) {
+            active = true;
+            while (active) {
+                proc();
+                render();
+                maybeTrimMemory();
+            }
+            flushFrameReadbacks();
+            return;
+        }
+
         SDL_Event e;
         active = true;
         while (active) {
@@ -861,8 +912,10 @@ namespace mxvk {
                 ? post_process_images.front()[last_presented_image_index]
                 : swapchain_images[last_presented_image_index];
         const VkImageLayout source_layout =
-            capture_offscreen ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                              : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            capture_offscreen
+                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            : headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                         : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         if (source_extent.width == 0U || source_extent.height == 0U) {
             throw mxvk::Exception("captureSnapshotPixels cannot capture an empty swapchain extent");
         }
@@ -993,11 +1046,15 @@ namespace mxvk {
             VkImageMemoryBarrier2 to_transfer_barrier{};
             to_transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_transfer_barrier.srcStageMask =
-                capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
-                                  : VK_PIPELINE_STAGE_2_NONE;
+                capture_offscreen
+                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+                : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                             : VK_PIPELINE_STAGE_2_NONE;
             to_transfer_barrier.srcAccessMask =
-                capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                                  : VK_ACCESS_2_NONE;
+                capture_offscreen
+                    ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                             : VK_ACCESS_2_NONE;
             to_transfer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_transfer_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             to_transfer_barrier.oldLayout = source_layout;
@@ -1040,11 +1097,15 @@ namespace mxvk {
             to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_present_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             to_present_barrier.dstStageMask =
-                capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
-                                  : VK_PIPELINE_STAGE_2_NONE;
+                capture_offscreen
+                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+                : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                             : VK_PIPELINE_STAGE_2_NONE;
             to_present_barrier.dstAccessMask =
-                capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                                  : VK_ACCESS_2_NONE;
+                capture_offscreen
+                    ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                             : VK_ACCESS_2_NONE;
             to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_present_barrier.newLayout = source_layout;
             to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1473,6 +1534,33 @@ namespace mxvk {
             render_extent_override.height == height) {
             return;
         }
+        if (headless()) {
+            if (width == 0U && height == 0U) {
+                return;
+            }
+            if (requested_headless_extent.width == width &&
+                requested_headless_extent.height == height) {
+                return;
+            }
+            if (device != VK_NULL_HANDLE) {
+                vkDeviceWaitIdle(device);
+                onSwapchainAboutToRecreate();
+                destroyFrameReadbackResources();
+                cleanupSyncObjects();
+                cleanupSwapchain(false);
+            }
+            requested_headless_extent = {width, height};
+            render_extent_override = {};
+            sprite_state_dirty = true;
+            text_state_dirty = true;
+            if (device != VK_NULL_HANDLE) {
+                createDevice();
+                onSwapchainRecreated();
+            }
+            std::cout << std::format(
+                "mxvk: surface-free render extent {}x{}\n", width, height);
+            return;
+        }
         if (device != VK_NULL_HANDLE && swapchain != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(device);
             destroyFrameReadbackResources();
@@ -1856,19 +1944,28 @@ namespace mxvk {
             return false;
         }
 
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() ||
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() ||
             image_fences.size() != swapchain_images.size()) {
             createDevice();
         }
 
-        return (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() &&
+        return (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() &&
                 image_fences.size() == swapchain_images.size());
+    }
+
+    bool VK_Window::renderTargetsReady() const noexcept {
+        if (headless()) {
+            return !swapchain_images.empty() &&
+                   swapchain_images.size() == swapchain_image_views.size() &&
+                   swapchain_images.size() == headless_image_memories.size();
+        }
+        return swapchain != VK_NULL_HANDLE;
     }
 
     void VK_Window::pickDevice() {
         std::cout << "mxvk: entering pickDevice\n";
-        if (instance == VK_NULL_HANDLE || surface == VK_NULL_HANDLE) {
-            std::cout << "vk: cannot pick device because instance or surface is missing\n";
+        if (instance == VK_NULL_HANDLE || (!headless() && surface == VK_NULL_HANDLE)) {
+            std::cout << "vk: cannot pick device because required instance state is missing\n";
             return;
         }
 
@@ -1899,11 +1996,18 @@ namespace mxvk {
                     candidate_graphics = i;
                 }
 
-                VkBool32 present_support = VK_FALSE;
-                vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface, &present_support);
-                if (present_support == VK_TRUE) {
-                    candidate_present = i;
+                if (!headless()) {
+                    VkBool32 present_support = VK_FALSE;
+                    vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface,
+                                                         &present_support);
+                    if (present_support == VK_TRUE) {
+                        candidate_present = i;
+                    }
                 }
+            }
+
+            if (headless()) {
+                candidate_present = candidate_graphics;
             }
 
             if (candidate_graphics == invalid_queue_index || candidate_present == invalid_queue_index) {
@@ -1911,10 +2015,14 @@ namespace mxvk {
                 continue;
             }
 
-            const SwapchainSupport swapchain_support = querySwapchainSupport(candidate, surface);
-            if (swapchain_support.formats.empty() || swapchain_support.present_modes.empty()) {
-                std::cout << "vk: candidate rejected due to incomplete swapchain support\n";
-                continue;
+            if (!headless()) {
+                const SwapchainSupport swapchain_support =
+                    querySwapchainSupport(candidate, surface);
+                if (swapchain_support.formats.empty() ||
+                    swapchain_support.present_modes.empty()) {
+                    std::cout << "vk: candidate rejected due to incomplete swapchain support\n";
+                    continue;
+                }
             }
 
             VkPhysicalDeviceProperties properties{};
@@ -1991,7 +2099,10 @@ namespace mxvk {
                 });
         };
 
-        std::vector<const char *> required_device_extensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        std::vector<const char *> required_device_extensions{};
+        if (!headless()) {
+            required_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        }
 #if defined(MXVK_CUDA) && defined(__linux__)
         if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME)) {
             if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)) {
@@ -2077,9 +2188,14 @@ namespace mxvk {
             device = VK_NULL_HANDLE;
             return;
         }
-        std::cout << "vk: retrieving graphics and present queues\n";
+        std::cout << (headless() ? "vk: retrieving graphics queue\n"
+                                 : "vk: retrieving graphics and present queues\n");
         vkGetDeviceQueue(device, graphics_queue_family, 0, &graphics_queue);
-        vkGetDeviceQueue(device, present_queue_family, 0, &present_queue);
+        if (headless()) {
+            present_queue = graphics_queue;
+        } else {
+            vkGetDeviceQueue(device, present_queue_family, 0, &present_queue);
+        }
         std::cout << "mxvk: createLogicalDevice complete\n";
     }
 
@@ -2096,16 +2212,24 @@ namespace mxvk {
             std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
             std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
 
-        if (swapchain != VK_NULL_HANDLE && command_pool != VK_NULL_HANDLE && !command_buffers.empty() &&
+        if (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() &&
             sync_ready && image_fences.size() == swapchain_images.size()) {
             std::cout << "vk: createDevice skipped because render resources are already initialized\n";
             return;
         }
 
-        std::cout << "vk: creating swapchain\n";
-        if (!createSwapchain(VK_NULL_HANDLE)) {
-            std::cout << "vk: createSwapchain failed\n";
-            return;
+        if (headless()) {
+            std::cout << "vk: creating surface-free color targets\n";
+            if (!createHeadlessTargets()) {
+                std::cout << "vk: createHeadlessTargets failed\n";
+                return;
+            }
+        } else {
+            std::cout << "vk: creating swapchain\n";
+            if (!createSwapchain(VK_NULL_HANDLE)) {
+                std::cout << "vk: createSwapchain failed\n";
+                return;
+            }
         }
 
         std::cout << "vk: creating render resources\n";
@@ -2269,6 +2393,123 @@ namespace mxvk {
         }
 
         std::cout << "vk: createSwapchain complete\n";
+        return true;
+    }
+
+    bool VK_Window::createHeadlessTargets() {
+        if (!headless() || device == VK_NULL_HANDLE ||
+            physical_device == VK_NULL_HANDLE ||
+            requested_headless_extent.width == 0U ||
+            requested_headless_extent.height == 0U) {
+            return false;
+        }
+        if (renderTargetsReady()) {
+            return true;
+        }
+
+        swapchain_format = VK_FORMAT_R8G8B8A8_UNORM;
+        swapchain_extent = requested_headless_extent;
+        swapchain_supports_transfer_src = true;
+        constexpr size_t HEADLESS_TARGET_COUNT = max_frames_in_flight;
+        swapchain_images.assign(HEADLESS_TARGET_COUNT, VK_NULL_HANDLE);
+        headless_image_memories.assign(HEADLESS_TARGET_COUNT,
+                                       VK_NULL_HANDLE);
+        swapchain_image_views.assign(HEADLESS_TARGET_COUNT, VK_NULL_HANDLE);
+        swapchain_image_initialized.assign(HEADLESS_TARGET_COUNT, false);
+
+        VkPhysicalDeviceMemoryProperties memory_properties{};
+        vkGetPhysicalDeviceMemoryProperties(physical_device,
+                                            &memory_properties);
+        try {
+            for (size_t index = 0; index < HEADLESS_TARGET_COUNT; ++index) {
+                VkImageCreateInfo image_info{};
+                image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+                image_info.imageType = VK_IMAGE_TYPE_2D;
+                image_info.extent = {swapchain_extent.width,
+                                     swapchain_extent.height, 1};
+                image_info.mipLevels = 1;
+                image_info.arrayLayers = 1;
+                image_info.format = swapchain_format;
+                image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+                image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                   VK_IMAGE_USAGE_SAMPLED_BIT;
+                image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+                image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                if (vkCreateImage(device, &image_info, nullptr,
+                                  &swapchain_images[index]) != VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "Failed to create a headless color image");
+                }
+
+                VkMemoryRequirements requirements{};
+                vkGetImageMemoryRequirements(device, swapchain_images[index],
+                                             &requirements);
+                uint32_t memory_type = invalid_queue_index;
+                for (uint32_t type = 0;
+                     type < memory_properties.memoryTypeCount; ++type) {
+                    const bool type_matches =
+                        (requirements.memoryTypeBits & (1U << type)) != 0U;
+                    const bool device_local =
+                        (memory_properties.memoryTypes[type].propertyFlags &
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U;
+                    if (type_matches && device_local) {
+                        memory_type = type;
+                        break;
+                    }
+                }
+                if (memory_type == invalid_queue_index) {
+                    throw mxvk::Exception(
+                        "Failed to find headless image memory");
+                }
+
+                VkMemoryAllocateInfo allocation_info{};
+                allocation_info.sType =
+                    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocation_info.allocationSize = requirements.size;
+                allocation_info.memoryTypeIndex = memory_type;
+                if (vkAllocateMemory(device, &allocation_info, nullptr,
+                                     &headless_image_memories[index]) !=
+                    VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "Failed to allocate headless image memory");
+                }
+                if (vkBindImageMemory(device, swapchain_images[index],
+                                      headless_image_memories[index], 0) !=
+                    VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "Failed to bind headless image memory");
+                }
+
+                VkImageViewCreateInfo view_info{};
+                view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                view_info.image = swapchain_images[index];
+                view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                view_info.format = swapchain_format;
+                view_info.subresourceRange.aspectMask =
+                    VK_IMAGE_ASPECT_COLOR_BIT;
+                view_info.subresourceRange.levelCount = 1;
+                view_info.subresourceRange.layerCount = 1;
+                if (vkCreateImageView(device, &view_info, nullptr,
+                                      &swapchain_image_views[index]) !=
+                    VK_SUCCESS) {
+                    throw mxvk::Exception(
+                        "Failed to create a headless image view");
+                }
+            }
+        } catch (const mxvk::Exception &ex) {
+            std::cerr << std::format("mxvk: {}\n", ex.text());
+            cleanupSwapchain(false);
+            return false;
+        }
+
+        next_headless_image = 0;
+        last_presented_image_index = invalid_queue_index;
+        std::cout << std::format(
+            "vk: created {} surface-free color targets ({}x{}, RGBA8)\n",
+            HEADLESS_TARGET_COUNT, swapchain_extent.width,
+            swapchain_extent.height);
         return true;
     }
 
@@ -2685,6 +2926,22 @@ namespace mxvk {
         }
         swapchain_image_views.clear();
 
+        if (!headless_image_memories.empty()) {
+            std::cout << "vk: destroying surface-free color images\n";
+            for (VkImage image : swapchain_images) {
+                if (image != VK_NULL_HANDLE) {
+                    vkDestroyImage(device, image, nullptr);
+                }
+            }
+            std::cout << "vk: freeing surface-free color image memory\n";
+            for (VkDeviceMemory memory : headless_image_memories) {
+                if (memory != VK_NULL_HANDLE) {
+                    vkFreeMemory(device, memory, nullptr);
+                }
+            }
+            headless_image_memories.clear();
+        }
+
         if (!depth_image_views.empty()) {
             std::cout << "vk: destroying depth image views\n";
             for (VkImageView view : depth_image_views) {
@@ -2721,6 +2978,7 @@ namespace mxvk {
         last_presented_image_index = invalid_queue_index;
         swapchain_supports_transfer_src = false;
         depth_format = VK_FORMAT_UNDEFINED;
+        next_headless_image = 0;
 
         // This guard prevents destroying the active swapchain during a live resize
         if (destroy_swapchain_handle && swapchain != VK_NULL_HANDLE) {
@@ -2738,15 +2996,18 @@ namespace mxvk {
 
         int pixel_w = 0;
         int pixel_h = 0;
-        if (window != nullptr) {
-            SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
-        }
-        if (pixel_w <= 0 || pixel_h <= 0) {
-            framebuffer_resized = true;
-            return;
+        if (!headless()) {
+            if (window != nullptr) {
+                SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+            }
+            if (pixel_w <= 0 || pixel_h <= 0) {
+                framebuffer_resized = true;
+                return;
+            }
         }
 
-        if (swapchain_extent.width != 0 && swapchain_extent.height != 0) {
+        if (!headless() && swapchain_extent.width != 0 &&
+            swapchain_extent.height != 0) {
             if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
                 swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
                 std::cout << std::format("mxvk: requesting swapchain recreation because window pixels changed from {}x{} to {}x{}\n",
@@ -2852,9 +3113,20 @@ namespace mxvk {
         }
 
         uint32_t image_index = 0;
-        const uint64_t acquire_timeout_ns = 100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
-        const VkResult acquire_result =
-            vkAcquireNextImageKHR(device, swapchain, acquire_timeout_ns, acquire_semaphore, VK_NULL_HANDLE, &image_index);
+        VkResult acquire_result = VK_SUCCESS;
+        if (headless()) {
+            image_index = next_headless_image %
+                          static_cast<uint32_t>(swapchain_images.size());
+            next_headless_image =
+                (next_headless_image + 1U) %
+                static_cast<uint32_t>(swapchain_images.size());
+        } else {
+            const uint64_t acquire_timeout_ns =
+                100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
+            acquire_result = vkAcquireNextImageKHR(
+                device, swapchain, acquire_timeout_ns, acquire_semaphore,
+                VK_NULL_HANDLE, &image_index);
+        }
 
         static VkResult last_acquire_error = VK_SUCCESS;
         static uint32_t repeated_acquire_errors = 0;
@@ -2975,8 +3247,11 @@ namespace mxvk {
         to_color_barrier.srcAccessMask = VK_ACCESS_2_NONE;
         to_color_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         to_color_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        to_color_barrier.oldLayout =
-            swapchain_image_initialized[image_index] ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
+        to_color_barrier.oldLayout = swapchain_image_initialized[image_index]
+                                         ? (headless()
+                                                ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                                                : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+                                         : VK_IMAGE_LAYOUT_UNDEFINED;
         to_color_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_color_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_color_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3608,7 +3883,8 @@ namespace mxvk {
                                    &readback_region);
         }
 
-        if (detached_render && post_process_present_sprite != nullptr) {
+        if (!headless() && detached_render &&
+            post_process_present_sprite != nullptr) {
             VkImageMemoryBarrier2 to_sample_barrier{};
             to_sample_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_sample_barrier.srcStageMask =
@@ -3685,7 +3961,7 @@ namespace mxvk {
         }
 
         const bool render_preview_text =
-            preview_text_queued && preview_text_renderer &&
+            !headless() && preview_text_queued && preview_text_renderer &&
             text_pipeline != VK_NULL_HANDLE;
         if (render_preview_text) {
             VkImageMemoryBarrier2 to_preview_barrier{};
@@ -3770,7 +4046,9 @@ namespace mxvk {
                                        : frame_readback_enabled && !detached_render
                                            ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        to_present_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        to_present_barrier.newLayout =
+            headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                       : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_present_barrier.image = swapchain_images[image_index];
@@ -3813,12 +4091,14 @@ namespace mxvk {
 
         VkSubmitInfo2 submit_info{};
         submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit_info.waitSemaphoreInfoCount = 1;
-        submit_info.pWaitSemaphoreInfos = &wait_semaphore_info;
+        submit_info.waitSemaphoreInfoCount = headless() ? 0U : 1U;
+        submit_info.pWaitSemaphoreInfos =
+            headless() ? nullptr : &wait_semaphore_info;
         submit_info.commandBufferInfoCount = 1;
         submit_info.pCommandBufferInfos = &command_buffer_info;
-        submit_info.signalSemaphoreInfoCount = 1;
-        submit_info.pSignalSemaphoreInfos = &signal_semaphore_info;
+        submit_info.signalSemaphoreInfoCount = headless() ? 0U : 1U;
+        submit_info.pSignalSemaphoreInfos =
+            headless() ? nullptr : &signal_semaphore_info;
 
         const VkResult fence_reset_result = vkResetFences(device, 1, &frame_fence);
         if (fence_reset_result == VK_ERROR_DEVICE_LOST) {
@@ -3848,15 +4128,17 @@ namespace mxvk {
         image_fences[image_index] = frame_fence;
         swapchain_image_initialized[image_index] = true;
 
-        VkPresentInfoKHR present_info{};
-        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = &present_semaphore;
-        present_info.swapchainCount = 1;
-        present_info.pSwapchains = &swapchain;
-        present_info.pImageIndices = &image_index;
-
-        const VkResult present_result = vkQueuePresentKHR(present_queue, &present_info);
+        VkResult present_result = VK_SUCCESS;
+        if (!headless()) {
+            VkPresentInfoKHR present_info{};
+            present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            present_info.waitSemaphoreCount = 1;
+            present_info.pWaitSemaphores = &present_semaphore;
+            present_info.swapchainCount = 1;
+            present_info.pSwapchains = &swapchain;
+            present_info.pImageIndices = &image_index;
+            present_result = vkQueuePresentKHR(present_queue, &present_info);
+        }
         if (present_result == VK_SUCCESS || present_result == VK_SUBOPTIMAL_KHR) {
             last_presented_image_index = image_index;
             if (frame_readback_enabled) {
@@ -4011,10 +4293,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot set font before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot initialize text renderer before swapchain and command resources are available");
         }
 
@@ -4199,10 +4481,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             return;
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             return;
         }
 
@@ -4223,10 +4505,10 @@ namespace mxvk {
             device == VK_NULL_HANDLE) {
             return;
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             return;
         }
         if (text_descriptor_set_layout == VK_NULL_HANDLE) {
@@ -4248,10 +4530,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             return;
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             return;
         }
         const std::string renderer_font_path =
@@ -4280,10 +4562,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             return;
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             return;
         }
 
@@ -4609,10 +4891,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
@@ -4645,10 +4927,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
@@ -4693,10 +4975,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create sprite before swapchain and command resources are available");
         }
 
@@ -4736,10 +5018,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create 3D sprite before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
         }
 
@@ -4765,10 +5047,10 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create 3D sprite before Vulkan device initialization");
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             createDevice();
         }
-        if (swapchain == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
         }
 

@@ -16,6 +16,9 @@ post-processing, media-clock synchronization, CUDA/NVDEC, software 3D,
 installer, multiplayer, rendering, and documentation work from earlier
 releases.
 
+See [MXVK 0.33.1 Release Notes](RELEASE_NOTES_0.33.1.md) for the complete list
+of changes since the last published 0.24.0 release and upgrade guidance.
+
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
 ## Contents
@@ -23,6 +26,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [What This Project Is](#what-this-project-is)
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
+- [Surface-Free Headless Rendering](#surface-free-headless-rendering)
 - [Build and Run with pcons](#build-and-run-with-pcons)
 - [Documentation](#documentation)
 - [Command Line Arguments](#command-line-arguments)
@@ -104,6 +108,31 @@ From repository root:
 cmake -S . -B build
 cmake --build build -j
 ```
+
+## Surface-Free Headless Rendering
+
+`mxvk::VK_Window::RuntimeMode::Headless` renders to MXVK-owned Vulkan images
+without initializing the SDL video subsystem and without creating a window,
+presentation surface, or swapchain. This mode is intended for render nodes and
+terminal sessions that have a Vulkan device but no graphical desktop.
+
+Pass the mode as the final constructor argument and consume completed RGBA8
+frames through `onFrameReadback()`:
+
+```cpp
+mxvk::VK_Window("renderer", 1920, 1080, false, MXVK_VALIDATION,
+                mxvk::VK_Window::PresentModePreference::LowLatency,
+                mxvk::VK_Window::RuntimeMode::Headless);
+```
+
+Build and run the included smoke example with display variables removed:
+
+```bash
+cmake --build build --target headless_example
+env -u DISPLAY -u WAYLAND_DISPLAY ./build/examples/headless/headless_example
+```
+
+The machine still needs a working Vulkan loader, ICD, and GPU/device access.
 
 <a id="build-and-run-with-pcons"></a>
 

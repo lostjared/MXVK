@@ -587,6 +587,8 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(stencil_surface)
     add_subdirectory(examples/hello_world)
     mxvk_configure_mingw_target(hello_world)
+    add_subdirectory(examples/headless)
+    mxvk_configure_mingw_target(headless_example)
     add_subdirectory(examples/static_example)
     mxvk_configure_mingw_target(static_example)
     add_subdirectory(examples/stencil)
@@ -783,6 +785,7 @@ if(EXAMPLES)
         surface
         stencil_surface
         hello_world
+        headless_example
         static_example
         stencil
         sprite_example
