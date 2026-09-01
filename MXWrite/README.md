@@ -3,6 +3,19 @@
 
 This repository provides a C++ class (`Writer`) that uses the [FFmpeg](https://ffmpeg.org/) libraries to write raw RGBA frames to an MP4 (or TS) file in H.264 format. It supports both a straightforward, frame-by-frame workflow (`open()`, `write()`, and `close()`) and a timestamp-based workflow (`open_ts()`, `write_ts()`, and `close()`).  
 
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Dependencies](#dependencies)
+3. [Building](#building)
+4. [Usage](#usage)
+   - [Basic Initialization (`open`/`write`)](#basic-initialization-openwrite)
+   - [Timestamp-Based Writing (`open_ts`/`write_ts`)](#timestamp-based-writing-open_tswrite_ts)
+5. [Key Implementation Details](#key-implementation-details)
+6. [License](#license)
+
+---
+
 ## Overview
 
 `Writer` is a C++ class that simplifies encoding and writing video frames to a container file. You can:
@@ -45,14 +58,13 @@ To install FFmpeg development libraries on your platform:
 ---
 ## Building
 
-Configure and build:
-
-```bash
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
-```
+ **Configure and build**:
+   ```bash
+   mkdir -p build
+   cd build
+   cmake ..
+   cmake --build .
+   ```
 ---
 
 ## Usage
@@ -97,6 +109,10 @@ if (!writer.open("output_hardware_lossless.mkv", 1920, 1080, 60.0f, options)) {
     return 1;
 }
 ```
+
+Set `options.bit_rate` to a positive number of bits per second to use
+bitrate-based VBR instead of the built-in CRF/CQ value. For example,
+`options.bit_rate = 10'000'000` is equivalent to FFmpeg `-b:v 10M`.
 
 MXWrite uses the FFmpeg libraries directly, so the parameter string contains
 video encoder/muxer options only; input and output filenames are supplied to

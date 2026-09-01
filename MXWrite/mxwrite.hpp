@@ -75,6 +75,8 @@ std::vector<EncoderOptionInfo> video_encoder_options(std::string_view encoder_na
  * crf:    Constant Rate Factor, 0 (lossless) .. 51 (worst). 18 is visually
  *         near-lossless; 23 is default for x264; 28 is typical "small file".
  *         For NVENC this is forwarded as `cq`.
+ * bit_rate: Target video bitrate in bits per second. A positive value selects
+ *         bitrate-based VBR and disables the built-in CRF/CQ setting.
  * codec:  "auto" (NVENC if available, else software), "software" (force software),
  *         "nvenc" (force resolution-selected NVENC), or any exact video encoder
  *         name registered by FFmpeg, such as "libx264", "libx265", "libsvtav1",
@@ -93,6 +95,7 @@ struct EncodeOptions {
     std::string preset = "medium"; ///< Encoder preset name.
     std::string tune = "";         ///< Optional tuning mode.
     int crf = 18;                  ///< Constant Rate Factor.
+    std::int64_t bit_rate = 0;     ///< Target bits/second; 0 selects CRF/CQ.
     std::string codec = "auto";    ///< Encoder selection policy or exact FFmpeg encoder name.
     std::string ffmpeg_options;    ///< Additional FFmpeg-style video encoder options.
     bool realtime = false;         ///< Enable low-latency settings.
@@ -106,15 +109,15 @@ struct EncodeOptions {
      *  - Encodes with libx265 at 10-bit (AV_PIX_FMT_YUV420P10LE).
      *  - Tags the stream with BT.2020 primaries, BT.2020 non-constant luminance
      *    matrix, and SMPTE ST.2084 (PQ) transfer.
-     *  - Converts incoming 8-bit sRGB RGBA shader output into PQ-encoded
-     *    10-bit YUV, placing SDR-range content at the 100-nit reference level
-     *    inside the PQ signal (SDR-in-HDR-container).
+     *  - Accepts already-PQ/HLG-encoded BT.2020 RGBA16 through the dedicated
+     *    HDR write methods and converts it directly to 10-bit YUV.
+     *  - Retains an RGBA8 compatibility path that places SDR-range content at
+     *    the 100-nit reference level inside a PQ signal.
      *  - Copies @ref mastering_display and @ref content_light side data from
      *    the input stream when provided, so player HDR metadata is preserved.
      *
-     * This mode is intended for use when the *input* video is HDR; the 8-bit
-     * GL pipeline cannot reconstruct the original highlight precision, but the
-     * resulting file is a correctly-tagged HDR container.
+     * This mode is intended for HDR render pipelines and preserves their
+     * 16-bit encoded signal through the RGB-to-YUV conversion.
      */
     struct HdrInfo {
         bool enabled = false;    ///< Enables the HDR output path.
@@ -314,10 +317,10 @@ class Writer {
     std::condition_variable queue_cv; ///< Signals queue availability.
     std::jthread encode_thread;       ///< Background encoder thread.
 
-    std::mutex queue_mutex{};                 ///< Guards the frame queue.
-    std::mutex writer_mutex{};                ///< Guards writer state transitions.
-    bool stop_requested = false;              ///< Signals encoder shutdown.
-    std::atomic<bool> block_when_full{false}; ///< Queue backpressure mode.
+    std::mutex queue_mutex{};                    ///< Guards the frame queue.
+    std::mutex writer_mutex{};                   ///< Guards writer state transitions.
+    bool stop_requested = false;                 ///< Signals encoder shutdown.
+    std::atomic<bool> block_when_full{false};    ///< Queue backpressure mode.
     std::atomic<std::uint64_t> bytes_written{0}; ///< Logical output bytes accepted by FFmpeg.
 
     /** @brief Shared implementation for open() and open_ts(). */
