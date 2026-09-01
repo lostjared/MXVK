@@ -87,10 +87,21 @@ VkResult volkInitialize(void)
         module = dlopen("vulkan.framework/vulkan", RTLD_NOW | RTLD_LOCAL);
     if (!module)
         module = dlopen("MoltenVK.framework/MoltenVK", RTLD_NOW | RTLD_LOCAL);
+    // Apple Silicon Homebrew installs the Vulkan loader and MoltenVK under
+    // /opt/homebrew/lib, which is not part of dyld's default search path.
+    // Windowed applications normally receive the loader through SDL, but
+    // surface-free/headless applications initialize volk directly and need an
+    // explicit fallback.
+    if (!module)
+        module = dlopen("/opt/homebrew/lib/libvulkan.dylib", RTLD_NOW | RTLD_LOCAL);
+    if (!module)
+        module = dlopen("/opt/homebrew/lib/libMoltenVK.dylib", RTLD_NOW | RTLD_LOCAL);
 	// modern versions of macOS don't search /usr/local/lib automatically contrary to what man dlopen says
 	// Vulkan SDK uses this as the system-wide installation location, so we're going to fallback to this if all else fails
 	if (!module && getenv("DYLD_FALLBACK_LIBRARY_PATH") == NULL)
 		module = dlopen("/usr/local/lib/libvulkan.dylib", RTLD_NOW | RTLD_LOCAL);
+    if (!module && getenv("DYLD_FALLBACK_LIBRARY_PATH") == NULL)
+        module = dlopen("/usr/local/lib/libMoltenVK.dylib", RTLD_NOW | RTLD_LOCAL);
 	if (!module)
 		return VK_ERROR_INITIALIZATION_FAILED;
 
