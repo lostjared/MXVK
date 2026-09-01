@@ -7,6 +7,7 @@
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -35,6 +36,25 @@
 
 namespace mxvk {
     namespace {
+        [[nodiscard]] float half_to_float(uint16_t value) noexcept {
+            const bool negative = (value & 0x8000U) != 0U;
+            const uint32_t exponent = (value >> 10U) & 0x1FU;
+            const uint32_t mantissa = value & 0x3FFU;
+            float result = 0.0F;
+            if (exponent == 0U) {
+                result = std::ldexp(static_cast<float>(mantissa), -24);
+            } else if (exponent == 31U) {
+                result = mantissa == 0U
+                             ? std::numeric_limits<float>::infinity()
+                             : std::numeric_limits<float>::quiet_NaN();
+            } else {
+                result = std::ldexp(
+                    1.0F + static_cast<float>(mantissa) / 1024.0F,
+                    static_cast<int>(exponent) - 15);
+            }
+            return negative ? -result : result;
+        }
+
         bool shouldLogMissingValidationLayer() {
             const char *quiet_missing_validation = std::getenv("MXVK_QUIET_MISSING_VALIDATION");
             return quiet_missing_validation == nullptr || std::strcmp(quiet_missing_validation, "1") != 0;
@@ -882,6 +902,19 @@ namespace mxvk {
             height = latest_frame_readback_height;
             return;
         }
+        if (!latest_frame_readback_rgba16.empty()) {
+            rgba_pixels.resize(latest_frame_readback_rgba16.size());
+            std::transform(
+                latest_frame_readback_rgba16.begin(),
+                latest_frame_readback_rgba16.end(), rgba_pixels.begin(),
+                [](std::uint16_t value) {
+                    return static_cast<std::uint8_t>(
+                        (static_cast<std::uint32_t>(value) + 128U) / 257U);
+                });
+            width = latest_frame_readback_width;
+            height = latest_frame_readback_height;
+            return;
+        }
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
             throw mxvk::Exception("captureSnapshotPixels called before Vulkan render resources are ready");
         }
@@ -1177,6 +1210,11 @@ namespace mxvk {
         [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
     }
 
+    void VK_Window::onFrameReadbackRgba16(
+        [[maybe_unused]] std::vector<std::uint16_t> &rgba_pixels,
+        [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
+    }
+
     void VK_Window::onFrameReadbackScheduled() {
     }
 
@@ -1186,6 +1224,28 @@ namespace mxvk {
         }
         if (slot.mapped == nullptr || slot.width == 0U || slot.height == 0U) {
             slot.pending = false;
+            return;
+        }
+
+        if (slot.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+            const auto *source = static_cast<const std::uint16_t *>(slot.mapped);
+            const std::size_t component_count =
+                static_cast<std::size_t>(slot.width) * slot.height * 4U;
+            latest_frame_readback_rgba16.resize(component_count);
+            for (std::size_t component = 0; component < component_count;
+                 ++component) {
+                const float normalized =
+                    std::clamp(half_to_float(source[component]), 0.0F, 1.0F);
+                latest_frame_readback_rgba16[component] =
+                    static_cast<std::uint16_t>(
+                        std::lround(normalized * 65535.0F));
+            }
+            latest_frame_readback_width = slot.width;
+            latest_frame_readback_height = slot.height;
+            slot.pending = false;
+            onFrameReadbackRgba16(latest_frame_readback_rgba16,
+                                  latest_frame_readback_width,
+                                  latest_frame_readback_height);
             return;
         }
 
@@ -1252,7 +1312,8 @@ namespace mxvk {
         const VkExtent2D readback_extent = getRenderExtent();
         const VkDeviceSize required_size =
             static_cast<VkDeviceSize>(readback_extent.width) *
-            readback_extent.height * 4U;
+            readback_extent.height *
+            (frame_readback_rgba16_enabled ? 8U : 4U);
         if (required_size == 0U) {
             throw mxvk::Exception("frame readback cannot use an empty swapchain extent");
         }
@@ -1355,6 +1416,7 @@ namespace mxvk {
             throw;
         }
         latest_frame_readback_rgba.clear();
+        latest_frame_readback_rgba16.clear();
         latest_frame_readback_width = 0;
         latest_frame_readback_height = 0;
     }
@@ -1381,6 +1443,7 @@ namespace mxvk {
             slot.pending = false;
         }
         latest_frame_readback_rgba.clear();
+        latest_frame_readback_rgba16.clear();
         latest_frame_readback_width = 0;
         latest_frame_readback_height = 0;
     }
@@ -3283,6 +3346,7 @@ namespace mxvk {
             use_post_process && post_process_texture_consumer_enabled;
         const size_t scene_target =
             hdr_render_intermediates_enabled ? 1U : 0U;
+        VkImage rgba16_readback_image = VK_NULL_HANDLE;
 
         VkImageMemoryBarrier2 to_color_barrier{};
         to_color_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -3728,6 +3792,12 @@ namespace mxvk {
                 }
             }
 
+            if (frame_readback_rgba16_enabled &&
+                hdr_render_intermediates_enabled && !consume_post_process) {
+                rgba16_readback_image =
+                    post_process_images[source_target][image_index];
+            }
+
             if (hdr_render_intermediates_enabled && !detached_render &&
                 !consume_post_process && post_process_present_sprite != nullptr) {
                 VkRenderingAttachmentInfo present_attachment{};
@@ -3917,20 +3987,37 @@ namespace mxvk {
             vkCmdEndRendering(cmd);
         }
 
+        const bool use_rgba16_readback =
+            frame_readback_enabled &&
+            rgba16_readback_image != VK_NULL_HANDLE;
+        const bool use_output_readback =
+            frame_readback_enabled && !use_rgba16_readback;
         if (frame_readback_enabled) {
+            const VkImage readback_image = use_rgba16_readback
+                                               ? rgba16_readback_image
+                                           : detached_render
+                                               ? post_process_images[0][image_index]
+                                               : swapchain_images[image_index];
             VkImageMemoryBarrier2 to_readback_barrier{};
             to_readback_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_readback_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_readback_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_readback_barrier.srcStageMask =
+                use_rgba16_readback
+                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_readback_barrier.srcAccessMask =
+                use_rgba16_readback ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_readback_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_readback_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            to_readback_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_readback_barrier.oldLayout =
+                use_rgba16_readback
+                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_readback_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_readback_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_readback_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_readback_barrier.image = detached_render
-                                            ? post_process_images[0][image_index]
-                                            : swapchain_images[image_index];
+            to_readback_barrier.image = readback_image;
             to_readback_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_readback_barrier.subresourceRange.baseMipLevel = 0;
             to_readback_barrier.subresourceRange.levelCount = 1;
@@ -3949,16 +4036,42 @@ namespace mxvk {
             readback_region.imageSubresource.baseArrayLayer = 0;
             readback_region.imageSubresource.layerCount = 1;
             readback_region.imageExtent = {
-                detached_render ? render_extent.width : swapchain_extent.width,
-                detached_render ? render_extent.height : swapchain_extent.height,
+                use_rgba16_readback || detached_render
+                    ? render_extent.width
+                    : swapchain_extent.width,
+                use_rgba16_readback || detached_render
+                    ? render_extent.height
+                    : swapchain_extent.height,
                 1};
-            vkCmdCopyImageToBuffer(cmd,
-                                   detached_render
-                                       ? post_process_images[0][image_index]
-                                       : swapchain_images[image_index],
+            vkCmdCopyImageToBuffer(cmd, readback_image,
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                    frame_readback_slots[current_frame].buffer, 1,
                                    &readback_region);
+
+            if (use_rgba16_readback) {
+                VkImageMemoryBarrier2 restore_readback_barrier =
+                    to_readback_barrier;
+                restore_readback_barrier.srcStageMask =
+                    VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                restore_readback_barrier.srcAccessMask =
+                    VK_ACCESS_2_TRANSFER_READ_BIT;
+                restore_readback_barrier.dstStageMask =
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                restore_readback_barrier.dstAccessMask =
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                restore_readback_barrier.oldLayout =
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                restore_readback_barrier.newLayout =
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                VkDependencyInfo restore_readback_dependency{};
+                restore_readback_dependency.sType =
+                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                restore_readback_dependency.imageMemoryBarrierCount = 1;
+                restore_readback_dependency.pImageMemoryBarriers =
+                    &restore_readback_barrier;
+                vkCmdPipelineBarrier2(cmd, &restore_readback_dependency);
+            }
         }
 
         if (!headless() && detached_render &&
@@ -3966,17 +4079,17 @@ namespace mxvk {
             VkImageMemoryBarrier2 to_sample_barrier{};
             to_sample_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_sample_barrier.srcStageMask =
-                frame_readback_enabled
+                use_output_readback
                     ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                     : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             to_sample_barrier.srcAccessMask =
-                frame_readback_enabled
+                use_output_readback
                     ? VK_ACCESS_2_TRANSFER_READ_BIT
                     : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_sample_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
             to_sample_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
             to_sample_barrier.oldLayout =
-                frame_readback_enabled
+                use_output_readback
                     ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_sample_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -4046,11 +4159,11 @@ namespace mxvk {
             to_preview_barrier.sType =
                 VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_preview_barrier.srcStageMask =
-                frame_readback_enabled && !detached_render
+                use_output_readback && !detached_render
                     ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                     : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             to_preview_barrier.srcAccessMask =
-                frame_readback_enabled && !detached_render
+                use_output_readback && !detached_render
                     ? VK_ACCESS_2_TRANSFER_READ_BIT
                     : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_preview_barrier.dstStageMask =
@@ -4059,7 +4172,7 @@ namespace mxvk {
                 VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_preview_barrier.oldLayout =
-                frame_readback_enabled && !detached_render
+                use_output_readback && !detached_render
                     ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_preview_barrier.newLayout =
@@ -4109,19 +4222,19 @@ namespace mxvk {
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         to_present_barrier.srcStageMask = render_preview_text
                                               ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-                                          : frame_readback_enabled && !detached_render
+                                          : use_output_readback && !detached_render
                                               ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
                                               : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         to_present_barrier.srcAccessMask = render_preview_text
                                                ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                           : frame_readback_enabled && !detached_render
+                                           : use_output_readback && !detached_render
                                                ? VK_ACCESS_2_TRANSFER_READ_BIT
                                                : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
         to_present_barrier.oldLayout = render_preview_text
                                            ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                       : frame_readback_enabled && !detached_render
+                                       : use_output_readback && !detached_render
                                            ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_present_barrier.newLayout =
@@ -4221,11 +4334,15 @@ namespace mxvk {
             last_presented_image_index = image_index;
             if (frame_readback_enabled) {
                 FrameReadbackSlot &slot = frame_readback_slots[current_frame];
-                slot.width = detached_render ? render_extent.width
-                                             : swapchain_extent.width;
-                slot.height = detached_render ? render_extent.height
-                                              : swapchain_extent.height;
-                slot.format = swapchain_format;
+                slot.width = use_rgba16_readback || detached_render
+                                 ? render_extent.width
+                                 : swapchain_extent.width;
+                slot.height = use_rgba16_readback || detached_render
+                                  ? render_extent.height
+                                  : swapchain_extent.height;
+                slot.format = use_rgba16_readback
+                                  ? VK_FORMAT_R16G16B16A16_SFLOAT
+                                  : swapchain_format;
                 slot.pending = true;
                 onFrameReadbackScheduled();
             }

@@ -196,6 +196,11 @@ namespace mxvk {
          */
         void setFrameReadbackEnabled(bool enabled) noexcept { frame_readback_enabled = enabled; }
 
+        /** @brief Request normalized RGBA16 callbacks from the final HDR intermediate. */
+        void setFrameReadbackRgba16Enabled(bool enabled) noexcept {
+            frame_readback_rgba16_enabled = enabled;
+        }
+
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
 
@@ -525,6 +530,11 @@ namespace mxvk {
         virtual void onFrameReadback(std::vector<std::uint8_t> &rgba_pixels,
                                      uint32_t width, uint32_t height);
 
+        /** @brief Receive normalized RGBA16 pixels from an RGBA16F HDR target. */
+        virtual void onFrameReadbackRgba16(
+            std::vector<std::uint16_t> &rgba_pixels, uint32_t width,
+            uint32_t height);
+
         /**
          * @brief Render one standalone sprite using the window's shared sprite pipeline.
          *
@@ -671,8 +681,10 @@ namespace mxvk {
         std::thread screenshot_worker;
         bool screenshot_worker_stop = false;
         bool frame_readback_enabled = false;
+        bool frame_readback_rgba16_enabled = false;
         std::array<FrameReadbackSlot, max_frames_in_flight> frame_readback_slots{};
         std::vector<std::uint8_t> latest_frame_readback_rgba{};
+        std::vector<std::uint16_t> latest_frame_readback_rgba16{};
         uint32_t latest_frame_readback_width = 0;
         uint32_t latest_frame_readback_height = 0;
         void ensureFrameReadbackResources();
