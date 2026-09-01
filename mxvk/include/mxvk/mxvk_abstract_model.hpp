@@ -214,6 +214,9 @@ namespace mxvk {
          */
         void setAlphaBlending(bool enabled);
 
+        /** @brief Override the dynamic-rendering color format for this model. */
+        void setColorAttachmentFormat(VkFormat format);
+
       private:
         struct TextureEntry {
             VkImage image = VK_NULL_HANDLE;
@@ -265,6 +268,7 @@ namespace mxvk {
         bool alphaBlendingEnabled = false;
         ModelFragmentPushConstants fragmentPushConstants{};
         bool extendedFragmentUniformsEnabled = false;
+        VkFormat colorAttachmentFormat = VK_FORMAT_UNDEFINED;
 
         VK_Window *windowPtr = nullptr;
 

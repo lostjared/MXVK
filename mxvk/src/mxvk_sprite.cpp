@@ -7,6 +7,7 @@
 #include "mxvk/mxvk_png.hpp"
 #include "mxvk/mxvk_shader_module.hpp"
 #include <algorithm>
+#include <bit>
 #include <filesystem>
 #include <limits>
 #ifdef MXVK_CUDA
@@ -14,6 +15,39 @@
 #endif
 
 namespace mxvk {
+    namespace {
+        [[nodiscard]] uint16_t float_to_half(float value) noexcept {
+            const uint32_t bits = std::bit_cast<uint32_t>(value);
+            const uint32_t sign = (bits >> 16U) & 0x8000U;
+            int32_t exponent =
+                static_cast<int32_t>((bits >> 23U) & 0xFFU) - 127;
+            uint32_t mantissa = bits & 0x7FFFFFU;
+            if (exponent < -24) {
+                return static_cast<uint16_t>(sign);
+            }
+            if (exponent < -14) {
+                mantissa |= 0x800000U;
+                const uint32_t shift = static_cast<uint32_t>(-exponent - 14);
+                const uint32_t rounded =
+                    (mantissa + (1U << (shift + 12U))) >> (shift + 13U);
+                return static_cast<uint16_t>(sign | rounded);
+            }
+            if (exponent > 15) {
+                return static_cast<uint16_t>(sign | 0x7C00U);
+            }
+            uint32_t half_exponent = static_cast<uint32_t>(exponent + 15);
+            mantissa += 0x1000U;
+            if ((mantissa & 0x800000U) != 0U) {
+                mantissa = 0U;
+                ++half_exponent;
+            }
+            if (half_exponent >= 31U) {
+                return static_cast<uint16_t>(sign | 0x7C00U);
+            }
+            return static_cast<uint16_t>(
+                sign | (half_exponent << 10U) | (mantissa >> 13U));
+        }
+    } // namespace
 
     VK_Sprite::VK_Sprite(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool)
         : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
@@ -220,11 +254,28 @@ namespace mxvk {
     }
 
     void VK_Sprite::enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers) {
+        enableHistoryTextureWithFormat(width, height, layers,
+                                       VK_FORMAT_R8G8B8A8_UNORM);
+    }
+
+    void VK_Sprite::enableHistoryTextureRgba16Float(uint32_t width,
+                                                    uint32_t height,
+                                                    uint32_t layers) {
+        enableHistoryTextureWithFormat(width, height, layers,
+                                       VK_FORMAT_R16G16B16A16_SFLOAT);
+    }
+
+    void VK_Sprite::enableHistoryTextureWithFormat(uint32_t width,
+                                                   uint32_t height,
+                                                   uint32_t layers,
+                                                   VkFormat format) {
         if (width == 0 || height == 0 || layers == 0) {
             throw mxvk::Exception("VKSprite::enableHistoryTexture requires positive dimensions and layer count");
         }
 
-        if (historyTextureEnabled && historyWidth == width && historyHeight == height && historyLayers == layers) {
+        if (historyTextureEnabled && historyWidth == width &&
+            historyHeight == height && historyLayers == layers &&
+            historyImageFormat == format) {
             return;
         }
 
@@ -239,26 +290,34 @@ namespace mxvk {
         historyHeight = height;
         historyLayers = layers;
         historyHead = 0;
+        historyImageFormat = format;
 #ifdef MXVK_CUDA
-        try {
-            createCudaExportableImage(width, height, layers, historyImage,
-                                      historyImageMemory,
-                                      cudaHistoryExportMemorySize);
-            cudaHistoryInteropUnavailableLogged = false;
-        } catch (const std::exception &exception) {
-            std::cout << std::format(
-                "mxvk: CUDA exportable history image unavailable: {}; using "
-                "CPU staging uploads\n",
-                exception.what());
-            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
+        if (format == VK_FORMAT_R8G8B8A8_UNORM) {
+            try {
+                createCudaExportableImage(width, height, layers, historyImage,
+                                          historyImageMemory,
+                                          cudaHistoryExportMemorySize);
+                cudaHistoryInteropUnavailableLogged = false;
+            } catch (const std::exception &exception) {
+                std::cout << std::format(
+                    "mxvk: CUDA exportable history image unavailable: {}; using "
+                    "CPU staging uploads\n",
+                    exception.what());
+                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                VK_IMAGE_USAGE_SAMPLED_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
+                            historyImageMemory, layers);
+            }
+        } else {
+            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                             VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
                         historyImageMemory, layers);
         }
 #else
-        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
+        createImage(width, height, format,
                     VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -266,7 +325,10 @@ namespace mxvk {
                     historyImageMemory, layers);
 #endif
 
-        const VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * 4;
+        const VkDeviceSize bytes_per_pixel =
+            format == VK_FORMAT_R16G16B16A16_SFLOAT ? 8U : 4U;
+        const VkDeviceSize layerSize =
+            static_cast<VkDeviceSize>(width) * height * bytes_per_pixel;
         const VkDeviceSize imageSize = layerSize * layers;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
@@ -303,7 +365,7 @@ namespace mxvk {
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
 
-        historyImageView = createImageView(historyImage, VK_FORMAT_R8G8B8A8_UNORM,
+        historyImageView = createImageView(historyImage, format,
                                            VK_IMAGE_VIEW_TYPE_2D_ARRAY, layers);
         historyTextureEnabled = true;
         historyTextureShared = false;
@@ -333,6 +395,7 @@ namespace mxvk {
         vkDeviceWaitIdle(device);
         destroyHistoryTexture();
         historyImageView = source.historyImageView;
+        historyImageFormat = source.historyImageFormat;
         historyWidth = source.historyWidth;
         historyHeight = source.historyHeight;
         historyLayers = source.historyLayers;
@@ -343,6 +406,69 @@ namespace mxvk {
     }
 
     void VK_Sprite::updateHistoryTexture(const void *pixels, int width, int height, int pitch) {
+        if (historyImageFormat == VK_FORMAT_R16G16B16A16_SFLOAT) {
+            const int source_pitch = pitch > 0 ? pitch : width * 4;
+            if (pixels == nullptr || width <= 0 || height <= 0 ||
+                source_pitch < width * 4) {
+                throw mxvk::Exception(
+                    "VKSprite::updateHistoryTexture received invalid RGBA8 pixels");
+            }
+            std::vector<uint16_t> converted(
+                static_cast<std::size_t>(width) * height * 4U);
+            const auto *source = static_cast<const uint8_t *>(pixels);
+            for (int row = 0; row < height; ++row) {
+                const uint8_t *source_row = source +
+                                            static_cast<std::size_t>(row) *
+                                                source_pitch;
+                uint16_t *destination_row = converted.data() +
+                                            static_cast<std::size_t>(row) *
+                                                width * 4U;
+                for (int component = 0; component < width * 4; ++component) {
+                    destination_row[component] =
+                        float_to_half(source_row[component] / 255.0F);
+                }
+            }
+            uploadHistoryTextureBytes(converted.data(), width, height,
+                                      width * 8, 8);
+            return;
+        }
+        uploadHistoryTextureBytes(pixels, width, height, pitch, 4);
+    }
+
+    void VK_Sprite::updateHistoryTextureRgba16(const uint16_t *pixels,
+                                               int width, int height,
+                                               int pitch) {
+        if (historyImageFormat != VK_FORMAT_R16G16B16A16_SFLOAT) {
+            throw mxvk::Exception(
+                "VKSprite::updateHistoryTextureRgba16 requires RGBA16F history");
+        }
+        const int source_pitch = pitch > 0 ? pitch : width * 8;
+        if (pixels == nullptr || width <= 0 || height <= 0 ||
+            source_pitch < width * 8) {
+            throw mxvk::Exception(
+                "VKSprite::updateHistoryTextureRgba16 received invalid pixels");
+        }
+        std::vector<uint16_t> converted(
+            static_cast<std::size_t>(width) * height * 4U);
+        const auto *source = reinterpret_cast<const uint8_t *>(pixels);
+        for (int row = 0; row < height; ++row) {
+            const auto *source_row = reinterpret_cast<const uint16_t *>(
+                source + static_cast<std::size_t>(row) * source_pitch);
+            uint16_t *destination_row = converted.data() +
+                                        static_cast<std::size_t>(row) * width *
+                                            4U;
+            for (int component = 0; component < width * 4; ++component) {
+                destination_row[component] =
+                    float_to_half(source_row[component] / 65535.0F);
+            }
+        }
+        uploadHistoryTextureBytes(converted.data(), width, height, width * 8,
+                                  8);
+    }
+
+    void VK_Sprite::uploadHistoryTextureBytes(const void *pixels, int width,
+                                              int height, int pitch,
+                                              int bytesPerPixel) {
         if (!historyTextureEnabled || historyImage == VK_NULL_HANDLE) {
             throw mxvk::Exception("VKSprite::updateHistoryTexture called before enableHistoryTexture");
         }
@@ -354,25 +480,27 @@ namespace mxvk {
             throw mxvk::Exception("VKSprite::updateHistoryTexture dimensions do not match the history texture");
         }
 
-        const int sourcePitch = pitch > 0 ? pitch : width * 4;
-        if (sourcePitch < width * 4) {
+        const int row_size = width * bytesPerPixel;
+        const int sourcePitch = pitch > 0 ? pitch : row_size;
+        if (sourcePitch < row_size) {
             throw mxvk::Exception("VKSprite::updateHistoryTexture pitch is smaller than one RGBA row");
         }
 
-        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+        const VkDeviceSize imageSize =
+            static_cast<VkDeviceSize>(width) * height * bytesPerPixel;
         createStagingResources(imageSize);
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
         VK_CHECK_RESULT(vkResetFences(device, 1, &uploadFence));
 
-        if (sourcePitch == width * 4) {
+        if (sourcePitch == row_size) {
             memcpy(persistentStagingMapped, pixels, static_cast<std::size_t>(imageSize));
         } else {
             const auto *source = static_cast<const uint8_t *>(pixels);
             auto *destination = static_cast<uint8_t *>(persistentStagingMapped);
             for (int row = 0; row < height; ++row) {
-                memcpy(destination + static_cast<std::size_t>(row * width * 4),
+                memcpy(destination + static_cast<std::size_t>(row * row_size),
                        source + static_cast<std::size_t>(row * sourcePitch),
-                       static_cast<std::size_t>(width * 4));
+                       static_cast<std::size_t>(row_size));
             }
         }
 
@@ -972,6 +1100,7 @@ namespace mxvk {
         historyHeight = 0;
         historyLayers = 0;
         historyHead = 0;
+        historyImageFormat = VK_FORMAT_R8G8B8A8_UNORM;
     }
 
     void VK_Sprite::destroySpectrumTexture() {
@@ -1737,40 +1866,69 @@ namespace mxvk {
     }
 
     void VK_Sprite::createEmptySprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
+        createEmptySpriteWithFormat(width, height, VK_FORMAT_R8G8B8A8_UNORM, 4,
+                                    vertexShaderPath, fragmentShaderPath);
+    }
+
+    void VK_Sprite::createEmptySpriteRgba16(
+        int width, int height, const std::string &vertexShaderPath,
+        const std::string &fragmentShaderPath) {
+        createEmptySpriteWithFormat(width, height,
+                                    VK_FORMAT_R16G16B16A16_UNORM, 8,
+                                    vertexShaderPath, fragmentShaderPath);
+    }
+
+    void VK_Sprite::createEmptySpriteWithFormat(
+        int width, int height, VkFormat format, uint32_t bytesPerPixel,
+        const std::string &vertexShaderPath,
+        const std::string &fragmentShaderPath) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::createEmptySprite invalid dimensions");
+        }
+        if (bytesPerPixel == 0) {
+            throw mxvk::Exception("VKSprite::createEmptySprite invalid pixel size");
         }
         if (spriteLoaded || spriteImage != VK_NULL_HANDLE || fragmentShaderModule != VK_NULL_HANDLE) {
             destroySpriteResources();
         }
         spriteWidth = width;
         spriteHeight = height;
+        spriteImageFormat = format;
+        spriteBytesPerPixel = bytesPerPixel;
 
         if (!vertexShaderPath.empty()) {
             setVertexShaderPath(vertexShaderPath);
         }
 
 #ifdef MXVK_CUDA
-        try {
-            createCudaExportableImage(width, height, 1, spriteImage,
-                                      spriteImageMemory,
-                                      cudaExportMemorySize);
-            cudaInteropUnavailableLogged = false;
-        } catch (const std::exception &ex) {
-            std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
-            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+        if (format == VK_FORMAT_R8G8B8A8_UNORM) {
+            try {
+                createCudaExportableImage(width, height, 1, spriteImage,
+                                          spriteImageMemory,
+                                          cudaExportMemorySize);
+                cudaInteropUnavailableLogged = false;
+            } catch (const std::exception &ex) {
+                std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
+                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+            }
+        } else {
+            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage,
+                        spriteImageMemory);
         }
 #else
-        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+        createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
 #endif
 
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height *
+                                 bytesPerPixel;
 
         createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -1791,7 +1949,7 @@ namespace mxvk {
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
 
-        spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
+        spriteImageView = createImageView(spriteImage, format);
         createSampler();
         createQuadBuffer();
         createDescriptorPool();
@@ -1810,7 +1968,11 @@ namespace mxvk {
         }
 
         spriteLoaded = true;
-        std::cout << std::format("mxvk: Created empty sprite: {}x{}\n", spriteWidth, spriteHeight);
+        std::cout << std::format(
+            "mxvk: Created empty sprite: {}x{} ({})\n", spriteWidth,
+            spriteHeight,
+            format == VK_FORMAT_R16G16B16A16_UNORM ? "RGBA16 UNORM"
+                                                   : "RGBA8 UNORM");
     }
 
     void VK_Sprite::updateTexture(SDL_Surface *surface) {
@@ -1870,6 +2032,12 @@ namespace mxvk {
         }
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::updateTexture invalid dimensions");
+        }
+        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM ||
+            spriteBytesPerPixel != 4) {
+            throw mxvk::Exception(
+                "VKSprite::updateTexture cannot update an RGBA16 sprite; use "
+                "updateTextureRgba16");
         }
         int srcPitch = (pitch > 0) ? pitch : width * 4;
         if (width == spriteWidth && height == spriteHeight && srcPitch == width * 4) {
@@ -1936,8 +2104,52 @@ namespace mxvk {
         }
     }
 
+    void VK_Sprite::updateTextureRgba16(const uint16_t *pixels, int width,
+                                        int height, int pitch) {
+        if (pixels == nullptr) {
+            throw mxvk::Exception(
+                "VKSprite::updateTextureRgba16 called with null pixel data");
+        }
+        if (!spriteLoaded ||
+            spriteImageFormat != VK_FORMAT_R16G16B16A16_UNORM ||
+            spriteBytesPerPixel != 8) {
+            throw mxvk::Exception(
+                "VKSprite::updateTextureRgba16 requires an RGBA16 sprite");
+        }
+        if (width != spriteWidth || height != spriteHeight || width <= 0 ||
+            height <= 0) {
+            throw mxvk::Exception(
+                "VKSprite::updateTextureRgba16 dimensions do not match");
+        }
+
+        const int rowBytes = width * 8;
+        const int sourcePitch = pitch > 0 ? pitch : rowBytes;
+        if (sourcePitch < rowBytes) {
+            throw mxvk::Exception(
+                "VKSprite::updateTextureRgba16 pitch is too small");
+        }
+        if (sourcePitch == rowBytes) {
+            updateSpriteTexture(pixels, static_cast<uint32_t>(width),
+                                static_cast<uint32_t>(height));
+            return;
+        }
+
+        std::vector<uint16_t> packed(
+            static_cast<size_t>(width) * static_cast<size_t>(height) * 4U);
+        const auto *source = reinterpret_cast<const uint8_t *>(pixels);
+        auto *destination = reinterpret_cast<uint8_t *>(packed.data());
+        for (int row = 0; row < height; ++row) {
+            std::memcpy(destination + static_cast<size_t>(row) * rowBytes,
+                        source + static_cast<size_t>(row) * sourcePitch,
+                        static_cast<size_t>(rowBytes));
+        }
+        updateSpriteTexture(packed.data(), static_cast<uint32_t>(width),
+                            static_cast<uint32_t>(height));
+    }
+
     void VK_Sprite::updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height) {
-        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height *
+                                 spriteBytesPerPixel;
 
         createStagingResources(imageSize);
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
@@ -2429,7 +2641,9 @@ namespace mxvk {
         if (!spriteLoaded) {
             return false;
         }
-        if (rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
+        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM ||
+            spriteBytesPerPixel != 4 || rgba.empty() ||
+            rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
             return false;
         }
         if (rgba.cols != spriteWidth || rgba.rows != spriteHeight || spriteImage == VK_NULL_HANDLE ||
@@ -2596,6 +2810,8 @@ namespace mxvk {
 #endif
 
     void VK_Sprite::createSpriteTexture(SDL_Surface *surface) {
+        spriteImageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        spriteBytesPerPixel = 4;
 #ifdef MXVK_CUDA
         try {
             createCudaExportableImage(surface->w, surface->h, 1, spriteImage,

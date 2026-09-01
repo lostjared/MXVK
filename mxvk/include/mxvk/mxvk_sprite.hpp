@@ -99,6 +99,16 @@ namespace mxvk {
         void createEmptySprite(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
+         * @brief Create a blank RGBA16 UNORM sprite texture.
+         *
+         * This preserves transfer-encoded 10/12-bit video input without
+         * quantizing it to RGBA8. It does not change render-target precision.
+         */
+        void createEmptySpriteRgba16(
+            int width, int height, const std::string &vertexShaderPath = "",
+            const std::string &fragmentShaderPath = "");
+
+        /**
          * @brief Queue a draw at the given pixel position.
          * @param x Destination X.
          * @param y Destination Y.
@@ -144,6 +154,16 @@ namespace mxvk {
          * @param pitch  Row stride in bytes (0 = auto).
          */
         void updateTexture(const void *pixels, int width, int height, int pitch = 0);
+
+        /**
+         * @brief Replace an RGBA16 UNORM sprite from native-endian uint16 data.
+         * @param pixels Pointer to four uint16 components per pixel.
+         * @param width Buffer width.
+         * @param height Buffer height.
+         * @param pitch Row stride in bytes (0 = tightly packed).
+         */
+        void updateTextureRgba16(const uint16_t *pixels, int width, int height,
+                                 int pitch = 0);
 
         void setExternalTexture(VkImageView image_view, int width, int height);
         void clearExternalTextureDescriptors();
@@ -231,7 +251,7 @@ namespace mxvk {
          * Compute shaders use the extended sprite descriptor ABI: binding 0 is
          * the sampled input image, binding 1 is SpriteExtended, optional
          * history/audio textures remain at bindings 2-4, and binding 5 is a
-         * write-only RGBA8 storage image.
+         * write-only storage image matching the active render precision.
          */
         void enableComputeShader(const std::string &path, uint32_t localSizeX,
                                  uint32_t localSizeY, uint32_t localSizeZ = 1);
@@ -337,6 +357,10 @@ namespace mxvk {
          */
         void enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers);
 
+        /** @brief Allocate a shader-readable RGBA16F history texture array. */
+        void enableHistoryTextureRgba16Float(uint32_t width, uint32_t height,
+                                             uint32_t layers);
+
         /**
          * @brief Bind another sprite's history array without taking ownership.
          *
@@ -363,6 +387,10 @@ namespace mxvk {
          * @throws mxvk::Exception for null data, invalid dimensions, or an inactive cache.
          */
         void updateHistoryTexture(const void *pixels, int width, int height, int pitch = 0);
+
+        /** @brief Upload normalized RGBA16 pixels into an RGBA16F history layer. */
+        void updateHistoryTextureRgba16(const uint16_t *pixels, int width,
+                                        int height, int pitch = 0);
 
 #ifdef MXVK_CUDA
         /**
@@ -457,6 +485,8 @@ namespace mxvk {
         VkImage spriteImage = VK_NULL_HANDLE;
         VkDeviceMemory spriteImageMemory = VK_NULL_HANDLE;
         VkImageView spriteImageView = VK_NULL_HANDLE;
+        VkFormat spriteImageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        uint32_t spriteBytesPerPixel = 4;
         int spriteWidth = 0;
         int spriteHeight = 0;
         bool spriteLoaded = false;
@@ -536,6 +566,10 @@ namespace mxvk {
         void createSampler();
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
         void createSpriteTexture(SDL_Surface *surface);
+        void createEmptySpriteWithFormat(
+            int width, int height, VkFormat format, uint32_t bytesPerPixel,
+            const std::string &vertexShaderPath,
+            const std::string &fragmentShaderPath);
         void updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height);
 #ifdef MXVK_CUDA
         void destroyCudaInterop();
@@ -607,11 +641,16 @@ namespace mxvk {
         VkImage historyImage = VK_NULL_HANDLE;
         VkDeviceMemory historyImageMemory = VK_NULL_HANDLE;
         VkImageView historyImageView = VK_NULL_HANDLE;
+        VkFormat historyImageFormat = VK_FORMAT_R8G8B8A8_UNORM;
         uint32_t historyWidth = 0;
         uint32_t historyHeight = 0;
         uint32_t historyLayers = 0;
         uint32_t historyHead = 0;
         void destroyHistoryTexture();
+        void enableHistoryTextureWithFormat(uint32_t width, uint32_t height,
+                                            uint32_t layers, VkFormat format);
+        void uploadHistoryTextureBytes(const void *pixels, int width, int height,
+                                       int pitch, int bytesPerPixel);
 
         bool spectrumTextureEnabled = false;
         VkImage spectrumImage = VK_NULL_HANDLE;

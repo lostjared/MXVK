@@ -13,6 +13,12 @@ namespace mxvk {
         Compute,
     };
 
+    enum class StorageImageFormat {
+        Unknown,
+        Rgba8,
+        Rgba16Float,
+    };
+
     struct ShaderModuleInfo {
         ShaderStage stage = ShaderStage::Unknown;
         uint32_t localSizeX = 1;
@@ -21,6 +27,7 @@ namespace mxvk {
         bool usesHistoryTexture = false;
         bool usesSpectrumTexture = false;
         bool usesSpectrumHistoryTexture = false;
+        StorageImageFormat storageImageFormat = StorageImageFormat::Unknown;
     };
 
     /**

@@ -222,6 +222,16 @@ namespace mxvk {
         /** @brief Get the swapchain color format. */
         [[nodiscard]] VkFormat getSwapchainFormat() const noexcept { return swapchain_format; }
 
+        /** @brief Select RGBA16F scene/effect intermediates while retaining the presentation format. */
+        void setHdrRenderIntermediatesEnabled(bool enabled);
+
+        /** @brief Get the active scene/effect color-attachment format. */
+        [[nodiscard]] VkFormat getSceneColorFormat() const noexcept {
+            return hdr_render_intermediates_enabled
+                       ? VK_FORMAT_R16G16B16A16_SFLOAT
+                       : swapchain_format;
+        }
+
         /** @brief Get the current swapchain extent. */
         [[nodiscard]] VkExtent2D getSwapchainExtent() const noexcept { return swapchain_extent; }
 
@@ -705,8 +715,12 @@ namespace mxvk {
         std::vector<std::vector<VkDeviceMemory>> post_process_memories{};
         std::vector<std::vector<VkImageView>> post_process_views{};
         std::vector<std::vector<bool>> post_process_initialized{};
-        static constexpr VkFormat post_process_compute_format =
-            VK_FORMAT_R8G8B8A8_UNORM;
+        [[nodiscard]] VkFormat postProcessIntermediateFormat() const noexcept {
+            return hdr_render_intermediates_enabled
+                       ? VK_FORMAT_R16G16B16A16_SFLOAT
+                       : VK_FORMAT_R8G8B8A8_UNORM;
+        }
+        bool hdr_render_intermediates_enabled = false;
 
         std::unique_ptr<VK_Text> text_renderer{};
         std::unique_ptr<VK_Text> preview_text_renderer{};

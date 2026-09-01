@@ -200,6 +200,16 @@ namespace mxvk {
         }
     }
 
+    void VKAbstractModel::setColorAttachmentFormat(VkFormat format) {
+        if (colorAttachmentFormat == format) {
+            return;
+        }
+        colorAttachmentFormat = format;
+        if (windowPtr != nullptr) {
+            createPipelines();
+        }
+    }
+
     void VKAbstractModel::updateUBO(uint32_t imageIndex, const UniformBufferObject &ubo) {
         if (imageIndex >= uniformBuffersMapped.size()) {
             return;
@@ -1934,7 +1944,10 @@ namespace mxvk {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");
             }
 
-            const VkFormat colorFormat = windowPtr->getSwapchainFormat();
+            const VkFormat colorFormat =
+                colorAttachmentFormat != VK_FORMAT_UNDEFINED
+                    ? colorAttachmentFormat
+                    : windowPtr->getSwapchainFormat();
             const VkFormat depthFormat = windowPtr->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;

@@ -27,8 +27,8 @@ namespace mxvk {
      * @brief FFmpeg-backed video-file capture source.
      *
      * VK_FF_Capture opens video files directly through FFmpeg, prefers CUDA
-     * hardware decoding when available, and returns tightly packed RGBA8 frames
-     * suitable for Vulkan staging uploads or encoder input.
+     * hardware decoding when available, and returns tightly packed RGBA8 or
+     * RGBA16 frames suitable for Vulkan staging uploads or encoder input.
      */
     class VK_FF_Capture {
       public:
@@ -86,6 +86,20 @@ namespace mxvk {
          * @return true when a frame was decoded, false on EOF or failure.
          */
         bool readRgba(std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY = false);
+        /**
+         * @brief Decode the next frame as native-endian RGBA16.
+         * @param rgba Output 16-bit component buffer, resized to pitch * height.
+         * @param width Output frame width in pixels.
+         * @param height Output frame height in pixels.
+         * @param pitch Output row pitch in bytes.
+         * @param flipY Flip rows vertically after conversion when true.
+         * @return true when a frame was decoded, false on EOF or failure.
+         *
+         * Ten-bit YUV/P010 sources retain their component precision. Values
+         * remain transfer-encoded; this method does not linearize PQ or HLG.
+         */
+        bool readRgba16(std::vector<uint16_t> &rgba, int &width, int &height,
+                        int &pitch, bool flipY = false);
 #ifdef MXVK_CUDA
         /**
          * @brief Decode the next frame as a CUDA-resident RGBA8 image.
@@ -114,6 +128,9 @@ namespace mxvk {
         bool initHardwareDevice(const AVCodec *decoder, int cuda_device);
         bool decodeNextFrame();
         bool convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY);
+        bool convertFrameToRgba16(const AVFrame *decodedFrame,
+                                  std::vector<uint16_t> &rgba, int &width,
+                                  int &height, int &pitch, bool flipY);
 #ifdef MXVK_CUDA
         bool convertFrameToGpuRgba(const AVFrame *decodedFrame, cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream, bool flipY);
 #endif
@@ -126,6 +143,7 @@ namespace mxvk {
         AVFrame *swFrame = nullptr;
         AVBufferRef *hwDeviceCtx = nullptr;
         SwsContext *swsCtx = nullptr;
+        bool rgba16_conversion_logged = false;
         int videoStream = -1;
         int frameWidth = 0;
         int frameHeight = 0;

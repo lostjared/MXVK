@@ -11,6 +11,7 @@ namespace mxvk {
         constexpr uint32_t SPIRV_MAGIC = 0x07230203U;
         constexpr uint16_t OP_ENTRY_POINT = 15U;
         constexpr uint16_t OP_EXECUTION_MODE = 16U;
+        constexpr uint16_t OP_TYPE_IMAGE = 25U;
         constexpr uint16_t OP_DECORATE = 71U;
         constexpr uint32_t EXECUTION_MODEL_VERTEX = 0U;
         constexpr uint32_t EXECUTION_MODEL_FRAGMENT = 4U;
@@ -18,6 +19,8 @@ namespace mxvk {
         constexpr uint32_t EXECUTION_MODE_LOCAL_SIZE = 17U;
         constexpr uint32_t DECORATION_BINDING = 33U;
         constexpr uint32_t DECORATION_DESCRIPTOR_SET = 34U;
+        constexpr uint32_t IMAGE_FORMAT_RGBA16F = 2U;
+        constexpr uint32_t IMAGE_FORMAT_RGBA8 = 4U;
     } // namespace
 
     std::vector<char> load_spv(const std::string &path) {
@@ -96,6 +99,13 @@ namespace mxvk {
                     descriptor_bindings[target_id] = words[offset + 3U];
                 } else if (decoration == DECORATION_DESCRIPTOR_SET) {
                     descriptor_sets[target_id] = words[offset + 3U];
+                }
+            } else if (opcode == OP_TYPE_IMAGE && word_count >= 9U) {
+                const uint32_t image_format = words[offset + 8U];
+                if (image_format == IMAGE_FORMAT_RGBA8) {
+                    info.storageImageFormat = StorageImageFormat::Rgba8;
+                } else if (image_format == IMAGE_FORMAT_RGBA16F) {
+                    info.storageImageFormat = StorageImageFormat::Rgba16Float;
                 }
             }
             offset += word_count;

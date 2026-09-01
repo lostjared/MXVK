@@ -28,6 +28,107 @@ namespace mxvk {
             return av_q2d(rational);
         }
 
+        [[nodiscard]] bool convertBt2020Yuv10LimitedToRgba16(
+            const AVFrame *source, std::vector<uint16_t> &rgba, int &width,
+            int &height, int &pitch, bool flipY) {
+            if (source == nullptr || source->data[0] == nullptr ||
+                source->data[1] == nullptr) {
+                return false;
+            }
+            const bool p010 = source->format == AV_PIX_FMT_P010LE;
+            if (!p010 && (source->format != AV_PIX_FMT_YUV420P10LE ||
+                          source->data[2] == nullptr)) {
+                return false;
+            }
+
+            width = source->width;
+            height = source->height;
+            pitch = width * 8;
+            if (width <= 0 || height <= 0) {
+                return false;
+            }
+            rgba.resize(static_cast<size_t>(width) *
+                        static_cast<size_t>(height) * 4U);
+
+            const int sampleShift = p010 ? 6 : 0;
+            const auto sample10 = [sampleShift](
+                                      const uint8_t *plane, int stride,
+                                      int x, int y) {
+                uint16_t raw = 0;
+                std::memcpy(&raw, plane + static_cast<size_t>(y) * stride + static_cast<size_t>(x) * 2U,
+                            sizeof(raw));
+                return static_cast<int>(raw >> sampleShift);
+            };
+
+            constexpr float CR_R = 1.4746F;
+            constexpr float CB_G = -0.16455312684366F;
+            constexpr float CR_G = -0.57135313725490F;
+            constexpr float CB_B = 1.8814F;
+            constexpr float INV_Y = 1.0F / 876.0F;
+            constexpr float INV_C = 1.0F / 896.0F;
+
+            for (int y = 0; y < height; ++y) {
+                uint16_t *destination =
+                    rgba.data() + static_cast<size_t>(y) * width * 4U;
+                const int chromaY = y >> 1;
+                for (int x = 0; x < width; ++x) {
+                    const int chromaX = x >> 1;
+                    const int ySample =
+                        sample10(source->data[0], source->linesize[0], x, y);
+                    int cbSample = 0;
+                    int crSample = 0;
+                    if (p010) {
+                        cbSample =
+                            sample10(source->data[1], source->linesize[1],
+                                     chromaX * 2, chromaY);
+                        crSample =
+                            sample10(source->data[1], source->linesize[1],
+                                     chromaX * 2 + 1, chromaY);
+                    } else {
+                        cbSample =
+                            sample10(source->data[1], source->linesize[1],
+                                     chromaX, chromaY);
+                        crSample =
+                            sample10(source->data[2], source->linesize[2],
+                                     chromaX, chromaY);
+                    }
+
+                    const float yValue = (ySample - 64) * INV_Y;
+                    const float cb = (cbSample - 512) * INV_C;
+                    const float cr = (crSample - 512) * INV_C;
+                    const float red =
+                        std::clamp(yValue + CR_R * cr, 0.0F, 1.0F);
+                    const float green = std::clamp(
+                        yValue + CB_G * cb + CR_G * cr, 0.0F, 1.0F);
+                    const float blue =
+                        std::clamp(yValue + CB_B * cb, 0.0F, 1.0F);
+
+                    destination[x * 4 + 0] =
+                        static_cast<uint16_t>(red * 65535.0F + 0.5F);
+                    destination[x * 4 + 1] =
+                        static_cast<uint16_t>(green * 65535.0F + 0.5F);
+                    destination[x * 4 + 2] =
+                        static_cast<uint16_t>(blue * 65535.0F + 0.5F);
+                    destination[x * 4 + 3] = UINT16_MAX;
+                }
+            }
+
+            if (flipY) {
+                std::vector<uint16_t> row(static_cast<size_t>(width) * 4U);
+                for (int y = 0; y < height / 2; ++y) {
+                    uint16_t *top =
+                        rgba.data() + static_cast<size_t>(y) * width * 4U;
+                    uint16_t *bottom =
+                        rgba.data() +
+                        static_cast<size_t>(height - 1 - y) * width * 4U;
+                    std::copy_n(top, row.size(), row.data());
+                    std::copy_n(bottom, row.size(), top);
+                    std::copy_n(row.data(), row.size(), bottom);
+                }
+            }
+            return true;
+        }
+
 #if defined(MXVK_CUDA) && defined(MXVK_CUDA_NPP)
         [[nodiscard]] NppStreamContext makeNppStreamContext(cudaStream_t stream) {
             NppStreamContext context{};
@@ -191,6 +292,7 @@ namespace mxvk {
             sws_freeContext(swsCtx);
             swsCtx = nullptr;
         }
+        rgba16_conversion_logged = false;
         if (hwDeviceCtx != nullptr) {
             av_buffer_unref(&hwDeviceCtx);
         }
@@ -227,6 +329,21 @@ namespace mxvk {
             return false;
         }
         const bool converted = convertFrameToRgba(frame, rgba, width, height, pitch, flipY);
+        av_frame_unref(frame);
+        return converted;
+    }
+
+    bool VK_FF_Capture::readRgba16(std::vector<uint16_t> &rgba, int &width,
+                                   int &height, int &pitch, bool flipY) {
+        if (!is_open()) {
+            return false;
+        }
+
+        if (!decodeNextFrame()) {
+            return false;
+        }
+        const bool converted =
+            convertFrameToRgba16(frame, rgba, width, height, pitch, flipY);
         av_frame_unref(frame);
         return converted;
     }
@@ -377,6 +494,113 @@ namespace mxvk {
         }
         if (flipY) {
             flipRows(rgba, pitch);
+        }
+        return true;
+    }
+
+    bool VK_FF_Capture::convertFrameToRgba16(
+        const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width,
+        int &height, int &pitch, bool flipY) {
+        const AVFrame *sourceFrame = decodedFrame;
+        if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
+            av_frame_unref(swFrame);
+            if (av_hwframe_transfer_data(swFrame, decodedFrame, 0) < 0) {
+                std::cout << "mxvk_ff_capture: failed to transfer CUDA decoded "
+                             "HDR frame to host memory\n";
+                return false;
+            }
+            sourceFrame = swFrame;
+        }
+
+        const AVColorSpace colorSpace =
+            sourceFrame->colorspace != AVCOL_SPC_UNSPECIFIED
+                ? sourceFrame->colorspace
+                : codecCtx->colorspace;
+        const AVColorRange colorRange =
+            sourceFrame->color_range != AVCOL_RANGE_UNSPECIFIED
+                ? sourceFrame->color_range
+                : codecCtx->color_range;
+        if (colorSpace == AVCOL_SPC_BT2020_NCL &&
+            colorRange != AVCOL_RANGE_JPEG &&
+            convertBt2020Yuv10LimitedToRgba16(
+                sourceFrame, rgba, width, height, pitch, flipY)) {
+            if (!rgba16_conversion_logged) {
+                std::cout
+                    << "mxvk_ff_capture: preserving 10-bit BT.2020 NCL input "
+                       "through native RGBA16 conversion\n";
+                rgba16_conversion_logged = true;
+            }
+            return true;
+        }
+
+        width = sourceFrame->width;
+        height = sourceFrame->height;
+        pitch = width * 8;
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+
+        rgba.resize(static_cast<size_t>(width) *
+                    static_cast<size_t>(height) * 4U);
+        auto *bytes = reinterpret_cast<uint8_t *>(rgba.data());
+        uint8_t *dstData[4] = {bytes, nullptr, nullptr, nullptr};
+        int dstLinesize[4] = {pitch, 0, 0, 0};
+
+        swsCtx = sws_getCachedContext(
+            swsCtx, sourceFrame->width, sourceFrame->height,
+            static_cast<AVPixelFormat>(sourceFrame->format), width, height,
+            AV_PIX_FMT_RGBA64, SWS_BILINEAR, nullptr, nullptr, nullptr);
+        if (swsCtx == nullptr) {
+            return false;
+        }
+
+        int sourceColorSpace = SWS_CS_DEFAULT;
+        switch (colorSpace) {
+        case AVCOL_SPC_BT2020_NCL:
+        case AVCOL_SPC_BT2020_CL:
+            sourceColorSpace = SWS_CS_BT2020;
+            break;
+        case AVCOL_SPC_BT709:
+            sourceColorSpace = SWS_CS_ITU709;
+            break;
+        case AVCOL_SPC_SMPTE170M:
+        case AVCOL_SPC_BT470BG:
+            sourceColorSpace = SWS_CS_ITU601;
+            break;
+        default:
+            break;
+        }
+        const int *sourceCoefficients =
+            sws_getCoefficients(sourceColorSpace);
+        const int *destinationCoefficients =
+            sws_getCoefficients(SWS_CS_BT2020);
+        sws_setColorspaceDetails(
+            swsCtx, sourceCoefficients,
+            colorRange == AVCOL_RANGE_JPEG ? 1 : 0,
+            destinationCoefficients, 1, 0, 1 << 16, 1 << 16);
+        if (!rgba16_conversion_logged) {
+            std::cout
+                << "mxvk_ff_capture: preserving high-bit-depth input through "
+                   "FFmpeg RGBA64 conversion\n";
+            rgba16_conversion_logged = true;
+        }
+
+        const int scaledRows =
+            sws_scale(swsCtx, sourceFrame->data, sourceFrame->linesize, 0,
+                      sourceFrame->height, dstData, dstLinesize);
+        if (scaledRows != height) {
+            return false;
+        }
+        if (flipY) {
+            std::vector<uint8_t> row(static_cast<size_t>(pitch));
+            for (int y = 0; y < height / 2; ++y) {
+                uint8_t *top = bytes + static_cast<size_t>(y) * pitch;
+                uint8_t *bottom =
+                    bytes + static_cast<size_t>(height - 1 - y) * pitch;
+                std::memcpy(row.data(), top, static_cast<size_t>(pitch));
+                std::memcpy(top, bottom, static_cast<size_t>(pitch));
+                std::memcpy(bottom, row.data(), static_cast<size_t>(pitch));
+            }
         }
         return true;
     }
