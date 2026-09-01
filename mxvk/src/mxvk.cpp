@@ -1749,9 +1749,16 @@ namespace mxvk {
         }
 
         if (!post_process_effect_stages.empty()) {
-            post_process_present_sprite = createSprite(1, 1);
+            post_process_present_sprite = createSprite(
+                1, 1,
+                resolveRuntimeShaderPath("sprite.vert.spv",
+                                         MXVK_SPRITE_SHADER_DIR));
             const uint32_t black_pixel = 0xFF000000u;
             post_process_present_sprite->updateTexture(&black_pixel, 1, 1);
+            if (!post_process_present_shader_path.empty()) {
+                post_process_present_sprite->setFragmentShaderPath(
+                    post_process_present_shader_path);
+            }
             owned_post_process_sprites.push_back(post_process_present_sprite);
 
             post_process_composite_sprite = createSprite(1, 1);
@@ -1769,6 +1776,18 @@ namespace mxvk {
         }
         sprite_state_dirty = true;
         return attachedSprites;
+    }
+
+    void VK_Window::setPostProcessingPresentFragmentShader(
+        const std::string &path) {
+        if (post_process_present_shader_path == path) {
+            return;
+        }
+        post_process_present_shader_path = path;
+        if (post_process_present_sprite != nullptr) {
+            post_process_present_sprite->setFragmentShaderPath(path);
+            sprite_state_dirty = true;
+        }
     }
 
     void VK_Window::detachPostProcessingShader() {
@@ -3792,14 +3811,114 @@ namespace mxvk {
                 }
             }
 
+            bool hdr_consumer_rendered = false;
+            if (consume_post_process && hdr_render_intermediates_enabled) {
+                const size_t consumer_target =
+                    source_target == 2U ? 3U : 2U;
+                VkImageMemoryBarrier2 consumer_target_barrier{};
+                consumer_target_barrier.sType =
+                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                consumer_target_barrier.srcStageMask =
+                    post_process_initialized[consumer_target][image_index]
+                        ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                              VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+                        : VK_PIPELINE_STAGE_2_NONE;
+                consumer_target_barrier.srcAccessMask =
+                    post_process_initialized[consumer_target][image_index]
+                        ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
+                        : VK_ACCESS_2_NONE;
+                consumer_target_barrier.dstStageMask =
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                consumer_target_barrier.dstAccessMask =
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                consumer_target_barrier.oldLayout =
+                    post_process_initialized[consumer_target][image_index]
+                        ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                        : VK_IMAGE_LAYOUT_UNDEFINED;
+                consumer_target_barrier.newLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_target_barrier.srcQueueFamilyIndex =
+                    VK_QUEUE_FAMILY_IGNORED;
+                consumer_target_barrier.dstQueueFamilyIndex =
+                    VK_QUEUE_FAMILY_IGNORED;
+                consumer_target_barrier.image =
+                    post_process_images[consumer_target][image_index];
+                consumer_target_barrier.subresourceRange.aspectMask =
+                    VK_IMAGE_ASPECT_COLOR_BIT;
+                consumer_target_barrier.subresourceRange.levelCount = 1;
+                consumer_target_barrier.subresourceRange.layerCount = 1;
+                VkDependencyInfo consumer_target_dependency{};
+                consumer_target_dependency.sType =
+                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                consumer_target_dependency.imageMemoryBarrierCount = 1;
+                consumer_target_dependency.pImageMemoryBarriers =
+                    &consumer_target_barrier;
+                vkCmdPipelineBarrier2(cmd, &consumer_target_dependency);
+
+                VkRenderingAttachmentInfo consumer_attachment{};
+                consumer_attachment.sType =
+                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                consumer_attachment.imageView =
+                    post_process_views[consumer_target][image_index];
+                consumer_attachment.imageLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                consumer_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                VkRenderingInfo consumer_info{};
+                consumer_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                consumer_info.renderArea.extent = render_extent;
+                consumer_info.layerCount = 1;
+                consumer_info.colorAttachmentCount = 1;
+                consumer_info.pColorAttachments = &consumer_attachment;
+                consumer_info.pDepthAttachment =
+                    depth_attachment.imageView != VK_NULL_HANDLE
+                        ? &depth_attachment
+                        : nullptr;
+                vkCmdBeginRendering(cmd, &consumer_info);
+                vkCmdSetViewport(cmd, 0, 1, &viewport);
+                vkCmdSetScissor(cmd, 0, 1, &scissor);
+                onRecordPostProcessingTexture(
+                    cmd, image_index,
+                    post_process_views[source_target][image_index],
+                    render_extent);
+                vkCmdEndRendering(cmd);
+
+                VkImageMemoryBarrier2 sampled_consumer_barrier =
+                    consumer_target_barrier;
+                sampled_consumer_barrier.srcStageMask =
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                sampled_consumer_barrier.srcAccessMask =
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                sampled_consumer_barrier.dstStageMask =
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                sampled_consumer_barrier.dstAccessMask =
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                sampled_consumer_barrier.oldLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                sampled_consumer_barrier.newLayout =
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                VkDependencyInfo sampled_consumer_dependency{};
+                sampled_consumer_dependency.sType =
+                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                sampled_consumer_dependency.imageMemoryBarrierCount = 1;
+                sampled_consumer_dependency.pImageMemoryBarriers =
+                    &sampled_consumer_barrier;
+                vkCmdPipelineBarrier2(cmd, &sampled_consumer_dependency);
+                post_process_initialized[consumer_target][image_index] = true;
+                source_target = consumer_target;
+                hdr_consumer_rendered = true;
+            }
+
             if (frame_readback_rgba16_enabled &&
-                hdr_render_intermediates_enabled && !consume_post_process) {
+                hdr_render_intermediates_enabled) {
                 rgba16_readback_image =
                     post_process_images[source_target][image_index];
             }
 
             if (hdr_render_intermediates_enabled && !detached_render &&
-                !consume_post_process && post_process_present_sprite != nullptr) {
+                (!consume_post_process || hdr_consumer_rendered) &&
+                post_process_present_sprite != nullptr) {
                 VkRenderingAttachmentInfo present_attachment{};
                 present_attachment.sType =
                     VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -3877,12 +3996,12 @@ namespace mxvk {
                 composite_info.colorAttachmentCount = 1;
                 composite_info.pColorAttachments = &composite_attachment;
                 composite_info.pDepthAttachment =
-                    consume_post_process &&
+                    consume_post_process && !hdr_consumer_rendered &&
                             depth_attachment.imageView != VK_NULL_HANDLE
                         ? &depth_attachment
                         : nullptr;
                 vkCmdBeginRendering(cmd, &composite_info);
-                if (consume_post_process) {
+                if (consume_post_process && !hdr_consumer_rendered) {
                     vkCmdSetViewport(cmd, 0, 1, &viewport);
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
                     onRecordPostProcessingTexture(
@@ -3902,7 +4021,7 @@ namespace mxvk {
                     post_process_composite_sprite->clearQueue();
                 }
                 vkCmdEndRendering(cmd);
-            } else if (consume_post_process) {
+            } else if (consume_post_process && !hdr_consumer_rendered) {
                 VkRenderingAttachmentInfo consumer_attachment{};
                 consumer_attachment.sType =
                     VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;

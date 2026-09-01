@@ -374,6 +374,12 @@ namespace mxvk {
             post_process_texture_consumer_enabled = enabled;
         }
 
+        /** Set an optional fragment shader used only when presenting the final
+         * post-processing texture to a window. The offscreen texture and frame
+         * readback remain unchanged. Pass an empty path for the normal copy.
+         */
+        void setPostProcessingPresentFragmentShader(const std::string &path);
+
         /**
          * @brief Create a world-space billboard sprite from a PNG file.
          * @param pngPath Path to the PNG file.
@@ -718,6 +724,7 @@ namespace mxvk {
         std::vector<VK_Sprite *> post_process_sprites{};
         std::vector<VK_Sprite *> owned_post_process_sprites{};
         VK_Sprite *post_process_present_sprite = nullptr;
+        std::string post_process_present_shader_path{};
         VK_Sprite *post_process_composite_sprite = nullptr;
         std::vector<ShaderStage> post_process_effect_stages{};
         std::vector<std::array<float, 4>> post_process_effect_params{};
