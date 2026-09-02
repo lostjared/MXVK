@@ -284,6 +284,15 @@ version_h = configure_file(
 
 shader_targets: list[Target] = []
 shader_output_dir = (project_dir / project.build_dir / "mxvk" / "shaders").resolve()
+font_output_dir = (project_dir / project.build_dir / "mxvk" / "data").resolve()
+font_output = font_output_dir / "default.ttf"
+font_target = project.Command(
+    "mxvk-default-font",
+    env,
+    target=font_output,
+    source=project_dir / "mxvk" / "data" / "default.ttf",
+    command=f"mkdir -p {quoted(font_output_dir)} && cp {quoted(project_dir / 'mxvk' / 'data' / 'default.ttf')} {quoted(font_output)}",
+)
 for shader in sorted((project_dir / "mxvk" / "shaders").glob("*")):
     if shader.suffix not in (".vert", ".frag", ".comp"):
         continue
@@ -444,7 +453,7 @@ mxvk.public.defines.extend(
         f'MXVK_SPRITE_SHADER_DIR="{shader_output_dir}"',
         f'MXVK_TEXT_SHADER_DIR="{shader_output_dir}"',
         f'MXVK_SPRITE3D_SHADER_DIR="{shader_output_dir}"',
-        f'MXVK_DEFAULT_FONT_DIR="{project_dir / "mxvk" / "data"}"',
+        f'MXVK_DEFAULT_FONT_DIR="{font_output_dir}"',
     ]
 )
 mxvk.link(volk, sdl3, sdl3_ttf, vulkan, libpng, zlib, glm)
@@ -463,7 +472,7 @@ if with_cuda and cuda and opencv:
 if with_mxwrite and mxwrite:
     mxvk.public.defines.append("MXVK_WITH_FFMPEG_CAPTURE")
     mxvk.link(mxwrite)
-mxvk.add_dependency(*shader_targets)
+mxvk.add_dependency(font_target, *shader_targets)
 
 mxmod2obj = project.Program(
     "mxmod2obj", env, sources=[project_dir / "tools" / "mxmod2obj.cpp"]
