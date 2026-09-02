@@ -17,7 +17,9 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent
-BUILD_DIR = ROOT_DIR / "build" / "pcons"
+BUILD_DIR = Path(
+    os.environ.get("MXVK_PCONS_BUILD_DIR", str(ROOT_DIR / "build" / "pcons"))
+).expanduser()
 SOURCE_DIR = ROOT_DIR / "examples"
 MISSING_EXECUTABLE_EXIT_CODE = 3
 DEFAULT_TIMEOUT_SECONDS = 5.0
@@ -212,16 +214,36 @@ def run_program(
         return 130
 
 
-def parse_arguments(arguments: list[str]) -> tuple[str | None, list[str], float | None, bool]:
+def parse_arguments(
+    arguments: list[str], invocation_dir: Path
+) -> tuple[str | None, list[str], float | None, bool, Path]:
     program = None
     forwarded = []
     timeout_seconds = None
     debug = False
+    build_dir = BUILD_DIR
     index = 0
     while index < len(arguments):
         argument = arguments[index]
         if program is None and argument == "--debug":
             debug = True
+            index += 1
+            continue
+        if argument == "--build-dir":
+            if index + 1 >= len(arguments):
+                raise ValueError("--build-dir requires a directory")
+            build_dir = Path(arguments[index + 1]).expanduser()
+            if not build_dir.is_absolute():
+                build_dir = invocation_dir / build_dir
+            build_dir = build_dir.resolve()
+            index += 2
+            continue
+        build_dir_match = re.fullmatch(r"--build-dir=(.+)", argument)
+        if build_dir_match:
+            build_dir = Path(build_dir_match.group(1)).expanduser()
+            if not build_dir.is_absolute():
+                build_dir = invocation_dir / build_dir
+            build_dir = build_dir.resolve()
             index += 1
             continue
         if argument == "--timeout":
@@ -248,11 +270,12 @@ def parse_arguments(arguments: list[str]) -> tuple[str | None, list[str], float 
         timeout_seconds = float(
             os.environ.get("MXVK_RUN_DEFAULT_TIMEOUT", DEFAULT_TIMEOUT_SECONDS)
         )
-    return program, forwarded, timeout_seconds, debug
+    return program, forwarded, timeout_seconds, debug, build_dir
 
 
 def show_usage() -> int:
     print("Usage: ./pcons-run.py <program_name> [extra args...]")
+    print("       ./pcons-run.py --build-dir <dir> <program_name> [extra args...]")
     print("       ./pcons-run.py <program_name> --timeout[=seconds] [extra args...]")
     print("       ./pcons-run.py --debug <program_name> [extra args...]")
     print("       ./pcons-run.py --all --timeout[=seconds] [extra args...]\n")
@@ -292,7 +315,15 @@ def run_all(
 
 
 def main() -> int:
-    program, forwarded, timeout_seconds, debug = parse_arguments(sys.argv[1:])
+    global BUILD_DIR
+    try:
+        program, forwarded, timeout_seconds, debug, build_dir = parse_arguments(
+            sys.argv[1:], Path.cwd()
+        )
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 2
+    BUILD_DIR = build_dir
     if program in (None, "-h", "--help", "--list"):
         return show_usage()
 
