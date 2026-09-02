@@ -768,7 +768,12 @@ def unique_paths(paths: list[Path]) -> list[Path]:
 
 demo_runtime_dirs: dict[str, Path] = {}
 demo_runtime_targets: dict[str, list[Target]] = {"mutatris": [mutatris_runtime_target]}
-selected_example_dirs = {directory for directory, unused, sources in EXAMPLES}
+# Do not generate (or stage) any per-demo assets for a libraries-only build.
+# Pcons otherwise registers their custom commands even though no executable
+# consumes them, which both wastes work and can race with bundled .spv assets.
+selected_example_dirs = (
+    {directory for directory, unused, sources in EXAMPLES} if with_examples else set()
+)
 
 for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     demo_source_dir = project_dir / "examples" / demo_name
@@ -865,7 +870,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
         f"runtime-core-{demo_name}",
         env,
         target=core_marker,
-        source=[project_dir / "mxvk" / "data" / "default.ttf"]
+        source=[asset_marker, project_dir / "mxvk" / "data" / "default.ttf"]
         + [shader_output_dir / source_name for source_name, aliases in core_aliases],
         command=" && ".join(core_commands),
     )
