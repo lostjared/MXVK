@@ -244,8 +244,8 @@ version_h = configure_file(
     project.build_dir / "mxvk" / "include" / "mxvk" / "mxvk_version.hpp",
     {
         "PROJECT_VERSION_MAJOR": "0",
-        "PROJECT_VERSION_MINOR": "25",
-        "PROJECT_VERSION_PATCH": "0",
+        "PROJECT_VERSION_MINOR": "33",
+        "PROJECT_VERSION_PATCH": "1",
     },
 )
 
