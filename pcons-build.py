@@ -35,6 +35,34 @@ project_dir = Path(__file__).parent.resolve()
 platform = get_platform()
 
 
+def configure_homebrew_paths() -> None:
+    """Make direct macOS Pcons invocations see Homebrew's keg-only packages."""
+    if not platform.is_macos:
+        return
+    package_dirs: list[str] = []
+    binary_dirs: list[str] = []
+    for prefix in (Path("/opt/homebrew"), Path("/usr/local")):
+        package_dirs.extend(
+            str(path)
+            for path in (prefix / "lib" / "pkgconfig", prefix / "share" / "pkgconfig")
+            if path.is_dir()
+        )
+        opt_dir = prefix / "opt"
+        if opt_dir.is_dir():
+            package_dirs.extend(str(path) for path in opt_dir.glob("*/lib/pkgconfig") if path.is_dir())
+            package_dirs.extend(str(path) for path in opt_dir.glob("*/share/pkgconfig") if path.is_dir())
+            binary_dirs.extend(str(path) for path in opt_dir.glob("*/bin") if path.is_dir())
+    if package_dirs:
+        os.environ["PKG_CONFIG_PATH"] = os.pathsep.join(
+            package_dirs + [os.environ.get("PKG_CONFIG_PATH", "")]
+        )
+    if binary_dirs:
+        os.environ["PATH"] = os.pathsep.join(binary_dirs + [os.environ.get("PATH", "")])
+
+
+configure_homebrew_paths()
+
+
 def option(name: str, default: bool = False) -> bool:
     return get_var(name, "1" if default else "0").lower() in (
         "1",
@@ -68,7 +96,12 @@ if extra_prefixes:
         [str(p / "lib" / "pkgconfig") for p in extra_prefixes]
         + [os.environ.get("PKG_CONFIG_PATH", "")]
     )
-search_prefixes = extra_prefixes + [Path("/usr/local"), Path("/usr"), Path("/opt/cuda")]
+search_prefixes = extra_prefixes + [
+    Path("/opt/homebrew"),
+    Path("/usr/local"),
+    Path("/usr"),
+    Path("/opt/cuda"),
+]
 
 project = Project("mxvk", root_dir=project_dir)
 env = project.Environment(toolchain=find_c_toolchain())
