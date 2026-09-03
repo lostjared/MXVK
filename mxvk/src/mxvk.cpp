@@ -2292,8 +2292,19 @@ namespace mxvk {
         create_info.pEnabledFeatures = nullptr;
 
         std::cout << "vk: creating logical device\n";
-        if (vkCreateDevice(physical_device, &create_info, nullptr, &device) != VK_SUCCESS) {
-            std::cout << "vk: logical device creation failed\n";
+        const VkResult create_device_result =
+            vkCreateDevice(physical_device, &create_info, nullptr, &device);
+        if (create_device_result != VK_SUCCESS) {
+            std::cerr << std::format(
+                "vk: logical device creation failed (VkResult={})",
+                static_cast<int>(create_device_result));
+            if (!required_device_extensions.empty()) {
+                std::cerr << "; requested extensions:";
+                for (const char *extension_name : required_device_extensions) {
+                    std::cerr << ' ' << extension_name;
+                }
+            }
+            std::cerr << '\n';
             device = VK_NULL_HANDLE;
             return;
         }

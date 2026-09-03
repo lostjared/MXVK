@@ -119,6 +119,12 @@ if platform.is_linux:
 if validation:
     env.cc.defines.append("ENABLE_VALIDATION")
     env.cxx.defines.append("ENABLE_VALIDATION")
+if platform.is_macos:
+    # Match MXVK_ENABLE_MOLTENVK=ON from CMake.  These definitions enable
+    # VK_KHR_portability_enumeration on the instance and request
+    # VK_KHR_portability_subset when creating the MoltenVK device.
+    env.cc.defines.extend(["MXVK_USE_MOLTENVK", "VK_ENABLE_BETA_EXTENSIONS"])
+    env.cxx.defines.extend(["MXVK_USE_MOLTENVK", "VK_ENABLE_BETA_EXTENSIONS"])
 
 
 def imported(
@@ -1028,6 +1034,10 @@ if with_cuda and cuda:
         [f"-L{cuda_lib.parent}", "-lcudart", "-lnppicc", "-lnppidei", "-lnppc"]
     )
 public_defines = []
+if platform.is_macos:
+    # MXVK's public headers and consumers must use the same Vulkan platform
+    # declarations as the library.  This mirrors CMake's PUBLIC definitions.
+    public_defines.extend(["-DMXVK_USE_MOLTENVK", "-DVK_ENABLE_BETA_EXTENSIONS"])
 if with_mixer:
     public_defines.extend(["-DMXVK_WITH_MIXER", "-DWITH_MIXER"])
 if with_jpeg:
