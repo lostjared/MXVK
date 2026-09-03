@@ -1011,6 +1011,16 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mxvk/include/mxvk
 )
 
 install(FILES
+    ${mxvk_VERTEX_SPV}
+    ${mxvk_FRAGMENT_SPV}
+    ${mxvk_TEXT_VERTEX_SPV}
+    ${mxvk_TEXT_FRAGMENT_SPV}
+    ${mxvk_SPRITE3D_VERTEX_SPV}
+    ${mxvk_SPRITE3D_FRAGMENT_SPV}
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/mxvk/shaders
+)
+
+install(FILES
     ${mxvk_VERSION_HEADER_OUTPUT}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mxvk
 )
