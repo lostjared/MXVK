@@ -22,6 +22,13 @@
 #include <sstream>
 #include <vector>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #ifndef MXVK_SPRITE_SHADER_DIR
 #define MXVK_SPRITE_SHADER_DIR "."
 #endif
@@ -173,11 +180,30 @@ namespace mxvk {
 
         std::vector<std::filesystem::path> candidates{};
 
+        const auto add_executable_candidates =
+            [&candidates, &shaderFileName](const std::filesystem::path &executableDir) {
+                candidates.push_back(executableDir / "data" / shaderFileName);
+                candidates.push_back(executableDir / shaderFileName);
+                candidates.push_back(executableDir.parent_path() / "share" / "mxvk" /
+                                     "shaders" / shaderFileName);
+            };
+
         if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
-            const std::filesystem::path executableDir(basePath);
-            candidates.push_back(executableDir / "data" / shaderFileName);
-            candidates.push_back(executableDir / shaderFileName);
+            add_executable_candidates(std::filesystem::path(basePath));
         }
+
+#ifdef _WIN32
+        std::vector<wchar_t> executableName(MAX_PATH);
+        const DWORD executableLength = GetModuleFileNameW(
+            nullptr, executableName.data(),
+            static_cast<DWORD>(executableName.size()));
+        if (executableLength > 0U &&
+            executableLength < executableName.size() - 1U) {
+            add_executable_candidates(std::filesystem::path(
+                                          std::wstring(executableName.data(), executableLength))
+                                          .parent_path());
+        }
+#endif
 
         candidates.push_back(std::filesystem::path("data") / shaderFileName);
 

@@ -780,6 +780,14 @@ demo_runtime_targets: dict[str, list[Target]] = {"mutatris": [mutatris_runtime_t
 selected_example_dirs = (
     {directory for directory, unused, sources in EXAMPLES} if with_examples else set()
 )
+core_aliases = (
+    ("sprite.vert.spv", ("sprite.vert.spv", "sprite_vert.spv")),
+    ("sprite.frag.spv", ("sprite.frag.spv", "sprite_frag.spv")),
+    ("text.vert.spv", ("text.vert.spv", "text_vert.spv")),
+    ("text.frag.spv", ("text.frag.spv", "text_frag.spv")),
+    ("sprite3d.vert.spv", ("sprite3d.vert.spv",)),
+    ("sprite3d.frag.spv", ("sprite3d.frag.spv",)),
+)
 
 for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     demo_source_dir = project_dir / "examples" / demo_name
@@ -846,14 +854,6 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     core_commands = [
         f"mkdir -p {quoted(runtime_dir / 'data')} {quoted(runtime_dir / 'shaders')}"
     ]
-    core_aliases = (
-        ("sprite.vert.spv", ("sprite.vert.spv", "sprite_vert.spv")),
-        ("sprite.frag.spv", ("sprite.frag.spv", "sprite_frag.spv")),
-        ("text.vert.spv", ("text.vert.spv", "text_vert.spv")),
-        ("text.frag.spv", ("text.frag.spv", "text_frag.spv")),
-        ("sprite3d.vert.spv", ("sprite3d.vert.spv",)),
-        ("sprite3d.frag.spv", ("sprite3d.frag.spv",)),
-    )
     for source_name, aliases in core_aliases:
         for alias in aliases:
             for destination in (
@@ -1071,6 +1071,11 @@ installed: list[Target] = [
     project.Install("lib", [mxvk, volk, mxnetwork] + ([mxwrite] if mxwrite else [])),
     project.Install("lib/pkgconfig", [pc_file]),
     project.Install("bin", [mxmod2obj]),
+    project.Install(
+        "share/mxvk/shaders",
+        [shader_output_dir / source_name for source_name, aliases in core_aliases],
+    ),
+    project.Install("share/mxvk/data", [font_output]),
 ]
 installed = [target for target in installed if target]
 if with_examples:
