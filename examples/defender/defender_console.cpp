@@ -18,9 +18,7 @@ namespace defender {
         console.printLine("Type 'help' for Defender commands.");
         log_game("Console attached.");
         log_game("Defender initialized.");
-        console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) {
-            return handle_console_command(args, out);
-        });
+        console.setCommandCallback([this](mxvk::VK_Window &, const std::vector<std::string> &args, std::ostream &out) { return handle_console_command(args, out); });
     }
 
     bool DefenderWindow::handle_console_command(const std::vector<std::string> &args, std::ostream &out) {
@@ -68,17 +66,7 @@ namespace defender {
         }
 
         if (cmd == "status") {
-            out << "Mode: " << mode_name() << '\n'
-                << "Score: " << score << '\n'
-                << "Lives: " << lives << '\n'
-                << "Level: " << level << '\n'
-                << "Game over: " << (game_over ? "yes" : "no") << '\n'
-                << "Ship respawning: " << (ship_respawning ? "yes" : "no") << '\n'
-                << "Controller: " << (controller.active() ? controller.name() : "Disconnected") << '\n'
-                << "Ship position: " << format_vec3(ship.position) << '\n'
-                << "Active UFOs: " << active_ufo_count() << '\n'
-                << "Active asteroids: " << active_asteroid_count() << '\n'
-                << "Projectiles: " << active_projectile_count() << '\n';
+            out << "Mode: " << mode_name() << '\n' << "Score: " << score << '\n' << "Lives: " << lives << '\n' << "Level: " << level << '\n' << "Game over: " << (game_over ? "yes" : "no") << '\n' << "Ship respawning: " << (ship_respawning ? "yes" : "no") << '\n' << "Controller: " << (controller.active() ? controller.name() : "Disconnected") << '\n' << "Ship position: " << format_vec3(ship.position) << '\n' << "Active UFOs: " << active_ufo_count() << '\n' << "Active asteroids: " << active_asteroid_count() << '\n' << "Projectiles: " << active_projectile_count() << '\n';
             return true;
         }
 
@@ -249,9 +237,7 @@ namespace defender {
         return "unknown";
     }
 
-    [[nodiscard]] std::string DefenderWindow::format_vec3(const glm::vec3 &value) {
-        return std::format("({:.1f}, {:.1f}, {:.1f})", value.x, value.y, value.z);
-    }
+    [[nodiscard]] std::string DefenderWindow::format_vec3(const glm::vec3 &value) { return std::format("({:.1f}, {:.1f}, {:.1f})", value.x, value.y, value.z); }
 
     bool DefenderWindow::parse_int_arg(const std::vector<std::string> &args, std::size_t index, const char *name, int &value, std::ostream &out) const {
         if (args.size() <= index) {
@@ -385,10 +371,7 @@ namespace defender {
             return 0.0f;
         }
 
-        const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) /
-                                                (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)),
-                                            0.0f,
-                                            1.0f);
+        const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) / (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)), 0.0f, 1.0f);
         return raw_value < 0 ? -normalized : normalized;
     }
 

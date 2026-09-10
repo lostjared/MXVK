@@ -141,8 +141,7 @@ namespace example {
 
     class ExampleWindow : public mxvk::VK_Window {
       public:
-        ExampleWindow(const std::string &path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
+        ExampleWindow(const std::string &path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             current_path = path.empty() ? std::string(sprite3d_example_ASSET_DIR) : path;
             if (current_path == ".") {
                 current_path = sprite3d_example_ASSET_DIR;
@@ -228,16 +227,11 @@ namespace example {
             const auto now = std::chrono::steady_clock::now();
             const float elapsed_seconds = std::chrono::duration<float>(now - start_time).count();
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const float yaw_radians = glm::radians(yaw_degrees);
             const float pitch_radians = glm::radians(pitch_degrees);
-            const glm::vec3 camera_position(
-                camera_distance * std::cos(pitch_radians) * std::sin(yaw_radians),
-                camera_distance * std::sin(pitch_radians),
-                camera_distance * std::cos(pitch_radians) * std::cos(yaw_radians));
+            const glm::vec3 camera_position(camera_distance * std::cos(pitch_radians) * std::sin(yaw_radians), camera_distance * std::sin(pitch_radians), camera_distance * std::cos(pitch_radians) * std::cos(yaw_radians));
             glm::mat4 view = glm::lookAt(camera_position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 proj = glm::perspective(glm::radians(48.0f), aspect, 0.1f, 100.0f);
             proj[1][1] *= -1.0f;
@@ -251,9 +245,7 @@ namespace example {
                     const float star_size = star.size * twinkle * (star.is_constellation ? 1.25f : 1.0f);
                     const float alpha = std::clamp(((6.5f - star.magnitude) / 6.5f) * twinkle, 0.0f, 1.0f);
                     const glm::vec3 color = starColor(star.temperature);
-                    stars_sprite->drawSprite(glm::vec3(star.x, star.y, star.z),
-                                             glm::vec2(star_size, star_size),
-                                             glm::vec4(color, alpha));
+                    stars_sprite->drawSprite(glm::vec3(star.x, star.y, star.z), glm::vec2(star_size, star_size), glm::vec4(color, alpha));
                 }
                 stars_sprite->render(cmd, imageIndex);
                 stars_sprite->clearQueue();
@@ -267,10 +259,7 @@ namespace example {
                 const float bob = std::sin(elapsed_seconds * saucer.bob_speed + saucer.orbit_phase) * saucer.bob_amplitude;
                 const float roll = orbit_angle * 0.85f + elapsed_seconds * saucer.roll_speed;
 
-                const glm::vec3 position(
-                    saucer.orbit_center.x + std::cos(orbit_angle) * saucer.orbit_radius,
-                    saucer.orbit_center.y + bob,
-                    saucer.orbit_center.z + std::sin(orbit_angle) * saucer.orbit_radius * 0.62f);
+                const glm::vec3 position(saucer.orbit_center.x + std::cos(orbit_angle) * saucer.orbit_radius, saucer.orbit_center.y + bob, saucer.orbit_center.z + std::sin(orbit_angle) * saucer.orbit_radius * 0.62f);
 
                 const glm::vec2 size(saucer.base_size * pulse, saucer.base_size * pulse * 0.72f);
                 sprite->drawSprite(position, size, saucer.tint, roll);

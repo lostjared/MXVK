@@ -33,16 +33,7 @@ namespace viewer {
 
     class ModelViewerWindow : public mxvk::VK_Window {
       public:
-        explicit ModelViewerWindow(const Arguments &args)
-            : mxvk::VK_Window("MXModel Viewer - [ Vulkan ]",
-                              args.width,
-                              args.height,
-                              args.fullscreen,
-                              MXVK_VALIDATION,
-                              args.enable_vsync),
-              assetRoot((args.path.empty() || args.path == ".") ? std::string(VIEWER_ASSET_DIR) : args.path),
-              shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath),
-              benchmarkEnabled(args.benchmark) {
+        explicit ModelViewerWindow(const Arguments &args) : mxvk::VK_Window("MXModel Viewer - [ Vulkan ]", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync), assetRoot((args.path.empty() || args.path == ".") ? std::string(VIEWER_ASSET_DIR) : args.path), shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath), benchmarkEnabled(args.benchmark) {
             setClearColor(0.3f, 0.3f, 0.3f, 1.0f);
             setFont(resolveFontPath(), 18);
 
@@ -57,12 +48,8 @@ namespace viewer {
 
             model.load(this, modelPath, textureManifestPath, textureBasePath, 1.0f);
             model.setShaders(this, shaderRoot + "/model.vert.spv", shaderRoot + "/model.frag.spv");
-            const std::string modelFormat =
-                std::filesystem::path(modelPath).extension() == ".obj" ? "OBJ" : "model";
-            benchmarkName = std::format(
-                "{} geometry draw (Vulkan backend, {} frames)",
-                modelFormat,
-                BENCHMARK_FRAME_COUNT);
+            const std::string modelFormat = std::filesystem::path(modelPath).extension() == ".obj" ? "OBJ" : "model";
+            benchmarkName = std::format("{} geometry draw (Vulkan backend, {} frames)", modelFormat, BENCHMARK_FRAME_COUNT);
         }
 
         ~ModelViewerWindow() override {
@@ -183,8 +170,7 @@ namespace viewer {
 
         void render() override {
             if (benchmarkEnabled && benchmarkStopwatch == nullptr) {
-                benchmarkStopwatch =
-                    std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmarkName);
+                benchmarkStopwatch = std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmarkName);
             }
 
             mxvk::VK_Window::render();
@@ -203,15 +189,11 @@ namespace viewer {
             }
         }
 
-        void onSwapchainRecreated() override {
-            model.resize(this);
-        }
+        void onSwapchainRecreated() override { model.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
             const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
 
             mxvk::UniformBufferObject ubo{};
@@ -324,9 +306,7 @@ namespace viewer {
             return std::filesystem::path(manifestPath).parent_path().string();
         }
 
-        void adjustCameraDistance(float delta) {
-            cameraDistance = std::clamp(cameraDistance + delta, 0.4f, 100.0f);
-        }
+        void adjustCameraDistance(float delta) { cameraDistance = std::clamp(cameraDistance + delta, 0.4f, 100.0f); }
 
         void resetView() {
             rotationXDegrees = 0.0f;
@@ -356,19 +336,10 @@ namespace viewer {
 
             printText(fpsText, 14, 12, SDL_Color{235, 240, 255, 255});
             printText(std::format("Model: {}", std::filesystem::path(modelPath).filename().string()), 14, 36, SDL_Color{210, 220, 235, 255});
-            printText(std::format("Mode: {}  Auto: {}  Distance: {:.1f}",
-                                  wireframe ? "wire" : "fill",
-                                  autoRotate ? "on" : "off",
-                                  cameraDistance),
-                      14,
-                      60,
-                      SDL_Color{210, 220, 235, 255});
+            printText(std::format("Mode: {}  Auto: {}  Distance: {:.1f}", wireframe ? "wire" : "fill", autoRotate ? "on" : "off", cameraDistance), 14, 60, SDL_Color{210, 220, 235, 255});
 
             if (showHelp) {
-                printText("Drag/arrows rotate  Wheel/+/-/A/S zoom  W wire  R/P auto-rotate  H/Space help  Home reset  Esc quit",
-                          14,
-                          static_cast<int>(getSwapchainExtent().height) - 30,
-                          SDL_Color{185, 198, 215, 255});
+                printText("Drag/arrows rotate  Wheel/+/-/A/S zoom  W wire  R/P auto-rotate  H/Space help  Home reset  Esc quit", 14, static_cast<int>(getSwapchainExtent().height) - 30, SDL_Color{185, 198, 215, 255});
             }
         }
 

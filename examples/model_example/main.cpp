@@ -27,25 +27,7 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-        ModelWindow(const std::string filename,
-                    bool usingDefaultModel,
-                    const std::string &path,
-                    const std::string &resource,
-                    const std::string &resource_path,
-                    const std::string &fragmentShaderPath,
-                    const std::string &texture_path,
-                    const std::string &title,
-                    int width,
-                    int height,
-                    bool fullscreen,
-                    bool enable_vsync,
-                    bool binaryTextureMode,
-                    int fontSize,
-                    const std::string &fontPath,
-                    const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path),
-              binaryTextureMode(binaryTextureMode) {
+        ModelWindow(const std::string filename, bool usingDefaultModel, const std::string &path, const std::string &resource, const std::string &resource_path, const std::string &fragmentShaderPath, const std::string &texture_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool binaryTextureMode, int fontSize, const std::string &fontPath, const std::string &color) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot(path.empty() ? std::string(MODEL_EXAMPLE_ASSET_DIR) : path), binaryTextureMode(binaryTextureMode) {
             const std::string modelPath = filename;
             const std::string textureManifestPath = resource.empty() && usingDefaultModel ? assetRoot + "/data/texture_manifest.txt" : resource;
             const bool useDefaultTextureBase = resource_path.empty() && (usingDefaultModel || !resource.empty());
@@ -171,9 +153,7 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            model.resize(this);
-        }
+        void onSwapchainRecreated() override { model.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const auto now = std::chrono::steady_clock::now();
@@ -192,9 +172,7 @@ namespace example {
 
             const VkExtent2D extent = getSwapchainExtent();
 
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             if (skyboxMode) {
@@ -228,8 +206,7 @@ namespace example {
                 const int textureHeight = binaryMatrixTexture->height();
                 const int texturePitch = binaryMatrixTexture->pitch();
                 const void *texturePixels = flippedMatrixTexturePixels(textureWidth, textureHeight, texturePitch);
-                [[maybe_unused]] const bool textureUpdated = model.updatePrimaryTexture(
-                    texturePixels, textureWidth, textureHeight, textureWidth * 4);
+                [[maybe_unused]] const bool textureUpdated = model.updatePrimaryTexture(texturePixels, textureWidth, textureHeight, textureWidth * 4);
             }
             model.render(cmd, imageIndex, false);
         }
@@ -314,24 +291,16 @@ namespace example {
         [[nodiscard]] glm::vec3 skyboxUpVector() const {
             const float yawRadians = glm::radians(skyboxYawDegrees);
             const float upPitchRadians = glm::radians(skyboxPitchDegrees + 90.0f);
-            return glm::normalize(glm::vec3{
-                std::sin(yawRadians) * std::cos(upPitchRadians),
-                std::sin(upPitchRadians),
-                -std::cos(yawRadians) * std::cos(upPitchRadians)});
+            return glm::normalize(glm::vec3{std::sin(yawRadians) * std::cos(upPitchRadians), std::sin(upPitchRadians), -std::cos(yawRadians) * std::cos(upPitchRadians)});
         }
 
         [[nodiscard]] glm::vec3 skyboxForwardVector() const {
             const float yawRadians = glm::radians(skyboxYawDegrees);
             const float pitchRadians = glm::radians(skyboxPitchDegrees);
-            return glm::normalize(glm::vec3{
-                std::sin(yawRadians) * std::cos(pitchRadians),
-                std::sin(pitchRadians),
-                -std::cos(yawRadians) * std::cos(pitchRadians)});
+            return glm::normalize(glm::vec3{std::sin(yawRadians) * std::cos(pitchRadians), std::sin(pitchRadians), -std::cos(yawRadians) * std::cos(pitchRadians)});
         }
 
-        [[nodiscard]] glm::vec3 skyboxRightVector() const {
-            return glm::normalize(glm::cross(skyboxForwardVector(), skyboxUpVector()));
-        }
+        [[nodiscard]] glm::vec3 skyboxRightVector() const { return glm::normalize(glm::cross(skyboxForwardVector(), skyboxUpVector())); }
 
         void updateSkyboxCamera(float deltaSeconds) {
             const float lookSpeed = 85.0f;
@@ -370,23 +339,7 @@ int main(int argc, char **argv) {
         if (args.filename.empty()) {
             filename = args.path + "/data/pyramid.obj";
         }
-        example::ModelWindow window(
-            filename,
-            usingDefaultModel,
-            args.path,
-            args.resource,
-            args.resource_path,
-            args.fragmentPath,
-            args.texture,
-            "MXVK Model Example",
-            args.width,
-            args.height,
-            args.fullscreen,
-            args.enable_vsync,
-            args.binary,
-            args.font_size,
-            args.font_path,
-            args.color);
+        example::ModelWindow window(filename, usingDefaultModel, args.path, args.resource, args.resource_path, args.fragmentPath, args.texture, "MXVK Model Example", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary, args.font_size, args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

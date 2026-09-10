@@ -12,8 +12,7 @@
 #include <QFileInfo>
 #include <QInputDialog>
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), activeProcess(nullptr) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), activeProcess(nullptr) {
     settings = new QSettings("MXModel", "ModelViewer", this);
     initWindow();
     loadSettings();
@@ -220,8 +219,7 @@ void MainWindow::createConnections() {
     connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
     connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettingsDialog);
 
-    connect(recentFilesCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &MainWindow::openRecentModel);
+    connect(recentFilesCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::openRecentModel);
 
     connect(modelLineEdit, &QLineEdit::textChanged, this, &MainWindow::validatePaths);
     connect(textureLineEdit, &QLineEdit::textChanged, this, &MainWindow::validatePaths);
@@ -238,9 +236,7 @@ void MainWindow::populateResolutionCombo() {
 
 void MainWindow::closeEvent(QCloseEvent *event) {
     if (activeProcess && activeProcess->state() != QProcess::NotRunning) {
-        auto reply = QMessageBox::question(this, tr("Viewer Running"),
-                                           tr("The model viewer is still running. Do you want to close it and exit?"),
-                                           QMessageBox::Yes | QMessageBox::No);
+        auto reply = QMessageBox::question(this, tr("Viewer Running"), tr("The model viewer is still running. Do you want to close it and exit?"), QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
             activeProcess->kill();
@@ -284,9 +280,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
 
 void MainWindow::browseModelFile() {
     QString lastDir = settings->value("lastModelDir", QDir::homePath()).toString();
-    QString fileName = QFileDialog::getOpenFileName(this,
-                                                    tr("Open Model File"), lastDir,
-                                                    tr("Model Files (*.mxmod *.mxmod.z *.obj);;All Files (*)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open Model File"), lastDir, tr("Model Files (*.mxmod *.mxmod.z *.obj);;All Files (*)"));
 
     if (!fileName.isEmpty()) {
         modelLineEdit->setText(fileName);
@@ -298,9 +292,7 @@ void MainWindow::browseModelFile() {
 
 void MainWindow::browseTextureFile() {
     QString lastDir = settings->value("lastTextureDir", QDir::homePath()).toString();
-    QString fileName = QFileDialog::getOpenFileName(this,
-                                                    tr("Open Texture File"), lastDir,
-                                                    tr("Texture Files (*.tex *.png *.jpg *.bmp *.mtl);;All Files (*)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open Texture File"), lastDir, tr("Texture Files (*.tex *.png *.jpg *.bmp *.mtl);;All Files (*)"));
 
     if (!fileName.isEmpty()) {
         textureLineEdit->setText(fileName);
@@ -311,9 +303,7 @@ void MainWindow::browseTextureFile() {
 
 void MainWindow::browseTextureDirectory() {
     QString lastDir = settings->value("lastTextureDirPath", QDir::homePath()).toString();
-    QString dirName = QFileDialog::getExistingDirectory(this,
-                                                        tr("Select Texture Directory"), lastDir,
-                                                        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    QString dirName = QFileDialog::getExistingDirectory(this, tr("Select Texture Directory"), lastDir, QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
 
     if (!dirName.isEmpty()) {
         textureDirLineEdit->setText(dirName);
@@ -379,20 +369,17 @@ void MainWindow::openModelViewer() {
     QDir dir(textureDir);
 
     if (!modelInfo.exists() || !modelInfo.isFile()) {
-        QMessageBox::warning(this, tr("Invalid Path"),
-                             tr("The model file does not exist or is invalid."));
+        QMessageBox::warning(this, tr("Invalid Path"), tr("The model file does not exist or is invalid."));
         return;
     }
 
     if (!texturePath.isEmpty() && (!textureInfo.exists() || !textureInfo.isFile())) {
-        QMessageBox::warning(this, tr("Invalid Path"),
-                             tr("The texture file does not exist or is invalid."));
+        QMessageBox::warning(this, tr("Invalid Path"), tr("The texture file does not exist or is invalid."));
         return;
     }
 
     if (!textureDir.isEmpty() && !dir.exists()) {
-        QMessageBox::warning(this, tr("Invalid Path"),
-                             tr("The texture directory does not exist."));
+        QMessageBox::warning(this, tr("Invalid Path"), tr("The texture directory does not exist."));
         return;
     }
 
@@ -400,17 +387,14 @@ void MainWindow::openModelViewer() {
     QProcess *process = activeProcess;
 
     consoleOutput->clear();
-    consoleOutput->appendPlainText(QString("[%1] Starting model viewer...")
-                                       .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+    consoleOutput->appendPlainText(QString("[%1] Starting model viewer...").arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
 
     // Mirror renderer stdout into the GUI console with wall-clock timestamps.
     connect(process, &QProcess::readyReadStandardOutput, [this, process]() {
         QByteArray output = process->readAllStandardOutput();
         QString text = QString::fromLocal8Bit(output).trimmed();
         if (!text.isEmpty()) {
-            consoleOutput->appendPlainText(QString("[%1] %2")
-                                               .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                               .arg(text));
+            consoleOutput->appendPlainText(QString("[%1] %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(text));
         }
         QScrollBar *scrollBar = consoleOutput->verticalScrollBar();
         scrollBar->setValue(scrollBar->maximum());
@@ -426,9 +410,7 @@ void MainWindow::openModelViewer() {
             errorFormat.setForeground(QColor("#39ff14"));
 
             consoleOutput->setCurrentCharFormat(errorFormat);
-            consoleOutput->appendPlainText(QString("[%1] ERROR: %2")
-                                               .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                               .arg(text));
+            consoleOutput->appendPlainText(QString("[%1] ERROR: %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(text));
             consoleOutput->setCurrentCharFormat(originalFormat);
         }
         QScrollBar *scrollBar = consoleOutput->verticalScrollBar();
@@ -436,35 +418,31 @@ void MainWindow::openModelViewer() {
     });
 
     // QProcess owns the renderer lifetime from launch until finished/error cleanup.
-    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            [this, process](int exitCode, QProcess::ExitStatus) {
-                QString exitMsg;
-                if (exitCode != 0) {
-                    exitMsg = QString("[%1] Process exited with error code %2")
-                                  .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                  .arg(exitCode);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), [this, process](int exitCode, QProcess::ExitStatus) {
+        QString exitMsg;
+        if (exitCode != 0) {
+            exitMsg = QString("[%1] Process exited with error code %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(exitCode);
 
-                    QTextCharFormat originalFormat = consoleOutput->currentCharFormat();
-                    QTextCharFormat errorFormat = originalFormat;
-                    errorFormat.setForeground(QColor("#39ff14"));
-                    consoleOutput->setCurrentCharFormat(errorFormat);
-                    consoleOutput->appendPlainText(exitMsg);
-                    consoleOutput->setCurrentCharFormat(originalFormat);
+            QTextCharFormat originalFormat = consoleOutput->currentCharFormat();
+            QTextCharFormat errorFormat = originalFormat;
+            errorFormat.setForeground(QColor("#39ff14"));
+            consoleOutput->setCurrentCharFormat(errorFormat);
+            consoleOutput->appendPlainText(exitMsg);
+            consoleOutput->setCurrentCharFormat(originalFormat);
 
-                    statusLabel->setText(tr("Viewer exited with error"));
-                } else {
-                    exitMsg = QString("[%1] Process completed successfully")
-                                  .arg(QDateTime::currentDateTime().toString("hh:mm:ss"));
-                    consoleOutput->appendPlainText(exitMsg);
-                    statusLabel->setText(tr("Viewer closed"));
-                }
+            statusLabel->setText(tr("Viewer exited with error"));
+        } else {
+            exitMsg = QString("[%1] Process completed successfully").arg(QDateTime::currentDateTime().toString("hh:mm:ss"));
+            consoleOutput->appendPlainText(exitMsg);
+            statusLabel->setText(tr("Viewer closed"));
+        }
 
-                if (activeProcess == process) {
-                    activeProcess = nullptr;
-                }
-                process->deleteLater();
-                updateUIState(false);
-            });
+        if (activeProcess == process) {
+            activeProcess = nullptr;
+        }
+        process->deleteLater();
+        updateUIState(false);
+    });
 
     connect(process, &QProcess::errorOccurred, [this, process](QProcess::ProcessError error) {
         QString errorMsg;
@@ -479,12 +457,9 @@ void MainWindow::openModelViewer() {
             errorMsg = process->errorString();
         }
 
-        QMessageBox::critical(this, tr("Process Error"),
-                              tr("Model viewer error: %1").arg(errorMsg));
+        QMessageBox::critical(this, tr("Process Error"), tr("Model viewer error: %1").arg(errorMsg));
 
-        consoleOutput->appendPlainText(QString("[%1] ERROR: %2")
-                                           .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                           .arg(errorMsg));
+        consoleOutput->appendPlainText(QString("[%1] ERROR: %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(errorMsg));
 
         if (activeProcess == process) {
             activeProcess = nullptr;
@@ -512,10 +487,7 @@ void MainWindow::openModelViewer() {
         rendererAssetPath = selectedExecutableInfo.absolutePath();
     }
     arguments << "-p" << rendererAssetPath;
-    consoleOutput->appendPlainText(QString("[%1] Command: %2 %3")
-                                       .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                       .arg(selectedExecutable)
-                                       .arg(arguments.join(" ")));
+    consoleOutput->appendPlainText(QString("[%1] Command: %2 %3").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(selectedExecutable).arg(arguments.join(" ")));
     consoleOutput->appendPlainText(QString("").leftJustified(60, '-'));
 
     process->start(selectedExecutable, arguments);
@@ -528,9 +500,7 @@ void MainWindow::openModelViewer() {
 
         QMessageBox::critical(this, tr("Startup Error"), errorMsg);
 
-        consoleOutput->appendPlainText(QString("[%1] FATAL: Failed to start process: %2")
-                                           .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-                                           .arg(selectedExecutable));
+        consoleOutput->appendPlainText(QString("[%1] FATAL: Failed to start process: %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(selectedExecutable));
 
         activeProcess = nullptr;
         process->deleteLater();
@@ -544,13 +514,10 @@ void MainWindow::openModelViewer() {
 
 void MainWindow::stopProcess() {
     if (activeProcess && activeProcess->state() != QProcess::NotRunning) {
-        auto reply = QMessageBox::question(this, tr("Stop Viewer"),
-                                           tr("Are you sure you want to stop the model viewer?"),
-                                           QMessageBox::Yes | QMessageBox::No);
+        auto reply = QMessageBox::question(this, tr("Stop Viewer"), tr("Are you sure you want to stop the model viewer?"), QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
-            consoleOutput->appendPlainText(QString("[%1] Stopping process...")
-                                               .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+            consoleOutput->appendPlainText(QString("[%1] Stopping process...").arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
             activeProcess->terminate();
 
             if (!activeProcess->waitForFinished(2000)) {
@@ -641,11 +608,9 @@ void MainWindow::openRecentModel(int index) {
         QString modelPath = recentFilesCombo->itemData(index).toString();
         if (QFileInfo(modelPath).exists()) {
             modelLineEdit->setText(modelPath);
-            statusLabel->setText(tr("Loaded recent: %1")
-                                     .arg(QFileInfo(modelPath).fileName()));
+            statusLabel->setText(tr("Loaded recent: %1").arg(QFileInfo(modelPath).fileName()));
         } else {
-            QMessageBox::warning(this, tr("File Not Found"),
-                                 tr("The selected recent file no longer exists."));
+            QMessageBox::warning(this, tr("File Not Found"), tr("The selected recent file no longer exists."));
             recentModels.removeAll(modelPath);
             loadRecentFiles();
         }
@@ -663,7 +628,8 @@ void MainWindow::removeRecentFile() {
 }
 
 void MainWindow::showAboutDialog() {
-    QMessageBox::about(this, tr("MXMOD Model Viewer"),
+    QMessageBox::about(this,
+                       tr("MXMOD Model Viewer"),
                        tr("<h3>MXMOD Model Viewer v1.0</h3>"
                           "<p>A modern Qt-based model viewer application for .mxmod files.</p>"
                           "<p><b>Features:</b></p>"
@@ -744,10 +710,7 @@ void MainWindow::showSettingsDialog() {
     mainLayout->addLayout(buttonLayout);
 
     connect(browseExecBtn, &QPushButton::clicked, [this, execPathEdit]() {
-        QString fileName = QFileDialog::getOpenFileName(this,
-                                                        tr("Select Viewer Executable"),
-                                                        QFileInfo(execPathEdit->text()).absolutePath(),
-                                                        tr("Executables (viewer*);;All Files (*)"));
+        QString fileName = QFileDialog::getOpenFileName(this, tr("Select Viewer Executable"), QFileInfo(execPathEdit->text()).absolutePath(), tr("Executables (viewer*);;All Files (*)"));
 
         if (!fileName.isEmpty()) {
             execPathEdit->setText(fileName);
@@ -755,15 +718,12 @@ void MainWindow::showSettingsDialog() {
     });
 
     connect(clearRecentBtn, &QPushButton::clicked, [this, &settingsDialog]() {
-        auto reply = QMessageBox::question(&settingsDialog, tr("Clear Recent Files"),
-                                           tr("Are you sure you want to clear all recent files?"),
-                                           QMessageBox::Yes | QMessageBox::No);
+        auto reply = QMessageBox::question(&settingsDialog, tr("Clear Recent Files"), tr("Are you sure you want to clear all recent files?"), QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
             recentModels.clear();
             loadRecentFiles();
-            QMessageBox::information(&settingsDialog, tr("Cleared"),
-                                     tr("Recent files history has been cleared."));
+            QMessageBox::information(&settingsDialog, tr("Cleared"), tr("Recent files history has been cleared."));
         }
     });
 
@@ -779,9 +739,7 @@ void MainWindow::showSettingsDialog() {
         }
 
         if (newPath != "viewer" && !QFileInfo(newPath).isExecutable() && !QFileInfo(newPath).exists()) {
-            auto reply = QMessageBox::question(&settingsDialog, tr("File Not Found"),
-                                               tr("The specified file does not exist or is not executable. Save anyway?"),
-                                               QMessageBox::Yes | QMessageBox::No);
+            auto reply = QMessageBox::question(&settingsDialog, tr("File Not Found"), tr("The specified file does not exist or is not executable. Save anyway?"), QMessageBox::Yes | QMessageBox::No);
 
             if (reply == QMessageBox::No) {
                 return;

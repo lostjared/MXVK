@@ -179,9 +179,7 @@ namespace {
         "red3.png",
     }};
 
-    [[nodiscard]] bool is_play_block(BlockType type) {
-        return type >= BlockType::Red1 && type <= BlockType::Match;
-    }
+    [[nodiscard]] bool is_play_block(BlockType type) { return type >= BlockType::Red1 && type <= BlockType::Match; }
 
     [[nodiscard]] int texture_index(BlockType type) {
         if (!is_play_block(type)) {
@@ -190,18 +188,11 @@ namespace {
         return static_cast<int>(type) - static_cast<int>(BlockType::Red1);
     }
 
-    [[nodiscard]] bool same_or_match(BlockType actual, BlockType expected) {
-        return actual == expected || actual == BlockType::Match;
-    }
+    [[nodiscard]] bool same_or_match(BlockType actual, BlockType expected) { return actual == expected || actual == BlockType::Match; }
 
     class PuzzleDropWindow final : public mxvk::VK_Window {
       public:
-        PuzzleDropWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("-[ MXVK 3D PuzzleDrop ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root((path.empty() || path == ".") ? std::string(puzzle_drop_ASSET_DIR) : path),
-              data_root(asset_root + "/data"),
-              shader_root(data_root),
-              tetris_data_root(data_root) {
+        PuzzleDropWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("-[ MXVK 3D PuzzleDrop ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root((path.empty() || path == ".") ? std::string(puzzle_drop_ASSET_DIR) : path), data_root(asset_root + "/data"), shader_root(data_root), tetris_data_root(data_root) {
             std::random_device rd;
             rng.seed(rd());
             setClearColor(0.03f, 0.04f, 0.05f, 1.0f);
@@ -212,15 +203,9 @@ namespace {
             }
             std::shuffle(level_graphics.begin(), level_graphics.end(), rng);
             for (size_t i = 0; i < backgrounds.size(); ++i) {
-                backgrounds[i] = createSprite(
-                    level_graphics[i],
-                    shader_root + "/sprite.vert.spv",
-                    shader_root + "/puzzle_drop_background.frag.spv");
+                backgrounds[i] = createSprite(level_graphics[i], shader_root + "/sprite.vert.spv", shader_root + "/puzzle_drop_background.frag.spv");
             }
-            intro_sprite = createSprite(
-                std::format("{}/intro1.png", data_root),
-                shader_root + "/sprite.vert.spv",
-                shader_root + "/intro.frag.spv");
+            intro_sprite = createSprite(std::format("{}/intro1.png", data_root), shader_root + "/sprite.vert.spv", shader_root + "/intro.frag.spv");
             matrix::RainConfig rain_config = matrix::make_matrix_rain_config(asset_root, false);
             rain_config.color = "#2f8dff";
             rain_config.surface_width = MATRIX_RAIN_TEXTURE_WIDTH;
@@ -483,10 +468,7 @@ namespace {
 
         void randomize_wildcard_color() {
             std::uniform_int_distribution<int> dist(0, 254);
-            wildcard_color = glm::vec3(
-                static_cast<float>(dist(rng)) / 255.0f,
-                static_cast<float>(dist(rng)) / 255.0f,
-                static_cast<float>(dist(rng)) / 255.0f);
+            wildcard_color = glm::vec3(static_cast<float>(dist(rng)) / 255.0f, static_cast<float>(dist(rng)) / 255.0f, static_cast<float>(dist(rng)) / 255.0f);
         }
 
         void handle_view_controls(const bool *keys, float delta_seconds) {
@@ -597,10 +579,7 @@ namespace {
             const bool dpad_down = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
             const bool dpad_up = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
 
-            const int move_direction = dpad_left == dpad_right
-                                           ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1
-                                                                                                              : 0)
-                                           : (dpad_left ? -1 : 1);
+            const int move_direction = dpad_left == dpad_right ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1 : 0) : (dpad_left ? -1 : 1);
             if (move_direction == 0) {
                 gamepad_move_direction = 0;
                 gamepad_move_held_seconds = 0.0f;
@@ -612,9 +591,7 @@ namespace {
                 move_piece_horizontal(gamepad_move_direction);
             } else {
                 gamepad_move_held_seconds += delta_seconds;
-                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS)
-                                            ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS
-                                            : GAMEPAD_MOVE_REPEAT_SECONDS;
+                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS) ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS : GAMEPAD_MOVE_REPEAT_SECONDS;
                 gamepad_move_repeat_timer += delta_seconds;
                 if (gamepad_move_repeat_timer >= threshold) {
                     move_piece_horizontal(gamepad_move_direction);
@@ -654,9 +631,7 @@ namespace {
                 grid_yaw += static_cast<float>(right_x) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_ROTATE_SPEED * delta_seconds;
             }
             if (std::abs(right_y) > GAMEPAD_DEADZONE) {
-                grid_pitch = std::clamp(grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds,
-                                        -70.0f,
-                                        70.0f);
+                grid_pitch = std::clamp(grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds, -70.0f, 70.0f);
             }
 
             constexpr float ZOOM_SPEED = 3.2f;
@@ -731,9 +706,7 @@ namespace {
             }
         }
 
-        void cycle_piece_blocks() {
-            piece.shift(ShiftDirection::Up);
-        }
+        void cycle_piece_blocks() { piece.shift(ShiftDirection::Up); }
 
         void hard_drop() {
             if (!game_started || game_over) {
@@ -883,8 +856,7 @@ namespace {
                             const BlockType one = start;
                             const BlockType two = static_cast<BlockType>(static_cast<int>(start) + 1);
                             const BlockType three = static_cast<BlockType>(static_cast<int>(start) + 2);
-                            if (check_sequence(x, y, direction[0], direction[1], one, two, three) ||
-                                check_sequence(x, y, direction[0], direction[1], three, two, one)) {
+                            if (check_sequence(x, y, direction[0], direction[1], one, two, three) || check_sequence(x, y, direction[0], direction[1], three, two, one)) {
                                 mark_clear(x, y, direction[0], direction[1]);
                                 add_score();
                                 return true;
@@ -931,9 +903,7 @@ namespace {
             return updated;
         }
 
-        [[nodiscard]] bool check_sequence(int x, int y, int dx, int dy, BlockType first, BlockType second, BlockType third) const {
-            return check_block(x, y, first) && check_block(x + dx, y + dy, second) && check_block(x + dx * 2, y + dy * 2, third);
-        }
+        [[nodiscard]] bool check_sequence(int x, int y, int dx, int dy, BlockType first, BlockType second, BlockType third) const { return check_block(x, y, first) && check_block(x + dx, y + dy, second) && check_block(x + dx * 2, y + dy * 2, third); }
 
         [[nodiscard]] bool check_block(int x, int y, BlockType expected) const {
             if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) {
@@ -960,24 +930,12 @@ namespace {
 
         void init_cube_model() {
             cube_model = std::make_unique<mxvk::VKAbstractModel>();
-            cube_model->load(this,
-                             tetris_data_root + "/cube.mxmod.z",
-                             data_root + "/cube_textures.txt",
-                             data_root,
-                             1.0f);
-            cube_model->setShaders(this,
-                                   shader_root + "/puzzle_drop_piece.vert.spv",
-                                   shader_root + "/puzzle_drop_piece.frag.spv");
+            cube_model->load(this, tetris_data_root + "/cube.mxmod.z", data_root + "/cube_textures.txt", data_root, 1.0f);
+            cube_model->setShaders(this, shader_root + "/puzzle_drop_piece.vert.spv", shader_root + "/puzzle_drop_piece.frag.spv");
 
             grid_backdrop_model = std::make_unique<mxvk::VKAbstractModel>();
-            grid_backdrop_model->load(this,
-                                      tetris_data_root + "/cube.mxmod.z",
-                                      tetris_data_root + "/manifest_gray.txt",
-                                      tetris_data_root,
-                                      1.0f);
-            grid_backdrop_model->setShaders(this,
-                                            shader_root + "/puzzle_drop_piece.vert.spv",
-                                            shader_root + "/puzzle_drop_piece.frag.spv");
+            grid_backdrop_model->load(this, tetris_data_root + "/cube.mxmod.z", tetris_data_root + "/manifest_gray.txt", tetris_data_root, 1.0f);
+            grid_backdrop_model->setShaders(this, shader_root + "/puzzle_drop_piece.vert.spv", shader_root + "/puzzle_drop_piece.frag.spv");
             grid_backdrop_model->setAlphaBlending(true);
         }
 
@@ -1194,13 +1152,7 @@ namespace {
             return model;
         }
 
-        void draw_cube(VkCommandBuffer cmd,
-                       uint32_t image_index,
-                       BlockType type,
-                       int x,
-                       int y,
-                       const glm::mat4 &view,
-                       const glm::mat4 &proj) const {
+        void draw_cube(VkCommandBuffer cmd, uint32_t image_index, BlockType type, int x, int y, const glm::mat4 &view, const glm::mat4 &proj) const {
             if (!cube_model) {
                 return;
             }
@@ -1229,12 +1181,7 @@ namespace {
             }
         }
 
-        void draw_frame_cube(VkCommandBuffer cmd,
-                             uint32_t image_index,
-                             int x,
-                             int y,
-                             const glm::mat4 &view,
-                             const glm::mat4 &proj) const {
+        void draw_frame_cube(VkCommandBuffer cmd, uint32_t image_index, int x, int y, const glm::mat4 &view, const glm::mat4 &proj) const {
             if (!cube_model) {
                 return;
             }

@@ -51,13 +51,9 @@ namespace mxvk {
 
 namespace jpeg {
     // Legacy namespace compatibility.
-    inline SDL_Surface *LoadJPEG(const char *filename) {
-        return mxvk::VK_JPEG::Load(filename);
-    }
+    inline SDL_Surface *LoadJPEG(const char *filename) { return mxvk::VK_JPEG::Load(filename); }
 
-    inline bool SaveJPEG(SDL_Renderer *renderer, SDL_Texture *texture, const char *filename, int quality = 90) {
-        return mxvk::VK_JPEG::SaveTexture(texture, renderer, filename, quality);
-    }
+    inline bool SaveJPEG(SDL_Renderer *renderer, SDL_Texture *texture, const char *filename, int quality = 90) { return mxvk::VK_JPEG::SaveTexture(texture, renderer, filename, quality); }
 } // namespace jpeg
 
 #endif

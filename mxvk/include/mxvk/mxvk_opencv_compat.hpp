@@ -14,17 +14,11 @@
 
 namespace mxvk {
 
-    [[nodiscard]] inline cudaStream_t cuda_stream_handle(cv::cuda::Stream &stream) {
-        return cv::cuda::StreamAccessor::getStream(stream);
-    }
+    [[nodiscard]] inline cudaStream_t cuda_stream_handle(cv::cuda::Stream &stream) { return cv::cuda::StreamAccessor::getStream(stream); }
 
-    [[nodiscard]] inline cv::Mat host_mem_mat_header(cv::cuda::HostMem &hostMem) {
-        return hostMem.createMatHeader();
-    }
+    [[nodiscard]] inline cv::Mat host_mem_mat_header(cv::cuda::HostMem &hostMem) { return hostMem.createMatHeader(); }
 
-    [[nodiscard]] inline cv::cuda::GpuMat host_mem_gpu_header(cv::cuda::HostMem &hostMem) {
-        return hostMem.createGpuMatHeader();
-    }
+    [[nodiscard]] inline cv::cuda::GpuMat host_mem_gpu_header(cv::cuda::HostMem &hostMem) { return hostMem.createGpuMatHeader(); }
 
 } // namespace mxvk
 #endif

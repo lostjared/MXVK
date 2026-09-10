@@ -39,13 +39,9 @@ namespace mxvk {
         std::cout << "mxvk_cv: Capture closed\n";
     }
 
-    void VK_Capture::resetSprite() {
-        sprite.reset();
-    }
+    void VK_Capture::resetSprite() { sprite.reset(); }
 
-    bool VK_Capture::createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue,
-                                 VkCommandPool cmdPool, size_t width, size_t height,
-                                 const std::string &vert, const std::string &frag) {
+    bool VK_Capture::createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool, size_t width, size_t height, const std::string &vert, const std::string &frag) {
         sprite = std::make_unique<VK_Sprite>(device, physDev, gQueue, cmdPool);
         sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
         sprite->enableExtendedUBO();
@@ -58,22 +54,16 @@ namespace mxvk {
         if (sprite) {
             sprite->createEmptySprite(static_cast<int>(width), static_cast<int>(height), vert, frag);
             sprite->enableExtendedUBO();
-            std::cout << std::format("mxvk_cv: Shader reloaded: vert={} frag={}\n",
-                                     std::filesystem::path(vert).filename().string(),
-                                     std::filesystem::path(frag).filename().string());
+            std::cout << std::format("mxvk_cv: Shader reloaded: vert={} frag={}\n", std::filesystem::path(vert).filename().string(), std::filesystem::path(frag).filename().string());
             return true;
         }
         std::cout << "mxvk_cv: Reload failed: no sprite\n";
         return false;
     }
 
-    bool VK_Capture::read(cv::Mat &frame) {
-        return cap.read(frame);
-    }
+    bool VK_Capture::read(cv::Mat &frame) { return cap.read(frame); }
 
-    bool VK_Capture::grab() {
-        return cap.grab();
-    }
+    bool VK_Capture::grab() { return cap.grab(); }
 
     bool VK_Capture::readRgba(cv::Mat &rgba, bool flipY) {
 #ifdef MXVK_CUDA
@@ -104,9 +94,7 @@ namespace mxvk {
                 }
 
                 if (!cudaPipelineLogged) {
-                    std::cout << std::format(
-                        "mxvk_cv: CUDA RGBA path active: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> {} -> download\n",
-                        flipY ? "cv::cuda::flip(Y)" : "no Y flip");
+                    std::cout << std::format("mxvk_cv: CUDA RGBA path active: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> {} -> download\n", flipY ? "cv::cuda::flip(Y)" : "no Y flip");
                     cudaPipelineLogged = true;
                 }
 
@@ -164,18 +152,11 @@ namespace mxvk {
             }
             cudaAvailable = true;
             std::cout << std::format("mxvk_cv: CUDA init: selected device 0: {}\n", deviceInfo.name());
-            std::cout << std::format("mxvk_cv: CUDA init: compute capability {}.{}\n",
-                                     deviceInfo.majorVersion(), deviceInfo.minorVersion());
-            std::cout << std::format("mxvk_cv: CUDA init: unified addressing={}, host memory mapping={}\n",
-                                     deviceInfo.unifiedAddressing() ? "true" : "false",
-                                     cudaMappedInput ? "true" : "false");
-            std::cout << std::format("mxvk_cv: CUDA init: capture input mode={}\n",
-                                     cudaMappedInput ? "mapped HostMem::SHARED GpuMat header" : "cv::Mat upload to GpuMat");
-            std::cout << std::format("mxvk_cv: CUDA init: Vulkan upload Y flip={} (default on for CUDA external-memory textures; override with MXVK_CUDA_FLIP_Y=0 or 1)\n",
-                                     cudaFlipYForVulkan ? "enabled" : "disabled");
-            std::cout << std::format("mxvk_cv: CUDA path enabled on {} ({})\n",
-                                     deviceInfo.name(),
-                                     cudaMappedInput ? "mapped zero-copy input" : "pinned async input upload");
+            std::cout << std::format("mxvk_cv: CUDA init: compute capability {}.{}\n", deviceInfo.majorVersion(), deviceInfo.minorVersion());
+            std::cout << std::format("mxvk_cv: CUDA init: unified addressing={}, host memory mapping={}\n", deviceInfo.unifiedAddressing() ? "true" : "false", cudaMappedInput ? "true" : "false");
+            std::cout << std::format("mxvk_cv: CUDA init: capture input mode={}\n", cudaMappedInput ? "mapped HostMem::SHARED GpuMat header" : "cv::Mat upload to GpuMat");
+            std::cout << std::format("mxvk_cv: CUDA init: Vulkan upload Y flip={} (default on for CUDA external-memory textures; override with MXVK_CUDA_FLIP_Y=0 or 1)\n", cudaFlipYForVulkan ? "enabled" : "disabled");
+            std::cout << std::format("mxvk_cv: CUDA path enabled on {} ({})\n", deviceInfo.name(), cudaMappedInput ? "mapped zero-copy input" : "pinned async input upload");
             std::cout << "mxvk_cv: CUDA pipeline: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> direct Vulkan texture when available\n";
         } catch (const cv::Exception &e) {
             std::cout << std::format("mxvk_cv: CUDA path unavailable: {}\n", e.what());
@@ -221,9 +202,7 @@ namespace mxvk {
 
             if (sprite && sprite->updateTextureCuda(gpuVulkanRgba, cuda_stream)) {
                 if (!cudaPipelineLogged) {
-                    std::cout << std::format(
-                        "mxvk_cv: CUDA interop active: RGBA GpuMat -> {} -> Vulkan external-memory image\n",
-                        cudaFlipYForVulkan ? "cv::cuda::flip(Y)" : "no Y flip");
+                    std::cout << std::format("mxvk_cv: CUDA interop active: RGBA GpuMat -> {} -> Vulkan external-memory image\n", cudaFlipYForVulkan ? "cv::cuda::flip(Y)" : "no Y flip");
                     cudaPipelineLogged = true;
                 }
                 return true;
@@ -238,8 +217,7 @@ namespace mxvk {
             cuda_stream.waitForCompletion();
 
             pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
-            sprite->updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
-                                  static_cast<int>(pinnedRgbaMat.step));
+            sprite->updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows, static_cast<int>(pinnedRgbaMat.step));
             return true;
         } catch (const cv::Exception &e) {
             std::cout << std::format("mxvk_cv: CUDA frame path failed; falling back to CPU path: {}\n", e.what());
@@ -283,9 +261,7 @@ namespace mxvk {
             }
 
             if (!cudaPipelineLogged) {
-                std::cout << std::format(
-                    "mxvk_cv: CUDA GpuMat path active: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> {} -> resident GpuMat for caller\n",
-                    flipY ? "cv::cuda::flip(Y)" : "no Y flip");
+                std::cout << std::format("mxvk_cv: CUDA GpuMat path active: capture -> GpuMat -> cv::cuda::cvtColor(BGR to RGBA) -> {} -> resident GpuMat for caller\n", flipY ? "cv::cuda::flip(Y)" : "no Y flip");
                 cudaPipelineLogged = true;
             }
 
@@ -329,9 +305,7 @@ namespace mxvk {
 
                 if (model.updatePrimaryTextureCuda(gpuVulkanRgba, cuda_stream)) {
                     if (!cudaPipelineLogged) {
-                        std::cout << std::format(
-                            "mxvk_cv: CUDA interop active for model texture: RGBA GpuMat -> {} -> Vulkan external-memory image array (no download)\n",
-                            flipY ? "cv::cuda::flip(Y)" : "no Y flip");
+                        std::cout << std::format("mxvk_cv: CUDA interop active for model texture: RGBA GpuMat -> {} -> Vulkan external-memory image array (no download)\n", flipY ? "cv::cuda::flip(Y)" : "no Y flip");
                         cudaPipelineLogged = true;
                     }
                     return true;
@@ -346,8 +320,7 @@ namespace mxvk {
                 cuda_stream.waitForCompletion();
 
                 pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
-                return model.updatePrimaryTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
-                                                  static_cast<int>(pinnedRgbaMat.step));
+                return model.updatePrimaryTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows, static_cast<int>(pinnedRgbaMat.step));
             } catch (const cv::Exception &e) {
                 std::cout << std::format("mxvk_cv: CUDA model-texture path failed; falling back to CPU path: {}\n", e.what());
                 cudaAvailable = false;
@@ -409,9 +382,7 @@ namespace mxvk {
 
                 if (targetSprite.updateTextureCuda(gpuVulkanRgba, cuda_stream)) {
                     if (!cudaPipelineLogged) {
-                        std::cout << std::format(
-                            "mxvk_cv: CUDA interop active for external sprite: RGBA GpuMat -> {} -> Vulkan external-memory image\n",
-                            flipY ? "cv::cuda::flip(Y)" : "no Y flip");
+                        std::cout << std::format("mxvk_cv: CUDA interop active for external sprite: RGBA GpuMat -> {} -> Vulkan external-memory image\n", flipY ? "cv::cuda::flip(Y)" : "no Y flip");
                         cudaPipelineLogged = true;
                     }
                     return true;
@@ -426,8 +397,7 @@ namespace mxvk {
                 cuda_stream.waitForCompletion();
 
                 pinnedRgbaMat = host_mem_mat_header(pinnedRgba);
-                targetSprite.updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows,
-                                           static_cast<int>(pinnedRgbaMat.step));
+                targetSprite.updateTexture(pinnedRgbaMat.ptr(), pinnedRgbaMat.cols, pinnedRgbaMat.rows, static_cast<int>(pinnedRgbaMat.step));
                 return true;
             } catch (const cv::Exception &e) {
                 std::cout << std::format("mxvk_cv: CUDA external-sprite path failed; falling back to CPU path: {}\n", e.what());
@@ -482,12 +452,8 @@ namespace mxvk {
             sprite->drawSprite(x, y);
     }
 
-    void VK_Capture::set(unsigned int option, double value) {
-        cap.set(option, value);
-    }
+    void VK_Capture::set(unsigned int option, double value) { cap.set(option, value); }
 
-    double VK_Capture::get(unsigned int option) {
-        return cap.get(option);
-    }
+    double VK_Capture::get(unsigned int option) { return cap.get(option); }
 
 } // namespace mxvk

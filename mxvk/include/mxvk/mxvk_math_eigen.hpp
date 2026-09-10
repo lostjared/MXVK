@@ -48,29 +48,19 @@ namespace mxvk {
      * @param b Blue component in the low 8 bits.
      * @return Packed color with alpha set to 255.
      */
-    [[nodiscard]] inline constexpr MXCOLOR MXVK_RGB(int r, int g, int b) {
-        return 0xFF000000u | ((static_cast<MXCOLOR>(r) & 0xFFu) << 16u) | ((static_cast<MXCOLOR>(g) & 0xFFu) << 8u) | (static_cast<MXCOLOR>(b) & 0xFFu);
-    }
+    [[nodiscard]] inline constexpr MXCOLOR MXVK_RGB(int r, int g, int b) { return 0xFF000000u | ((static_cast<MXCOLOR>(r) & 0xFFu) << 16u) | ((static_cast<MXCOLOR>(g) & 0xFFu) << 8u) | (static_cast<MXCOLOR>(b) & 0xFFu); }
 
     /// Extract the red component from a packed ARGB color.
-    [[nodiscard]] inline constexpr std::uint8_t color_r(MXCOLOR color) {
-        return static_cast<std::uint8_t>((color >> 16u) & 0xFFu);
-    }
+    [[nodiscard]] inline constexpr std::uint8_t color_r(MXCOLOR color) { return static_cast<std::uint8_t>((color >> 16u) & 0xFFu); }
 
     /// Extract the green component from a packed ARGB color.
-    [[nodiscard]] inline constexpr std::uint8_t color_g(MXCOLOR color) {
-        return static_cast<std::uint8_t>((color >> 8u) & 0xFFu);
-    }
+    [[nodiscard]] inline constexpr std::uint8_t color_g(MXCOLOR color) { return static_cast<std::uint8_t>((color >> 8u) & 0xFFu); }
 
     /// Extract the blue component from a packed ARGB color.
-    [[nodiscard]] inline constexpr std::uint8_t color_b(MXCOLOR color) {
-        return static_cast<std::uint8_t>(color & 0xFFu);
-    }
+    [[nodiscard]] inline constexpr std::uint8_t color_b(MXCOLOR color) { return static_cast<std::uint8_t>(color & 0xFFu); }
 
     /// Extract the alpha component from a packed ARGB color.
-    [[nodiscard]] inline constexpr std::uint8_t color_a(MXCOLOR color) {
-        return static_cast<std::uint8_t>((color >> 24u) & 0xFFu);
-    }
+    [[nodiscard]] inline constexpr std::uint8_t color_a(MXCOLOR color) { return static_cast<std::uint8_t>((color >> 24u) & 0xFFu); }
 
     /**
      * @brief Scale the RGB channels of a color while preserving alpha.
@@ -80,13 +70,8 @@ namespace mxvk {
      */
     [[nodiscard]] inline MXCOLOR shade_color(MXCOLOR color, float intensity) {
         intensity = std::clamp(intensity, 0.0f, 1.0f);
-        const auto scale = [intensity](std::uint8_t component) {
-            return static_cast<int>(std::clamp(static_cast<float>(component) * intensity, 0.0f, 255.0f));
-        };
-        return (static_cast<MXCOLOR>(color_a(color)) << 24u) |
-               ((static_cast<MXCOLOR>(scale(color_r(color))) & 0xFFu) << 16u) |
-               ((static_cast<MXCOLOR>(scale(color_g(color))) & 0xFFu) << 8u) |
-               (static_cast<MXCOLOR>(scale(color_b(color))) & 0xFFu);
+        const auto scale = [intensity](std::uint8_t component) { return static_cast<int>(std::clamp(static_cast<float>(component) * intensity, 0.0f, 255.0f)); };
+        return (static_cast<MXCOLOR>(color_a(color)) << 24u) | ((static_cast<MXCOLOR>(scale(color_r(color))) & 0xFFu) << 16u) | ((static_cast<MXCOLOR>(scale(color_g(color))) & 0xFFu) << 8u) | (static_cast<MXCOLOR>(scale(color_b(color))) & 0xFFu);
     }
 
     inline std::array<float, 361> build_sin_table() {
@@ -123,14 +108,10 @@ namespace mxvk {
     }
 
     /// Convert degrees to radians.
-    [[nodiscard]] inline float deg2rad(float ang) {
-        return ang * PI / 180.0f;
-    }
+    [[nodiscard]] inline float deg2rad(float ang) { return ang * PI / 180.0f; }
 
     /// Convert radians to degrees.
-    [[nodiscard]] inline float rad2deg(float rad) {
-        return rad * 180.0f / PI;
-    }
+    [[nodiscard]] inline float rad2deg(float rad) { return rad * 180.0f / PI; }
 
     /**
      * @brief Approximate cosine using the degree lookup table with linear interpolation.
@@ -213,9 +194,7 @@ namespace mxvk {
         vec2D &operator=(const vec2D &) = default;
 
         /// Add two vectors component-wise.
-        [[nodiscard]] vec2D operator+(const vec2D &v) const {
-            return FromEigen(ToEigen() + v.ToEigen());
-        }
+        [[nodiscard]] vec2D operator+(const vec2D &v) const { return FromEigen(ToEigen() + v.ToEigen()); }
 
         /// Add another vector to this vector.
         vec2D &operator+=(const vec2D &v) {
@@ -224,9 +203,7 @@ namespace mxvk {
         }
 
         /// Subtract two vectors component-wise.
-        [[nodiscard]] vec2D operator-(const vec2D &v) const {
-            return FromEigen(ToEigen() - v.ToEigen());
-        }
+        [[nodiscard]] vec2D operator-(const vec2D &v) const { return FromEigen(ToEigen() - v.ToEigen()); }
 
         /// Subtract another vector from this vector.
         vec2D &operator-=(const vec2D &v) {
@@ -235,29 +212,19 @@ namespace mxvk {
         }
 
         /// Scale this vector by a scalar.
-        [[nodiscard]] vec2D operator*(float k) const {
-            return FromEigen(ToEigen() * k);
-        }
+        [[nodiscard]] vec2D operator*(float k) const { return FromEigen(ToEigen() * k); }
 
         /// Return a scaled copy of this vector.
-        [[nodiscard]] vec2D Scale(float k) const {
-            return *this * k;
-        }
+        [[nodiscard]] vec2D Scale(float k) const { return *this * k; }
 
         /// Scale this vector in place.
-        void ScaleThis(float k) {
-            FromEigen(ToEigen() * k, *this);
-        }
+        void ScaleThis(float k) { FromEigen(ToEigen() * k, *this); }
 
         /// Compute the dot product with another vector.
-        [[nodiscard]] float DotProduct(const vec2D &v) const {
-            return ToEigen().dot(v.ToEigen());
-        }
+        [[nodiscard]] float DotProduct(const vec2D &v) const { return ToEigen().dot(v.ToEigen()); }
 
         /// Compute the Euclidean length of this vector.
-        [[nodiscard]] float Length() const {
-            return ToEigen().norm();
-        }
+        [[nodiscard]] float Length() const { return ToEigen().norm(); }
 
         /// Normalize this vector in place, or reset it to zero if it is too short.
         void Normalize() {
@@ -289,28 +256,18 @@ namespace mxvk {
         }
 
       private:
-        [[nodiscard]] Eigen::Vector2f ToEigen() const {
-            return {x, y};
-        }
+        [[nodiscard]] Eigen::Vector2f ToEigen() const { return {x, y}; }
 
-        [[nodiscard]] static vec2D FromEigen(const Eigen::Vector2f &v) {
-            return {v.x(), v.y()};
-        }
+        [[nodiscard]] static vec2D FromEigen(const Eigen::Vector2f &v) { return {v.x(), v.y()}; }
 
-        static void FromEigen(const Eigen::Vector2f &v, vec2D &out) {
-            out.Set(v.x(), v.y());
-        }
+        static void FromEigen(const Eigen::Vector2f &v, vec2D &out) { out.Set(v.x(), v.y()); }
     };
 
     /// Write a 2D vector to a stream using vec2D::Print().
-    inline std::ostream &operator<<(std::ostream &out, const vec2D &v) {
-        return out << v.Print();
-    }
+    inline std::ostream &operator<<(std::ostream &out, const vec2D &v) { return out << v.Print(); }
 
     /// Read a 2D vector from a stream as two scalar coordinates.
-    inline std::istream &operator>>(std::istream &in, vec2D &v) {
-        return in >> v.x >> v.y;
-    }
+    inline std::istream &operator>>(std::istream &in, vec2D &v) { return in >> v.x >> v.y; }
 
     /// Three-dimensional float vector with arithmetic, dot, and cross-product helpers.
     class vec3D {
@@ -340,9 +297,7 @@ namespace mxvk {
         vec3D &operator=(const vec3D &) = default;
 
         /// Add two vectors component-wise.
-        [[nodiscard]] vec3D operator+(const vec3D &v) const {
-            return FromEigen(ToEigen() + v.ToEigen());
-        }
+        [[nodiscard]] vec3D operator+(const vec3D &v) const { return FromEigen(ToEigen() + v.ToEigen()); }
 
         /// Add another vector to this vector.
         vec3D &operator+=(const vec3D &v) {
@@ -351,9 +306,7 @@ namespace mxvk {
         }
 
         /// Subtract two vectors component-wise.
-        [[nodiscard]] vec3D operator-(const vec3D &v) const {
-            return FromEigen(ToEigen() - v.ToEigen());
-        }
+        [[nodiscard]] vec3D operator-(const vec3D &v) const { return FromEigen(ToEigen() - v.ToEigen()); }
 
         /// Subtract another vector from this vector.
         vec3D &operator-=(const vec3D &v) {
@@ -362,34 +315,22 @@ namespace mxvk {
         }
 
         /// Scale this vector by a scalar.
-        [[nodiscard]] vec3D operator*(float k) const {
-            return FromEigen(ToEigen() * k);
-        }
+        [[nodiscard]] vec3D operator*(float k) const { return FromEigen(ToEigen() * k); }
 
         /// Return a scaled copy of this vector.
-        [[nodiscard]] vec3D Scale(float k) const {
-            return *this * k;
-        }
+        [[nodiscard]] vec3D Scale(float k) const { return *this * k; }
 
         /// Scale this vector in place.
-        void ScaleThis(float k) {
-            FromEigen(ToEigen() * k, *this);
-        }
+        void ScaleThis(float k) { FromEigen(ToEigen() * k, *this); }
 
         /// Compute the dot product with another vector.
-        [[nodiscard]] float DotProduct(const vec3D &v) const {
-            return ToEigen().dot(v.ToEigen());
-        }
+        [[nodiscard]] float DotProduct(const vec3D &v) const { return ToEigen().dot(v.ToEigen()); }
 
         /// Compute the right-handed cross product with another vector.
-        [[nodiscard]] vec3D CrossProduct(const vec3D &v) const {
-            return FromEigen(ToEigen().cross(v.ToEigen()));
-        }
+        [[nodiscard]] vec3D CrossProduct(const vec3D &v) const { return FromEigen(ToEigen().cross(v.ToEigen())); }
 
         /// Compute the Euclidean length of this vector.
-        [[nodiscard]] float Length() const {
-            return ToEigen().norm();
-        }
+        [[nodiscard]] float Length() const { return ToEigen().norm(); }
 
         /// Normalize this vector in place, or reset it to zero if it is too short.
         void Normalize() {
@@ -421,28 +362,18 @@ namespace mxvk {
         }
 
       private:
-        [[nodiscard]] Eigen::Vector3f ToEigen() const {
-            return {x, y, z};
-        }
+        [[nodiscard]] Eigen::Vector3f ToEigen() const { return {x, y, z}; }
 
-        [[nodiscard]] static vec3D FromEigen(const Eigen::Vector3f &v) {
-            return {v.x(), v.y(), v.z()};
-        }
+        [[nodiscard]] static vec3D FromEigen(const Eigen::Vector3f &v) { return {v.x(), v.y(), v.z()}; }
 
-        static void FromEigen(const Eigen::Vector3f &v, vec3D &out) {
-            out.Set(v.x(), v.y(), v.z());
-        }
+        static void FromEigen(const Eigen::Vector3f &v, vec3D &out) { out.Set(v.x(), v.y(), v.z()); }
     };
 
     /// Write a 3D vector to a stream using vec3D::Print().
-    inline std::ostream &operator<<(std::ostream &out, const vec3D &v) {
-        return out << v.Print();
-    }
+    inline std::ostream &operator<<(std::ostream &out, const vec3D &v) { return out << v.Print(); }
 
     /// Read a 3D vector from a stream as three scalar coordinates.
-    inline std::istream &operator>>(std::istream &in, vec3D &v) {
-        return in >> v.x >> v.y >> v.z;
-    }
+    inline std::istream &operator>>(std::istream &in, vec3D &v) { return in >> v.x >> v.y >> v.z; }
 
     /// Four-dimensional float vector used for homogeneous 3D coordinates.
     class vec4D {
@@ -474,16 +405,12 @@ namespace mxvk {
         }
 
         /// Copy coordinates from another vector.
-        void Set(const vec4D &v) {
-            *this = v;
-        }
+        void Set(const vec4D &v) { *this = v; }
 
         vec4D &operator=(const vec4D &) = default;
 
         /// Add two vectors component-wise.
-        [[nodiscard]] vec4D operator+(const vec4D &v) const {
-            return {x + v.x, y + v.y, z + v.z, w + v.w};
-        }
+        [[nodiscard]] vec4D operator+(const vec4D &v) const { return {x + v.x, y + v.y, z + v.z, w + v.w}; }
 
         /// Add another vector to this vector.
         vec4D &operator+=(const vec4D &v) {
@@ -495,9 +422,7 @@ namespace mxvk {
         }
 
         /// Subtract two vectors component-wise.
-        [[nodiscard]] vec4D operator-(const vec4D &v) const {
-            return {x - v.x, y - v.y, z - v.z, w - v.w};
-        }
+        [[nodiscard]] vec4D operator-(const vec4D &v) const { return {x - v.x, y - v.y, z - v.z, w - v.w}; }
 
         /// Subtract another vector from this vector.
         vec4D &operator-=(const vec4D &v) {
@@ -509,19 +434,13 @@ namespace mxvk {
         }
 
         /// Scale this vector by a scalar.
-        [[nodiscard]] vec4D operator*(float k) const {
-            return {x * k, y * k, z * k, w * k};
-        }
+        [[nodiscard]] vec4D operator*(float k) const { return {x * k, y * k, z * k, w * k}; }
 
         /// Multiply two vectors component-wise.
-        [[nodiscard]] vec4D operator*(const vec4D &v) const {
-            return {x * v.x, y * v.y, z * v.z, w * v.w};
-        }
+        [[nodiscard]] vec4D operator*(const vec4D &v) const { return {x * v.x, y * v.y, z * v.z, w * v.w}; }
 
         /// Return a scaled copy of this vector.
-        [[nodiscard]] vec4D Scale(float k) const {
-            return *this * k;
-        }
+        [[nodiscard]] vec4D Scale(float k) const { return *this * k; }
 
         /// Scale this vector in place.
         void ScaleThis(float k) {
@@ -532,9 +451,7 @@ namespace mxvk {
         }
 
         /// Compute the 3D dot product, ignoring the W component.
-        [[nodiscard]] float DotProduct(const vec4D &v) const {
-            return x * v.x + y * v.y + z * v.z;
-        }
+        [[nodiscard]] float DotProduct(const vec4D &v) const { return x * v.x + y * v.y + z * v.z; }
 
         /// Compute the 3D cross product and return it as a direction with W set to 0.
         [[nodiscard]] vec4D CrossProduct(const vec4D &v) const {
@@ -547,9 +464,7 @@ namespace mxvk {
         }
 
         /// Compute the 3D Euclidean length, ignoring the W component.
-        [[nodiscard]] float Length() const {
-            return std::sqrt(DotProduct(*this));
-        }
+        [[nodiscard]] float Length() const { return std::sqrt(DotProduct(*this)); }
 
         /// Normalize the 3D components in place while preserving W.
         void Normalize() {
@@ -576,14 +491,10 @@ namespace mxvk {
         }
 
         /// Replace this vector with the direction from this point to @p to.
-        void Build(const vec4D &to) {
-            *this = Build(*this, to);
-        }
+        void Build(const vec4D &to) { *this = Build(*this, to); }
 
         /// Build a direction vector from @p from to @p to with W set to 0.
-        [[nodiscard]] vec4D Build(const vec4D &from, const vec4D &to) const {
-            return {to.x - from.x, to.y - from.y, to.z - from.z, 0.0f};
-        }
+        [[nodiscard]] vec4D Build(const vec4D &from, const vec4D &to) const { return {to.x - from.x, to.y - from.y, to.z - from.z, 0.0f}; }
 
         /// Format this vector as a named angle-bracket tuple.
         [[nodiscard]] std::string Print(const std::string &name = "v") const {
@@ -594,14 +505,10 @@ namespace mxvk {
     };
 
     /// Write a 4D vector to a stream using vec4D::Print().
-    inline std::ostream &operator<<(std::ostream &out, const vec4D &v) {
-        return out << v.Print();
-    }
+    inline std::ostream &operator<<(std::ostream &out, const vec4D &v) { return out << v.Print(); }
 
     /// Read a 4D vector from a stream as four scalar coordinates.
-    inline std::istream &operator>>(std::istream &in, vec4D &v) {
-        return in >> v.x >> v.y >> v.z >> v.w;
-    }
+    inline std::istream &operator>>(std::istream &in, vec4D &v) { return in >> v.x >> v.y >> v.z >> v.w; }
 
     /// Two-element column-vector storage used by 2x2 linear solves.
     class Mat1D {
@@ -665,39 +572,25 @@ namespace mxvk {
         Mat2D() = default;
 
         /// Construct from explicit row-major elements.
-        Mat2D(float m00, float m01, float m10, float m11) {
-            Set(m00, m01, m10, m11);
-        }
+        Mat2D(float m00, float m01, float m10, float m11) { Set(m00, m01, m10, m11); }
 
         /// Set all matrix elements in row-major order.
-        void Set(float m00, float m01, float m10, float m11) {
-            ToEigen() << m00, m01, m10, m11;
-        }
+        void Set(float m00, float m01, float m10, float m11) { ToEigen() << m00, m01, m10, m11; }
 
         /// Set this matrix to the identity matrix.
-        void LoadIdentity() {
-            ToEigen().setIdentity();
-        }
+        void LoadIdentity() { ToEigen().setIdentity(); }
 
         /// Add two matrices component-wise.
-        [[nodiscard]] Mat2D operator+(const Mat2D &m) const {
-            return FromEigen(ToEigen() + m.ToEigen());
-        }
+        [[nodiscard]] Mat2D operator+(const Mat2D &m) const { return FromEigen(ToEigen() + m.ToEigen()); }
 
         /// Subtract two matrices component-wise.
-        [[nodiscard]] Mat2D operator-(const Mat2D &m) const {
-            return FromEigen(ToEigen() - m.ToEigen());
-        }
+        [[nodiscard]] Mat2D operator-(const Mat2D &m) const { return FromEigen(ToEigen() - m.ToEigen()); }
 
         /// Multiply two 2x2 matrices.
-        [[nodiscard]] Mat2D operator*(const Mat2D &m) const {
-            return FromEigen(ToEigen() * m.ToEigen());
-        }
+        [[nodiscard]] Mat2D operator*(const Mat2D &m) const { return FromEigen(ToEigen() * m.ToEigen()); }
 
         /// Compute the matrix determinant.
-        [[nodiscard]] float Determinate() const {
-            return ToEigen().determinant();
-        }
+        [[nodiscard]] float Determinate() const { return ToEigen().determinant(); }
 
         /**
          * @brief Compute the inverse matrix.
@@ -734,16 +627,11 @@ namespace mxvk {
       private:
         using EigenMatrix = Eigen::Matrix<float, 2, 2, Eigen::RowMajor>;
 
-        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() {
-            return Eigen::Map<EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() { return Eigen::Map<EigenMatrix>(&mat[0][0]); }
 
-        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const {
-            return Eigen::Map<const EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const { return Eigen::Map<const EigenMatrix>(&mat[0][0]); }
 
-        template <typename Derived>
-        [[nodiscard]] static Mat2D FromEigen(const Eigen::MatrixBase<Derived> &m) {
+        template <typename Derived> [[nodiscard]] static Mat2D FromEigen(const Eigen::MatrixBase<Derived> &m) {
             Mat2D out;
             out.ToEigen() = m;
             return out;
@@ -760,24 +648,16 @@ namespace mxvk {
         Mat3D() = default;
 
         /// Construct from explicit row-major elements.
-        Mat3D(float m00, float m01, float m02, float m10, float m11, float m12, float m20, float m21, float m22) {
-            Set(m00, m01, m02, m10, m11, m12, m20, m21, m22);
-        }
+        Mat3D(float m00, float m01, float m02, float m10, float m11, float m12, float m20, float m21, float m22) { Set(m00, m01, m02, m10, m11, m12, m20, m21, m22); }
 
         /// Set all matrix elements in row-major order.
-        void Set(float m00, float m01, float m02, float m10, float m11, float m12, float m20, float m21, float m22) {
-            ToEigen() << m00, m01, m02, m10, m11, m12, m20, m21, m22;
-        }
+        void Set(float m00, float m01, float m02, float m10, float m11, float m12, float m20, float m21, float m22) { ToEigen() << m00, m01, m02, m10, m11, m12, m20, m21, m22; }
 
         /// Set this matrix to the identity matrix.
-        void LoadIdentity() {
-            ToEigen().setIdentity();
-        }
+        void LoadIdentity() { ToEigen().setIdentity(); }
 
         /// Multiply two 3x3 matrices.
-        [[nodiscard]] Mat3D operator*(const Mat3D &m) const {
-            return FromEigen(ToEigen() * m.ToEigen());
-        }
+        [[nodiscard]] Mat3D operator*(const Mat3D &m) const { return FromEigen(ToEigen() * m.ToEigen()); }
 
         /// Transform a 3D vector by this matrix.
         [[nodiscard]] vec3D MulVec(const vec3D &in) const {
@@ -786,14 +666,10 @@ namespace mxvk {
         }
 
         /// Transform a 3D vector and write the result to @p out.
-        void MulVec(const vec3D &in, vec3D &out) const {
-            out = MulVec(in);
-        }
+        void MulVec(const vec3D &in, vec3D &out) const { out = MulVec(in); }
 
         /// Compute the matrix determinant.
-        [[nodiscard]] float Determinate() const {
-            return ToEigen().determinant();
-        }
+        [[nodiscard]] float Determinate() const { return ToEigen().determinant(); }
 
         /**
          * @brief Compute the inverse matrix.
@@ -829,16 +705,11 @@ namespace mxvk {
       private:
         using EigenMatrix = Eigen::Matrix<float, 3, 3, Eigen::RowMajor>;
 
-        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() {
-            return Eigen::Map<EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() { return Eigen::Map<EigenMatrix>(&mat[0][0]); }
 
-        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const {
-            return Eigen::Map<const EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const { return Eigen::Map<const EigenMatrix>(&mat[0][0]); }
 
-        template <typename Derived>
-        [[nodiscard]] static Mat3D FromEigen(const Eigen::MatrixBase<Derived> &m) {
+        template <typename Derived> [[nodiscard]] static Mat3D FromEigen(const Eigen::MatrixBase<Derived> &m) {
             Mat3D out;
             out.ToEigen() = m;
             return out;
@@ -855,29 +726,19 @@ namespace mxvk {
         Mat4D() = default;
 
         /// Construct from explicit row-major elements.
-        Mat4D(float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13, float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33) {
-            Set(m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33);
-        }
+        Mat4D(float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13, float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33) { Set(m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33); }
 
         /// Set all matrix elements in row-major order.
-        void Set(float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13, float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33) {
-            ToEigen() << m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33;
-        }
+        void Set(float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13, float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33) { ToEigen() << m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33; }
 
         /// Set this matrix to the identity matrix.
-        void LoadIdentity() {
-            ToEigen().setIdentity();
-        }
+        void LoadIdentity() { ToEigen().setIdentity(); }
 
         /// Add two matrices component-wise.
-        [[nodiscard]] Mat4D operator+(const Mat4D &m) const {
-            return FromEigen(ToEigen() + m.ToEigen());
-        }
+        [[nodiscard]] Mat4D operator+(const Mat4D &m) const { return FromEigen(ToEigen() + m.ToEigen()); }
 
         /// Multiply two 4x4 matrices.
-        [[nodiscard]] Mat4D operator*(const Mat4D &m) const {
-            return FromEigen(ToEigen() * m.ToEigen());
-        }
+        [[nodiscard]] Mat4D operator*(const Mat4D &m) const { return FromEigen(ToEigen() * m.ToEigen()); }
 
         /// Multiply this matrix by another matrix in place.
         Mat4D &operator*=(const Mat4D &m) {
@@ -892,9 +753,7 @@ namespace mxvk {
         }
 
         /// Transform a homogeneous 4D vector and write the result to @p out.
-        void MulVec(const vec4D &in, vec4D &out) const {
-            out = MulVec(in);
-        }
+        void MulVec(const vec4D &in, vec4D &out) const { out = MulVec(in); }
 
         /**
          * @brief Transform a batch of homogeneous 4D vectors.
@@ -929,9 +788,7 @@ namespace mxvk {
         }
 
         /// Transform a 3D point and write the result to @p out.
-        void MulVec(const vec3D &in, vec3D &out) const {
-            out = MulVec(in);
-        }
+        void MulVec(const vec3D &in, vec3D &out) const { out = MulVec(in); }
 
         /**
          * @brief Compute the inverse matrix.
@@ -966,16 +823,11 @@ namespace mxvk {
       private:
         using EigenMatrix = Eigen::Matrix<float, 4, 4, Eigen::RowMajor>;
 
-        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() {
-            return Eigen::Map<EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<EigenMatrix> ToEigen() { return Eigen::Map<EigenMatrix>(&mat[0][0]); }
 
-        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const {
-            return Eigen::Map<const EigenMatrix>(&mat[0][0]);
-        }
+        [[nodiscard]] Eigen::Map<const EigenMatrix> ToEigen() const { return Eigen::Map<const EigenMatrix>(&mat[0][0]); }
 
-        template <typename Derived>
-        [[nodiscard]] static Mat4D FromEigen(const Eigen::MatrixBase<Derived> &m) {
+        template <typename Derived> [[nodiscard]] static Mat4D FromEigen(const Eigen::MatrixBase<Derived> &m) {
             Mat4D out;
             out.ToEigen() = m;
             return out;
@@ -997,9 +849,7 @@ namespace mxvk {
         paramLine2D() = default;
 
         /// Construct from explicit endpoints and direction.
-        paramLine2D(const vec2D &start, const vec2D &end, const vec2D &dir) {
-            Set(start, end, dir);
-        }
+        paramLine2D(const vec2D &start, const vec2D &end, const vec2D &dir) { Set(start, end, dir); }
 
         /// Set explicit endpoints and direction.
         void Set(const vec2D &start, const vec2D &end, const vec2D &dir) {
@@ -1016,9 +866,7 @@ namespace mxvk {
         }
 
         /// Compute the point p0 + v * t.
-        [[nodiscard]] vec2D ComputePoint(float t) const {
-            return p0 + v * t;
-        }
+        [[nodiscard]] vec2D ComputePoint(float t) const { return p0 + v * t; }
 
         /// Compute the point p0 + v * t and write it to @p out.
         vec2D ComputePoint(float t, vec2D &out) const {
@@ -1079,9 +927,7 @@ namespace mxvk {
         paramLine3D() = default;
 
         /// Construct from explicit endpoints and direction.
-        paramLine3D(const vec3D &start, const vec3D &end, const vec3D &dir) {
-            Set(start, end, dir);
-        }
+        paramLine3D(const vec3D &start, const vec3D &end, const vec3D &dir) { Set(start, end, dir); }
 
         /// Set explicit endpoints and direction.
         void Set(const vec3D &start, const vec3D &end, const vec3D &dir) {
@@ -1098,9 +944,7 @@ namespace mxvk {
         }
 
         /// Compute the point p0 + v * t.
-        [[nodiscard]] vec3D ComputePoint(float t) const {
-            return p0 + v * t;
-        }
+        [[nodiscard]] vec3D ComputePoint(float t) const { return p0 + v * t; }
 
         /// Compute the point p0 + v * t and write it to @p out.
         vec3D ComputePoint(float t, vec3D &out) const {
@@ -1188,22 +1032,13 @@ namespace mxvk {
         constexpr QuatType(float x_value, float y_value, float z_value, float w_value) : x(x_value), y(y_value), z(z_value), w(w_value) {}
 
         /// Add two quaternions component-wise.
-        [[nodiscard]] constexpr QuatType operator+(const QuatType &q) const {
-            return {x + q.x, y + q.y, z + q.z, w + q.w};
-        }
+        [[nodiscard]] constexpr QuatType operator+(const QuatType &q) const { return {x + q.x, y + q.y, z + q.z, w + q.w}; }
 
         /// Subtract two quaternions component-wise.
-        [[nodiscard]] constexpr QuatType operator-(const QuatType &q) const {
-            return {x - q.x, y - q.y, z - q.z, w - q.w};
-        }
+        [[nodiscard]] constexpr QuatType operator-(const QuatType &q) const { return {x - q.x, y - q.y, z - q.z, w - q.w}; }
 
         /// Multiply two quaternions.
-        [[nodiscard]] constexpr QuatType operator*(const QuatType &q) const {
-            return {w * q.x + x * q.w + y * q.z - z * q.y,
-                    w * q.y - x * q.z + y * q.w + z * q.x,
-                    w * q.z + x * q.y - y * q.x + z * q.w,
-                    w * q.w - x * q.x - y * q.y - z * q.z};
-        }
+        [[nodiscard]] constexpr QuatType operator*(const QuatType &q) const { return {w * q.x + x * q.w + y * q.z - z * q.y, w * q.y - x * q.z + y * q.w + z * q.x, w * q.z + x * q.y - y * q.x + z * q.w, w * q.w - x * q.x - y * q.y - z * q.z}; }
 
         /// Multiply this quaternion by another quaternion in place.
         QuatType &operator*=(const QuatType &q) {
@@ -1227,14 +1062,10 @@ namespace mxvk {
         }
 
         /// Compute the squared norm.
-        [[nodiscard]] float Norm2() const {
-            return w * w + x * x + y * y + z * z;
-        }
+        [[nodiscard]] float Norm2() const { return w * w + x * x + y * y + z * z; }
 
         /// Compute the norm.
-        [[nodiscard]] float Norm() const {
-            return std::sqrt(Norm2());
-        }
+        [[nodiscard]] float Norm() const { return std::sqrt(Norm2()); }
 
         /// Normalize this quaternion in place, or reset it to identity if it is too small.
         void Normalize() {
@@ -1262,14 +1093,10 @@ namespace mxvk {
         }
 
         /// Invert a unit quaternion by conjugating it.
-        void InverseNormal() {
-            Conj();
-        }
+        void InverseNormal() { Conj(); }
 
         /// Return the quaternion product (*this * p1) * p2.
-        [[nodiscard]] QuatType TripleProduct(const QuatType &p1, const QuatType &p2) const {
-            return (*this * p1) * p2;
-        }
+        [[nodiscard]] QuatType TripleProduct(const QuatType &p1, const QuatType &p2) const { return (*this * p1) * p2; }
 
         /// Build a quaternion from an axis and angle in degrees.
         void vec3DthetaQuat(float theta_degrees, const vec3D &axis) {
@@ -1570,8 +1397,7 @@ namespace mxvk {
                     }
                 }
 
-                const Eigen::Vector3f scaled =
-                    coordinates.cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
+                const Eigen::Vector3f scaled = coordinates.cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
                 if (!scaled.allFinite()) {
                     return load_failed("scaled vertex is not finite");
                 }
@@ -1587,8 +1413,7 @@ namespace mxvk {
                 Triangle tri;
                 int count = 0;
                 std::istringstream polygon_line(line);
-                if (!(polygon_line >> std::hex >> tri.state >> std::dec >> count) || count != 3 ||
-                    !(polygon_line >> tri.vert[0] >> tri.vert[1] >> tri.vert[2])) {
+                if (!(polygon_line >> std::hex >> tri.state >> std::dec >> count) || count != 3 || !(polygon_line >> tri.vert[0] >> tri.vert[1] >> tri.vert[2])) {
                     return load_failed("invalid triangle data");
                 }
                 for (const int index : tri.vert) {
@@ -1618,9 +1443,7 @@ namespace mxvk {
         }
 
         /// Load an MX mesh file using the PLG loader compatibility path.
-        [[nodiscard]] bool LoadMX(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) {
-            return LoadPLG(path, scale, obj_pos, rotation);
-        }
+        [[nodiscard]] bool LoadMX(const std::string &path, const vec4D &scale, const vec4D &obj_pos, const vec4D &rotation) { return LoadPLG(path, scale, obj_pos, rotation); }
 
         /**
          * @brief Load a Wavefront OBJ mesh and its referenced MTL material library.
@@ -1664,9 +1487,7 @@ namespace mxvk {
 
                 for (std::size_t vertex_index = 0; vertex_index < source_triangle.vertices.size(); ++vertex_index) {
                     const detail::OBJVertex &source_vertex = source_triangle.vertices[vertex_index];
-                    const Eigen::Vector3f scaled =
-                        Eigen::Vector3f(source_vertex.position[0], source_vertex.position[1], source_vertex.position[2])
-                            .cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
+                    const Eigen::Vector3f scaled = Eigen::Vector3f(source_vertex.position[0], source_vertex.position[1], source_vertex.position[2]).cwiseProduct(Eigen::Vector3f(scale.x, scale.y, scale.z));
                     if (!scaled.allFinite()) {
                         std::cerr << "mxvk_math_eigen: failed to load OBJ model '" << path << "': scaled vertex is not finite\n";
                         return false;
@@ -1817,19 +1638,12 @@ namespace mxvk {
         }
 
         /// Replace the object state flags.
-        void SetState(int new_state) {
-            state = new_state;
-        }
+        void SetState(int new_state) { state = new_state; }
 
       private:
         [[nodiscard]] static MXCOLOR material_color(const OBJMaterial &material) {
-            const auto channel = [](float value) {
-                return static_cast<MXCOLOR>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f));
-            };
-            return (channel(material.dissolve) << 24u) |
-                   (channel(material.diffuse[0]) << 16u) |
-                   (channel(material.diffuse[1]) << 8u) |
-                   channel(material.diffuse[2]);
+            const auto channel = [](float value) { return static_cast<MXCOLOR>(std::lround(std::clamp(value, 0.0f, 1.0f) * 255.0f)); };
+            return (channel(material.dissolve) << 24u) | (channel(material.diffuse[0]) << 16u) | (channel(material.diffuse[1]) << 8u) | channel(material.diffuse[2]);
         }
     };
 
@@ -2001,10 +1815,7 @@ namespace mxvk {
                     if (std::fabs(vertex.z) <= EPSILON) {
                         continue;
                     }
-                    const Eigen::Vector2f projected =
-                        Eigen::Vector2f(vertex.x, vertex.y)
-                            .cwiseProduct(Eigen::Vector2f(view_dist, view_dist * aspect_ratio)) /
-                        vertex.z;
+                    const Eigen::Vector2f projected = Eigen::Vector2f(vertex.x, vertex.y).cwiseProduct(Eigen::Vector2f(view_dist, view_dist * aspect_ratio)) / vertex.z;
                     vertex.x = projected.x();
                     vertex.y = projected.y();
                 }
@@ -2017,10 +1828,7 @@ namespace mxvk {
                 if (std::fabs(vertex.z) <= EPSILON) {
                     continue;
                 }
-                const Eigen::Vector2f projected =
-                    Eigen::Vector2f(vertex.x, vertex.y)
-                        .cwiseProduct(Eigen::Vector2f(view_dist, view_dist * aspect_ratio)) /
-                    vertex.z;
+                const Eigen::Vector2f projected = Eigen::Vector2f(vertex.x, vertex.y).cwiseProduct(Eigen::Vector2f(view_dist, view_dist * aspect_ratio)) / vertex.z;
                 vertex.x = projected.x();
                 vertex.y = projected.y();
             }
@@ -2035,10 +1843,7 @@ namespace mxvk {
                     continue;
                 }
                 for (auto &vertex : poly.tlist) {
-                    const Eigen::Vector2f screen =
-                        Eigen::Vector2f(alpha, beta) +
-                        Eigen::Vector2f(alpha, -beta)
-                            .cwiseProduct(Eigen::Vector2f(vertex.x, vertex.y));
+                    const Eigen::Vector2f screen = Eigen::Vector2f(alpha, beta) + Eigen::Vector2f(alpha, -beta).cwiseProduct(Eigen::Vector2f(vertex.x, vertex.y));
                     vertex.x = screen.x();
                     vertex.y = screen.y();
                 }
@@ -2050,10 +1855,7 @@ namespace mxvk {
             const float alpha = viewport_center_x;
             const float beta = viewport_center_y;
             for (auto &vertex : object.trans) {
-                const Eigen::Vector2f screen =
-                    Eigen::Vector2f(alpha, beta) +
-                    Eigen::Vector2f(alpha, -beta)
-                        .cwiseProduct(Eigen::Vector2f(vertex.x, vertex.y));
+                const Eigen::Vector2f screen = Eigen::Vector2f(alpha, beta) + Eigen::Vector2f(alpha, -beta).cwiseProduct(Eigen::Vector2f(vertex.x, vertex.y));
                 vertex.x = screen.x();
                 vertex.y = screen.y();
             }
@@ -2101,8 +1903,7 @@ namespace mxvk {
      * @param color Packed ARGB color.
      * @param plot_pixel Pixel plotting callable.
      */
-    template <typename PlotPixel>
-    void draw_line(int x0, int y0, int x1, int y1, MXCOLOR color, PlotPixel &&plot_pixel) {
+    template <typename PlotPixel> void draw_line(int x0, int y0, int x1, int y1, MXCOLOR color, PlotPixel &&plot_pixel) {
         const int dx = std::abs(x1 - x0);
         const int sx = x0 < x1 ? 1 : -1;
         const int dy = -std::abs(y1 - y0);
@@ -2127,14 +1928,10 @@ namespace mxvk {
     }
 
     /// Draw a line directly to an SDL renderer.
-    inline void draw_line(SDL_Renderer *renderer, int x0, int y0, int x1, int y1, MXCOLOR color) {
-        draw_line(x0, y0, x1, y1, color, SDLRendererPixelPlotter{renderer});
-    }
+    inline void draw_line(SDL_Renderer *renderer, int x0, int y0, int x1, int y1, MXCOLOR color) { draw_line(x0, y0, x1, y1, color, SDLRendererPixelPlotter{renderer}); }
 
     /// Draw a line directly to a VK_Sprite with optional square pixel size.
-    inline void draw_line(VK_Sprite &sprite, int x0, int y0, int x1, int y1, MXCOLOR color, int pixel_size = 1) {
-        draw_line(x0, y0, x1, y1, color, VKSpritePixelPlotter{&sprite, pixel_size});
-    }
+    inline void draw_line(VK_Sprite &sprite, int x0, int y0, int x1, int y1, MXCOLOR color, int pixel_size = 1) { draw_line(x0, y0, x1, y1, color, VKSpritePixelPlotter{&sprite, pixel_size}); }
 
     /// Compute the signed edge function value for point @p p relative to edge @p a-@p b.
     [[nodiscard]] inline float edge_function(const vec2D &a, const vec2D &b, const vec2D &p) {
@@ -2152,8 +1949,7 @@ namespace mxvk {
      * @param color Packed ARGB color.
      * @param plot_pixel Pixel plotting callable.
      */
-    template <typename PlotPixel>
-    void draw_filled_triangle(const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color, PlotPixel &&plot_pixel) {
+    template <typename PlotPixel> void draw_filled_triangle(const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color, PlotPixel &&plot_pixel) {
         const float area = edge_function(p0, p1, p2);
         if (std::fabs(area) <= EPSILON) {
             return;
@@ -2170,8 +1966,7 @@ namespace mxvk {
                 const float w0 = edge_function(p1, p2, p);
                 const float w1 = edge_function(p2, p0, p);
                 const float w2 = edge_function(p0, p1, p);
-                if ((area > 0.0f && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) ||
-                    (area < 0.0f && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
+                if ((area > 0.0f && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) || (area < 0.0f && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
                     plot_pixel(x, y, color);
                 }
             }
@@ -2179,14 +1974,10 @@ namespace mxvk {
     }
 
     /// Draw a filled triangle directly to an SDL renderer.
-    inline void draw_filled_triangle(SDL_Renderer *renderer, const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color) {
-        draw_filled_triangle(p0, p1, p2, color, SDLRendererPixelPlotter{renderer});
-    }
+    inline void draw_filled_triangle(SDL_Renderer *renderer, const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color) { draw_filled_triangle(p0, p1, p2, color, SDLRendererPixelPlotter{renderer}); }
 
     /// Draw a filled triangle directly to a VK_Sprite with optional square pixel size.
-    inline void draw_filled_triangle(VK_Sprite &sprite, const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color, int pixel_size = 1) {
-        draw_filled_triangle(p0, p1, p2, color, VKSpritePixelPlotter{&sprite, pixel_size});
-    }
+    inline void draw_filled_triangle(VK_Sprite &sprite, const vec2D &p0, const vec2D &p1, const vec2D &p2, MXCOLOR color, int pixel_size = 1) { draw_filled_triangle(p0, p1, p2, color, VKSpritePixelPlotter{&sprite, pixel_size}); }
 
     /**
      * @brief Rasterize a filled triangle as horizontal spans.
@@ -2199,8 +1990,7 @@ namespace mxvk {
      * @param color Packed ARGB color.
      * @param draw_span Span drawing callable.
      */
-    template <typename DrawSpan>
-    void draw_filled_triangle_spans_clipped(vec2D p0, vec2D p1, vec2D p2, int clip_min_y, int clip_max_y, MXCOLOR color, DrawSpan &&draw_span) {
+    template <typename DrawSpan> void draw_filled_triangle_spans_clipped(vec2D p0, vec2D p1, vec2D p2, int clip_min_y, int clip_max_y, MXCOLOR color, DrawSpan &&draw_span) {
         if (std::fabs(edge_function(p0, p1, p2)) <= EPSILON) {
             return;
         }
@@ -2211,9 +2001,7 @@ namespace mxvk {
             float x0 = 0.0f;
             float slope = 0.0f;
 
-            [[nodiscard]] float x_at(int y) const {
-                return x0 + static_cast<float>(y - y0) * slope;
-            }
+            [[nodiscard]] float x_at(int y) const { return x0 + static_cast<float>(y - y0) * slope; }
         };
 
         const int min_y = std::max(clip_min_y, static_cast<int>(std::floor(std::min({p0.y, p1.y, p2.y}))));
@@ -2279,10 +2067,7 @@ namespace mxvk {
         }
     }
 
-    template <typename DrawSpan>
-    void draw_filled_triangle_spans(vec2D p0, vec2D p1, vec2D p2, MXCOLOR color, DrawSpan &&draw_span) {
-        draw_filled_triangle_spans_clipped(p0, p1, p2, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), color, std::forward<DrawSpan>(draw_span));
-    }
+    template <typename DrawSpan> void draw_filled_triangle_spans(vec2D p0, vec2D p1, vec2D p2, MXCOLOR color, DrawSpan &&draw_span) { draw_filled_triangle_spans_clipped(p0, p1, p2, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), color, std::forward<DrawSpan>(draw_span)); }
 
     /// Clipped software rasterization pipeline for lines and filled triangles.
     class PipeLine {
@@ -2396,11 +2181,7 @@ namespace mxvk {
             int code0 = ComputeCode(x0, y0);
             int code1 = ComputeCode(x1, y1);
             const auto interpolate = [](int dependent0, int dependent1, int independent0, int independent1, int boundary) {
-                const double value =
-                    static_cast<double>(dependent0) +
-                    (static_cast<double>(dependent1) - static_cast<double>(dependent0)) *
-                        (static_cast<double>(boundary) - static_cast<double>(independent0)) /
-                        (static_cast<double>(independent1) - static_cast<double>(independent0));
+                const double value = static_cast<double>(dependent0) + (static_cast<double>(dependent1) - static_cast<double>(dependent0)) * (static_cast<double>(boundary) - static_cast<double>(independent0)) / (static_cast<double>(independent1) - static_cast<double>(independent0));
                 return static_cast<int>(std::lround(value));
             };
 
@@ -2462,9 +2243,7 @@ namespace mxvk {
         }
 
         /// Draw a clipped line.
-        void DrawClippedLine(int x0, int y0, int x1, int y1, MXCOLOR color) const {
-            DrawClipedLine(x0, y0, x1, y1, color);
-        }
+        void DrawClippedLine(int x0, int y0, int x1, int y1, MXCOLOR color) const { DrawClipedLine(x0, y0, x1, y1, color); }
 
         /**
          * @brief Draw a clipped screen-space line with perspective-correct depth testing.
@@ -2474,25 +2253,14 @@ namespace mxvk {
          * @param depth_buffer Full framebuffer depth buffer initialized to a far value.
          */
         void DrawDepthTestedLine(const vec4D &first, const vec4D &second, MXCOLOR color, std::span<float> depth_buffer) const {
-            if (!plot_pixel ||
-                first.z <= EPSILON ||
-                second.z <= EPSILON ||
-                !std::isfinite(first.x) ||
-                !std::isfinite(first.y) ||
-                !std::isfinite(first.z) ||
-                !std::isfinite(second.x) ||
-                !std::isfinite(second.y) ||
-                !std::isfinite(second.z)) {
+            if (!plot_pixel || first.z <= EPSILON || second.z <= EPSILON || !std::isfinite(first.x) || !std::isfinite(first.y) || !std::isfinite(first.z) || !std::isfinite(second.x) || !std::isfinite(second.y) || !std::isfinite(second.z)) {
                 return;
             }
 
             const int framebuffer_width = max_clip_x + 1;
             const int framebuffer_height = max_clip_y + 1;
-            const std::size_t required_depth_values =
-                static_cast<std::size_t>(framebuffer_width) * static_cast<std::size_t>(framebuffer_height);
-            if (framebuffer_width <= 0 ||
-                framebuffer_height <= 0 ||
-                depth_buffer.size() < required_depth_values) {
+            const std::size_t required_depth_values = static_cast<std::size_t>(framebuffer_width) * static_cast<std::size_t>(framebuffer_height);
+            if (framebuffer_width <= 0 || framebuffer_height <= 0 || depth_buffer.size() < required_depth_values) {
                 return;
             }
 
@@ -2514,10 +2282,7 @@ namespace mxvk {
                 return first_fraction <= last_fraction;
             };
 
-            if (!clip_fraction(-delta_x, first.x - static_cast<float>(clip_min_x)) ||
-                !clip_fraction(delta_x, static_cast<float>(clip_max_x) - first.x) ||
-                !clip_fraction(-delta_y, first.y - static_cast<float>(clip_min_y)) ||
-                !clip_fraction(delta_y, static_cast<float>(clip_max_y) - first.y)) {
+            if (!clip_fraction(-delta_x, first.x - static_cast<float>(clip_min_x)) || !clip_fraction(delta_x, static_cast<float>(clip_max_x) - first.x) || !clip_fraction(-delta_y, first.y - static_cast<float>(clip_min_y)) || !clip_fraction(delta_y, static_cast<float>(clip_max_y) - first.y)) {
                 return;
             }
 
@@ -2533,26 +2298,20 @@ namespace mxvk {
 
             for (int step = 0; step <= steps; ++step) {
                 const float clipped_fraction = static_cast<float>(step) / static_cast<float>(steps);
-                const float fraction =
-                    first_fraction +
-                    (last_fraction - first_fraction) * clipped_fraction;
+                const float fraction = first_fraction + (last_fraction - first_fraction) * clipped_fraction;
                 const int x = static_cast<int>(std::lround(first.x + delta_x * fraction));
                 const int y = static_cast<int>(std::lround(first.y + delta_y * fraction));
                 if (x < clip_min_x || x > clip_max_x || y < clip_min_y || y > clip_max_y) {
                     continue;
                 }
 
-                const float reciprocal_depth =
-                    first_reciprocal_depth +
-                    (second_reciprocal_depth - first_reciprocal_depth) * fraction;
+                const float reciprocal_depth = first_reciprocal_depth + (second_reciprocal_depth - first_reciprocal_depth) * fraction;
                 if (reciprocal_depth <= EPSILON) {
                     continue;
                 }
 
                 const float depth = 1.0f / reciprocal_depth;
-                const std::size_t pixel_index =
-                    static_cast<std::size_t>(y) * static_cast<std::size_t>(framebuffer_width) +
-                    static_cast<std::size_t>(x);
+                const std::size_t pixel_index = static_cast<std::size_t>(y) * static_cast<std::size_t>(framebuffer_width) + static_cast<std::size_t>(x);
                 if (depth >= depth_buffer[pixel_index]) {
                     continue;
                 }
@@ -2564,24 +2323,9 @@ namespace mxvk {
 
         /// Draw a clipped wireframe triangle without depth testing.
         void DrawWireframeTriangle(const vec4D &first, const vec4D &second, const vec4D &third, MXCOLOR color) const {
-            DrawClippedLine(
-                static_cast<int>(std::lround(first.x)),
-                static_cast<int>(std::lround(first.y)),
-                static_cast<int>(std::lround(second.x)),
-                static_cast<int>(std::lround(second.y)),
-                color);
-            DrawClippedLine(
-                static_cast<int>(std::lround(second.x)),
-                static_cast<int>(std::lround(second.y)),
-                static_cast<int>(std::lround(third.x)),
-                static_cast<int>(std::lround(third.y)),
-                color);
-            DrawClippedLine(
-                static_cast<int>(std::lround(third.x)),
-                static_cast<int>(std::lround(third.y)),
-                static_cast<int>(std::lround(first.x)),
-                static_cast<int>(std::lround(first.y)),
-                color);
+            DrawClippedLine(static_cast<int>(std::lround(first.x)), static_cast<int>(std::lround(first.y)), static_cast<int>(std::lround(second.x)), static_cast<int>(std::lround(second.y)), color);
+            DrawClippedLine(static_cast<int>(std::lround(second.x)), static_cast<int>(std::lround(second.y)), static_cast<int>(std::lround(third.x)), static_cast<int>(std::lround(third.y)), color);
+            DrawClippedLine(static_cast<int>(std::lround(third.x)), static_cast<int>(std::lround(third.y)), static_cast<int>(std::lround(first.x)), static_cast<int>(std::lround(first.y)), color);
         }
 
         /// Draw a clipped wireframe triangle with perspective-correct depth testing.
@@ -2618,9 +2362,7 @@ namespace mxvk {
         }
 
         /// Draw a clipped filled triangle from homogeneous screen-space vertices.
-        void DrawFilledTriangle(const vec4D &p0, const vec4D &p1, const vec4D &p2, MXCOLOR color) const {
-            DrawFilledTriangle(vec2D(p0.x, p0.y), vec2D(p1.x, p1.y), vec2D(p2.x, p2.y), color);
-        }
+        void DrawFilledTriangle(const vec4D &p0, const vec4D &p1, const vec4D &p2, MXCOLOR color) const { DrawFilledTriangle(vec2D(p0.x, p0.y), vec2D(p1.x, p1.y), vec2D(p2.x, p2.y), color); }
 
         /// Draw active render-list triangles as filled polygons.
         void DrawSolidPolys(const RenderList &list) const {

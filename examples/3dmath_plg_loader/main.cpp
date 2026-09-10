@@ -45,35 +45,18 @@ namespace {
 
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
 
-    [[nodiscard]] mxvk::MXCOLOR pack_color(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha) {
-        return ((alpha & 0xFFU) << 24U) |
-               ((red & 0xFFU) << 16U) |
-               ((green & 0xFFU) << 8U) |
-               (blue & 0xFFU);
-    }
+    [[nodiscard]] mxvk::MXCOLOR pack_color(std::uint32_t red, std::uint32_t green, std::uint32_t blue, std::uint32_t alpha) { return ((alpha & 0xFFU) << 24U) | ((red & 0xFFU) << 16U) | ((green & 0xFFU) << 8U) | (blue & 0xFFU); }
 
     [[nodiscard]] mxvk::MXCOLOR interpolate_color(mxvk::MXCOLOR first, mxvk::MXCOLOR second, float fraction) {
-        const std::uint32_t second_weight = static_cast<std::uint32_t>(
-            std::clamp(static_cast<int>(fraction * 256.0f + 0.5f), 0, 256));
+        const std::uint32_t second_weight = static_cast<std::uint32_t>(std::clamp(static_cast<int>(fraction * 256.0f + 0.5f), 0, 256));
         const std::uint32_t first_weight = 256U - second_weight;
-        const auto interpolate_channel = [first_weight, second_weight](std::uint8_t first_channel, std::uint8_t second_channel) {
-            return (static_cast<std::uint32_t>(first_channel) * first_weight +
-                    static_cast<std::uint32_t>(second_channel) * second_weight +
-                    128U) >>
-                   8U;
-        };
-        return pack_color(
-            interpolate_channel(mxvk::color_r(first), mxvk::color_r(second)),
-            interpolate_channel(mxvk::color_g(first), mxvk::color_g(second)),
-            interpolate_channel(mxvk::color_b(first), mxvk::color_b(second)),
-            interpolate_channel(mxvk::color_a(first), mxvk::color_a(second)));
+        const auto interpolate_channel = [first_weight, second_weight](std::uint8_t first_channel, std::uint8_t second_channel) { return (static_cast<std::uint32_t>(first_channel) * first_weight + static_cast<std::uint32_t>(second_channel) * second_weight + 128U) >> 8U; };
+        return pack_color(interpolate_channel(mxvk::color_r(first), mxvk::color_r(second)), interpolate_channel(mxvk::color_g(first), mxvk::color_g(second)), interpolate_channel(mxvk::color_b(first), mxvk::color_b(second)), interpolate_channel(mxvk::color_a(first), mxvk::color_a(second)));
     }
 
     struct MipLevel {
@@ -92,9 +75,7 @@ namespace {
             const int second_y = std::min(first_y + 1, height - 1);
             const float x_fraction = texture_x - static_cast<float>(first_x);
             const float y_fraction = texture_y - static_cast<float>(first_y);
-            const auto texel = [this](int x, int y) {
-                return pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
-            };
+            const auto texel = [this](int x, int y) { return pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)]; };
             const mxvk::MXCOLOR top = interpolate_color(texel(first_x, first_y), texel(second_x, first_y), x_fraction);
             const mxvk::MXCOLOR bottom = interpolate_color(texel(first_x, second_y), texel(second_x, second_y), x_fraction);
             return interpolate_color(top, bottom, y_fraction);
@@ -104,17 +85,11 @@ namespace {
     struct Texture {
         std::vector<MipLevel> levels;
 
-        [[nodiscard]] bool empty() const {
-            return levels.empty() || levels.front().width <= 0 || levels.front().height <= 0 || levels.front().pixels.empty();
-        }
+        [[nodiscard]] bool empty() const { return levels.empty() || levels.front().width <= 0 || levels.front().height <= 0 || levels.front().pixels.empty(); }
 
-        [[nodiscard]] int width() const {
-            return empty() ? 0 : levels.front().width;
-        }
+        [[nodiscard]] int width() const { return empty() ? 0 : levels.front().width; }
 
-        [[nodiscard]] int height() const {
-            return empty() ? 0 : levels.front().height;
-        }
+        [[nodiscard]] int height() const { return empty() ? 0 : levels.front().height; }
 
         [[nodiscard]] mxvk::MXCOLOR sample(float u, float v, float level, bool repeat_horizontal) const {
             level = std::clamp(level, 0.0f, static_cast<float>(levels.size() - 1));
@@ -192,8 +167,7 @@ namespace {
                 std::uint8_t blue = 0;
                 std::uint8_t alpha = 0;
                 SDL_GetRGBA(source[x], format, nullptr, &red, &green, &blue, &alpha);
-                base_level.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(base_level.width) + static_cast<std::size_t>(x)] =
-                    pack_color(red, green, blue, alpha);
+                base_level.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(base_level.width) + static_cast<std::size_t>(x)] = pack_color(red, green, blue, alpha);
             }
         }
         texture.levels.push_back(std::move(base_level));
@@ -210,9 +184,7 @@ namespace {
                     const int second_x = std::min(first_x + 1, source.width - 1);
                     const int first_y = std::min(y * 2, source.height - 1);
                     const int second_y = std::min(first_y + 1, source.height - 1);
-                    const auto texel = [&source](int source_x, int source_y) {
-                        return source.pixels[static_cast<std::size_t>(source_y) * static_cast<std::size_t>(source.width) + static_cast<std::size_t>(source_x)];
-                    };
+                    const auto texel = [&source](int source_x, int source_y) { return source.pixels[static_cast<std::size_t>(source_y) * static_cast<std::size_t>(source.width) + static_cast<std::size_t>(source_x)]; };
                     const std::array<mxvk::MXCOLOR, 4> colors = {
                         texel(first_x, first_y),
                         texel(second_x, first_y),
@@ -226,24 +198,13 @@ namespace {
                         }
                         return (sum + 2U) / 4U;
                     };
-                    destination.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(destination.width) + static_cast<std::size_t>(x)] =
-                        pack_color(
-                            average_channel(mxvk::color_r),
-                            average_channel(mxvk::color_g),
-                            average_channel(mxvk::color_b),
-                            average_channel(mxvk::color_a));
+                    destination.pixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(destination.width) + static_cast<std::size_t>(x)] = pack_color(average_channel(mxvk::color_r), average_channel(mxvk::color_g), average_channel(mxvk::color_b), average_channel(mxvk::color_a));
                 }
             }
             texture.levels.push_back(std::move(destination));
         }
 
-        std::cout << std::format(
-            "{}: loaded texture '{}' ({}x{}, {} mip levels)\n",
-            APP_NAME,
-            path.string(),
-            texture.width(),
-            texture.height(),
-            texture.levels.size());
+        std::cout << std::format("{}: loaded texture '{}' ({}x{}, {} mip levels)\n", APP_NAME, path.string(), texture.width(), texture.height(), texture.levels.size());
         return texture;
     }
 
@@ -257,12 +218,7 @@ namespace {
     };
 
     [[nodiscard]] bool crosses_horizontal_texture_seam(const std::array<mxvk::vec2D, 3> &texcoords) {
-        const auto [minimum, maximum] = std::minmax_element(
-            texcoords.begin(),
-            texcoords.end(),
-            [](const mxvk::vec2D &first, const mxvk::vec2D &second) {
-                return first.x < second.x;
-            });
+        const auto [minimum, maximum] = std::minmax_element(texcoords.begin(), texcoords.end(), [](const mxvk::vec2D &first, const mxvk::vec2D &second) { return first.x < second.x; });
         const float span = maximum->x - minimum->x;
         return span > 0.5f && span < 1.0f - mxvk::EPSILON;
     }
@@ -305,19 +261,7 @@ namespace {
 namespace example {
     class Math3DModelLoaderWindow : public mxvk::VK_Window {
       public:
-        Math3DModelLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark, bool wireframe)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              override_texture(wireframe ? Texture{} : load_texture(texture_filename, asset_path, !disable_mipmap)),
-              frame_width(framebuffer.width),
-              frame_height(framebuffer.height),
-              fallback_width(width),
-              fallback_height(height),
-              warp_fix_enabled(!disable_warp_fix),
-              mipmapping_enabled(!disable_mipmap),
-              mip_level_bias(mip_bias),
-              texture_repeat_enabled(repeat_texture),
-              benchmark_enabled(benchmark),
-              wireframe_enabled(wireframe) {
+        Math3DModelLoaderWindow(const std::string &filename, const std::string &texture_filename, const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool repeat_texture, bool disable_warp_fix, bool disable_mipmap, float mip_bias, const FramebufferDimensions &framebuffer, bool benchmark, bool wireframe) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), override_texture(wireframe ? Texture{} : load_texture(texture_filename, asset_path, !disable_mipmap)), frame_width(framebuffer.width), frame_height(framebuffer.height), fallback_width(width), fallback_height(height), warp_fix_enabled(!disable_warp_fix), mipmapping_enabled(!disable_mipmap), mip_level_bias(mip_bias), texture_repeat_enabled(repeat_texture), benchmark_enabled(benchmark), wireframe_enabled(wireframe) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -358,8 +302,7 @@ namespace example {
             triangle_visible.resize(static_cast<Eigen::Index>(model.vlist.size()));
 #endif
             for (std::size_t index = 0; index < model.local.size(); ++index) {
-                local_vertex_batch.col(static_cast<Eigen::Index>(index)) =
-                    Eigen::Vector4f(model.local[index].x, model.local[index].y, model.local[index].z, model.local[index].w);
+                local_vertex_batch.col(static_cast<Eigen::Index>(index)) = Eigen::Vector4f(model.local[index].x, model.local[index].y, model.local[index].z, model.local[index].w);
             }
 #else
             camera_vertices.resize(model.local.size());
@@ -396,10 +339,7 @@ namespace example {
                 const float delta_x = e.motion.x - last_mouse_x;
                 const float delta_y = e.motion.y - last_mouse_y;
                 yaw_degrees = std::fmod(yaw_degrees + delta_x * MOUSE_ROTATION_SENSITIVITY, 360.0f);
-                pitch_degrees = std::clamp(
-                    pitch_degrees + delta_y * MOUSE_ROTATION_SENSITIVITY,
-                    -MAX_PITCH_DEGREES,
-                    MAX_PITCH_DEGREES);
+                pitch_degrees = std::clamp(pitch_degrees + delta_y * MOUSE_ROTATION_SENSITIVITY, -MAX_PITCH_DEGREES, MAX_PITCH_DEGREES);
                 last_mouse_x = e.motion.x;
                 last_mouse_y = e.motion.y;
                 return;
@@ -423,17 +363,14 @@ namespace example {
             std::ranges::fill(depth_buffer, std::numeric_limits<float>::infinity());
 
             const std::uint64_t current_ticks = SDL_GetTicks();
-            const float elapsed_seconds = previous_frame_ticks == 0
-                                              ? 0.0f
-                                              : static_cast<float>(current_ticks - previous_frame_ticks) * 0.001f;
+            const float elapsed_seconds = previous_frame_ticks == 0 ? 0.0f : static_cast<float>(current_ticks - previous_frame_ticks) * 0.001f;
             previous_frame_ticks = current_ticks;
             if (automatic_rotation && !mouse_dragging) {
                 yaw_degrees = std::fmod(yaw_degrees + elapsed_seconds * 42.0f, 360.0f);
             }
 
             if (benchmark_enabled && benchmark_frame_count == 0) {
-                benchmark_stopwatch =
-                    std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmark_name);
+                benchmark_stopwatch = std::make_unique<StopWatch<HighResolutionClockPolicy>>(benchmark_name);
             }
 
             mxvk::Mat4D rotation;
@@ -447,12 +384,7 @@ namespace example {
 
             for (const FaceDraw &face : visible_faces) {
                 if (wireframe_enabled) {
-                    wireframe_pipeline.DrawWireframeTriangle(
-                        face.points[0],
-                        face.points[1],
-                        face.points[2],
-                        mxvk::shade_color(face.material_color, face.intensity),
-                        depth_buffer);
+                    wireframe_pipeline.DrawWireframeTriangle(face.points[0], face.points[1], face.points[2], mxvk::shade_color(face.material_color, face.intensity), depth_buffer);
                 } else {
                     draw_gradient_triangle(face);
                 }
@@ -520,8 +452,7 @@ namespace example {
         bool benchmark_enabled = false;
         bool wireframe_enabled = false;
         std::size_t benchmark_frame_count = 0;
-        std::string benchmark_name =
-            std::format("{} geometry draw ({} backend, {} frames)", MODEL_FORMAT, BACKEND_NAME, BENCHMARK_FRAME_COUNT);
+        std::string benchmark_name = std::format("{} geometry draw ({} backend, {} frames)", MODEL_FORMAT, BACKEND_NAME, BENCHMARK_FRAME_COUNT);
         std::unique_ptr<StopWatch<HighResolutionClockPolicy>> benchmark_stopwatch;
 
         static constexpr std::size_t BENCHMARK_FRAME_COUNT = 60 * 10;
@@ -532,14 +463,8 @@ namespace example {
                 throw mxvk::Exception(std::format("{}: cannot fit an OBJ model with no triangles", APP_NAME));
             }
 
-            mxvk::vec4D minimum(
-                std::numeric_limits<float>::max(),
-                std::numeric_limits<float>::max(),
-                std::numeric_limits<float>::max());
-            mxvk::vec4D maximum(
-                std::numeric_limits<float>::lowest(),
-                std::numeric_limits<float>::lowest(),
-                std::numeric_limits<float>::lowest());
+            mxvk::vec4D minimum(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+            mxvk::vec4D maximum(std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest());
             for (const mxvk::Triangle &triangle : model.vlist) {
                 for (const int vertex_index : triangle.vert) {
                     const mxvk::vec4D &vertex = model.local[static_cast<std::size_t>(vertex_index)];
@@ -552,20 +477,12 @@ namespace example {
                 }
             }
 
-            const mxvk::vec4D center(
-                (minimum.x + maximum.x) * 0.5f,
-                (minimum.y + maximum.y) * 0.5f,
-                (minimum.z + maximum.z) * 0.5f);
+            const mxvk::vec4D center((minimum.x + maximum.x) * 0.5f, (minimum.y + maximum.y) * 0.5f, (minimum.z + maximum.z) * 0.5f);
             float source_radius = 0.0f;
             for (const mxvk::Triangle &triangle : model.vlist) {
                 for (const int vertex_index : triangle.vert) {
                     const mxvk::vec4D &vertex = model.local[static_cast<std::size_t>(vertex_index)];
-                    source_radius = std::max(
-                        source_radius,
-                        std::sqrt(
-                            (vertex.x - center.x) * (vertex.x - center.x) +
-                            (vertex.y - center.y) * (vertex.y - center.y) +
-                            (vertex.z - center.z) * (vertex.z - center.z)));
+                    source_radius = std::max(source_radius, std::sqrt((vertex.x - center.x) * (vertex.x - center.x) + (vertex.y - center.y) * (vertex.y - center.y) + (vertex.z - center.z) * (vertex.z - center.z)));
                 }
             }
             if (!std::isfinite(source_radius) || source_radius <= mxvk::EPSILON) {
@@ -579,12 +496,7 @@ namespace example {
                 vertex.z = (vertex.z - center.z) * fit_scale;
             }
             model.ComputeRad();
-            std::cout << std::format(
-                "{}: centered model and scaled radius {:.3f} to {:.3f} (scale {:.6f})\n",
-                APP_NAME,
-                source_radius,
-                MODEL_FIT_RADIUS,
-                fit_scale);
+            std::cout << std::format("{}: centered model and scaled radius {:.3f} to {:.3f} (scale {:.6f})\n", APP_NAME, source_radius, MODEL_FIT_RADIUS, fit_scale);
         }
 #endif
 
@@ -597,30 +509,17 @@ namespace example {
                 return;
             }
 
-            const auto dominant = std::max_element(
-                triangle_counts.begin(),
-                triangle_counts.end(),
-                [](const auto &left, const auto &right) {
-                    return left.second < right.second;
-                });
+            const auto dominant = std::max_element(triangle_counts.begin(), triangle_counts.end(), [](const auto &left, const auto &right) { return left.second < right.second; });
             constexpr float DOMINANT_OBJECT_FRACTION = 0.95f;
-            if (static_cast<float>(dominant->second) <
-                static_cast<float>(model.vlist.size()) * DOMINANT_OBJECT_FRACTION) {
+            if (static_cast<float>(dominant->second) < static_cast<float>(model.vlist.size()) * DOMINANT_OBJECT_FRACTION) {
                 return;
             }
 
             const std::size_t original_triangle_count = model.vlist.size();
-            std::erase_if(model.vlist, [&dominant](const mxvk::Triangle &triangle) {
-                return triangle.source_object_name != dominant->first;
-            });
+            std::erase_if(model.vlist, [&dominant](const mxvk::Triangle &triangle) { return triangle.source_object_name != dominant->first; });
             model.num_polys = static_cast<int>(model.vlist.size());
             model.object_name = dominant->first;
-            std::cout << std::format(
-                "{}: selected dominant OBJ object '{}' ({} triangles); ignored {} auxiliary triangle(s)\n",
-                APP_NAME,
-                dominant->first,
-                dominant->second,
-                original_triangle_count - model.vlist.size());
+            std::cout << std::format("{}: selected dominant OBJ object '{}' ({} triangles); ignored {} auxiliary triangle(s)\n", APP_NAME, dominant->first, dominant->second, original_triangle_count - model.vlist.size());
         }
 
         void load_material_textures(const std::string &asset_path, bool generate_mipmaps) {
@@ -641,9 +540,7 @@ namespace example {
             if (!override_texture.empty()) {
                 return &override_texture;
             }
-            if (material_index >= 0 &&
-                static_cast<std::size_t>(material_index) < material_textures.size() &&
-                !material_textures[static_cast<std::size_t>(material_index)].empty()) {
+            if (material_index >= 0 && static_cast<std::size_t>(material_index) < material_textures.size() && !material_textures[static_cast<std::size_t>(material_index)].empty()) {
                 return &material_textures[static_cast<std::size_t>(material_index)];
             }
             return nullptr;
@@ -652,11 +549,7 @@ namespace example {
 #if defined(MXVK_USE_EIGEN_MATH)
         static void transform_eigen_batch(const mxvk::Mat4D &matrix, const VertexBatch &input, VertexBatch &output) {
             for (int component = 0; component < 4; ++component) {
-                output.row(component).array() =
-                    input.row(0).array() * matrix.mat[0][component] +
-                    input.row(1).array() * matrix.mat[1][component] +
-                    input.row(2).array() * matrix.mat[2][component] +
-                    input.row(3).array() * matrix.mat[3][component];
+                output.row(component).array() = input.row(0).array() * matrix.mat[0][component] + input.row(1).array() * matrix.mat[1][component] + input.row(2).array() * matrix.mat[2][component] + input.row(3).array() * matrix.mat[3][component];
             }
         }
 #endif
@@ -674,11 +567,7 @@ namespace example {
                 const mxvk::vec4D &b = model.local[static_cast<std::size_t>(triangle.vert[1])];
                 const mxvk::vec4D &c = model.local[static_cast<std::size_t>(triangle.vert[2])];
 #if !defined(MXVK_USE_EIGEN_MATH) || !defined(MXVK_OBJ_LOADER)
-                const mxvk::vec4D center(
-                    (a.x + b.x + c.x) * (1.0f / 3.0f),
-                    (a.y + b.y + c.y) * (1.0f / 3.0f),
-                    (a.z + b.z + c.z) * (1.0f / 3.0f),
-                    1.0f);
+                const mxvk::vec4D center((a.x + b.x + c.x) * (1.0f / 3.0f), (a.y + b.y + c.y) * (1.0f / 3.0f), (a.z + b.z + c.z) * (1.0f / 3.0f), 1.0f);
 #endif
                 mxvk::vec4D normal = mxvk::vec4D().Build(a, b).CrossProduct(mxvk::vec4D().Build(a, c));
                 normal.Normalize();
@@ -704,12 +593,9 @@ namespace example {
             const float scale = static_cast<float>(std::min(frame_width, frame_height)) * 0.52f;
             const float center_x = static_cast<float>(frame_width) * 0.5f;
             const float center_y = static_cast<float>(frame_height) * 0.5f;
-            inverse_vertex_depth.array() =
-                camera_vertex_batch.row(2).array().max(0.001f).inverse();
-            projected_vertex_batch.row(0).array() =
-                center_x + camera_vertex_batch.row(0).array() * inverse_vertex_depth.array() * scale;
-            projected_vertex_batch.row(1).array() =
-                center_y - camera_vertex_batch.row(1).array() * inverse_vertex_depth.array() * scale;
+            inverse_vertex_depth.array() = camera_vertex_batch.row(2).array().max(0.001f).inverse();
+            projected_vertex_batch.row(0).array() = center_x + camera_vertex_batch.row(0).array() * inverse_vertex_depth.array() * scale;
+            projected_vertex_batch.row(1).array() = center_y - camera_vertex_batch.row(1).array() * inverse_vertex_depth.array() * scale;
             projected_vertex_batch.row(2) = camera_vertex_batch.row(2);
             projected_vertex_batch.row(3).setOnes();
 #else
@@ -749,9 +635,7 @@ namespace example {
                 texcoord.y = 1.0f - texcoord.y;
             }
 #endif
-            const bool repeat_horizontal =
-                face_texture(triangle.material_index) != nullptr &&
-                texture_repeat_enabled;
+            const bool repeat_horizontal = face_texture(triangle.material_index) != nullptr && texture_repeat_enabled;
             if (repeat_horizontal) {
                 texcoords = unwrap_horizontal_texcoords(texcoords);
             }
@@ -773,18 +657,10 @@ namespace example {
 #endif
             transform_eigen_batch(rotation_matrix, local_face_normal_batch, camera_face_normal_batch);
 #if !defined(MXVK_OBJ_LOADER)
-            triangle_visible =
-                (-camera_face_normal_batch.row(0).array() * camera_face_center_batch.row(0).array() -
-                 camera_face_normal_batch.row(1).array() * camera_face_center_batch.row(1).array() -
-                 camera_face_normal_batch.row(2).array() * camera_face_center_batch.row(2).array()) >
-                0.0f;
+            triangle_visible = (-camera_face_normal_batch.row(0).array() * camera_face_center_batch.row(0).array() - camera_face_normal_batch.row(1).array() * camera_face_center_batch.row(1).array() - camera_face_normal_batch.row(2).array() * camera_face_center_batch.row(2).array()) > 0.0f;
 #endif
 
-            const auto diffuse =
-                (camera_face_normal_batch.row(0).array() * light_direction.x +
-                 camera_face_normal_batch.row(1).array() * light_direction.y +
-                 camera_face_normal_batch.row(2).array() * light_direction.z)
-                    .max(0.0f);
+            const auto diffuse = (camera_face_normal_batch.row(0).array() * light_direction.x + camera_face_normal_batch.row(1).array() * light_direction.y + camera_face_normal_batch.row(2).array() * light_direction.z).max(0.0f);
             triangle_intensity.array() = (0.35f + diffuse * 0.65f).min(1.0f);
 
             for (std::size_t index = 0; index < model.vlist.size(); ++index) {
@@ -831,21 +707,15 @@ namespace example {
 
             depth_buffer.resize(static_cast<std::size_t>(frame_width) * static_cast<std::size_t>(frame_height));
             clear_frame(BACKGROUND_COLOR);
-            wireframe_pipeline.Begin(frame_width, frame_height, [this](int x, int y, mxvk::MXCOLOR color) {
-                put_pixel(x, y, color);
-            });
+            wireframe_pipeline.Begin(frame_width, frame_height, [this](int x, int y, mxvk::MXCOLOR color) { put_pixel(x, y, color); });
 
             frame_sprite = createSprite(frame_surface.get());
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
         }
 
-        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
-            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
-        }
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const { return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color)); }
 
-        void clear_frame(mxvk::MXCOLOR color) {
-            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
-        }
+        void clear_frame(mxvk::MXCOLOR color) { SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color)); }
 
         void put_pixel(int x, int y, mxvk::MXCOLOR color) {
             if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
@@ -881,68 +751,33 @@ namespace example {
                 const float inverse_z_b = 1.0f / b.z;
                 const float inverse_z_c = 1.0f / c.z;
                 const float inverse_z = (inverse_z_a + inverse_z_b + inverse_z_c) / 3.0f;
-                const float inverse_z_dx =
-                    weight_a_dx * inverse_z_a +
-                    weight_b_dx * inverse_z_b +
-                    weight_c_dx * inverse_z_c;
-                const float inverse_z_dy =
-                    weight_a_dy * inverse_z_a +
-                    weight_b_dy * inverse_z_b +
-                    weight_c_dy * inverse_z_c;
+                const float inverse_z_dx = weight_a_dx * inverse_z_a + weight_b_dx * inverse_z_b + weight_c_dx * inverse_z_c;
+                const float inverse_z_dy = weight_a_dy * inverse_z_a + weight_b_dy * inverse_z_b + weight_c_dy * inverse_z_c;
                 const auto corrected_derivatives = [&](float first, float second, float third) {
-                    const float value_over_z =
-                        (first * inverse_z_a + second * inverse_z_b + third * inverse_z_c) / 3.0f;
-                    const float value_over_z_dx =
-                        weight_a_dx * first * inverse_z_a +
-                        weight_b_dx * second * inverse_z_b +
-                        weight_c_dx * third * inverse_z_c;
-                    const float value_over_z_dy =
-                        weight_a_dy * first * inverse_z_a +
-                        weight_b_dy * second * inverse_z_b +
-                        weight_c_dy * third * inverse_z_c;
+                    const float value_over_z = (first * inverse_z_a + second * inverse_z_b + third * inverse_z_c) / 3.0f;
+                    const float value_over_z_dx = weight_a_dx * first * inverse_z_a + weight_b_dx * second * inverse_z_b + weight_c_dx * third * inverse_z_c;
+                    const float value_over_z_dy = weight_a_dy * first * inverse_z_a + weight_b_dy * second * inverse_z_b + weight_c_dy * third * inverse_z_c;
                     const float denominator = inverse_z * inverse_z;
                     return std::array<float, 2>{
                         (value_over_z_dx * inverse_z - value_over_z * inverse_z_dx) / denominator,
                         (value_over_z_dy * inverse_z - value_over_z * inverse_z_dy) / denominator,
                     };
                 };
-                const std::array<float, 2> u_derivatives = corrected_derivatives(
-                    face.texcoords[0].x,
-                    face.texcoords[1].x,
-                    face.texcoords[2].x);
-                const std::array<float, 2> v_derivatives = corrected_derivatives(
-                    face.texcoords[0].y,
-                    face.texcoords[1].y,
-                    face.texcoords[2].y);
+                const std::array<float, 2> u_derivatives = corrected_derivatives(face.texcoords[0].x, face.texcoords[1].x, face.texcoords[2].x);
+                const std::array<float, 2> v_derivatives = corrected_derivatives(face.texcoords[0].y, face.texcoords[1].y, face.texcoords[2].y);
                 u_dx = u_derivatives[0];
                 u_dy = u_derivatives[1];
                 v_dx = v_derivatives[0];
                 v_dy = v_derivatives[1];
             } else {
-                u_dx =
-                    weight_a_dx * face.texcoords[0].x +
-                    weight_b_dx * face.texcoords[1].x +
-                    weight_c_dx * face.texcoords[2].x;
-                u_dy =
-                    weight_a_dy * face.texcoords[0].x +
-                    weight_b_dy * face.texcoords[1].x +
-                    weight_c_dy * face.texcoords[2].x;
-                v_dx =
-                    weight_a_dx * face.texcoords[0].y +
-                    weight_b_dx * face.texcoords[1].y +
-                    weight_c_dx * face.texcoords[2].y;
-                v_dy =
-                    weight_a_dy * face.texcoords[0].y +
-                    weight_b_dy * face.texcoords[1].y +
-                    weight_c_dy * face.texcoords[2].y;
+                u_dx = weight_a_dx * face.texcoords[0].x + weight_b_dx * face.texcoords[1].x + weight_c_dx * face.texcoords[2].x;
+                u_dy = weight_a_dy * face.texcoords[0].x + weight_b_dy * face.texcoords[1].x + weight_c_dy * face.texcoords[2].x;
+                v_dx = weight_a_dx * face.texcoords[0].y + weight_b_dx * face.texcoords[1].y + weight_c_dx * face.texcoords[2].y;
+                v_dy = weight_a_dy * face.texcoords[0].y + weight_b_dy * face.texcoords[1].y + weight_c_dy * face.texcoords[2].y;
             }
 
-            const float horizontal_footprint = std::hypot(
-                u_dx * static_cast<float>(texture->width()),
-                v_dx * static_cast<float>(texture->height()));
-            const float vertical_footprint = std::hypot(
-                u_dy * static_cast<float>(texture->width()),
-                v_dy * static_cast<float>(texture->height()));
+            const float horizontal_footprint = std::hypot(u_dx * static_cast<float>(texture->width()), v_dx * static_cast<float>(texture->height()));
+            const float vertical_footprint = std::hypot(u_dy * static_cast<float>(texture->width()), v_dy * static_cast<float>(texture->height()));
             return std::log2(std::max({mxvk::EPSILON, horizontal_footprint, vertical_footprint})) + mip_level_bias;
         }
 
@@ -950,9 +785,7 @@ namespace example {
             const mxvk::vec4D &a = face.points[0];
             const mxvk::vec4D &b = face.points[1];
             const mxvk::vec4D &c = face.points[2];
-            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) {
-                return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x);
-            };
+            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) { return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x); };
 
             const float area = edge(b, c, a.x, a.y);
             if (std::abs(area) <= mxvk::EPSILON) {
@@ -977,18 +810,13 @@ namespace example {
                         continue;
                     }
 
-                    const float reciprocal_depth =
-                        weight_a / a.z +
-                        weight_b / b.z +
-                        weight_c / c.z;
+                    const float reciprocal_depth = weight_a / a.z + weight_b / b.z + weight_c / c.z;
                     if (reciprocal_depth <= mxvk::EPSILON) {
                         continue;
                     }
 
                     const float depth = 1.0f / reciprocal_depth;
-                    const std::size_t pixel_index =
-                        static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) +
-                        static_cast<std::size_t>(x);
+                    const std::size_t pixel_index = static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) + static_cast<std::size_t>(x);
                     if (depth >= depth_buffer[pixel_index]) {
                         continue;
                     }
@@ -997,14 +825,8 @@ namespace example {
                     const float texture_weight_a = warp_fix_enabled ? (weight_a / a.z) * depth : weight_a;
                     const float texture_weight_b = warp_fix_enabled ? (weight_b / b.z) * depth : weight_b;
                     const float texture_weight_c = warp_fix_enabled ? (weight_c / c.z) * depth : weight_c;
-                    const float u =
-                        face.texcoords[0].x * texture_weight_a +
-                        face.texcoords[1].x * texture_weight_b +
-                        face.texcoords[2].x * texture_weight_c;
-                    const float v =
-                        face.texcoords[0].y * texture_weight_a +
-                        face.texcoords[1].y * texture_weight_b +
-                        face.texcoords[2].y * texture_weight_c;
+                    const float u = face.texcoords[0].x * texture_weight_a + face.texcoords[1].x * texture_weight_b + face.texcoords[2].x * texture_weight_c;
+                    const float v = face.texcoords[0].y * texture_weight_a + face.texcoords[1].y * texture_weight_b + face.texcoords[2].y * texture_weight_c;
                     mxvk::MXCOLOR color = face.material_color;
                     if (texture != nullptr) {
                         color = texture->sample(u, v, texture_level, face.repeat_horizontal);
@@ -1028,19 +850,12 @@ namespace example {
             constexpr mxvk::MXCOLOR TOP_LEFT = mxvk::MXVK_RGB(155, 105, 255);
             constexpr mxvk::MXCOLOR TOP_RIGHT = mxvk::MXVK_RGB(255, 82, 197);
             const auto bilinear_channel = [&](auto component) {
-                const float bottom =
-                    static_cast<float>(component(BOTTOM_LEFT)) +
-                    (static_cast<float>(component(BOTTOM_RIGHT)) - static_cast<float>(component(BOTTOM_LEFT))) * u;
-                const float top =
-                    static_cast<float>(component(TOP_LEFT)) +
-                    (static_cast<float>(component(TOP_RIGHT)) - static_cast<float>(component(TOP_LEFT))) * u;
+                const float bottom = static_cast<float>(component(BOTTOM_LEFT)) + (static_cast<float>(component(BOTTOM_RIGHT)) - static_cast<float>(component(BOTTOM_LEFT))) * u;
+                const float top = static_cast<float>(component(TOP_LEFT)) + (static_cast<float>(component(TOP_RIGHT)) - static_cast<float>(component(TOP_LEFT))) * u;
                 return std::clamp(static_cast<int>(std::lround(bottom + (top - bottom) * v)), 0, 255);
             };
 
-            return mxvk::MXVK_RGB(
-                bilinear_channel(mxvk::color_r),
-                bilinear_channel(mxvk::color_g),
-                bilinear_channel(mxvk::color_b));
+            return mxvk::MXVK_RGB(bilinear_channel(mxvk::color_r), bilinear_channel(mxvk::color_g), bilinear_channel(mxvk::color_b));
         }
 
         [[nodiscard]] static mxvk::vec4D project_to_screen(const mxvk::vec4D &point, int width, int height) {

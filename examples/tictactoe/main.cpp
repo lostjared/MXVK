@@ -19,9 +19,7 @@
 namespace example {
     class TicTacToeWindow : public mxvk::VK_Window {
       public:
-        TicTacToeWindow(const std::string &assetPath, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("-[ MXVK Tic-Tac-Toe ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              rng(std::random_device{}()) {
+        TicTacToeWindow(const std::string &assetPath, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("-[ MXVK Tic-Tac-Toe ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), rng(std::random_device{}()) {
             assetRoot = assetPath.empty() ? std::string(tictactoe_ASSET_DIR) : assetPath;
             const std::string fontPath = assetPath.empty() ? std::string(tictactoe_FONT_PATH) : assetRoot + "/data/font.ttf";
             setFont(fontPath, 20);
@@ -57,12 +55,7 @@ namespace example {
         }
 
       private:
-        enum class Outcome {
-            Running,
-            UserWon,
-            ComputerWon,
-            Draw
-        };
+        enum class Outcome { Running, UserWon, ComputerWon, Draw };
 
         static constexpr int gridSize = 360;
         static constexpr int cellSize = gridSize / 3;
@@ -144,15 +137,11 @@ namespace example {
             SDL_GetWindowSize(getSDLWindow(), &logicalWidth, &logicalHeight);
             SDL_GetWindowSizeInPixels(getSDLWindow(), &pixelWidth, &pixelHeight);
 
-            if (logicalWidth <= 0 || logicalHeight <= 0 || pixelWidth <= 0 || pixelHeight <= 0 ||
-                swapchain_extent.width == 0 || swapchain_extent.height == 0) {
+            if (logicalWidth <= 0 || logicalHeight <= 0 || pixelWidth <= 0 || pixelHeight <= 0 || swapchain_extent.width == 0 || swapchain_extent.height == 0) {
                 return {static_cast<int>(std::lround(mouseX)), static_cast<int>(std::lround(mouseY))};
             }
 
-            const bool mouseLooksLogical =
-                mouseX >= 0.0f && mouseY >= 0.0f &&
-                mouseX <= static_cast<float>(logicalWidth) + 0.5f &&
-                mouseY <= static_cast<float>(logicalHeight) + 0.5f;
+            const bool mouseLooksLogical = mouseX >= 0.0f && mouseY >= 0.0f && mouseX <= static_cast<float>(logicalWidth) + 0.5f && mouseY <= static_cast<float>(logicalHeight) + 0.5f;
 
             if (mouseLooksLogical && (pixelWidth != logicalWidth || pixelHeight != logicalHeight)) {
                 mouseX *= static_cast<float>(swapchain_extent.width) / static_cast<float>(logicalWidth);
@@ -229,9 +218,7 @@ namespace example {
 
             for (const auto &line : lines) {
                 const char first = board[static_cast<std::size_t>(line[0])];
-                if (first != ' ' &&
-                    first == board[static_cast<std::size_t>(line[1])] &&
-                    first == board[static_cast<std::size_t>(line[2])]) {
+                if (first != ' ' && first == board[static_cast<std::size_t>(line[1])] && first == board[static_cast<std::size_t>(line[2])]) {
                     return first;
                 }
             }
@@ -330,9 +317,7 @@ namespace example {
             }
         }
 
-        void drawDot(mxvk::VK_Sprite &sprite, int x, int y, int size) {
-            sprite.drawSpriteRect(x - size / 2, y - size / 2, size, size);
-        }
+        void drawDot(mxvk::VK_Sprite &sprite, int x, int y, int size) { sprite.drawSpriteRect(x - size / 2, y - size / 2, size, size); }
 
         void drawText() {
             printText("Tic-Tac-Toe", boardX, 30, SDL_Color{235, 240, 255, 255}, titleFont);

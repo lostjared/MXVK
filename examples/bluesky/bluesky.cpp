@@ -67,11 +67,7 @@ namespace {
 namespace example {
     class WaterWindow : public mxvk::VK_Window {
       public:
-        WaterWindow(const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root((path.empty() ? std::string(WATER_ASSET_DIR) : path) + "/data") {
-            setClearColor(0.60f, 0.78f, 0.96f, 1.0f);
-        }
+        WaterWindow(const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), shader_root((path.empty() ? std::string(WATER_ASSET_DIR) : path) + "/data") { setClearColor(0.60f, 0.78f, 0.96f, 1.0f); }
 
         ~WaterWindow() override {
             if (device != VK_NULL_HANDLE) {
@@ -146,10 +142,7 @@ namespace example {
             const glm::vec3 camera_target(0.0f, -0.15f, -18.0f);
             const float yaw = glm::radians(camera_yaw_degrees);
             const float pitch = glm::radians(camera_pitch_degrees);
-            const glm::vec3 camera_offset(
-                std::sin(yaw) * std::cos(pitch) * camera_distance,
-                std::sin(pitch) * camera_distance,
-                std::cos(yaw) * std::cos(pitch) * camera_distance);
+            const glm::vec3 camera_offset(std::sin(yaw) * std::cos(pitch) * camera_distance, std::sin(pitch) * camera_distance, std::cos(yaw) * std::cos(pitch) * camera_distance);
             const glm::vec3 camera_pos = camera_target + camera_offset;
             const glm::mat4 view = glm::lookAt(camera_pos, camera_target, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 projection = glm::perspective(glm::radians(62.0f), aspect, 0.1f, 260.0f);
@@ -220,9 +213,7 @@ namespace example {
                 }
             }
 
-            const auto vertex_index = [](int x, int z) {
-                return static_cast<std::uint32_t>(z * (WATER_GRID_RESOLUTION + 1) + x);
-            };
+            const auto vertex_index = [](int x, int z) { return static_cast<std::uint32_t>(z * (WATER_GRID_RESOLUTION + 1) + x); };
             for (int z = 0; z < WATER_GRID_RESOLUTION; ++z) {
                 for (int x = 0; x < WATER_GRID_RESOLUTION; ++x) {
                     const std::uint32_t a = vertex_index(x, z);
@@ -246,20 +237,10 @@ namespace example {
             mesh.indexCount = static_cast<uint32_t>(data.indices.size());
 
             const VkDeviceSize vertex_size = sizeof(SceneVertex) * data.vertices.size();
-            uploadDeviceBuffer(
-                context,
-                data.vertices.data(),
-                vertex_size,
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                mesh.vertexBuffer);
+            uploadDeviceBuffer(context, data.vertices.data(), vertex_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, mesh.vertexBuffer);
 
             const VkDeviceSize index_size = sizeof(std::uint32_t) * data.indices.size();
-            uploadDeviceBuffer(
-                context,
-                data.indices.data(),
-                index_size,
-                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                mesh.indexBuffer);
+            uploadDeviceBuffer(context, data.indices.data(), index_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, mesh.indexBuffer);
         }
 
         void drawMesh(VkCommandBuffer cmd, const MeshResources &mesh, const PipelineResources &pipeline, const PushConstants &push_constants) const {
@@ -271,13 +252,7 @@ namespace example {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
             vkCmdBindVertexBuffers(cmd, 0, 1, &mesh.vertexBuffer.buffer, offsets);
             vkCmdBindIndexBuffer(cmd, mesh.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdPushConstants(
-                cmd,
-                pipeline.layout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                0,
-                sizeof(PushConstants),
-                &push_constants);
+            vkCmdPushConstants(cmd, pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &push_constants);
             vkCmdDrawIndexed(cmd, mesh.indexCount, 1, 0, 0, 0);
         }
 
@@ -287,40 +262,20 @@ namespace example {
             }
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline);
-            vkCmdPushConstants(
-                cmd,
-                pipeline.layout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                0,
-                sizeof(PushConstants),
-                &push_constants);
+            vkCmdPushConstants(cmd, pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &push_constants);
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
 
-        void uploadDeviceBuffer(const mxvk::VulkanContext &context,
-                                const void *data,
-                                VkDeviceSize size,
-                                VkBufferUsageFlags usage,
-                                mxvk::BufferResource &buffer) const {
+        void uploadDeviceBuffer(const mxvk::VulkanContext &context, const void *data, VkDeviceSize size, VkBufferUsageFlags usage, mxvk::BufferResource &buffer) const {
             mxvk::BufferResource staging;
-            mxvk::create_buffer(
-                context,
-                size,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                staging);
+            mxvk::create_buffer(context, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging);
 
             try {
                 mxvk::map_buffer(device, staging);
                 std::memcpy(staging.mapped, data, static_cast<std::size_t>(size));
                 mxvk::unmap_buffer(device, staging);
 
-                mxvk::create_buffer(
-                    context,
-                    size,
-                    usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    buffer);
+                mxvk::create_buffer(context, size, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buffer);
                 mxvk::copy_buffer(context, staging.buffer, buffer.buffer, size);
             } catch (...) {
                 mxvk::destroy_buffer(device, staging);
@@ -419,11 +374,7 @@ namespace example {
                 depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
                 VkPipelineColorBlendAttachmentState color_blend_attachment{};
-                color_blend_attachment.colorWriteMask =
-                    VK_COLOR_COMPONENT_R_BIT |
-                    VK_COLOR_COMPONENT_G_BIT |
-                    VK_COLOR_COMPONENT_B_BIT |
-                    VK_COLOR_COMPONENT_A_BIT;
+                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 color_blend_attachment.blendEnable = alphaBlend ? VK_TRUE : VK_FALSE;
                 color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
                 color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;

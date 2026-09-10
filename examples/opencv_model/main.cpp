@@ -30,13 +30,7 @@ namespace example {
 
     class OpenCVModelWindow : public mxvk::VK_Window {
       public:
-        OpenCVModelWindow(const Arguments &args, const std::string &title)
-            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
-              assetRoot((args.path.empty() || args.path == ".") ? std::string(opencv_model_ASSET_DIR) : args.path),
-              shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath),
-              cameraIndex(args.camera_index),
-              fallbackWidth(args.width),
-              fallbackHeight(args.height) {
+        OpenCVModelWindow(const Arguments &args, const std::string &title) : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync), assetRoot((args.path.empty() || args.path == ".") ? std::string(opencv_model_ASSET_DIR) : args.path), shaderRoot(args.shaderPath.empty() ? assetRoot + "/data" : args.shaderPath), cameraIndex(args.camera_index), fallbackWidth(args.width), fallbackHeight(args.height) {
             try {
                 modelPath = resolveModelPath(args.filename, assetRoot);
                 if (modelPath.empty()) {
@@ -55,8 +49,7 @@ namespace example {
                 fallbackWidth = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_WIDTH));
                 fallbackHeight = static_cast<int>(capture.get(cv::CAP_PROP_FRAME_HEIGHT));
 
-                std::cout << "opencv_model: model='" << modelPath << "' capture="
-                          << fallbackWidth << "x" << fallbackHeight << " @ " << fps << " fps\n";
+                std::cout << "opencv_model: model='" << modelPath << "' capture=" << fallbackWidth << "x" << fallbackHeight << " @ " << fps << " fps\n";
 
                 const std::string vertPath = shaderRoot + "/model.vert.spv";
                 const std::string fragPath = shaderRoot + "/model.frag.spv";
@@ -126,16 +119,11 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            model.resize(this);
-        }
+        void onSwapchainRecreated() override { model.resize(this); }
 
         void proc() override {
             const auto now = std::chrono::steady_clock::now();
-            const float deltaSeconds = std::clamp(
-                std::chrono::duration<float>(now - lastUpdateTime).count(),
-                0.0f,
-                0.1f);
+            const float deltaSeconds = std::clamp(std::chrono::duration<float>(now - lastUpdateTime).count(), 0.0f, 0.1f);
             lastUpdateTime = now;
             updateRotationFromKeyboard(deltaSeconds);
 
@@ -158,9 +146,7 @@ namespace example {
             const VkExtent2D extent = getSwapchainExtent();
             const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - startTime).count();
 
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::mat4(1.0f);

@@ -12,12 +12,7 @@
 namespace example {
     class ConsoleDemoWindow : public mxvk::VK_Window {
       public:
-        ConsoleDemoWindow(const std::string &path,
-                          const std::string &title,
-                          const int width,
-                          const int height,
-                          const bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
+        ConsoleDemoWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync) {
             const std::string base_path = path.empty() ? std::string(console_demo_ASSET_DIR) : path;
             const std::string sprite_vert_path = base_path + "/data/sprite.vert.spv";
             const std::string shader_path = base_path + "/data/background_pulse.frag.spv";
@@ -82,10 +77,7 @@ namespace example {
 
             if (!console.isVisible()) {
                 printText("MXVK Console Demo", 14, 12, SDL_Color{255, 255, 255, 255});
-                printText("Press F3 to toggle console. Press ESC to quit when console is hidden.",
-                          14,
-                          38,
-                          SDL_Color{180, 180, 220, 255});
+                printText("Press F3 to toggle console. Press ESC to quit when console is hidden.", 14, 38, SDL_Color{180, 180, 220, 255});
             }
             console.draw();
         }
@@ -100,11 +92,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::ConsoleDemoWindow window(args.path,
-                                          "MXVK_Console_Demo",
-                                          args.width,
-                                          args.height,
-                                          args.fullscreen, args.enable_vsync);
+        example::ConsoleDemoWindow window(args.path, "MXVK_Console_Demo", args.width, args.height, args.fullscreen, args.enable_vsync);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

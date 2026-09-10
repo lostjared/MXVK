@@ -19,8 +19,7 @@ namespace mxvk {
         [[nodiscard]] uint16_t float_to_half(float value) noexcept {
             const uint32_t bits = std::bit_cast<uint32_t>(value);
             const uint32_t sign = (bits >> 16U) & 0x8000U;
-            int32_t exponent =
-                static_cast<int32_t>((bits >> 23U) & 0xFFU) - 127;
+            int32_t exponent = static_cast<int32_t>((bits >> 23U) & 0xFFU) - 127;
             uint32_t mantissa = bits & 0x7FFFFFU;
             if (exponent < -24) {
                 return static_cast<uint16_t>(sign);
@@ -28,8 +27,7 @@ namespace mxvk {
             if (exponent < -14) {
                 mantissa |= 0x800000U;
                 const uint32_t shift = static_cast<uint32_t>(-exponent - 14);
-                const uint32_t rounded =
-                    (mantissa + (1U << (shift + 12U))) >> (shift + 13U);
+                const uint32_t rounded = (mantissa + (1U << (shift + 12U))) >> (shift + 13U);
                 return static_cast<uint16_t>(sign | rounded);
             }
             if (exponent > 15) {
@@ -44,19 +42,13 @@ namespace mxvk {
             if (half_exponent >= 31U) {
                 return static_cast<uint16_t>(sign | 0x7C00U);
             }
-            return static_cast<uint16_t>(
-                sign | (half_exponent << 10U) | (mantissa >> 13U));
+            return static_cast<uint16_t>(sign | (half_exponent << 10U) | (mantissa >> 13U));
         }
     } // namespace
 
-    VK_Sprite::VK_Sprite(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool)
-        : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
-        std::cout << "mxvk: Created Sprite\n";
-    }
+    VK_Sprite::VK_Sprite(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool) : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) { std::cout << "mxvk: Created Sprite\n"; }
 
-    void VK_Sprite::releaseUploadResources() {
-        destroyStagingResources();
-    }
+    void VK_Sprite::releaseUploadResources() { destroyStagingResources(); }
 
     void VK_Sprite::setCommandPool(VkCommandPool pool) {
         if (pool == commandPool) {
@@ -85,8 +77,7 @@ namespace mxvk {
             createSampler();
         }
 
-        std::cout << "mxvk: Sprite texture filter set to "
-                  << (textureFilter == VK_FILTER_NEAREST ? "nearest\n" : "linear\n");
+        std::cout << "mxvk: Sprite texture filter set to " << (textureFilter == VK_FILTER_NEAREST ? "nearest\n" : "linear\n");
     }
 
     VK_Sprite::~VK_Sprite() {
@@ -216,35 +207,21 @@ namespace mxvk {
         rebuildPipeline();
     }
 
-    void VK_Sprite::setMouseState(float mx, float my, float pressed, float reserved) {
-        extendedUBOData.mouse = glm::vec4(mx, my, pressed, reserved);
-    }
+    void VK_Sprite::setMouseState(float mx, float my, float pressed, float reserved) { extendedUBOData.mouse = glm::vec4(mx, my, pressed, reserved); }
 
-    void VK_Sprite::setUniform0(float x, float y, float z, float w) {
-        extendedUBOData.u0 = glm::vec4(x, y, z, w);
-    }
+    void VK_Sprite::setUniform0(float x, float y, float z, float w) { extendedUBOData.u0 = glm::vec4(x, y, z, w); }
 
-    void VK_Sprite::setUniform1(float x, float y, float z, float w) {
-        extendedUBOData.u1 = glm::vec4(x, y, z, w);
-    }
+    void VK_Sprite::setUniform1(float x, float y, float z, float w) { extendedUBOData.u1 = glm::vec4(x, y, z, w); }
 
-    void VK_Sprite::setUniform2(float x, float y, float z, float w) {
-        extendedUBOData.u2 = glm::vec4(x, y, z, w);
-    }
+    void VK_Sprite::setUniform2(float x, float y, float z, float w) { extendedUBOData.u2 = glm::vec4(x, y, z, w); }
 
-    void VK_Sprite::setUniform3(float x, float y, float z, float w) {
-        extendedUBOData.u3 = glm::vec4(x, y, z, w);
-    }
+    void VK_Sprite::setUniform3(float x, float y, float z, float w) { extendedUBOData.u3 = glm::vec4(x, y, z, w); }
 
-    void VK_Sprite::setAudioBands(float low, float mid, float high, float reserved) {
-        extendedUBOData.audio_bands = glm::vec4(low, mid, high, reserved);
-    }
+    void VK_Sprite::setAudioBands(float low, float mid, float high, float reserved) { extendedUBOData.audio_bands = glm::vec4(low, mid, high, reserved); }
 
     void VK_Sprite::setCustomUniforms(const std::vector<float> &values) {
         if (values.size() > MAX_CUSTOM_UNIFORMS) {
-            throw mxvk::Exception(std::format(
-                "VKSprite::setCustomUniforms supports at most {} values",
-                MAX_CUSTOM_UNIFORMS));
+            throw mxvk::Exception(std::format("VKSprite::setCustomUniforms supports at most {} values", MAX_CUSTOM_UNIFORMS));
         }
 
         extendedUBOData.custom_uniforms.fill(glm::vec4(0.0f));
@@ -253,29 +230,16 @@ namespace mxvk {
         }
     }
 
-    void VK_Sprite::enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers) {
-        enableHistoryTextureWithFormat(width, height, layers,
-                                       VK_FORMAT_R8G8B8A8_UNORM);
-    }
+    void VK_Sprite::enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers) { enableHistoryTextureWithFormat(width, height, layers, VK_FORMAT_R8G8B8A8_UNORM); }
 
-    void VK_Sprite::enableHistoryTextureRgba16Float(uint32_t width,
-                                                    uint32_t height,
-                                                    uint32_t layers) {
-        enableHistoryTextureWithFormat(width, height, layers,
-                                       VK_FORMAT_R16G16B16A16_SFLOAT);
-    }
+    void VK_Sprite::enableHistoryTextureRgba16Float(uint32_t width, uint32_t height, uint32_t layers) { enableHistoryTextureWithFormat(width, height, layers, VK_FORMAT_R16G16B16A16_SFLOAT); }
 
-    void VK_Sprite::enableHistoryTextureWithFormat(uint32_t width,
-                                                   uint32_t height,
-                                                   uint32_t layers,
-                                                   VkFormat format) {
+    void VK_Sprite::enableHistoryTextureWithFormat(uint32_t width, uint32_t height, uint32_t layers, VkFormat format) {
         if (width == 0 || height == 0 || layers == 0) {
             throw mxvk::Exception("VKSprite::enableHistoryTexture requires positive dimensions and layer count");
         }
 
-        if (historyTextureEnabled && historyWidth == width &&
-            historyHeight == height && historyLayers == layers &&
-            historyImageFormat == format) {
+        if (historyTextureEnabled && historyWidth == width && historyHeight == height && historyLayers == layers && historyImageFormat == format) {
             return;
         }
 
@@ -294,55 +258,34 @@ namespace mxvk {
 #ifdef MXVK_CUDA
         if (format == VK_FORMAT_R8G8B8A8_UNORM) {
             try {
-                createCudaExportableImage(width, height, layers, historyImage,
-                                          historyImageMemory,
-                                          cudaHistoryExportMemorySize);
+                createCudaExportableImage(width, height, layers, historyImage, historyImageMemory, cudaHistoryExportMemorySize);
                 cudaHistoryInteropUnavailableLogged = false;
             } catch (const std::exception &exception) {
-                std::cout << std::format(
-                    "mxvk: CUDA exportable history image unavailable: {}; using "
-                    "CPU staging uploads\n",
-                    exception.what());
-                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
-                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                VK_IMAGE_USAGE_SAMPLED_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
-                            historyImageMemory, layers);
+                std::cout << std::format("mxvk: CUDA exportable history image unavailable: {}; using "
+                                         "CPU staging uploads\n",
+                                         exception.what());
+                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage, historyImageMemory, layers);
             }
         } else {
-            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
-                        historyImageMemory, layers);
+            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage, historyImageMemory, layers);
         }
 #else
-        createImage(width, height, format,
-                    VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                        VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage,
-                    historyImageMemory, layers);
+        createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, historyImage, historyImageMemory, layers);
 #endif
 
-        const VkDeviceSize bytes_per_pixel =
-            format == VK_FORMAT_R16G16B16A16_SFLOAT ? 8U : 4U;
-        const VkDeviceSize layerSize =
-            static_cast<VkDeviceSize>(width) * height * bytes_per_pixel;
+        const VkDeviceSize bytes_per_pixel = format == VK_FORMAT_R16G16B16A16_SFLOAT ? 8U : 4U;
+        const VkDeviceSize layerSize = static_cast<VkDeviceSize>(width) * height * bytes_per_pixel;
         const VkDeviceSize imageSize = layerSize * layers;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
         memset(data, 0, static_cast<std::size_t>(imageSize));
         vkUnmapMemory(device, stagingMemory);
 
-        transitionImageLayout(historyImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, layers);
+        transitionImageLayout(historyImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, layers);
 
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
         std::vector<VkBufferImageCopy> regions(layers);
@@ -355,18 +298,14 @@ namespace mxvk {
             region.imageSubresource.layerCount = 1;
             region.imageExtent = {width, height, 1};
         }
-        vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, historyImage,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               static_cast<uint32_t>(regions.size()), regions.data());
+        vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, historyImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()), regions.data());
         endSingleTimeCommands(commandBuffer);
 
-        transitionImageLayout(historyImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, layers);
+        transitionImageLayout(historyImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, layers);
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
 
-        historyImageView = createImageView(historyImage, format,
-                                           VK_IMAGE_VIEW_TYPE_2D_ARRAY, layers);
+        historyImageView = createImageView(historyImage, format, VK_IMAGE_VIEW_TYPE_2D_ARRAY, layers);
         historyTextureEnabled = true;
         historyTextureShared = false;
         recreateExtendedDescriptorLayout();
@@ -374,18 +313,13 @@ namespace mxvk {
 
     void VK_Sprite::shareHistoryTexture(const VK_Sprite &source) {
         if (source.device != device) {
-            throw mxvk::Exception(
-                "VKSprite::shareHistoryTexture requires sprites on the same Vulkan device");
+            throw mxvk::Exception("VKSprite::shareHistoryTexture requires sprites on the same Vulkan device");
         }
-        if (!source.historyTextureEnabled ||
-            source.historyImageView == VK_NULL_HANDLE ||
-            source.historyLayers == 0) {
-            throw mxvk::Exception(
-                "VKSprite::shareHistoryTexture source has no enabled history texture");
+        if (!source.historyTextureEnabled || source.historyImageView == VK_NULL_HANDLE || source.historyLayers == 0) {
+            throw mxvk::Exception("VKSprite::shareHistoryTexture source has no enabled history texture");
         }
         if (&source == this) {
-            throw mxvk::Exception(
-                "VKSprite::shareHistoryTexture cannot share a sprite with itself");
+            throw mxvk::Exception("VKSprite::shareHistoryTexture cannot share a sprite with itself");
         }
 
         if (!extendedUBOEnabled) {
@@ -408,75 +342,52 @@ namespace mxvk {
     void VK_Sprite::updateHistoryTexture(const void *pixels, int width, int height, int pitch) {
         if (historyImageFormat == VK_FORMAT_R16G16B16A16_SFLOAT) {
             const int source_pitch = pitch > 0 ? pitch : width * 4;
-            if (pixels == nullptr || width <= 0 || height <= 0 ||
-                source_pitch < width * 4) {
-                throw mxvk::Exception(
-                    "VKSprite::updateHistoryTexture received invalid RGBA8 pixels");
+            if (pixels == nullptr || width <= 0 || height <= 0 || source_pitch < width * 4) {
+                throw mxvk::Exception("VKSprite::updateHistoryTexture received invalid RGBA8 pixels");
             }
-            std::vector<uint16_t> converted(
-                static_cast<std::size_t>(width) * height * 4U);
+            std::vector<uint16_t> converted(static_cast<std::size_t>(width) * height * 4U);
             const auto *source = static_cast<const uint8_t *>(pixels);
             for (int row = 0; row < height; ++row) {
-                const uint8_t *source_row = source +
-                                            static_cast<std::size_t>(row) *
-                                                source_pitch;
-                uint16_t *destination_row = converted.data() +
-                                            static_cast<std::size_t>(row) *
-                                                width * 4U;
+                const uint8_t *source_row = source + static_cast<std::size_t>(row) * source_pitch;
+                uint16_t *destination_row = converted.data() + static_cast<std::size_t>(row) * width * 4U;
                 for (int component = 0; component < width * 4; ++component) {
-                    destination_row[component] =
-                        float_to_half(source_row[component] / 255.0F);
+                    destination_row[component] = float_to_half(source_row[component] / 255.0F);
                 }
             }
-            uploadHistoryTextureBytes(converted.data(), width, height,
-                                      width * 8, 8);
+            uploadHistoryTextureBytes(converted.data(), width, height, width * 8, 8);
             return;
         }
         uploadHistoryTextureBytes(pixels, width, height, pitch, 4);
     }
 
-    void VK_Sprite::updateHistoryTextureRgba16(const uint16_t *pixels,
-                                               int width, int height,
-                                               int pitch) {
+    void VK_Sprite::updateHistoryTextureRgba16(const uint16_t *pixels, int width, int height, int pitch) {
         if (historyImageFormat != VK_FORMAT_R16G16B16A16_SFLOAT) {
-            throw mxvk::Exception(
-                "VKSprite::updateHistoryTextureRgba16 requires RGBA16F history");
+            throw mxvk::Exception("VKSprite::updateHistoryTextureRgba16 requires RGBA16F history");
         }
         const int source_pitch = pitch > 0 ? pitch : width * 8;
-        if (pixels == nullptr || width <= 0 || height <= 0 ||
-            source_pitch < width * 8) {
-            throw mxvk::Exception(
-                "VKSprite::updateHistoryTextureRgba16 received invalid pixels");
+        if (pixels == nullptr || width <= 0 || height <= 0 || source_pitch < width * 8) {
+            throw mxvk::Exception("VKSprite::updateHistoryTextureRgba16 received invalid pixels");
         }
-        std::vector<uint16_t> converted(
-            static_cast<std::size_t>(width) * height * 4U);
+        std::vector<uint16_t> converted(static_cast<std::size_t>(width) * height * 4U);
         const auto *source = reinterpret_cast<const uint8_t *>(pixels);
         for (int row = 0; row < height; ++row) {
-            const auto *source_row = reinterpret_cast<const uint16_t *>(
-                source + static_cast<std::size_t>(row) * source_pitch);
-            uint16_t *destination_row = converted.data() +
-                                        static_cast<std::size_t>(row) * width *
-                                            4U;
+            const auto *source_row = reinterpret_cast<const uint16_t *>(source + static_cast<std::size_t>(row) * source_pitch);
+            uint16_t *destination_row = converted.data() + static_cast<std::size_t>(row) * width * 4U;
             for (int component = 0; component < width * 4; ++component) {
-                destination_row[component] =
-                    float_to_half(source_row[component] / 65535.0F);
+                destination_row[component] = float_to_half(source_row[component] / 65535.0F);
             }
         }
-        uploadHistoryTextureBytes(converted.data(), width, height, width * 8,
-                                  8);
+        uploadHistoryTextureBytes(converted.data(), width, height, width * 8, 8);
     }
 
-    void VK_Sprite::uploadHistoryTextureBytes(const void *pixels, int width,
-                                              int height, int pitch,
-                                              int bytesPerPixel) {
+    void VK_Sprite::uploadHistoryTextureBytes(const void *pixels, int width, int height, int pitch, int bytesPerPixel) {
         if (!historyTextureEnabled || historyImage == VK_NULL_HANDLE) {
             throw mxvk::Exception("VKSprite::updateHistoryTexture called before enableHistoryTexture");
         }
         if (pixels == nullptr) {
             throw mxvk::Exception("VKSprite::updateHistoryTexture called with null pixel data");
         }
-        if (width <= 0 || height <= 0 || static_cast<uint32_t>(width) != historyWidth ||
-            static_cast<uint32_t>(height) != historyHeight) {
+        if (width <= 0 || height <= 0 || static_cast<uint32_t>(width) != historyWidth || static_cast<uint32_t>(height) != historyHeight) {
             throw mxvk::Exception("VKSprite::updateHistoryTexture dimensions do not match the history texture");
         }
 
@@ -486,8 +397,7 @@ namespace mxvk {
             throw mxvk::Exception("VKSprite::updateHistoryTexture pitch is smaller than one RGBA row");
         }
 
-        const VkDeviceSize imageSize =
-            static_cast<VkDeviceSize>(width) * height * bytesPerPixel;
+        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * bytesPerPixel;
         createStagingResources(imageSize);
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
         VK_CHECK_RESULT(vkResetFences(device, 1, &uploadFence));
@@ -498,9 +408,7 @@ namespace mxvk {
             const auto *source = static_cast<const uint8_t *>(pixels);
             auto *destination = static_cast<uint8_t *>(persistentStagingMapped);
             for (int row = 0; row < height; ++row) {
-                memcpy(destination + static_cast<std::size_t>(row * row_size),
-                       source + static_cast<std::size_t>(row * sourcePitch),
-                       static_cast<std::size_t>(row_size));
+                memcpy(destination + static_cast<std::size_t>(row * row_size), source + static_cast<std::size_t>(row * sourcePitch), static_cast<std::size_t>(row_size));
             }
         }
 
@@ -524,9 +432,7 @@ namespace mxvk {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -534,16 +440,13 @@ namespace mxvk {
         region.imageSubresource.baseArrayLayer = historyHead;
         region.imageSubresource.layerCount = 1;
         region.imageExtent = {historyWidth, historyHeight, 1};
-        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer, historyImage,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer, historyImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                             1, &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VK_CHECK_RESULT(vkEndCommandBuffer(uploadCmdBuffer));
         VkSubmitInfo submitInfo{};
@@ -571,35 +474,26 @@ namespace mxvk {
         destroySpectrumTexture();
 
         spectrumBins = bins;
-        createImage(bins, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spectrumImage,
-                    spectrumImageMemory, 1, VK_IMAGE_TYPE_1D);
+        createImage(bins, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spectrumImage, spectrumImageMemory, 1, VK_IMAGE_TYPE_1D);
 
         const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) * sizeof(float);
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
         memset(data, 0, static_cast<std::size_t>(imageSize));
         vkUnmapMemory(device, stagingMemory);
 
-        transitionImageLayout(spectrumImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        transitionImageLayout(spectrumImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, spectrumImage, bins, 1);
-        transitionImageLayout(spectrumImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        transitionImageLayout(spectrumImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
 
-        spectrumImageView = createImageView(spectrumImage, VK_FORMAT_R32_SFLOAT,
-                                            VK_IMAGE_VIEW_TYPE_1D);
+        spectrumImageView = createImageView(spectrumImage, VK_FORMAT_R32_SFLOAT, VK_IMAGE_VIEW_TYPE_1D);
         spectrumTextureEnabled = true;
         recreateExtendedDescriptorLayout();
     }
@@ -641,9 +535,7 @@ namespace mxvk {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -651,16 +543,13 @@ namespace mxvk {
         region.imageSubresource.baseArrayLayer = 0;
         region.imageSubresource.layerCount = 1;
         region.imageExtent = {bins, 1, 1};
-        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer, spectrumImage,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer, spectrumImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
-                             1, &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VK_CHECK_RESULT(vkEndCommandBuffer(uploadCmdBuffer));
         VkSubmitInfo submitInfo{};
@@ -673,19 +562,15 @@ namespace mxvk {
 
     uint32_t VK_Sprite::enableSpectrumHistoryTexture(uint32_t bins, uint32_t layers) {
         if (bins == 0 || layers == 0) {
-            throw mxvk::Exception(
-                "VKSprite::enableSpectrumHistoryTexture requires positive bin and layer counts");
+            throw mxvk::Exception("VKSprite::enableSpectrumHistoryTexture requires positive bin and layer counts");
         }
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-        const uint32_t allocatedLayers =
-            std::min(layers, properties.limits.maxImageArrayLayers);
+        const uint32_t allocatedLayers = std::min(layers, properties.limits.maxImageArrayLayers);
         if (allocatedLayers == 0) {
-            throw mxvk::Exception(
-                "VKSprite::enableSpectrumHistoryTexture is unavailable on this device");
+            throw mxvk::Exception("VKSprite::enableSpectrumHistoryTexture is unavailable on this device");
         }
-        if (spectrumHistoryTextureEnabled && spectrumHistoryBins == bins &&
-            spectrumHistoryLayers == allocatedLayers) {
+        if (spectrumHistoryTextureEnabled && spectrumHistoryBins == bins && spectrumHistoryLayers == allocatedLayers) {
             return spectrumHistoryLayers;
         }
         if (!extendedUBOEnabled) {
@@ -696,53 +581,34 @@ namespace mxvk {
         destroySpectrumHistoryTexture();
 
         if (allocatedLayers != layers) {
-            std::cerr << "vk: spectrum history clamped to device array-layer limit "
-                      << allocatedLayers << " (was " << layers << ")\n";
+            std::cerr << "vk: spectrum history clamped to device array-layer limit " << allocatedLayers << " (was " << layers << ")\n";
         }
         spectrumHistoryBins = bins;
         spectrumHistoryLayers = allocatedLayers;
         spectrumHistoryHead = 0;
         spectrumHistoryWriteIndex = 0;
-        extendedUBOData.audio_history =
-            glm::vec4(0.0f, static_cast<float>(allocatedLayers),
-                      static_cast<float>(bins), 0.0f);
+        extendedUBOData.audio_history = glm::vec4(0.0f, static_cast<float>(allocatedLayers), static_cast<float>(bins), 0.0f);
 
-        createImage(bins, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spectrumHistoryImage,
-                    spectrumHistoryImageMemory, allocatedLayers, VK_IMAGE_TYPE_1D);
+        createImage(bins, 1, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spectrumHistoryImage, spectrumHistoryImageMemory, allocatedLayers, VK_IMAGE_TYPE_1D);
 
-        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) *
-                                       static_cast<VkDeviceSize>(allocatedLayers) *
-                                       sizeof(float);
+        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) * static_cast<VkDeviceSize>(allocatedLayers) * sizeof(float);
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
         memset(data, 0, static_cast<std::size_t>(imageSize));
         vkUnmapMemory(device, stagingMemory);
 
-        transitionImageLayout(spectrumHistoryImage, VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                              allocatedLayers);
-        copyBufferToImage(stagingBuffer, spectrumHistoryImage, bins, 1, 0,
-                          allocatedLayers);
-        transitionImageLayout(spectrumHistoryImage,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0,
-                              allocatedLayers);
+        transitionImageLayout(spectrumHistoryImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, allocatedLayers);
+        copyBufferToImage(stagingBuffer, spectrumHistoryImage, bins, 1, 0, allocatedLayers);
+        transitionImageLayout(spectrumHistoryImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, allocatedLayers);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
         vkFreeMemory(device, stagingMemory, nullptr);
 
-        spectrumHistoryImageView =
-            createImageView(spectrumHistoryImage, VK_FORMAT_R32_SFLOAT,
-                            VK_IMAGE_VIEW_TYPE_1D_ARRAY, allocatedLayers);
+        spectrumHistoryImageView = createImageView(spectrumHistoryImage, VK_FORMAT_R32_SFLOAT, VK_IMAGE_VIEW_TYPE_1D_ARRAY, allocatedLayers);
         spectrumHistoryTextureEnabled = true;
         recreateExtendedDescriptorLayout();
         return allocatedLayers;
@@ -750,16 +616,13 @@ namespace mxvk {
 
     void VK_Sprite::updateSpectrumHistoryTexture(const float *magnitudes, uint32_t bins) {
         if (!spectrumHistoryTextureEnabled || spectrumHistoryImage == VK_NULL_HANDLE) {
-            throw mxvk::Exception(
-                "VKSprite::updateSpectrumHistoryTexture called before enableSpectrumHistoryTexture");
+            throw mxvk::Exception("VKSprite::updateSpectrumHistoryTexture called before enableSpectrumHistoryTexture");
         }
         if (magnitudes == nullptr) {
-            throw mxvk::Exception(
-                "VKSprite::updateSpectrumHistoryTexture called with null data");
+            throw mxvk::Exception("VKSprite::updateSpectrumHistoryTexture called with null data");
         }
         if (bins != spectrumHistoryBins) {
-            throw mxvk::Exception(
-                "VKSprite::updateSpectrumHistoryTexture bin count does not match the history texture");
+            throw mxvk::Exception("VKSprite::updateSpectrumHistoryTexture bin count does not match the history texture");
         }
 
         const VkDeviceSize imageSize = static_cast<VkDeviceSize>(bins) * sizeof(float);
@@ -788,9 +651,7 @@ namespace mxvk {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                             nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -798,17 +659,13 @@ namespace mxvk {
         region.imageSubresource.baseArrayLayer = spectrumHistoryWriteIndex;
         region.imageSubresource.layerCount = 1;
         region.imageExtent = {bins, 1, 1};
-        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer,
-                               spectrumHistoryImage,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(uploadCmdBuffer, persistentStagingBuffer, spectrumHistoryImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
         barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
-                             0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VK_CHECK_RESULT(vkEndCommandBuffer(uploadCmdBuffer));
         VkSubmitInfo submitInfo{};
@@ -819,20 +676,14 @@ namespace mxvk {
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
 
         spectrumHistoryHead = spectrumHistoryWriteIndex;
-        spectrumHistoryWriteIndex =
-            (spectrumHistoryWriteIndex + 1) % spectrumHistoryLayers;
-        extendedUBOData.audio_history =
-            glm::vec4(static_cast<float>(spectrumHistoryHead),
-                      static_cast<float>(spectrumHistoryLayers),
-                      static_cast<float>(spectrumHistoryBins), 0.0f);
+        spectrumHistoryWriteIndex = (spectrumHistoryWriteIndex + 1) % spectrumHistoryLayers;
+        extendedUBOData.audio_history = glm::vec4(static_cast<float>(spectrumHistoryHead), static_cast<float>(spectrumHistoryLayers), static_cast<float>(spectrumHistoryBins), 0.0f);
     }
 
     void VK_Sprite::createExtendedUBO() {
         if (extendedUBOBuffer != VK_NULL_HANDLE)
             return;
-        createBuffer(sizeof(SpriteExtendedUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     extendedUBOBuffer, extendedUBOMemory);
+        createBuffer(sizeof(SpriteExtendedUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, extendedUBOBuffer, extendedUBOMemory);
         VK_CHECK_RESULT(vkMapMemory(device, extendedUBOMemory, 0, sizeof(SpriteExtendedUBO), 0, &extendedUBOMapped));
         memset(extendedUBOMapped, 0, sizeof(SpriteExtendedUBO));
     }
@@ -852,23 +703,20 @@ namespace mxvk {
         bindings[0].binding = 0;
         bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[0].descriptorCount = 1;
-        bindings[0].stageFlags =
-            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
         bindings[0].pImmutableSamplers = nullptr;
         // binding 1: uniform buffer for extended data
         bindings[1].binding = 1;
         bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         bindings[1].descriptorCount = 1;
-        bindings[1].stageFlags =
-            VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
         bindings[1].pImmutableSamplers = nullptr;
         if (historyTextureEnabled) {
             VkDescriptorSetLayoutBinding historyBinding{};
             historyBinding.binding = 2;
             historyBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             historyBinding.descriptorCount = 1;
-            historyBinding.stageFlags =
-                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+            historyBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(historyBinding);
         }
         if (spectrumTextureEnabled) {
@@ -876,18 +724,15 @@ namespace mxvk {
             spectrumBinding.binding = 3;
             spectrumBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             spectrumBinding.descriptorCount = 1;
-            spectrumBinding.stageFlags =
-                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+            spectrumBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(spectrumBinding);
         }
         if (spectrumHistoryTextureEnabled) {
             VkDescriptorSetLayoutBinding spectrumHistoryBinding{};
             spectrumHistoryBinding.binding = 4;
-            spectrumHistoryBinding.descriptorType =
-                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            spectrumHistoryBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             spectrumHistoryBinding.descriptorCount = 1;
-            spectrumHistoryBinding.stageFlags =
-                VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+            spectrumHistoryBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(spectrumHistoryBinding);
         }
         if (computeShaderModule != VK_NULL_HANDLE) {
@@ -909,14 +754,7 @@ namespace mxvk {
     }
 
     void VK_Sprite::createExtendedDescriptorSet() {
-        if (extendedDescriptorSetLayout == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE ||
-            spriteSampler == VK_NULL_HANDLE || extendedUBOBuffer == VK_NULL_HANDLE ||
-            (historyTextureEnabled && historyImageView == VK_NULL_HANDLE) ||
-            (spectrumTextureEnabled && spectrumImageView == VK_NULL_HANDLE) ||
-            (spectrumHistoryTextureEnabled &&
-             spectrumHistoryImageView == VK_NULL_HANDLE) ||
-            (computeShaderModule != VK_NULL_HANDLE &&
-             computeOutputImageView == VK_NULL_HANDLE))
+        if (extendedDescriptorSetLayout == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE || spriteSampler == VK_NULL_HANDLE || extendedUBOBuffer == VK_NULL_HANDLE || (historyTextureEnabled && historyImageView == VK_NULL_HANDLE) || (spectrumTextureEnabled && spectrumImageView == VK_NULL_HANDLE) || (spectrumHistoryTextureEnabled && spectrumHistoryImageView == VK_NULL_HANDLE) || (computeShaderModule != VK_NULL_HANDLE && computeOutputImageView == VK_NULL_HANDLE))
             return;
 
         if (extendedDescriptorPool != VK_NULL_HANDLE) {
@@ -928,20 +766,15 @@ namespace mxvk {
 
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[0].descriptorCount = 1U + static_cast<uint32_t>(historyTextureEnabled) +
-                                       static_cast<uint32_t>(spectrumTextureEnabled) +
-                                       static_cast<uint32_t>(spectrumHistoryTextureEnabled);
+        poolSizes[0].descriptorCount = 1U + static_cast<uint32_t>(historyTextureEnabled) + static_cast<uint32_t>(spectrumTextureEnabled) + static_cast<uint32_t>(spectrumHistoryTextureEnabled);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[1].descriptorCount = 1;
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        poolSizes[2].descriptorCount =
-            computeShaderModule != VK_NULL_HANDLE ? 1U : 0U;
+        poolSizes[2].descriptorCount = computeShaderModule != VK_NULL_HANDLE ? 1U : 0U;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = computeShaderModule != VK_NULL_HANDLE
-                                     ? static_cast<uint32_t>(poolSizes.size())
-                                     : 2U;
+        poolInfo.poolSizeCount = computeShaderModule != VK_NULL_HANDLE ? static_cast<uint32_t>(poolSizes.size()) : 2U;
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 1;
 
@@ -976,8 +809,7 @@ namespace mxvk {
         spectrumImageInfo.sampler = spriteSampler;
 
         VkDescriptorImageInfo spectrumHistoryImageInfo{};
-        spectrumHistoryImageInfo.imageLayout =
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        spectrumHistoryImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         spectrumHistoryImageInfo.imageView = spectrumHistoryImageView;
         spectrumHistoryImageInfo.sampler = spriteSampler;
 
@@ -1027,8 +859,7 @@ namespace mxvk {
             spectrumHistoryWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             spectrumHistoryWrite.dstSet = extendedDescriptorSet;
             spectrumHistoryWrite.dstBinding = 4;
-            spectrumHistoryWrite.descriptorType =
-                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            spectrumHistoryWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             spectrumHistoryWrite.descriptorCount = 1;
             spectrumHistoryWrite.pImageInfo = &spectrumHistoryImageInfo;
             writes.push_back(spectrumHistoryWrite);
@@ -1044,8 +875,7 @@ namespace mxvk {
             writes.push_back(outputWrite);
         }
 
-        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0,
-                               nullptr);
+        vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
     void VK_Sprite::recreateExtendedDescriptorLayout() {
@@ -1181,9 +1011,7 @@ namespace mxvk {
         }
         destroyStagingResources();
 
-        createBuffer(allocationSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     persistentStagingBuffer, persistentStagingMemory);
+        createBuffer(allocationSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, persistentStagingBuffer, persistentStagingMemory);
 
         try {
             VK_CHECK_RESULT(vkMapMemory(device, persistentStagingMemory, 0, allocationSize, 0, &persistentStagingMapped));
@@ -1285,17 +1113,13 @@ namespace mxvk {
         }
 
         VkDeviceSize size = sizeof(SpriteInstanceData) * count;
-        createBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     instanceBuffer, instanceBufferMemory);
+        createBuffer(size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, instanceBuffer, instanceBufferMemory);
 
         VK_CHECK_RESULT(vkMapMemory(device, instanceBufferMemory, 0, size, 0, &instanceBufferMapped));
         instanceBufferCapacity = count;
     }
 
-    void VK_Sprite::enableInstancing(uint32_t maxInstances,
-                                     const std::string &instanceVertShaderPath,
-                                     const std::string &instanceFragShaderPath) {
+    void VK_Sprite::enableInstancing(uint32_t maxInstances, const std::string &instanceVertShaderPath, const std::string &instanceFragShaderPath) {
         if (colorAttachmentFormat == VK_FORMAT_UNDEFINED || descriptorSetLayout == VK_NULL_HANDLE) {
             throw mxvk::Exception("VKSprite::enableInstancing called before color format/descriptorSetLayout set");
         }
@@ -1411,8 +1235,7 @@ namespace mxvk {
         depthStencil.depthWriteEnable = VK_FALSE;
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -1566,8 +1389,7 @@ namespace mxvk {
         depthStencil.depthWriteEnable = VK_FALSE;
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -1685,8 +1507,7 @@ namespace mxvk {
     }
 
     void VK_Sprite::createComputePipeline() {
-        if (computeShaderModule == VK_NULL_HANDLE ||
-            extendedDescriptorSetLayout == VK_NULL_HANDLE) {
+        if (computeShaderModule == VK_NULL_HANDLE || extendedDescriptorSetLayout == VK_NULL_HANDLE) {
             return;
         }
 
@@ -1695,8 +1516,7 @@ namespace mxvk {
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         layoutInfo.setLayoutCount = 1;
         layoutInfo.pSetLayouts = &extendedDescriptorSetLayout;
-        VK_CHECK_RESULT(vkCreatePipelineLayout(
-            device, &layoutInfo, nullptr, &computePipelineLayout));
+        VK_CHECK_RESULT(vkCreatePipelineLayout(device, &layoutInfo, nullptr, &computePipelineLayout));
 
         VkPipelineShaderStageCreateInfo stageInfo{};
         stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1708,20 +1528,13 @@ namespace mxvk {
         pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
         pipelineInfo.stage = stageInfo;
         pipelineInfo.layout = computePipelineLayout;
-        VK_CHECK_RESULT(vkCreateComputePipelines(
-            device, pipelineCache, 1, &pipelineInfo, nullptr,
-            &computePipeline));
+        VK_CHECK_RESULT(vkCreateComputePipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &computePipeline));
         std::cout << "mxvk: Compute pipeline rebuilt\n";
     }
 
-    void VK_Sprite::enableComputeShader(const std::string &path,
-                                        uint32_t localSizeX,
-                                        uint32_t localSizeY,
-                                        uint32_t localSizeZ) {
-        if (path.empty() || localSizeX == 0 || localSizeY == 0 ||
-            localSizeZ == 0) {
-            throw mxvk::Exception(
-                "VKSprite::enableComputeShader requires a shader and positive local size");
+    void VK_Sprite::enableComputeShader(const std::string &path, uint32_t localSizeX, uint32_t localSizeY, uint32_t localSizeZ) {
+        if (path.empty() || localSizeX == 0 || localSizeY == 0 || localSizeZ == 0) {
+            throw mxvk::Exception("VKSprite::enableComputeShader requires a shader and positive local size");
         }
 
         vkDeviceWaitIdle(device);
@@ -1730,8 +1543,7 @@ namespace mxvk {
             vkDestroyShaderModule(device, computeShaderModule, nullptr);
             computeShaderModule = VK_NULL_HANDLE;
         }
-        computeShaderModule =
-            mxvk::create_shader_module(device, readShaderFile(path));
+        computeShaderModule = mxvk::create_shader_module(device, readShaderFile(path));
         computeLocalSizeX = localSizeX;
         computeLocalSizeY = localSizeY;
 
@@ -1743,19 +1555,12 @@ namespace mxvk {
         }
     }
 
-    void VK_Sprite::dispatchCompute(VkCommandBuffer cmdBuffer,
-                                    VkImageView inputView,
-                                    VkImageView outputView, uint32_t width,
-                                    uint32_t height) {
-        if (computePipeline == VK_NULL_HANDLE ||
-            computePipelineLayout == VK_NULL_HANDLE || inputView == VK_NULL_HANDLE ||
-            outputView == VK_NULL_HANDLE || width == 0 || height == 0) {
-            throw mxvk::Exception(
-                "VKSprite::dispatchCompute received an incomplete compute pass");
+    void VK_Sprite::dispatchCompute(VkCommandBuffer cmdBuffer, VkImageView inputView, VkImageView outputView, uint32_t width, uint32_t height) {
+        if (computePipeline == VK_NULL_HANDLE || computePipelineLayout == VK_NULL_HANDLE || inputView == VK_NULL_HANDLE || outputView == VK_NULL_HANDLE || width == 0 || height == 0) {
+            throw mxvk::Exception("VKSprite::dispatchCompute received an incomplete compute pass");
         }
 
-        setExternalTexture(inputView, static_cast<int>(width),
-                           static_cast<int>(height));
+        setExternalTexture(inputView, static_cast<int>(width), static_cast<int>(height));
         if (computeOutputImageView != outputView) {
             if (extendedDescriptorPool != VK_NULL_HANDLE) {
                 vkDeviceWaitIdle(device);
@@ -1770,19 +1575,12 @@ namespace mxvk {
             createExtendedDescriptorSet();
         }
         if (extendedDescriptorSet == VK_NULL_HANDLE) {
-            throw mxvk::Exception(
-                "VKSprite::dispatchCompute could not create its descriptor set");
+            throw mxvk::Exception("VKSprite::dispatchCompute could not create its descriptor set");
         }
 
-        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                          computePipeline);
-        vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                computePipelineLayout, 0, 1,
-                                &extendedDescriptorSet, 0, nullptr);
-        vkCmdDispatch(cmdBuffer,
-                      (width + computeLocalSizeX - 1U) / computeLocalSizeX,
-                      (height + computeLocalSizeY - 1U) / computeLocalSizeY,
-                      1U);
+        vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+        vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout, 0, 1, &extendedDescriptorSet, 0, nullptr);
+        vkCmdDispatch(cmdBuffer, (width + computeLocalSizeX - 1U) / computeLocalSizeX, (height + computeLocalSizeY - 1U) / computeLocalSizeY, 1U);
     }
 
     void VK_Sprite::rebuildInstancedPipeline() {
@@ -1795,17 +1593,11 @@ namespace mxvk {
         if (quadBufferCreated)
             return;
 
-        SpriteVertex vertices[] = {
-            {{0.0f, 0.0f}, {0.0f, 0.0f}},
-            {{1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{1.0f, 1.0f}, {1.0f, 1.0f}},
-            {{0.0f, 1.0f}, {0.0f, 1.0f}}};
+        SpriteVertex vertices[] = {{{0.0f, 0.0f}, {0.0f, 0.0f}}, {{1.0f, 0.0f}, {1.0f, 0.0f}}, {{1.0f, 1.0f}, {1.0f, 1.0f}}, {{0.0f, 1.0f}, {0.0f, 1.0f}}};
         uint16_t indices[] = {0, 1, 2, 0, 2, 3};
 
         VkDeviceSize vertexSize = sizeof(vertices);
-        createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     quadVertexBuffer, quadVertexBufferMemory);
+        createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, quadVertexBuffer, quadVertexBufferMemory);
 
         void *data;
         VK_CHECK_RESULT(vkMapMemory(device, quadVertexBufferMemory, 0, vertexSize, 0, &data));
@@ -1813,9 +1605,7 @@ namespace mxvk {
         vkUnmapMemory(device, quadVertexBufferMemory);
 
         VkDeviceSize indexSize = sizeof(indices);
-        createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     quadIndexBuffer, quadIndexBufferMemory);
+        createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, quadIndexBuffer, quadIndexBufferMemory);
 
         VK_CHECK_RESULT(vkMapMemory(device, quadIndexBufferMemory, 0, indexSize, 0, &data));
         memcpy(data, indices, indexSize);
@@ -1865,23 +1655,11 @@ namespace mxvk {
         std::cout << std::format("mxvk: Loaded surface texture: {}x{}\n", spriteWidth, spriteHeight);
     }
 
-    void VK_Sprite::createEmptySprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
-        createEmptySpriteWithFormat(width, height, VK_FORMAT_R8G8B8A8_UNORM, 4,
-                                    vertexShaderPath, fragmentShaderPath);
-    }
+    void VK_Sprite::createEmptySprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) { createEmptySpriteWithFormat(width, height, VK_FORMAT_R8G8B8A8_UNORM, 4, vertexShaderPath, fragmentShaderPath); }
 
-    void VK_Sprite::createEmptySpriteRgba16(
-        int width, int height, const std::string &vertexShaderPath,
-        const std::string &fragmentShaderPath) {
-        createEmptySpriteWithFormat(width, height,
-                                    VK_FORMAT_R16G16B16A16_UNORM, 8,
-                                    vertexShaderPath, fragmentShaderPath);
-    }
+    void VK_Sprite::createEmptySpriteRgba16(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) { createEmptySpriteWithFormat(width, height, VK_FORMAT_R16G16B16A16_UNORM, 8, vertexShaderPath, fragmentShaderPath); }
 
-    void VK_Sprite::createEmptySpriteWithFormat(
-        int width, int height, VkFormat format, uint32_t bytesPerPixel,
-        const std::string &vertexShaderPath,
-        const std::string &fragmentShaderPath) {
+    void VK_Sprite::createEmptySpriteWithFormat(int width, int height, VkFormat format, uint32_t bytesPerPixel, const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::createEmptySprite invalid dimensions");
         }
@@ -1903,36 +1681,24 @@ namespace mxvk {
 #ifdef MXVK_CUDA
         if (format == VK_FORMAT_R8G8B8A8_UNORM) {
             try {
-                createCudaExportableImage(width, height, 1, spriteImage,
-                                          spriteImageMemory,
-                                          cudaExportMemorySize);
+                createCudaExportableImage(width, height, 1, spriteImage, spriteImageMemory, cudaExportMemorySize);
                 cudaInteropUnavailableLogged = false;
             } catch (const std::exception &ex) {
                 std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
-                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
-                            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+                createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
             }
         } else {
-            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage,
-                        spriteImageMemory);
+            createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
         }
 #else
-        createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+        createImage(width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
 #endif
 
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height *
-                                 bytesPerPixel;
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * bytesPerPixel;
 
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
@@ -1968,11 +1734,7 @@ namespace mxvk {
         }
 
         spriteLoaded = true;
-        std::cout << std::format(
-            "mxvk: Created empty sprite: {}x{} ({})\n", spriteWidth,
-            spriteHeight,
-            format == VK_FORMAT_R16G16B16A16_UNORM ? "RGBA16 UNORM"
-                                                   : "RGBA8 UNORM");
+        std::cout << std::format("mxvk: Created empty sprite: {}x{} ({})\n", spriteWidth, spriteHeight, format == VK_FORMAT_R16G16B16A16_UNORM ? "RGBA16 UNORM" : "RGBA8 UNORM");
     }
 
     void VK_Sprite::updateTexture(SDL_Surface *surface) {
@@ -1988,8 +1750,7 @@ namespace mxvk {
         }
         if (rgbaSurface->w == spriteWidth && rgbaSurface->h == spriteHeight) {
 #ifdef MXVK_CUDA
-            if (updateTextureCudaHost(rgbaSurface->pixels, static_cast<uint32_t>(rgbaSurface->w), static_cast<uint32_t>(rgbaSurface->h),
-                                      static_cast<uint32_t>(rgbaSurface->pitch))) {
+            if (updateTextureCudaHost(rgbaSurface->pixels, static_cast<uint32_t>(rgbaSurface->w), static_cast<uint32_t>(rgbaSurface->h), static_cast<uint32_t>(rgbaSurface->pitch))) {
                 SDL_DestroySurface(rgbaSurface);
                 return;
             }
@@ -2033,11 +1794,9 @@ namespace mxvk {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("VKSprite::updateTexture invalid dimensions");
         }
-        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM ||
-            spriteBytesPerPixel != 4) {
-            throw mxvk::Exception(
-                "VKSprite::updateTexture cannot update an RGBA16 sprite; use "
-                "updateTextureRgba16");
+        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM || spriteBytesPerPixel != 4) {
+            throw mxvk::Exception("VKSprite::updateTexture cannot update an RGBA16 sprite; use "
+                                  "updateTextureRgba16");
         }
         int srcPitch = (pitch > 0) ? pitch : width * 4;
         if (width == spriteWidth && height == spriteHeight && srcPitch == width * 4) {
@@ -2092,9 +1851,7 @@ namespace mxvk {
                 texData = packed.data();
             }
             // Resize path: wrap raw pixels in a temporary SDL3 surface (no copy)
-            SDL_Surface *tmpSurface = SDL_CreateSurfaceFrom(
-                width, height, SDL_PIXELFORMAT_RGBA32,
-                const_cast<void *>(texData), width * 4);
+            SDL_Surface *tmpSurface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA32, const_cast<void *>(texData), width * 4);
             if (!tmpSurface) {
                 throw mxvk::Exception("VKSprite::updateTexture failed to create temp surface");
             }
@@ -2104,52 +1861,38 @@ namespace mxvk {
         }
     }
 
-    void VK_Sprite::updateTextureRgba16(const uint16_t *pixels, int width,
-                                        int height, int pitch) {
+    void VK_Sprite::updateTextureRgba16(const uint16_t *pixels, int width, int height, int pitch) {
         if (pixels == nullptr) {
-            throw mxvk::Exception(
-                "VKSprite::updateTextureRgba16 called with null pixel data");
+            throw mxvk::Exception("VKSprite::updateTextureRgba16 called with null pixel data");
         }
-        if (!spriteLoaded ||
-            spriteImageFormat != VK_FORMAT_R16G16B16A16_UNORM ||
-            spriteBytesPerPixel != 8) {
-            throw mxvk::Exception(
-                "VKSprite::updateTextureRgba16 requires an RGBA16 sprite");
+        if (!spriteLoaded || spriteImageFormat != VK_FORMAT_R16G16B16A16_UNORM || spriteBytesPerPixel != 8) {
+            throw mxvk::Exception("VKSprite::updateTextureRgba16 requires an RGBA16 sprite");
         }
-        if (width != spriteWidth || height != spriteHeight || width <= 0 ||
-            height <= 0) {
-            throw mxvk::Exception(
-                "VKSprite::updateTextureRgba16 dimensions do not match");
+        if (width != spriteWidth || height != spriteHeight || width <= 0 || height <= 0) {
+            throw mxvk::Exception("VKSprite::updateTextureRgba16 dimensions do not match");
         }
 
         const int rowBytes = width * 8;
         const int sourcePitch = pitch > 0 ? pitch : rowBytes;
         if (sourcePitch < rowBytes) {
-            throw mxvk::Exception(
-                "VKSprite::updateTextureRgba16 pitch is too small");
+            throw mxvk::Exception("VKSprite::updateTextureRgba16 pitch is too small");
         }
         if (sourcePitch == rowBytes) {
-            updateSpriteTexture(pixels, static_cast<uint32_t>(width),
-                                static_cast<uint32_t>(height));
+            updateSpriteTexture(pixels, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
             return;
         }
 
-        std::vector<uint16_t> packed(
-            static_cast<size_t>(width) * static_cast<size_t>(height) * 4U);
+        std::vector<uint16_t> packed(static_cast<size_t>(width) * static_cast<size_t>(height) * 4U);
         const auto *source = reinterpret_cast<const uint8_t *>(pixels);
         auto *destination = reinterpret_cast<uint8_t *>(packed.data());
         for (int row = 0; row < height; ++row) {
-            std::memcpy(destination + static_cast<size_t>(row) * rowBytes,
-                        source + static_cast<size_t>(row) * sourcePitch,
-                        static_cast<size_t>(rowBytes));
+            std::memcpy(destination + static_cast<size_t>(row) * rowBytes, source + static_cast<size_t>(row) * sourcePitch, static_cast<size_t>(rowBytes));
         }
-        updateSpriteTexture(packed.data(), static_cast<uint32_t>(width),
-                            static_cast<uint32_t>(height));
+        updateSpriteTexture(packed.data(), static_cast<uint32_t>(width), static_cast<uint32_t>(height));
     }
 
     void VK_Sprite::updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height) {
-        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height *
-                                 spriteBytesPerPixel;
+        VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * spriteBytesPerPixel;
 
         createStagingResources(imageSize);
         VK_CHECK_RESULT(vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX));
@@ -2180,11 +1923,8 @@ namespace mxvk {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_ACCESS_MEMORY_WRITE_BIT : VK_ACCESS_SHADER_READ_BIT;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_GENERAL)
-                                                  ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
-                                                  : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        vkCmdPipelineBarrier(uploadCmdBuffer, srcStage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -2202,8 +1942,7 @@ namespace mxvk {
         barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(uploadCmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         VK_CHECK_RESULT(vkEndCommandBuffer(uploadCmdBuffer));
 
@@ -2241,13 +1980,12 @@ namespace mxvk {
         cudaSampleBarrierLogged = false;
     }
 
-    void VK_Sprite::createCudaExportableImage(
-        uint32_t width, uint32_t height, uint32_t arrayLayers, VkImage &image,
-        VkDeviceMemory &imageMemory, VkDeviceSize &exportMemorySize) {
-        std::cout << std::format(
-            "mxvk: CUDA interop init: requesting exportable Vulkan image "
-            "{}x{}x{} RGBA8 OPAQUE_FD\n",
-            width, height, arrayLayers);
+    void VK_Sprite::createCudaExportableImage(uint32_t width, uint32_t height, uint32_t arrayLayers, VkImage &image, VkDeviceMemory &imageMemory, VkDeviceSize &exportMemorySize) {
+        std::cout << std::format("mxvk: CUDA interop init: requesting exportable Vulkan image "
+                                 "{}x{}x{} RGBA8 OPAQUE_FD\n",
+                                 width,
+                                 height,
+                                 arrayLayers);
         if (image != VK_NULL_HANDLE) {
             vkDestroyImage(device, image, nullptr);
             image = VK_NULL_HANDLE;
@@ -2296,10 +2034,7 @@ namespace mxvk {
             VK_CHECK_RESULT(vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory));
             VK_CHECK_RESULT(vkBindImageMemory(device, image, imageMemory, 0));
             exportMemorySize = memRequirements.size;
-            std::cout << std::format(
-                "mxvk: CUDA interop init: exportable Vulkan image allocated (memorySize={} bytes, memoryType={})\n",
-                static_cast<unsigned long long>(exportMemorySize),
-                allocInfo.memoryTypeIndex);
+            std::cout << std::format("mxvk: CUDA interop init: exportable Vulkan image allocated (memorySize={} bytes, memoryType={})\n", static_cast<unsigned long long>(exportMemorySize), allocInfo.memoryTypeIndex);
         } catch (...) {
             if (imageMemory != VK_NULL_HANDLE) {
                 vkFreeMemory(device, imageMemory, nullptr);
@@ -2358,15 +2093,13 @@ namespace mxvk {
         if (cudaResult != cudaSuccess) {
             close(memoryFd);
             if (!cudaInteropUnavailableLogged) {
-                std::cout << std::format("mxvk: CUDA interop init: cudaImportExternalMemory failed: {}\n",
-                                         cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA interop init: cudaImportExternalMemory failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaInteropUnavailableLogged = true;
             }
             cudaExternalMemory = nullptr;
             return false;
         }
-        std::cout << std::format("mxvk: CUDA interop init: imported external memory into CUDA ({} bytes)\n",
-                                 static_cast<unsigned long long>(cudaExportMemorySize));
+        std::cout << std::format("mxvk: CUDA interop init: imported external memory into CUDA ({} bytes)\n", static_cast<unsigned long long>(cudaExportMemorySize));
 
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;
@@ -2378,8 +2111,7 @@ namespace mxvk {
         cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&cudaMipmappedArray, cudaExternalMemory, &arrayDesc);
         if (cudaResult != cudaSuccess) {
             if (!cudaInteropUnavailableLogged) {
-                std::cout << std::format("mxvk: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: {}\n",
-                                         cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaInteropUnavailableLogged = true;
             }
             destroyCudaInterop();
@@ -2390,8 +2122,7 @@ namespace mxvk {
         cudaResult = cudaGetMipmappedArrayLevel(&cudaArray, cudaMipmappedArray, 0);
         if (cudaResult != cudaSuccess) {
             if (!cudaInteropUnavailableLogged) {
-                std::cout << std::format("mxvk: CUDA interop init: cudaGetMipmappedArrayLevel failed: {}\n",
-                                         cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA interop init: cudaGetMipmappedArrayLevel failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaInteropUnavailableLogged = true;
             }
             destroyCudaInterop();
@@ -2404,9 +2135,7 @@ namespace mxvk {
     }
 
     void VK_Sprite::destroyCudaHistoryInterop() {
-        if (cudaHistoryInteropEnabled ||
-            cudaHistoryExternalMemory != nullptr ||
-            cudaHistoryMipmappedArray != nullptr) {
+        if (cudaHistoryInteropEnabled || cudaHistoryExternalMemory != nullptr || cudaHistoryMipmappedArray != nullptr) {
             std::cout << "mxvk: CUDA interop: destroying imported history "
                          "texture resources\n";
         }
@@ -2428,9 +2157,7 @@ namespace mxvk {
         if (cudaHistoryInteropEnabled) {
             return true;
         }
-        if (historyImage == VK_NULL_HANDLE ||
-            historyImageMemory == VK_NULL_HANDLE ||
-            cudaHistoryExportMemorySize == 0) {
+        if (historyImage == VK_NULL_HANDLE || historyImageMemory == VK_NULL_HANDLE || cudaHistoryExportMemorySize == 0) {
             if (!cudaHistoryInteropUnavailableLogged) {
                 std::cout << "mxvk: CUDA history interop: history image is not "
                              "exportable\n";
@@ -2453,14 +2180,12 @@ namespace mxvk {
         fdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
         int memoryFd = -1;
-        const VkResult fdResult =
-            vkGetMemoryFdKHR(device, &fdInfo, &memoryFd);
+        const VkResult fdResult = vkGetMemoryFdKHR(device, &fdInfo, &memoryFd);
         if (fdResult != VK_SUCCESS) {
             if (!cudaHistoryInteropUnavailableLogged) {
-                std::cout << std::format(
-                    "mxvk: CUDA history interop: vkGetMemoryFdKHR failed "
-                    "({})\n",
-                    static_cast<int>(fdResult));
+                std::cout << std::format("mxvk: CUDA history interop: vkGetMemoryFdKHR failed "
+                                         "({})\n",
+                                         static_cast<int>(fdResult));
                 cudaHistoryInteropUnavailableLogged = true;
             }
             return false;
@@ -2471,14 +2196,11 @@ namespace mxvk {
         externalMemoryDesc.handle.fd = memoryFd;
         externalMemoryDesc.size = cudaHistoryExportMemorySize;
 
-        cudaError_t cudaResult = cudaImportExternalMemory(
-            &cudaHistoryExternalMemory, &externalMemoryDesc);
+        cudaError_t cudaResult = cudaImportExternalMemory(&cudaHistoryExternalMemory, &externalMemoryDesc);
         if (cudaResult != cudaSuccess) {
             close(memoryFd);
             if (!cudaHistoryInteropUnavailableLogged) {
-                std::cout << std::format(
-                    "mxvk: CUDA history interop: import failed: {}\n",
-                    cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA history interop: import failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaHistoryInteropUnavailableLogged = true;
             }
             cudaHistoryExternalMemory = nullptr;
@@ -2488,33 +2210,24 @@ namespace mxvk {
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;
         arrayDesc.formatDesc = cudaCreateChannelDesc<uchar4>();
-        arrayDesc.extent = make_cudaExtent(
-            static_cast<size_t>(historyWidth),
-            static_cast<size_t>(historyHeight),
-            static_cast<size_t>(historyLayers));
+        arrayDesc.extent = make_cudaExtent(static_cast<size_t>(historyWidth), static_cast<size_t>(historyHeight), static_cast<size_t>(historyLayers));
         arrayDesc.flags = cudaArrayColorAttachment | cudaArrayLayered;
         arrayDesc.numLevels = 1;
 
-        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(
-            &cudaHistoryMipmappedArray, cudaHistoryExternalMemory, &arrayDesc);
+        cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&cudaHistoryMipmappedArray, cudaHistoryExternalMemory, &arrayDesc);
         if (cudaResult != cudaSuccess) {
             if (!cudaHistoryInteropUnavailableLogged) {
-                std::cout << std::format(
-                    "mxvk: CUDA history interop: array mapping failed: {}\n",
-                    cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA history interop: array mapping failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaHistoryInteropUnavailableLogged = true;
             }
             destroyCudaHistoryInterop();
             return false;
         }
 
-        cudaResult = cudaGetMipmappedArrayLevel(
-            &cudaHistoryArray, cudaHistoryMipmappedArray, 0);
+        cudaResult = cudaGetMipmappedArrayLevel(&cudaHistoryArray, cudaHistoryMipmappedArray, 0);
         if (cudaResult != cudaSuccess) {
             if (!cudaHistoryInteropUnavailableLogged) {
-                std::cout << std::format(
-                    "mxvk: CUDA history interop: array lookup failed: {}\n",
-                    cudaGetErrorString(cudaResult));
+                std::cout << std::format("mxvk: CUDA history interop: array lookup failed: {}\n", cudaGetErrorString(cudaResult));
                 cudaHistoryInteropUnavailableLogged = true;
             }
             destroyCudaHistoryInterop();
@@ -2523,17 +2236,11 @@ namespace mxvk {
 
         cudaHistoryInteropEnabled = true;
         cudaHistoryInteropUnavailableLogged = false;
-        std::cout << std::format(
-            "mxvk: CUDA history interop: direct {}-layer upload is ready\n",
-            historyLayers);
+        std::cout << std::format("mxvk: CUDA history interop: direct {}-layer upload is ready\n", historyLayers);
         return true;
     }
 
-    void VK_Sprite::transitionCudaHistoryLayer(
-        VkImageLayout oldLayout, VkImageLayout newLayout,
-        VkAccessFlags sourceAccess, VkAccessFlags destinationAccess,
-        VkPipelineStageFlags sourceStage,
-        VkPipelineStageFlags destinationStage) {
+    void VK_Sprite::transitionCudaHistoryLayer(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags sourceAccess, VkAccessFlags destinationAccess, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -2549,8 +2256,7 @@ namespace mxvk {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = sourceAccess;
         barrier.dstAccessMask = destinationAccess;
-        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0,
-                             nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
     }
 
@@ -2559,9 +2265,7 @@ namespace mxvk {
             return true;
         }
 
-        const VkImageLayout oldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                                            ? VK_IMAGE_LAYOUT_UNDEFINED
-                                            : cudaImageLayout;
+        const VkImageLayout oldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? VK_IMAGE_LAYOUT_UNDEFINED : cudaImageLayout;
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
@@ -2579,11 +2283,8 @@ namespace mxvk {
         barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_ACCESS_SHADER_READ_BIT : 0;
         barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
-        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-                                                  ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                                                  : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
 
         cudaImageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -2615,8 +2316,7 @@ namespace mxvk {
         barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
 
         cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -2641,13 +2341,10 @@ namespace mxvk {
         if (!spriteLoaded) {
             return false;
         }
-        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM ||
-            spriteBytesPerPixel != 4 || rgba.empty() ||
-            rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
+        if (spriteImageFormat != VK_FORMAT_R8G8B8A8_UNORM || spriteBytesPerPixel != 4 || rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0) {
             return false;
         }
-        if (rgba.cols != spriteWidth || rgba.rows != spriteHeight || spriteImage == VK_NULL_HANDLE ||
-            spriteImageMemory == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE || cudaExportMemorySize == 0) {
+        if (rgba.cols != spriteWidth || rgba.rows != spriteHeight || spriteImage == VK_NULL_HANDLE || spriteImageMemory == VK_NULL_HANDLE || spriteImageView == VK_NULL_HANDLE || cudaExportMemorySize == 0) {
             if (stagingResourcesCreated && uploadFence != VK_NULL_HANDLE) {
                 vkWaitForFences(device, 1, &uploadFence, VK_TRUE, UINT64_MAX);
             }
@@ -2670,10 +2367,7 @@ namespace mxvk {
             spriteWidth = rgba.cols;
             spriteHeight = rgba.rows;
             try {
-                createCudaExportableImage(
-                    static_cast<uint32_t>(spriteWidth),
-                    static_cast<uint32_t>(spriteHeight), 1, spriteImage,
-                    spriteImageMemory, cudaExportMemorySize);
+                createCudaExportableImage(static_cast<uint32_t>(spriteWidth), static_cast<uint32_t>(spriteHeight), 1, spriteImage, spriteImageMemory, cudaExportMemorySize);
                 cudaInteropUnavailableLogged = false;
                 spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
             } catch (const std::exception &ex) {
@@ -2696,14 +2390,10 @@ namespace mxvk {
 
         cudaStream_t cudaStream = cuda_stream_handle(stream);
         if (!cudaUploadLogged) {
-            std::cout << std::format("mxvk: CUDA interop upload: copying {}x{} RGBA GpuMat to Vulkan image array (pitch={} bytes)\n",
-                                     rgba.cols, rgba.rows, static_cast<unsigned long long>(rgba.step));
+            std::cout << std::format("mxvk: CUDA interop upload: copying {}x{} RGBA GpuMat to Vulkan image array (pitch={} bytes)\n", rgba.cols, rgba.rows, static_cast<unsigned long long>(rgba.step));
             cudaUploadLogged = true;
         }
-        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
-            cudaArray, 0, 0, rgba.ptr(), rgba.step,
-            static_cast<size_t>(rgba.cols) * 4, static_cast<size_t>(rgba.rows),
-            cudaMemcpyDeviceToDevice, cudaStream);
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(cudaArray, 0, 0, rgba.ptr(), rgba.step, static_cast<size_t>(rgba.cols) * 4, static_cast<size_t>(rgba.rows), cudaMemcpyDeviceToDevice, cudaStream);
         if (cudaResult != cudaSuccess) {
             std::cout << std::format("mxvk: CUDA interop texture copy failed: {}\n", cudaGetErrorString(cudaResult));
             return false;
@@ -2719,57 +2409,37 @@ namespace mxvk {
         return transitionCudaImageForShaderRead();
     }
 
-    bool VK_Sprite::updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba,
-                                             cv::cuda::Stream &stream) {
-        if (!historyTextureEnabled || rgba.empty() || rgba.type() != CV_8UC4 ||
-            rgba.cols <= 0 || rgba.rows <= 0 ||
-            static_cast<uint32_t>(rgba.cols) != historyWidth ||
-            static_cast<uint32_t>(rgba.rows) != historyHeight ||
-            !ensureCudaHistoryInterop()) {
+    bool VK_Sprite::updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream) {
+        if (!historyTextureEnabled || rgba.empty() || rgba.type() != CV_8UC4 || rgba.cols <= 0 || rgba.rows <= 0 || static_cast<uint32_t>(rgba.cols) != historyWidth || static_cast<uint32_t>(rgba.rows) != historyHeight || !ensureCudaHistoryInterop()) {
             return false;
         }
 
-        transitionCudaHistoryLayer(
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_MEMORY_WRITE_BIT,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+        transitionCudaHistoryLayer(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
         cudaMemcpy3DParms copyParameters{};
-        copyParameters.srcPtr = make_cudaPitchedPtr(
-            const_cast<unsigned char *>(rgba.ptr()), rgba.step,
-            static_cast<size_t>(rgba.cols),
-            static_cast<size_t>(rgba.rows));
+        copyParameters.srcPtr = make_cudaPitchedPtr(const_cast<unsigned char *>(rgba.ptr()), rgba.step, static_cast<size_t>(rgba.cols), static_cast<size_t>(rgba.rows));
         copyParameters.dstArray = cudaHistoryArray;
         copyParameters.dstPos = make_cudaPos(0, 0, historyHead);
-        copyParameters.extent = make_cudaExtent(
-            static_cast<size_t>(rgba.cols), static_cast<size_t>(rgba.rows), 1);
+        copyParameters.extent = make_cudaExtent(static_cast<size_t>(rgba.cols), static_cast<size_t>(rgba.rows), 1);
         copyParameters.kind = cudaMemcpyDeviceToDevice;
 
         cudaStream_t cudaStream = cuda_stream_handle(stream);
-        cudaError_t cudaResult =
-            cudaMemcpy3DAsync(&copyParameters, cudaStream);
+        cudaError_t cudaResult = cudaMemcpy3DAsync(&copyParameters, cudaStream);
         if (cudaResult == cudaSuccess) {
             cudaResult = cudaStreamSynchronize(cudaStream);
         }
 
-        transitionCudaHistoryLayer(
-            VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+        transitionCudaHistoryLayer(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         if (cudaResult != cudaSuccess) {
-            std::cout << std::format(
-                "mxvk: CUDA history interop upload failed: {}\n",
-                cudaGetErrorString(cudaResult));
+            std::cout << std::format("mxvk: CUDA history interop upload failed: {}\n", cudaGetErrorString(cudaResult));
             return false;
         }
         if (!cudaHistoryUploadLogged) {
-            std::cout << std::format(
-                "mxvk: CUDA history interop: copying {}x{} RGBA GpuMat into "
-                "the Vulkan history array\n",
-                rgba.cols, rgba.rows);
+            std::cout << std::format("mxvk: CUDA history interop: copying {}x{} RGBA GpuMat into "
+                                     "the Vulkan history array\n",
+                                     rgba.cols,
+                                     rgba.rows);
             cudaHistoryUploadLogged = true;
         }
         historyHead = (historyHead + 1) % historyLayers;
@@ -2789,16 +2459,11 @@ namespace mxvk {
         }
 
         if (!cudaUploadLogged) {
-            std::cout << std::format(
-                "mxvk: CUDA interop upload: copying {}x{} host RGBA pixels to Vulkan image array (pitch={} bytes)\n",
-                width, height, pitch);
+            std::cout << std::format("mxvk: CUDA interop upload: copying {}x{} host RGBA pixels to Vulkan image array (pitch={} bytes)\n", width, height, pitch);
             cudaUploadLogged = true;
         }
 
-        const cudaError_t copyResult = cudaMemcpy2DToArray(
-            cudaArray, 0, 0, pixels, pitch,
-            static_cast<size_t>(rowBytes), static_cast<size_t>(height),
-            cudaMemcpyHostToDevice);
+        const cudaError_t copyResult = cudaMemcpy2DToArray(cudaArray, 0, 0, pixels, pitch, static_cast<size_t>(rowBytes), static_cast<size_t>(height), cudaMemcpyHostToDevice);
         if (copyResult != cudaSuccess) {
             std::cout << std::format("mxvk: CUDA interop host texture copy failed: {}\n", cudaGetErrorString(copyResult));
             return false;
@@ -2814,25 +2479,18 @@ namespace mxvk {
         spriteBytesPerPixel = 4;
 #ifdef MXVK_CUDA
         try {
-            createCudaExportableImage(surface->w, surface->h, 1, spriteImage,
-                                      spriteImageMemory,
-                                      cudaExportMemorySize);
+            createCudaExportableImage(surface->w, surface->h, 1, spriteImage, spriteImageMemory, cudaExportMemorySize);
             cudaInteropUnavailableLogged = false;
         } catch (const std::exception &ex) {
             std::cout << std::format("mxvk: CUDA exportable sprite image unavailable: {}; using standard Vulkan image\n", ex.what());
-            createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+            createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
         }
 #else
-        createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+        createImage(surface->w, surface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
 #endif
 
 #ifdef MXVK_CUDA
-        if (updateTextureCudaHost(surface->pixels, static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h),
-                                  static_cast<uint32_t>(surface->pitch))) {
+        if (updateTextureCudaHost(surface->pixels, static_cast<uint32_t>(surface->w), static_cast<uint32_t>(surface->h), static_cast<uint32_t>(surface->pitch))) {
             spriteImageView = createImageView(spriteImage, VK_FORMAT_R8G8B8A8_UNORM);
             return;
         }
@@ -2842,9 +2500,7 @@ namespace mxvk {
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
         VkDeviceSize imageSize = static_cast<VkDeviceSize>(surface->w) * surface->h * 4;
 
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
@@ -2860,9 +2516,7 @@ namespace mxvk {
         vkUnmapMemory(device, stagingMemory);
 
 #ifdef MXVK_CUDA
-        const VkImageLayout uploadOldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
-                                                  ? VK_IMAGE_LAYOUT_GENERAL
-                                                  : VK_IMAGE_LAYOUT_UNDEFINED;
+        const VkImageLayout uploadOldLayout = (cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
 #else
         const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 #endif
@@ -2904,23 +2558,16 @@ namespace mxvk {
         VK_CHECK_RESULT(vkCreateSampler(device, &samplerInfo, nullptr, &spriteSampler));
     }
 
-    void VK_Sprite::drawSprite(int x, int y) {
-        drawSpriteRect(x, y, spriteWidth, spriteHeight);
-    }
+    void VK_Sprite::drawSprite(int x, int y) { drawSpriteRect(x, y, spriteWidth, spriteHeight); }
 
-    void VK_Sprite::drawSprite(int x, int y, float scaleX, float scaleY) {
-        drawSpriteRect(x, y, static_cast<int>(spriteWidth * scaleX), static_cast<int>(spriteHeight * scaleY));
-    }
+    void VK_Sprite::drawSprite(int x, int y, float scaleX, float scaleY) { drawSpriteRect(x, y, static_cast<int>(spriteWidth * scaleX), static_cast<int>(spriteHeight * scaleY)); }
 
     void VK_Sprite::drawSprite(int x, int y, float scaleX, float scaleY, float rotation) {
         if (!spriteLoaded) {
             throw mxvk::Exception("VKSprite::drawSprite called before sprite was loaded");
         }
 
-        drawQueue.push_back({static_cast<float>(x), static_cast<float>(y),
-                             static_cast<float>(static_cast<int>(spriteWidth * scaleX)),
-                             static_cast<float>(static_cast<int>(spriteHeight * scaleY)),
-                             rotation, shaderParams});
+        drawQueue.push_back({static_cast<float>(x), static_cast<float>(y), static_cast<float>(static_cast<int>(spriteWidth * scaleX)), static_cast<float>(static_cast<int>(spriteHeight * scaleY)), rotation, shaderParams});
     }
 
     void VK_Sprite::drawSpriteRect(int x, int y, int w, int h) {
@@ -2928,13 +2575,10 @@ namespace mxvk {
             throw mxvk::Exception("VKSprite::drawSpriteRect called before sprite was loaded");
         }
 
-        drawQueue.push_back({static_cast<float>(x), static_cast<float>(y),
-                             static_cast<float>(w), static_cast<float>(h), 0.0f, shaderParams});
+        drawQueue.push_back({static_cast<float>(x), static_cast<float>(y), static_cast<float>(w), static_cast<float>(h), 0.0f, shaderParams});
     }
 
-    void VK_Sprite::setShaderParams(float p1, float p2, float p3, float p4) {
-        shaderParams = glm::vec4(p1, p2, p3, p4);
-    }
+    void VK_Sprite::setShaderParams(float p1, float p2, float p3, float p4) { shaderParams = glm::vec4(p1, p2, p3, p4); }
 
     void VK_Sprite::setExternalTexture(VkImageView image_view, int width, int height) {
         if (image_view == VK_NULL_HANDLE || width <= 0 || height <= 0) {
@@ -2988,8 +2632,7 @@ namespace mxvk {
 #endif
     }
 
-    void VK_Sprite::renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                                  uint32_t screenWidth, uint32_t screenHeight) {
+    void VK_Sprite::renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout, uint32_t screenWidth, uint32_t screenHeight) {
         if (drawQueue.empty() || !spriteLoaded || !quadBufferCreated) {
             return;
         }
@@ -3021,8 +2664,7 @@ namespace mxvk {
             }
 
             vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedPipeline);
-            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedPipelineLayout,
-                                    0, 1, &descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, instancedPipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
             VkBuffer buffers[] = {quadVertexBuffer, instanceBuffer};
             VkDeviceSize bufOffsets[] = {0, 0};
@@ -3030,8 +2672,7 @@ namespace mxvk {
             vkCmdBindIndexBuffer(cmdBuffer, quadIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
             float screenSize[2] = {static_cast<float>(screenWidth), static_cast<float>(screenHeight)};
-            vkCmdPushConstants(cmdBuffer, instancedPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(screenSize), screenSize);
+            vkCmdPushConstants(cmdBuffer, instancedPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(screenSize), screenSize);
 
             vkCmdDrawIndexed(cmdBuffer, 6, instanceCount, 0, 0, 0);
             return;
@@ -3048,11 +2689,9 @@ namespace mxvk {
             if (extendedDescriptorSet == VK_NULL_HANDLE) {
                 createExtendedDescriptorSet();
             }
-            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutToUse,
-                                    0, 1, &extendedDescriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutToUse, 0, 1, &extendedDescriptorSet, 0, nullptr);
         } else {
-            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutToUse,
-                                    0, 1, &descriptorSet, 0, nullptr);
+            vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layoutToUse, 0, 1, &descriptorSet, 0, nullptr);
         }
 
         VkBuffer vertexBuffers[] = {quadVertexBuffer};
@@ -3071,19 +2710,15 @@ namespace mxvk {
                 float effectsOn;
                 float padding2;
                 float params[4];
-            } pc{
-                static_cast<float>(screenWidth), static_cast<float>(screenHeight), cmd.x, cmd.y, cmd.w, cmd.h, effectsEnabled ? 1.0f : 0.0f, cmd.rotation, {cmd.params.x, cmd.params.y, cmd.params.z, cmd.params.w}};
+            } pc{static_cast<float>(screenWidth), static_cast<float>(screenHeight), cmd.x, cmd.y, cmd.w, cmd.h, effectsEnabled ? 1.0f : 0.0f, cmd.rotation, {cmd.params.x, cmd.params.y, cmd.params.z, cmd.params.w}};
 
-            vkCmdPushConstants(cmdBuffer, layoutToUse, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0, sizeof(SpritePushConstants), &pc);
+            vkCmdPushConstants(cmdBuffer, layoutToUse, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SpritePushConstants), &pc);
 
             vkCmdDrawIndexed(cmdBuffer, 6, 1, 0, 0, 0);
         }
     }
 
-    void VK_Sprite::clearQueue() {
-        drawQueue.clear();
-    }
+    void VK_Sprite::clearQueue() { drawQueue.clear(); }
 
     void VK_Sprite::createDescriptorPool() {
         VkDescriptorPoolSize poolSize{};
@@ -3176,9 +2811,7 @@ namespace mxvk {
         return descSet;
     }
 
-    void VK_Sprite::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                 VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                                 VkDeviceMemory &bufferMemory) {
+    void VK_Sprite::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
         VkBuffer newBuffer = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -3233,9 +2866,7 @@ namespace mxvk {
         throw mxvk::Exception("Failed to find suitable memory type!");
     }
 
-    void VK_Sprite::transitionImageLayout(VkImage image, VkImageLayout oldLayout,
-                                          VkImageLayout newLayout, uint32_t baseArrayLayer,
-                                          uint32_t layerCount) {
+    void VK_Sprite::transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseArrayLayer, uint32_t layerCount) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
@@ -3282,9 +2913,7 @@ namespace mxvk {
         endSingleTimeCommands(commandBuffer);
     }
 
-    void VK_Sprite::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
-                                      uint32_t height, uint32_t baseArrayLayer,
-                                      uint32_t layerCount) {
+    void VK_Sprite::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t baseArrayLayer, uint32_t layerCount) {
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkBufferImageCopy region{};
@@ -3336,10 +2965,7 @@ namespace mxvk {
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
-    void VK_Sprite::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                                VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                                VkImage &image, VkDeviceMemory &imageMemory,
-                                uint32_t arrayLayers, VkImageType imageType) {
+    void VK_Sprite::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory, uint32_t arrayLayers, VkImageType imageType) {
         VkImage newImage = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -3390,8 +3016,7 @@ namespace mxvk {
         imageMemory = newMemory;
     }
 
-    VkImageView VK_Sprite::createImageView(VkImage image, VkFormat format,
-                                           VkImageViewType viewType, uint32_t layerCount) {
+    VkImageView VK_Sprite::createImageView(VkImage image, VkFormat format, VkImageViewType viewType, uint32_t layerCount) {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = image;

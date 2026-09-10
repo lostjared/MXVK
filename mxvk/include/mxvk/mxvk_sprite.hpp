@@ -33,12 +33,12 @@
 #endif
 
 #ifndef VK_CHECK_RESULT
-#define VK_CHECK_RESULT(f)                                                                                                                \
-    {                                                                                                                                     \
-        VkResult res = (f);                                                                                                               \
-        if (res != VK_SUCCESS) {                                                                                                          \
-            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__)); \
-        }                                                                                                                                 \
+#define VK_CHECK_RESULT(f)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+        VkResult res = (f);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+        if (res != VK_SUCCESS) {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__));                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
+        }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
     }
 #endif
 
@@ -64,8 +64,7 @@ namespace mxvk {
          * @param graphicsQueue  Graphics queue.
          * @param commandPool    Command pool for staging operations.
          */
-        VK_Sprite(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue,
-                  VkCommandPool commandPool);
+        VK_Sprite(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue, VkCommandPool commandPool);
 
         /** @brief Destructor — frees all Vulkan resources. */
         ~VK_Sprite();
@@ -104,9 +103,7 @@ namespace mxvk {
          * This preserves transfer-encoded 10/12-bit video input without
          * quantizing it to RGBA8. It does not change render-target precision.
          */
-        void createEmptySpriteRgba16(
-            int width, int height, const std::string &vertexShaderPath = "",
-            const std::string &fragmentShaderPath = "");
+        void createEmptySpriteRgba16(int width, int height, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
          * @brief Queue a draw at the given pixel position.
@@ -162,8 +159,7 @@ namespace mxvk {
          * @param height Buffer height.
          * @param pitch Row stride in bytes (0 = tightly packed).
          */
-        void updateTextureRgba16(const uint16_t *pixels, int width, int height,
-                                 int pitch = 0);
+        void updateTextureRgba16(const uint16_t *pixels, int width, int height, int pitch = 0);
 
         void setExternalTexture(VkImageView image_view, int width, int height);
         void clearExternalTextureDescriptors();
@@ -195,8 +191,7 @@ namespace mxvk {
          * @param screenWidth  Current viewport width.
          * @param screenHeight Current viewport height.
          */
-        void renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                           uint32_t screenWidth, uint32_t screenHeight);
+        void renderSprites(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout, uint32_t screenWidth, uint32_t screenHeight);
 
         /**
          * @brief Record texture barriers that must happen before dynamic rendering begins.
@@ -253,18 +248,13 @@ namespace mxvk {
          * history/audio textures remain at bindings 2-4, and binding 5 is a
          * write-only storage image matching the active render precision.
          */
-        void enableComputeShader(const std::string &path, uint32_t localSizeX,
-                                 uint32_t localSizeY, uint32_t localSizeZ = 1);
+        void enableComputeShader(const std::string &path, uint32_t localSizeX, uint32_t localSizeY, uint32_t localSizeZ = 1);
 
         /** @return Whether this sprite owns an executable compute pipeline. */
-        [[nodiscard]] bool hasComputePipeline() const {
-            return computePipeline != VK_NULL_HANDLE;
-        }
+        [[nodiscard]] bool hasComputePipeline() const { return computePipeline != VK_NULL_HANDLE; }
 
         /** @brief Dispatch the compute effect between two full-frame images. */
-        void dispatchCompute(VkCommandBuffer cmdBuffer, VkImageView inputView,
-                             VkImageView outputView, uint32_t width,
-                             uint32_t height);
+        void dispatchCompute(VkCommandBuffer cmdBuffer, VkImageView inputView, VkImageView outputView, uint32_t width, uint32_t height);
 
         /** @return @c true if a custom pipeline has been built. */
         bool hasOwnPipeline() const { return customPipeline != VK_NULL_HANDLE; }
@@ -286,9 +276,7 @@ namespace mxvk {
          * @param instanceVertShaderPath Vertex shader supporting instancing.
          * @param instanceFragShaderPath Fragment shader.
          */
-        void enableInstancing(uint32_t maxInstances,
-                              const std::string &instanceVertShaderPath,
-                              const std::string &instanceFragShaderPath);
+        void enableInstancing(uint32_t maxInstances, const std::string &instanceVertShaderPath, const std::string &instanceFragShaderPath);
 
         /** @return @c true if GPU instancing is active. */
         bool isInstancingEnabled() const { return instancingEnabled; }
@@ -358,8 +346,7 @@ namespace mxvk {
         void enableHistoryTexture(uint32_t width, uint32_t height, uint32_t layers);
 
         /** @brief Allocate a shader-readable RGBA16F history texture array. */
-        void enableHistoryTextureRgba16Float(uint32_t width, uint32_t height,
-                                             uint32_t layers);
+        void enableHistoryTextureRgba16Float(uint32_t width, uint32_t height, uint32_t layers);
 
         /**
          * @brief Bind another sprite's history array without taking ownership.
@@ -389,8 +376,7 @@ namespace mxvk {
         void updateHistoryTexture(const void *pixels, int width, int height, int pitch = 0);
 
         /** @brief Upload normalized RGBA16 pixels into an RGBA16F history layer. */
-        void updateHistoryTextureRgba16(const uint16_t *pixels, int width,
-                                        int height, int pitch = 0);
+        void updateHistoryTextureRgba16(const uint16_t *pixels, int width, int height, int pitch = 0);
 
 #ifdef MXVK_CUDA
         /**
@@ -405,8 +391,7 @@ namespace mxvk {
          * @return @c true on success, or @c false for invalid input or when
          * direct CUDA/Vulkan history interop is unavailable.
          */
-        [[nodiscard]] bool updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba,
-                                                    cv::cuda::Stream &stream);
+        [[nodiscard]] bool updateHistoryTextureCuda(const cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream);
 #endif
 
         /** @return The logical oldest-layer index for a circular history sampler. */
@@ -545,31 +530,18 @@ namespace mxvk {
         [[nodiscard]] VkDeviceSize stagingAllocationSize(VkDeviceSize requiredSize) const;
         void createStagingResources(VkDeviceSize size);
         void destroyStagingResources();
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory);
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height,
-                               uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-        void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
-                                   uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
-        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                         VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkImage &image, VkDeviceMemory &imageMemory,
-                         uint32_t arrayLayers = 1,
-                         VkImageType imageType = VK_IMAGE_TYPE_2D);
-        VkImageView createImageView(VkImage image, VkFormat format,
-                                    VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D,
-                                    uint32_t layerCount = 1);
+        void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseArrayLayer = 0, uint32_t layerCount = 1);
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory, uint32_t arrayLayers = 1, VkImageType imageType = VK_IMAGE_TYPE_2D);
+        VkImageView createImageView(VkImage image, VkFormat format, VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D, uint32_t layerCount = 1);
         void createSampler();
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
         void createSpriteTexture(SDL_Surface *surface);
-        void createEmptySpriteWithFormat(
-            int width, int height, VkFormat format, uint32_t bytesPerPixel,
-            const std::string &vertexShaderPath,
-            const std::string &fragmentShaderPath);
+        void createEmptySpriteWithFormat(int width, int height, VkFormat format, uint32_t bytesPerPixel, const std::string &vertexShaderPath, const std::string &fragmentShaderPath);
         void updateSpriteTexture(const void *pixels, uint32_t width, uint32_t height);
 #ifdef MXVK_CUDA
         void destroyCudaInterop();
@@ -578,18 +550,10 @@ namespace mxvk {
         bool ensureCudaHistoryInterop();
         bool transitionCudaImageForWrite();
         bool transitionCudaImageForShaderRead();
-        void transitionCudaHistoryLayer(VkImageLayout oldLayout,
-                                        VkImageLayout newLayout,
-                                        VkAccessFlags sourceAccess,
-                                        VkAccessFlags destinationAccess,
-                                        VkPipelineStageFlags sourceStage,
-                                        VkPipelineStageFlags destinationStage);
+        void transitionCudaHistoryLayer(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags sourceAccess, VkAccessFlags destinationAccess, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage);
         bool updateTextureCudaHost(const void *pixels, uint32_t width, uint32_t height, uint32_t pitch);
         void recordCudaReadyBarrier(VkCommandBuffer cmdBuffer);
-        void createCudaExportableImage(uint32_t width, uint32_t height,
-                                       uint32_t arrayLayers, VkImage &image,
-                                       VkDeviceMemory &imageMemory,
-                                       VkDeviceSize &exportMemorySize);
+        void createCudaExportableImage(uint32_t width, uint32_t height, uint32_t arrayLayers, VkImage &image, VkDeviceMemory &imageMemory, VkDeviceSize &exportMemorySize);
         VkDeviceSize cudaExportMemorySize = 0;
         cudaExternalMemory_t cudaExternalMemory = nullptr;
         cudaMipmappedArray_t cudaMipmappedArray = nullptr;
@@ -647,10 +611,8 @@ namespace mxvk {
         uint32_t historyLayers = 0;
         uint32_t historyHead = 0;
         void destroyHistoryTexture();
-        void enableHistoryTextureWithFormat(uint32_t width, uint32_t height,
-                                            uint32_t layers, VkFormat format);
-        void uploadHistoryTextureBytes(const void *pixels, int width, int height,
-                                       int pitch, int bytesPerPixel);
+        void enableHistoryTextureWithFormat(uint32_t width, uint32_t height, uint32_t layers, VkFormat format);
+        void uploadHistoryTextureBytes(const void *pixels, int width, int height, int pitch, int bytesPerPixel);
 
         bool spectrumTextureEnabled = false;
         VkImage spectrumImage = VK_NULL_HANDLE;

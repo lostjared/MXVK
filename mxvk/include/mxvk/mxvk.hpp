@@ -38,15 +38,9 @@ namespace mxvk {
      */
     class VK_Window {
       public:
-        enum class PresentModePreference {
-            LowLatency,
-            Vsync
-        };
+        enum class PresentModePreference { LowLatency, Vsync };
 
-        enum class RuntimeMode {
-            Windowed,
-            Headless
-        };
+        enum class RuntimeMode { Windowed, Headless };
 
         /**
          * @brief Construct an empty window object.
@@ -75,11 +69,7 @@ namespace mxvk {
          * @param presentModePreference Preferred swapchain present-mode policy.
          * @param runtimeMode Selects windowed presentation or surface-free rendering.
          */
-        VK_Window(const std::string &title, int width, int height, bool full = false,
-                  bool validiation = true,
-                  PresentModePreference presentModePreference =
-                      PresentModePreference::LowLatency,
-                  RuntimeMode runtimeMode = RuntimeMode::Windowed);
+        VK_Window(const std::string &title, int width, int height, bool full = false, bool validiation = true, PresentModePreference presentModePreference = PresentModePreference::LowLatency, RuntimeMode runtimeMode = RuntimeMode::Windowed);
         VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync);
 
         // no copy
@@ -165,8 +155,7 @@ namespace mxvk {
          * but excluded from screenshots and frame-readback consumers.
          */
         void printPreviewText(const std::string &text, int x, int y, const SDL_Color &col);
-        void printPreviewText(const std::string &text, int x, int y,
-                              const SDL_Color &col, const Font &font);
+        void printPreviewText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font);
 
         /** @brief Clear all queued text draw calls for the current frame. */
         void clearTextQueue();
@@ -197,17 +186,13 @@ namespace mxvk {
         void setFrameReadbackEnabled(bool enabled) noexcept { frame_readback_enabled = enabled; }
 
         /** @brief Request normalized RGBA16 callbacks from the final HDR intermediate. */
-        void setFrameReadbackRgba16Enabled(bool enabled) noexcept {
-            frame_readback_rgba16_enabled = enabled;
-        }
+        void setFrameReadbackRgba16Enabled(bool enabled) noexcept { frame_readback_rgba16_enabled = enabled; }
 
         /** @brief Get the underlying SDL window handle. */
         [[nodiscard]] SDL_Window *getSDLWindow() const noexcept { return window.get(); }
 
         /** @brief Return true when rendering without SDL video, a surface, or presentation. */
-        [[nodiscard]] bool headless() const noexcept {
-            return runtime_mode == RuntimeMode::Headless;
-        }
+        [[nodiscard]] bool headless() const noexcept { return runtime_mode == RuntimeMode::Headless; }
 
         /** @brief Get the Vulkan logical device handle. */
         [[nodiscard]] VkDevice getDevice() const noexcept { return device; }
@@ -231,11 +216,7 @@ namespace mxvk {
         void setHdrRenderIntermediatesEnabled(bool enabled);
 
         /** @brief Get the active scene/effect color-attachment format. */
-        [[nodiscard]] VkFormat getSceneColorFormat() const noexcept {
-            return hdr_render_intermediates_enabled
-                       ? VK_FORMAT_R16G16B16A16_SFLOAT
-                       : swapchain_format;
-        }
+        [[nodiscard]] VkFormat getSceneColorFormat() const noexcept { return hdr_render_intermediates_enabled ? VK_FORMAT_R16G16B16A16_SFLOAT : swapchain_format; }
 
         /** @brief Get the current swapchain extent. */
         [[nodiscard]] VkExtent2D getSwapchainExtent() const noexcept { return swapchain_extent; }
@@ -322,10 +303,7 @@ namespace mxvk {
          * @param spectrumHistoryLayerCount Requested binding-4 history depth.
          * @return Non-owning pointer to the created sprite.
          */
-        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath,
-                                const std::string &fragmentShaderPath,
-                                uint32_t spectrumBinCount,
-                                uint32_t spectrumHistoryLayerCount);
+        VK_Sprite *createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount, uint32_t spectrumHistoryLayerCount);
 
         struct PostProcessingEffect {
             std::string fragmentShaderPath{};
@@ -370,9 +348,7 @@ namespace mxvk {
         void setPostProcessingEnabled(bool enabled) { post_process_enabled = enabled; }
 
         /** Route the completed effect chain to a derived renderer as a sampled texture. */
-        void setPostProcessingTextureConsumerEnabled(bool enabled) noexcept {
-            post_process_texture_consumer_enabled = enabled;
-        }
+        void setPostProcessingTextureConsumerEnabled(bool enabled) noexcept { post_process_texture_consumer_enabled = enabled; }
 
         /** Set an optional fragment shader used only when presenting the final
          * post-processing texture to a window. The offscreen texture and frame
@@ -489,10 +465,7 @@ namespace mxvk {
          * Called inside a fresh final-color rendering scope when texture-consumer
          * mode is enabled. The supplied view is in shader-read-only layout.
          */
-        virtual void onRecordPostProcessingTexture(VkCommandBuffer cmd,
-                                                   uint32_t image_index,
-                                                   VkImageView texture_view,
-                                                   VkExtent2D texture_extent);
+        virtual void onRecordPostProcessingTexture(VkCommandBuffer cmd, uint32_t image_index, VkImageView texture_view, VkExtent2D texture_extent);
 
         /**
          * @brief Allow derived classes to customize depth/stencil attachments for the main dynamic rendering pass.
@@ -500,9 +473,7 @@ namespace mxvk {
          * Override this when custom rendering needs hardware stencil testing or a custom depth/stencil image.
          * The callback is invoked immediately before vkCmdBeginRendering.
          */
-        virtual void onConfigureDepthStencilAttachments(VkRenderingAttachmentInfo &depth_attachment,
-                                                        VkRenderingAttachmentInfo &stencil_attachment,
-                                                        uint32_t image_index);
+        virtual void onConfigureDepthStencilAttachments(VkRenderingAttachmentInfo &depth_attachment, VkRenderingAttachmentInfo &stencil_attachment, uint32_t image_index);
 
       protected:
         /**
@@ -533,13 +504,10 @@ namespace mxvk {
          * @param width Frame width in pixels.
          * @param height Frame height in pixels.
          */
-        virtual void onFrameReadback(std::vector<std::uint8_t> &rgba_pixels,
-                                     uint32_t width, uint32_t height);
+        virtual void onFrameReadback(std::vector<std::uint8_t> &rgba_pixels, uint32_t width, uint32_t height);
 
         /** @brief Receive normalized RGBA16 pixels from an RGBA16F HDR target. */
-        virtual void onFrameReadbackRgba16(
-            std::vector<std::uint16_t> &rgba_pixels, uint32_t width,
-            uint32_t height);
+        virtual void onFrameReadbackRgba16(std::vector<std::uint16_t> &rgba_pixels, uint32_t width, uint32_t height);
 
         /**
          * @brief Render one standalone sprite using the window's shared sprite pipeline.
@@ -548,8 +516,7 @@ namespace mxvk {
          * their own scene content without registering it in the window-managed sprite list.
          */
         void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd);
-        void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd,
-                                    VkExtent2D extent);
+        void renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd, VkExtent2D extent);
 
       private:
         static constexpr uint32_t invalid_queue_index = std::numeric_limits<uint32_t>::max();
@@ -603,8 +570,7 @@ namespace mxvk {
         void destroyPostProcessTargets();
         void ensureTextRenderer();
         void ensurePreviewTextRenderer();
-        void ensurePreviewTextRenderer(const std::string &fallbackFontPath,
-                                       int fallbackFontSize);
+        void ensurePreviewTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize);
         void createTextDescriptorSetLayout();
         void createTextPipeline();
         void destroyTextPipeline();
@@ -734,11 +700,7 @@ namespace mxvk {
         std::vector<std::vector<VkDeviceMemory>> post_process_memories{};
         std::vector<std::vector<VkImageView>> post_process_views{};
         std::vector<std::vector<bool>> post_process_initialized{};
-        [[nodiscard]] VkFormat postProcessIntermediateFormat() const noexcept {
-            return hdr_render_intermediates_enabled
-                       ? VK_FORMAT_R16G16B16A16_SFLOAT
-                       : VK_FORMAT_R8G8B8A8_UNORM;
-        }
+        [[nodiscard]] VkFormat postProcessIntermediateFormat() const noexcept { return hdr_render_intermediates_enabled ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM; }
         bool hdr_render_intermediates_enabled = false;
 
         std::unique_ptr<VK_Text> text_renderer{};

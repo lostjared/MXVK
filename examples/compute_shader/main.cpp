@@ -39,56 +39,7 @@
 static constexpr int HISTORY_SIZE = 8;
 static constexpr const char *MODE_SHADER_NAME = "acidcam_filters.spv";
 static constexpr std::array<std::string_view, 50> ACIDCAM_FILTER_MODE_NAMES = {
-    "Block Pixelate",
-    "Block Mirror X",
-    "Block Mirror Y",
-    "Combine Pixels",
-    "History XOR",
-    "Temporal Blend",
-    "Scanline Warp",
-    "RGB Split",
-    "Horizontal Mirror",
-    "Vertical Mirror",
-    "Kaleidoscope",
-    "Dynamic Kaleidoscope",
-    "Negate",
-    "Posterize",
-    "Threshold",
-    "Gamma Darken",
-    "Brightness Contrast",
-    "Sepia",
-    "Solarize",
-    "Hue Rotate",
-    "Saturate",
-    "Desaturate",
-    "Box Blur",
-    "Sharpen",
-    "Emboss",
-    "Sobel",
-    "Edge Detect",
-    "Dilate",
-    "Erode",
-    "Posterize Scale",
-    "Wave",
-    "Ripple",
-    "Twirl",
-    "Zoom Pulse",
-    "Crosshatch",
-    "Noise Grain",
-    "Strobe Bars",
-    "Scanline XOR",
-    "Block Shuffle",
-    "Diagonal Slice",
-    "Frame Blend",
-    "Trail Blend",
-    "History Median",
-    "Row Blend",
-    "Column Blend",
-    "Color Cycle",
-    "Gradient Ramp",
-    "Flash Invert",
-    "XOR Grid",
-    "Mirror Trail",
+    "Block Pixelate", "Block Mirror X", "Block Mirror Y", "Combine Pixels", "History XOR", "Temporal Blend", "Scanline Warp", "RGB Split", "Horizontal Mirror", "Vertical Mirror", "Kaleidoscope", "Dynamic Kaleidoscope", "Negate", "Posterize", "Threshold", "Gamma Darken", "Brightness Contrast", "Sepia", "Solarize", "Hue Rotate", "Saturate", "Desaturate", "Box Blur", "Sharpen", "Emboss", "Sobel", "Edge Detect", "Dilate", "Erode", "Posterize Scale", "Wave", "Ripple", "Twirl", "Zoom Pulse", "Crosshatch", "Noise Grain", "Strobe Bars", "Scanline XOR", "Block Shuffle", "Diagonal Slice", "Frame Blend", "Trail Blend", "History Median", "Row Blend", "Column Blend", "Color Cycle", "Gradient Ramp", "Flash Invert", "XOR Grid", "Mirror Trail",
 };
 
 struct ComputePC {
@@ -104,28 +55,7 @@ struct ComputePC {
 
 class ComputeWindow : public mxvk::VK_Window {
   public:
-    explicit ComputeWindow(const Arguments &args)
-        : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
-          assetRoot(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path),
-          inputFilename(args.filename),
-          usingFile(!inputFilename.empty()),
-          fastMode(args.fast),
-          explicitResolution(args.resolutionSpecified),
-          fullscreenMode(args.fullscreen),
-          outputFilename(args.output),
-          outputCrf(args.crf),
-          encodePreset(args.encodePreset),
-          encodeTune(args.encodeTune),
-          encodeCodec(args.encodeCodec),
-          encodeRealtime(args.encodeRealtime),
-          mxwriteBlockWhenFull(args.mxwriteBlockWhenFull),
-          repeat(args.repeat),
-          cameraIndex(args.camera_index),
-          requestedShaderIndex(args.shader_index),
-          initialShaderMode(
-              args.index > 0
-                  ? std::clamp(args.index - 1, 0, static_cast<int>(ACIDCAM_FILTER_MODE_NAMES.size()) - 1)
-                  : 0) {
+    explicit ComputeWindow(const Arguments &args) : mxvk::VK_Window("-[ VK Compute CV ]-", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync), assetRoot(args.path.empty() ? std::string(compute_shader_ASSET_DIR) : args.path), inputFilename(args.filename), usingFile(!inputFilename.empty()), fastMode(args.fast), explicitResolution(args.resolutionSpecified), fullscreenMode(args.fullscreen), outputFilename(args.output), outputCrf(args.crf), encodePreset(args.encodePreset), encodeTune(args.encodeTune), encodeCodec(args.encodeCodec), encodeRealtime(args.encodeRealtime), mxwriteBlockWhenFull(args.mxwriteBlockWhenFull), repeat(args.repeat), cameraIndex(args.camera_index), requestedShaderIndex(args.shader_index), initialShaderMode(args.index > 0 ? std::clamp(args.index - 1, 0, static_cast<int>(ACIDCAM_FILTER_MODE_NAMES.size()) - 1) : 0) {
         recordWidth = args.width;
         recordHeight = args.height;
         shaderMode = initialShaderMode;
@@ -219,33 +149,26 @@ class ComputeWindow : public mxvk::VK_Window {
         updateFpsOverlay(frameUploaded);
     }
 
-    void onSwapchainRecreated() override {
-        rebuildDisplayPipeline();
-    }
+    void onSwapchainRecreated() override { rebuildDisplayPipeline(); }
 
-    void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t imageIndex) override {
-        renderComputeOutput(cmd);
-    }
+    void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t imageIndex) override { renderComputeOutput(cmd); }
 
     void event(SDL_Event &e) override {
-        if (e.type == SDL_EVENT_QUIT ||
-            (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE)) {
+        if (e.type == SDL_EVENT_QUIT || (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE)) {
             exit();
             return;
         }
 
         if (e.type == SDL_EVENT_KEY_DOWN && !spvFiles.empty()) {
             if (e.key.key == SDLK_UP) {
-                currentSpvIndex =
-                    (currentSpvIndex - 1 + static_cast<int>(spvFiles.size())) % static_cast<int>(spvFiles.size());
+                currentSpvIndex = (currentSpvIndex - 1 + static_cast<int>(spvFiles.size())) % static_cast<int>(spvFiles.size());
                 std::cout << "Current index: " << spvFiles[currentSpvIndex] << "\n";
                 reloadPipeline();
             } else if (e.key.key == SDLK_DOWN) {
                 currentSpvIndex = (currentSpvIndex + 1) % static_cast<int>(spvFiles.size());
                 std::cout << "Current index: " << spvFiles[currentSpvIndex] << "\n";
                 reloadPipeline();
-            } else if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME &&
-                       (e.key.key == SDLK_LEFT || e.key.key == SDLK_RIGHT)) {
+            } else if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME && (e.key.key == SDLK_LEFT || e.key.key == SDLK_RIGHT)) {
                 const int delta = (e.key.key == SDLK_LEFT) ? -1 : 1;
                 shaderMode = (shaderMode + delta + 50) % 50;
                 std::cout << "Mode shader mode: " << shaderMode << "\n";
@@ -387,8 +310,7 @@ class ComputeWindow : public mxvk::VK_Window {
             throw mxvk::Exception("index.txt contains no entries");
         }
 
-        currentSpvIndex =
-            std::clamp(requestedShaderIndex, 0, static_cast<int>(spvFiles.size()) - 1);
+        currentSpvIndex = std::clamp(requestedShaderIndex, 0, static_cast<int>(spvFiles.size()) - 1);
     }
 
     [[nodiscard]] double configureCameraFps() {
@@ -407,9 +329,7 @@ class ComputeWindow : public mxvk::VK_Window {
         return (reportedFps > 0.0) ? reportedFps : fpsChoices.back();
     }
 
-    void resetVideoPlaybackClock() {
-        nextVideoFrameDeadline = std::chrono::steady_clock::now();
-    }
+    void resetVideoPlaybackClock() { nextVideoFrameDeadline = std::chrono::steady_clock::now(); }
 
     void configureVideoPlaybackRate() {
         double reportedFps = 0.0;
@@ -429,8 +349,7 @@ class ComputeWindow : public mxvk::VK_Window {
         }
         videoFrameInterval = std::chrono::duration<double>(1.0 / videoFps);
         resetVideoPlaybackClock();
-        std::cout << "compute_shader: video file FPS " << videoFps
-                  << " fps, fast=" << (fastMode ? "true" : "false") << "\n";
+        std::cout << "compute_shader: video file FPS " << videoFps << " fps, fast=" << (fastMode ? "true" : "false") << "\n";
     }
 
     bool openVideoSource() {
@@ -438,8 +357,7 @@ class ComputeWindow : public mxvk::VK_Window {
         usingFfCapture = false;
         if (ffCapture.open(inputFilename)) {
             usingFfCapture = true;
-            std::cout << "compute_shader: FFmpeg capture path active for file input"
-                      << (ffCapture.using_hardware_decode() ? " (CUDA decode)\n" : " (software decode)\n");
+            std::cout << "compute_shader: FFmpeg capture path active for file input" << (ffCapture.using_hardware_decode() ? " (CUDA decode)\n" : " (software decode)\n");
             return true;
         }
         std::cout << "compute_shader: FFmpeg capture failed; falling back to VK_Capture/OpenCV file input\n";
@@ -548,8 +466,7 @@ class ComputeWindow : public mxvk::VK_Window {
     void maybeResizeWindowToSource() {
         if (usingFile && !explicitResolution && !fullscreenMode && getSDLWindow() != nullptr) {
             SDL_SetWindowSize(getSDLWindow(), texWidth, texHeight);
-            std::cout << "compute_shader: window resized to source frame size " << texWidth << "x" << texHeight
-                      << " (pass -r/--resolution to override)\n";
+            std::cout << "compute_shader: window resized to source frame size " << texWidth << "x" << texHeight << " (pass -r/--resolution to override)\n";
         }
     }
 
@@ -594,13 +511,7 @@ class ComputeWindow : public mxvk::VK_Window {
             throw mxvk::Exception("compute_shader: failed to open MXWrite output file '" + outputFilename + "'");
         }
         videoWriterOpen = true;
-        std::cout << "compute_shader: recording to " << outputFilename << " at " << sourceFps
-                  << " fps with crf " << encodeOptions.crf
-                  << ", codec=" << encodeOptions.codec
-                  << ", preset=" << encodeOptions.preset
-                  << ", tune=" << (encodeOptions.tune.empty() ? "none" : encodeOptions.tune)
-                  << ", realtime=" << (encodeOptions.realtime ? "true" : "false")
-                  << ", block_when_full=" << (mxwriteBlockWhenFull ? "true" : "false") << "\n";
+        std::cout << "compute_shader: recording to " << outputFilename << " at " << sourceFps << " fps with crf " << encodeOptions.crf << ", codec=" << encodeOptions.codec << ", preset=" << encodeOptions.preset << ", tune=" << (encodeOptions.tune.empty() ? "none" : encodeOptions.tune) << ", realtime=" << (encodeOptions.realtime ? "true" : "false") << ", block_when_full=" << (mxwriteBlockWhenFull ? "true" : "false") << "\n";
     }
 
     void recordFrame(const cv::Mat &frame) {
@@ -627,9 +538,7 @@ class ComputeWindow : public mxvk::VK_Window {
         const int recordTightPitch = recordWidth * 4;
         recordScratch.resize(static_cast<size_t>(recordTightPitch) * static_cast<size_t>(recordHeight));
         for (int row = 0; row < recordHeight; ++row) {
-            std::memcpy(recordScratch.data() + static_cast<size_t>(row) * static_cast<size_t>(tightPitch),
-                        data + static_cast<size_t>(row) * static_cast<size_t>(pitch),
-                        static_cast<size_t>(recordTightPitch));
+            std::memcpy(recordScratch.data() + static_cast<size_t>(row) * static_cast<size_t>(tightPitch), data + static_cast<size_t>(row) * static_cast<size_t>(pitch), static_cast<size_t>(recordTightPitch));
         }
         videoWriter.write(recordScratch.data());
     }
@@ -640,8 +549,7 @@ class ComputeWindow : public mxvk::VK_Window {
             return;
         }
 #if defined(MXWRITE_HAS_CUDA_COPY)
-        if (videoWriter.is_hardware_encode() &&
-            videoWriter.write_cuda_rgba(gpuFrame.ptr(), static_cast<int>(gpuFrame.step))) {
+        if (videoWriter.is_hardware_encode() && videoWriter.write_cuda_rgba(gpuFrame.ptr(), static_cast<int>(gpuFrame.step))) {
             return;
         }
 #endif
@@ -676,29 +584,12 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
-        transitionImageLayout(
-            cmd,
-            outImg.image,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            VK_ACCESS_2_MEMORY_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            VK_ACCESS_2_MEMORY_READ_BIT);
+        transitionImageLayout(cmd, outImg.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT);
         endSingleTimeCommands(cmd);
 
         processedRecordGpuFrame.create(texHeight, texWidth, CV_8UC4);
         cudaStream_t cudaStream = mxvk::cuda_stream_handle(processedRecordStream);
-        cudaError_t cudaResult = cudaMemcpy2DFromArrayAsync(
-            processedRecordGpuFrame.ptr(),
-            processedRecordGpuFrame.step,
-            outImg.cudaArray,
-            0,
-            0,
-            static_cast<size_t>(texWidth) * 4U,
-            static_cast<size_t>(texHeight),
-            cudaMemcpyDeviceToDevice,
-            cudaStream);
+        cudaError_t cudaResult = cudaMemcpy2DFromArrayAsync(processedRecordGpuFrame.ptr(), processedRecordGpuFrame.step, outImg.cudaArray, 0, 0, static_cast<size_t>(texWidth) * 4U, static_cast<size_t>(texHeight), cudaMemcpyDeviceToDevice, cudaStream);
         if (cudaResult != cudaSuccess) {
             std::cout << "compute_shader: CUDA processed-frame readback failed: " << cudaGetErrorString(cudaResult) << "\n";
             return false;
@@ -740,15 +631,7 @@ class ComputeWindow : public mxvk::VK_Window {
         const VkDeviceSize bytes = static_cast<VkDeviceSize>(tightPitch) * static_cast<VkDeviceSize>(texHeight);
         const VkCommandBuffer cmd = beginSingleTimeCommands();
 
-        transitionImageLayout(
-            cmd,
-            outImg.image,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_READ_BIT);
+        transitionImageLayout(cmd, outImg.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 
         VkBufferImageCopy2 region{};
         region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
@@ -764,15 +647,7 @@ class ComputeWindow : public mxvk::VK_Window {
         copyInfo.pRegions = &region;
         vkCmdCopyImageToBuffer2(cmd, &copyInfo);
 
-        transitionImageLayout(
-            cmd,
-            outImg.image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_READ_BIT,
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+        transitionImageLayout(cmd, outImg.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
         endSingleTimeCommands(cmd);
 
@@ -820,11 +695,10 @@ class ComputeWindow : public mxvk::VK_Window {
 
             if (!usingFile) {
                 capture.set(cv::CAP_PROP_FRAME_WIDTH, recordWidth);
-                capture.set(cv::CAP_PROP_FRAME_HEIGHT,recordHeight);
+                capture.set(cv::CAP_PROP_FRAME_HEIGHT, recordHeight);
                 const double selectedFps = configureCameraFps();
                 sourceFps = selectedFps;
-                std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected "
-                          << selectedFps << " fps\n";
+                std::cout << "compute_shader: requested camera FPS fallback order 60 -> 30 -> 24; selected " << selectedFps << " fps\n";
             }
 
 #if defined(MXVK_WITH_FFMPEG_CAPTURE)
@@ -849,8 +723,7 @@ class ComputeWindow : public mxvk::VK_Window {
             if (explicitResolution) {
                 texWidth = recordWidth;
                 texHeight = recordHeight;
-                std::cout << "compute_shader: compute canvas set from explicit resolution " << texWidth << "x" << texHeight
-                          << "; source frames are " << sourceWidth << "x" << sourceHeight << "\n";
+                std::cout << "compute_shader: compute canvas set from explicit resolution " << texWidth << "x" << texHeight << "; source frames are " << sourceWidth << "x" << sourceHeight << "\n";
             } else {
                 texWidth = sourceWidth;
                 texHeight = sourceHeight;
@@ -867,18 +740,8 @@ class ComputeWindow : public mxvk::VK_Window {
 
             const VkDeviceSize imgBytes = static_cast<VkDeviceSize>(texWidth) * texHeight * 4;
 
-            createBuffer(
-                imgBytes,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                stagingBuf,
-                stagingMem);
-            createBuffer(
-                imgBytes,
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                readbackBuf,
-                readbackMem);
+            createBuffer(imgBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuf, stagingMem);
+            createBuffer(imgBytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, readbackBuf, readbackMem);
 
             {
                 const VkCommandBuffer cmd = beginSingleTimeCommands();
@@ -952,38 +815,26 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         const auto recElapsed = now - playbackStartTime;
-        const uint64_t recTotalSeconds =
-            static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(recElapsed).count());
+        const uint64_t recTotalSeconds = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(recElapsed).count());
         const uint64_t recHours = recTotalSeconds / 3600U;
         const uint64_t recMinutes = (recTotalSeconds / 60U) % 60U;
         const uint64_t recSeconds = recTotalSeconds % 60U;
         const std::string recText = std::format("Rec: {:02}:{:02}:{:02}", recHours, recMinutes, recSeconds);
 
         const double effectiveSourceFps = (sourceFps > 0.0) ? sourceFps : videoFps;
-        const uint64_t totalTenths = (effectiveSourceFps > 0.0)
-                                         ? static_cast<uint64_t>(std::llround((static_cast<double>(processedVideoFrames) / effectiveSourceFps) * 10.0))
-                                         : 0U;
+        const uint64_t totalTenths = (effectiveSourceFps > 0.0) ? static_cast<uint64_t>(std::llround((static_cast<double>(processedVideoFrames) / effectiveSourceFps) * 10.0)) : 0U;
         const uint64_t hours = totalTenths / 36000U;
         const uint64_t minutes = (totalTenths / 600U) % 60U;
         const uint64_t seconds = (totalTenths / 10U) % 60U;
         const uint64_t tenths = totalTenths % 10U;
         const std::string timeText = std::format("Output: {:02}:{:02}:{:02}.{:01}", hours, minutes, seconds, tenths);
-        const std::string overlayText = std::format(
-            "Source FPS: {:.1f} Current FPS: {:.1f} | {} | {}",
-            sourceFps,
-            currentFps,
-            recText,
-            timeText);
+        const std::string overlayText = std::format("Source FPS: {:.1f} Current FPS: {:.1f} | {} | {}", sourceFps, currentFps, recText, timeText);
 
         printText(overlayText, 18, 18, SDL_Color{255, 240, 0, 255}, fpsFont);
         if (!spvFiles.empty()) {
             if (spvFiles[currentSpvIndex] == MODE_SHADER_NAME) {
                 const int modeIndex = std::clamp(shaderMode, 0, static_cast<int>(ACIDCAM_FILTER_MODE_NAMES.size()) - 1);
-                const std::string modeText = std::format(
-                    "Mode: {} {}/{}",
-                    ACIDCAM_FILTER_MODE_NAMES[modeIndex],
-                    modeIndex + 1,
-                    ACIDCAM_FILTER_MODE_NAMES.size());
+                const std::string modeText = std::format("Mode: {} {}/{}", ACIDCAM_FILTER_MODE_NAMES[modeIndex], modeIndex + 1, ACIDCAM_FILTER_MODE_NAMES.size());
                 printText(modeText, 15, 68, SDL_Color{255, 105, 180, 255});
             } else {
                 const std::string spvText = std::format("{}: {}", currentSpvIndex, spvFiles[currentSpvIndex]);
@@ -998,8 +849,7 @@ class ComputeWindow : public mxvk::VK_Window {
 
         for (uint32_t index = 0; index < memProperties.memoryTypeCount; ++index) {
             const bool typeMatches = (typeFilter & (1U << index)) != 0U;
-            const bool propertyMatches =
-                (memProperties.memoryTypes[index].propertyFlags & properties) == properties;
+            const bool propertyMatches = (memProperties.memoryTypes[index].propertyFlags & properties) == properties;
             if (typeMatches && propertyMatches) {
                 return index;
             }
@@ -1008,11 +858,7 @@ class ComputeWindow : public mxvk::VK_Window {
         throw mxvk::Exception("Failed to find suitable memory type");
     }
 
-    void createBuffer(VkDeviceSize size,
-                      VkBufferUsageFlags usage,
-                      VkMemoryPropertyFlags properties,
-                      VkBuffer &buffer,
-                      VkDeviceMemory &bufferMemory) {
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
         VkBuffer newBuffer = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -1089,14 +935,7 @@ class ComputeWindow : public mxvk::VK_Window {
         vkFreeCommandBuffers(device, command_pool, 1, &commandBuffer);
     }
 
-    void createImage(uint32_t width,
-                     uint32_t height,
-                     VkFormat format,
-                     VkImageTiling tiling,
-                     VkImageUsageFlags usage,
-                     VkMemoryPropertyFlags properties,
-                     VkImage &image,
-                     VkDeviceMemory &imageMemory) {
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory) {
         VkImage newImage = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -1149,8 +988,7 @@ class ComputeWindow : public mxvk::VK_Window {
 
 #ifdef MXVK_CUDA
     void createCudaExportableImage(ComputeImage &img) {
-        std::cout << "compute_shader: CUDA interop init: requesting exportable compute input image "
-                  << texWidth << "x" << texHeight << " RGBA8 optimal-tiled OPAQUE_FD\n";
+        std::cout << "compute_shader: CUDA interop init: requesting exportable compute input image " << texWidth << "x" << texHeight << " RGBA8 optimal-tiled OPAQUE_FD\n";
 
         VkExternalMemoryImageCreateInfo externalImageInfo{};
         externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
@@ -1168,8 +1006,7 @@ class ComputeWindow : public mxvk::VK_Window {
         imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
@@ -1193,10 +1030,7 @@ class ComputeWindow : public mxvk::VK_Window {
             VK_CHECK_RESULT(vkBindImageMemory(device, img.image, img.memory, 0));
             img.cudaExportMemorySize = memRequirements.size;
             img.cudaInteropUnavailableLogged = false;
-            std::cout << "compute_shader: CUDA interop init: exportable compute input image allocated (memorySize="
-                      << static_cast<unsigned long long>(memRequirements.size)
-                      << " bytes, memoryType=" << allocInfo.memoryTypeIndex
-                      << "); optimal image memory will be imported as cudaArray\n";
+            std::cout << "compute_shader: CUDA interop init: exportable compute input image allocated (memorySize=" << static_cast<unsigned long long>(memRequirements.size) << " bytes, memoryType=" << allocInfo.memoryTypeIndex << "); optimal image memory will be imported as cudaArray\n";
         } catch (...) {
             if (img.image != VK_NULL_HANDLE) {
                 vkDestroyImage(device, img.image, nullptr);
@@ -1274,15 +1108,13 @@ class ComputeWindow : public mxvk::VK_Window {
         if (cudaResult != cudaSuccess) {
             close(memoryFd);
             if (!img.cudaInteropUnavailableLogged) {
-                std::cout << "compute_shader: CUDA interop init: cudaImportExternalMemory failed: "
-                          << cudaGetErrorString(cudaResult) << "\n";
+                std::cout << "compute_shader: CUDA interop init: cudaImportExternalMemory failed: " << cudaGetErrorString(cudaResult) << "\n";
                 img.cudaInteropUnavailableLogged = true;
             }
             img.cudaExternalMemory = nullptr;
             return false;
         }
-        std::cout << "compute_shader: CUDA interop init: imported compute input image external memory into CUDA ("
-                  << static_cast<unsigned long long>(img.cudaExportMemorySize) << " bytes)\n";
+        std::cout << "compute_shader: CUDA interop init: imported compute input image external memory into CUDA (" << static_cast<unsigned long long>(img.cudaExportMemorySize) << " bytes)\n";
 
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;
@@ -1294,21 +1126,18 @@ class ComputeWindow : public mxvk::VK_Window {
         cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&img.cudaMipmappedArray, img.cudaExternalMemory, &arrayDesc);
         if (cudaResult != cudaSuccess) {
             if (!img.cudaInteropUnavailableLogged) {
-                std::cout << "compute_shader: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: "
-                          << cudaGetErrorString(cudaResult) << "\n";
+                std::cout << "compute_shader: CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed: " << cudaGetErrorString(cudaResult) << "\n";
                 img.cudaInteropUnavailableLogged = true;
             }
             destroyCudaInterop(img);
             return false;
         }
-        std::cout << "compute_shader: CUDA interop init: mapped compute input CUDA mipmapped array "
-                  << texWidth << "x" << texHeight << " uchar4\n";
+        std::cout << "compute_shader: CUDA interop init: mapped compute input CUDA mipmapped array " << texWidth << "x" << texHeight << " uchar4\n";
 
         cudaResult = cudaGetMipmappedArrayLevel(&img.cudaArray, img.cudaMipmappedArray, 0);
         if (cudaResult != cudaSuccess) {
             if (!img.cudaInteropUnavailableLogged) {
-                std::cout << "compute_shader: CUDA interop init: cudaGetMipmappedArrayLevel failed: "
-                          << cudaGetErrorString(cudaResult) << "\n";
+                std::cout << "compute_shader: CUDA interop init: cudaGetMipmappedArrayLevel failed: " << cudaGetErrorString(cudaResult) << "\n";
                 img.cudaInteropUnavailableLogged = true;
             }
             destroyCudaInterop(img);
@@ -1321,9 +1150,7 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 #endif
 
-    [[nodiscard]] VkImageView createImageView(VkImage image,
-                                              VkFormat format,
-                                              VkImageAspectFlags aspectFlags) const {
+    [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const {
         VkImageViewCreateInfo viewInfo{};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = image;
@@ -1346,54 +1173,18 @@ class ComputeWindow : public mxvk::VK_Window {
             try {
                 createCudaExportableImage(img);
             } catch (const std::exception &ex) {
-                std::cout << "compute_shader: CUDA exportable input image unavailable: " << ex.what()
-                          << "; using Vulkan staging fallback\n";
-                createImage(
-                    static_cast<uint32_t>(texWidth),
-                    static_cast<uint32_t>(texHeight),
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    img.image,
-                    img.memory);
+                std::cout << "compute_shader: CUDA exportable input image unavailable: " << ex.what() << "; using Vulkan staging fallback\n";
+                createImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img.image, img.memory);
             }
         } else {
-            createImage(
-                static_cast<uint32_t>(texWidth),
-                static_cast<uint32_t>(texHeight),
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                img.image,
-                img.memory);
+            createImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img.image, img.memory);
         }
 #else
-        createImage(
-            static_cast<uint32_t>(texWidth),
-            static_cast<uint32_t>(texHeight),
-            VK_FORMAT_R8G8B8A8_UNORM,
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            img.image,
-            img.memory);
+        createImage(static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img.image, img.memory);
 #endif
         img.view = createImageView(img.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-        transitionImageLayout(
-            cmd,
-            img.image,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_NONE,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+        transitionImageLayout(cmd, img.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
     }
 
     void reloadPipeline() {
@@ -1502,17 +1293,12 @@ class ComputeWindow : public mxvk::VK_Window {
     void writeBlurDS(VkDescriptorSet descriptorSet, VkImageView destView, VkImageView srcView) {
         VkDescriptorImageInfo destInfo{VK_NULL_HANDLE, destView, VK_IMAGE_LAYOUT_GENERAL};
         VkDescriptorImageInfo srcInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL};
-        std::vector<VkDescriptorImageInfo> historyInfos(
-            HISTORY_SIZE,
-            VkDescriptorImageInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL});
+        std::vector<VkDescriptorImageInfo> historyInfos(HISTORY_SIZE, VkDescriptorImageInfo{computeSampler, srcView, VK_IMAGE_LAYOUT_GENERAL});
 
         std::array<VkWriteDescriptorSet, 3> writes{};
-        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1,
-                     VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &destInfo, nullptr, nullptr};
-        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 1, 0, 1,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &srcInfo, nullptr, nullptr};
-        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 2, 0, HISTORY_SIZE,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, historyInfos.data(), nullptr, nullptr};
+        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &destInfo, nullptr, nullptr};
+        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 1, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &srcInfo, nullptr, nullptr};
+        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 2, 0, HISTORY_SIZE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, historyInfos.data(), nullptr, nullptr};
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
@@ -1558,16 +1344,8 @@ class ComputeWindow : public mxvk::VK_Window {
         };
         const std::array<uint16_t, 6> indices = {0, 1, 2, 0, 2, 3};
 
-        createBuffer(sizeof(float) * vertices.size(),
-                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     displayVertexBuffer,
-                     displayVertexMemory);
-        createBuffer(sizeof(uint16_t) * indices.size(),
-                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     displayIndexBuffer,
-                     displayIndexMemory);
+        createBuffer(sizeof(float) * vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, displayVertexBuffer, displayVertexMemory);
+        createBuffer(sizeof(uint16_t) * indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, displayIndexBuffer, displayIndexMemory);
 
         void *mapped = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, displayVertexMemory, 0, sizeof(float) * vertices.size(), 0, &mapped));
@@ -1709,8 +1487,7 @@ class ComputeWindow : public mxvk::VK_Window {
         depthStencil.depthWriteEnable = VK_FALSE;
 
         VkPipelineColorBlendAttachmentState blendAttachment{};
-        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         blendAttachment.blendEnable = VK_FALSE;
 
         VkPipelineColorBlendStateCreateInfo colorBlend{};
@@ -1776,12 +1553,9 @@ class ComputeWindow : public mxvk::VK_Window {
         }
 
         std::array<VkWriteDescriptorSet, 3> writes{};
-        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1,
-                     VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &destInfo, nullptr, nullptr};
-        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 1, 0, 1,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &srcInfo, nullptr, nullptr};
-        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 2, 0, HISTORY_SIZE,
-                     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, historyInfos.data(), nullptr, nullptr};
+        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &destInfo, nullptr, nullptr};
+        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 1, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &srcInfo, nullptr, nullptr};
+        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, descriptorSet, 2, 0, HISTORY_SIZE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, historyInfos.data(), nullptr, nullptr};
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
@@ -1800,24 +1574,14 @@ class ComputeWindow : public mxvk::VK_Window {
             const auto *src = static_cast<const uint8_t *>(data);
             auto *dst = static_cast<uint8_t *>(mapped);
             for (int row = 0; row < texHeight; ++row) {
-                std::memcpy(dst + static_cast<size_t>(row) * tightPitch,
-                            src + static_cast<size_t>(row) * srcPitch,
-                            static_cast<size_t>(tightPitch));
+                std::memcpy(dst + static_cast<size_t>(row) * tightPitch, src + static_cast<size_t>(row) * srcPitch, static_cast<size_t>(tightPitch));
             }
         }
         vkUnmapMemory(device, stagingMem);
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
 
-        transitionImageLayout(
-            cmd,
-            img.image,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_WRITE_BIT);
+        transitionImageLayout(cmd, img.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
         VkBufferImageCopy2 region{};
         region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
@@ -1833,15 +1597,7 @@ class ComputeWindow : public mxvk::VK_Window {
         copyInfo.pRegions = &region;
         vkCmdCopyBufferToImage2(cmd, &copyInfo);
 
-        transitionImageLayout(
-            cmd,
-            img.image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-            VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+        transitionImageLayout(cmd, img.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 
         endSingleTimeCommands(cmd);
     }
@@ -1857,43 +1613,24 @@ class ComputeWindow : public mxvk::VK_Window {
 
         cudaStream_t cudaStream = mxvk::cuda_stream_handle(stream);
         if (!img.cudaUploadLogged) {
-            std::cout << "compute_shader: CUDA interop upload: copying "
-                      << rgba.cols << "x" << rgba.rows
-                      << " RGBA GpuMat to Vulkan compute storage image via cudaArray (source pitch="
-                      << static_cast<unsigned long long>(rgba.step)
-                      << " bytes, copy row bytes="
-                      << static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U)
-                      << ")\n";
+            std::cout << "compute_shader: CUDA interop upload: copying " << rgba.cols << "x" << rgba.rows << " RGBA GpuMat to Vulkan compute storage image via cudaArray (source pitch=" << static_cast<unsigned long long>(rgba.step) << " bytes, copy row bytes=" << static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U) << ")\n";
             img.cudaUploadLogged = true;
         }
 
-        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
-            img.cudaArray, 0, 0, rgba.ptr(), rgba.step,
-            static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows),
-            cudaMemcpyDeviceToDevice, cudaStream);
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(img.cudaArray, 0, 0, rgba.ptr(), rgba.step, static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows), cudaMemcpyDeviceToDevice, cudaStream);
         if (cudaResult != cudaSuccess) {
-            std::cout << "compute_shader: CUDA interop compute input copy failed: "
-                      << cudaGetErrorString(cudaResult) << "\n";
+            std::cout << "compute_shader: CUDA interop compute input copy failed: " << cudaGetErrorString(cudaResult) << "\n";
             return false;
         }
 
         cudaResult = cudaStreamSynchronize(cudaStream);
         if (cudaResult != cudaSuccess) {
-            std::cout << "compute_shader: CUDA interop compute input sync failed: "
-                      << cudaGetErrorString(cudaResult) << "\n";
+            std::cout << "compute_shader: CUDA interop compute input sync failed: " << cudaGetErrorString(cudaResult) << "\n";
             return false;
         }
 
         const VkCommandBuffer cmd = beginSingleTimeCommands();
-        transitionImageLayout(
-            cmd,
-            img.image,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            VK_ACCESS_2_MEMORY_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+        transitionImageLayout(cmd, img.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
         endSingleTimeCommands(cmd);
 
         if (!img.cudaBarrierLogged) {
@@ -1916,15 +1653,7 @@ class ComputeWindow : public mxvk::VK_Window {
         pc.do_swap = 0;
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, compPipeline);
-        vkCmdBindDescriptorSets(
-            cmd,
-            VK_PIPELINE_BIND_POINT_COMPUTE,
-            compPipeLayout,
-            0,
-            1,
-            &descriptorSet,
-            0,
-            nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, compPipeLayout, 0, 1, &descriptorSet, 0, nullptr);
         vkCmdPushConstants(cmd, compPipeLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
 
         const uint32_t groupX = (static_cast<uint32_t>(texWidth) + 15) / 16;
@@ -1933,15 +1662,12 @@ class ComputeWindow : public mxvk::VK_Window {
     }
 
     void renderComputeOutput(VkCommandBuffer cmd) {
-        if (displayPipeline == VK_NULL_HANDLE || displayPipeLayout == VK_NULL_HANDLE ||
-            displayDS == VK_NULL_HANDLE || displayVertexBuffer == VK_NULL_HANDLE ||
-            displayIndexBuffer == VK_NULL_HANDLE) {
+        if (displayPipeline == VK_NULL_HANDLE || displayPipeLayout == VK_NULL_HANDLE || displayDS == VK_NULL_HANDLE || displayVertexBuffer == VK_NULL_HANDLE || displayIndexBuffer == VK_NULL_HANDLE) {
             return;
         }
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeLayout,
-                                0, 1, &displayDS, 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, displayPipeLayout, 0, 1, &displayDS, 0, nullptr);
 
         const VkDeviceSize offset = 0;
         vkCmdBindVertexBuffers(cmd, 0, 1, &displayVertexBuffer, &offset);
@@ -1969,22 +1695,11 @@ class ComputeWindow : public mxvk::VK_Window {
             {0.0f, 0.0f, 0.0f, 0.0f},
         };
 
-        vkCmdPushConstants(cmd, displayPipeLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0, sizeof(DisplayPC), &pc);
+        vkCmdPushConstants(cmd, displayPipeLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DisplayPC), &pc);
         vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
     }
 
-    void computeBarrier(VkCommandBuffer cmd, VkImage img) const {
-        transitionImageLayout(
-            cmd,
-            img,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
-    }
+    void computeBarrier(VkCommandBuffer cmd, VkImage img) const { transitionImageLayout(cmd, img, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT); }
 
     void runComputeFrame() {
         const VkCommandBuffer cmd = beginSingleTimeCommands();
@@ -1994,23 +1709,9 @@ class ComputeWindow : public mxvk::VK_Window {
 
         if (isModeShader) {
             std::array<VkImageMemoryBarrier2, 2> barriers{};
-            barriers[0] = makeImageBarrier(
-                workImg[srcIdx].image,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_WRITE_BIT,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_READ_BIT);
+            barriers[0] = makeImageBarrier(workImg[srcIdx].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 
-            barriers[1] = makeImageBarrier(
-                histImg[historyIndex].image,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_WRITE_BIT);
+            barriers[1] = makeImageBarrier(histImg[historyIndex].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
             VkDependencyInfo dependencyInfo{};
             dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -2034,23 +1735,9 @@ class ComputeWindow : public mxvk::VK_Window {
             copyInfo.pRegions = &copy;
             vkCmdCopyImage2(cmd, &copyInfo);
 
-            barriers[0] = makeImageBarrier(
-                workImg[srcIdx].image,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_READ_BIT,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+            barriers[0] = makeImageBarrier(workImg[srcIdx].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 
-            barriers[1] = makeImageBarrier(
-                histImg[historyIndex].image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT);
+            barriers[1] = makeImageBarrier(histImg[historyIndex].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 
             dependencyInfo = {};
             dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -2072,23 +1759,9 @@ class ComputeWindow : public mxvk::VK_Window {
             }
 
             std::array<VkImageMemoryBarrier2, 2> barriers{};
-            barriers[0] = makeImageBarrier(
-                workImg[srcIdx].image,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_WRITE_BIT,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_READ_BIT);
+            barriers[0] = makeImageBarrier(workImg[srcIdx].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
 
-            barriers[1] = makeImageBarrier(
-                histImg[historyIndex].image,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_WRITE_BIT);
+            barriers[1] = makeImageBarrier(histImg[historyIndex].image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
             VkDependencyInfo dependencyInfo{};
             dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -2112,23 +1785,9 @@ class ComputeWindow : public mxvk::VK_Window {
             copyInfo.pRegions = &copy;
             vkCmdCopyImage2(cmd, &copyInfo);
 
-            barriers[0] = makeImageBarrier(
-                workImg[srcIdx].image,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_READ_BIT,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
+            barriers[0] = makeImageBarrier(workImg[srcIdx].image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT);
 
-            barriers[1] = makeImageBarrier(
-                histImg[historyIndex].image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                VK_IMAGE_LAYOUT_GENERAL,
-                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                VK_ACCESS_2_SHADER_READ_BIT);
+            barriers[1] = makeImageBarrier(histImg[historyIndex].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 
             dependencyInfo = {};
             dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -2141,20 +1800,11 @@ class ComputeWindow : public mxvk::VK_Window {
             }
             historyIndex = (historyIndex + 1) % HISTORY_SIZE;
 
-            const bool isMetalMedian =
-                !spvFiles.empty() && spvFiles[currentSpvIndex].find("metalmedianblend") != std::string::npos;
+            const bool isMetalMedian = !spvFiles.empty() && spvFiles[currentSpvIndex].find("metalmedianblend") != std::string::npos;
             dispatchOne(cmd, blendDS[srcIdx], isMetalMedian ? 2 : 1);
         }
 
-        transitionImageLayout(
-            cmd,
-            outImg.image,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-            VK_ACCESS_2_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+        transitionImageLayout(cmd, outImg.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
         endSingleTimeCommands(cmd);
     }
@@ -2200,13 +1850,7 @@ class ComputeWindow : public mxvk::VK_Window {
         }
     }
 
-    static VkImageMemoryBarrier2 makeImageBarrier(VkImage img,
-                                                  VkImageLayout oldLayout,
-                                                  VkImageLayout newLayout,
-                                                  VkPipelineStageFlags2 srcStage,
-                                                  VkAccessFlags2 srcAccess,
-                                                  VkPipelineStageFlags2 dstStage,
-                                                  VkAccessFlags2 dstAccess) {
+    static VkImageMemoryBarrier2 makeImageBarrier(VkImage img, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         barrier.srcStageMask = srcStage;
@@ -2222,22 +1866,8 @@ class ComputeWindow : public mxvk::VK_Window {
         return barrier;
     }
 
-    static void transitionImageLayout(VkCommandBuffer cmd,
-                                      VkImage img,
-                                      VkImageLayout oldLayout,
-                                      VkImageLayout newLayout,
-                                      VkPipelineStageFlags2 srcStage,
-                                      VkAccessFlags2 srcAccess,
-                                      VkPipelineStageFlags2 dstStage,
-                                      VkAccessFlags2 dstAccess) {
-        const VkImageMemoryBarrier2 barrier = makeImageBarrier(
-            img,
-            oldLayout,
-            newLayout,
-            srcStage,
-            srcAccess,
-            dstStage,
-            dstAccess);
+    static void transitionImageLayout(VkCommandBuffer cmd, VkImage img, VkImageLayout oldLayout, VkImageLayout newLayout, VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess, VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+        const VkImageMemoryBarrier2 barrier = makeImageBarrier(img, oldLayout, newLayout, srcStage, srcAccess, dstStage, dstAccess);
 
         VkDependencyInfo dependencyInfo{};
         dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;

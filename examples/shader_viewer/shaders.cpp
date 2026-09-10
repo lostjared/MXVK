@@ -121,7 +121,7 @@ namespace example {
         float rotation_y_degrees = 0.0f;
         float auto_rotation_radians = 0.0f;
         float camera_distance = 5.0f;
-	bool menu_visible = true;
+        bool menu_visible = true;
         std::chrono::steady_clock::time_point last_model_update_time{std::chrono::steady_clock::now()};
 
         [[nodiscard]] bool openCaptureSource() {
@@ -408,16 +408,14 @@ namespace example {
                 }
             }
 
-	    if(!menu_visible)
-		    return;
+            if (!menu_visible)
+                return;
 
             printText(fps_text, 15, 15, SDL_Color{255, 255, 255, 255});
             if (using_model) {
-                printText(std::format("Model: {}  Wire: {}  Auto: {} M: Toggle Menu", std::filesystem::path(model_filename).filename().string(), wireframe ? "on" : "off", auto_rotate ? "on" : "off"),
-                          15, 39, SDL_Color{220, 228, 240, 255});
+                printText(std::format("Model: {}  Wire: {}  Auto: {} M: Toggle Menu", std::filesystem::path(model_filename).filename().string(), wireframe ? "on" : "off", auto_rotate ? "on" : "off"), 15, 39, SDL_Color{220, 228, 240, 255});
                 if (show_help) {
-                    printText("Drag/Left/Right rotate  Wheel/A/S zoom  Up/Down shader  W wire  R auto  Home reset  Esc quit",
-                              15, static_cast<int>(getSwapchainExtent().height) - 30, SDL_Color{195, 205, 220, 255});
+                    printText("Drag/Left/Right rotate  Wheel/A/S zoom  Up/Down shader  W wire  R auto  Home reset  Esc quit", 15, static_cast<int>(getSwapchainExtent().height) - 30, SDL_Color{195, 205, 220, 255});
                 }
             }
         }
@@ -447,9 +445,7 @@ namespace example {
                 if (using_model) {
                     model_filename = resolveModelPath(model_filename);
                     const std::string texture_manifest = resolveOptionalPath(args.texture);
-                    const std::string texture_base = args.resource_path.empty()
-                                                         ? std::filesystem::path(texture_manifest.empty() ? model_filename : texture_manifest).parent_path().string()
-                                                         : resolveOptionalPath(args.resource_path);
+                    const std::string texture_base = args.resource_path.empty() ? std::filesystem::path(texture_manifest.empty() ? model_filename : texture_manifest).parent_path().string() : resolveOptionalPath(args.resource_path);
                     model_vertex_shader = joinPath(current_path, "data/model.vert.spv");
                     if (!std::filesystem::exists(model_vertex_shader)) {
                         model_vertex_shader = joinPath(shader_viewer_ASSET_DIR, "data/model.vert.spv");
@@ -495,9 +491,7 @@ namespace example {
             }
         }
 
-        ~ExampleWindow() override {
-            cleanupWindowResources();
-        }
+        ~ExampleWindow() override { cleanupWindowResources(); }
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
@@ -508,9 +502,9 @@ namespace example {
                 selectShader(1);
             } else if (using_model && e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat) {
                 switch (e.key.key) {
-		case SDLK_M:
-		    menu_visible = !menu_visible;
-		    break;
+                case SDLK_M:
+                    menu_visible = !menu_visible;
+                    break;
                 case SDLK_W:
                     wireframe = !wireframe;
                     break;

@@ -9,18 +9,14 @@
 
 namespace mutatris {
 
-    PuzzleGame::PuzzleGame(int difficulty, std::function<void()> lineSoundCallback)
-        : playLineSound(std::move(lineSoundCallback)) {
-        newGame(difficulty);
-    }
+    PuzzleGame::PuzzleGame(int difficulty, std::function<void()> lineSoundCallback) : playLineSound(std::move(lineSoundCallback)) { newGame(difficulty); }
 
     void PuzzleGame::newGame(int difficulty) {
         std::srand(static_cast<unsigned int>(std::time(nullptr)));
         score = 0;
         clears = 0;
         level = 0;
-        timeout = difficulty == 0 ? 1200U : difficulty == 1 ? 900U
-                                                            : 650U;
+        timeout = difficulty == 0 ? 1200U : difficulty == 1 ? 900U : 650U;
         grid[0].initGrid(GRID_WIDTH, TOP_GRID_HEIGHT);
         grid[1].initGrid(SIDE_GRID_WIDTH, SIDE_GRID_HEIGHT);
         grid[2].initGrid(GRID_WIDTH, BOTTOM_GRID_HEIGHT);
@@ -35,10 +31,7 @@ namespace mutatris {
         for (GameGrid &focusGrid : grid) {
             for (int x = 0; x < focusGrid.width(); ++x) {
                 for (int y = 0; y < focusGrid.height(); ++y) {
-                    if (clearRun(focusGrid, x, y, 0, 1) ||
-                        clearRun(focusGrid, x, y, 1, 0) ||
-                        clearRun(focusGrid, x, y, 1, 1) ||
-                        clearRun(focusGrid, x, y, -1, 1)) {
+                    if (clearRun(focusGrid, x, y, 0, 1) || clearRun(focusGrid, x, y, 1, 0) || clearRun(focusGrid, x, y, 1, 1) || clearRun(focusGrid, x, y, -1, 1)) {
                         return;
                     }
                 }
@@ -70,20 +63,12 @@ namespace mutatris {
             return {cell.y * BLOCK_HEIGHT, SIDE_GRID_Y + cell.x * BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH};
         }
         if (cell.gridIndex == 2) {
-            return {CENTER_GRID_X + cell.x * BLOCK_WIDTH,
-                    BOTTOM_GRID_Y + (BOTTOM_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
-                    BLOCK_WIDTH,
-                    BLOCK_HEIGHT};
+            return {CENTER_GRID_X + cell.x * BLOCK_WIDTH, BOTTOM_GRID_Y + (BOTTOM_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT, BLOCK_WIDTH, BLOCK_HEIGHT};
         }
-        return {RIGHT_GRID_X + (SIDE_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT,
-                SIDE_GRID_Y + (SIDE_GRID_WIDTH - 1 - cell.x) * BLOCK_WIDTH,
-                BLOCK_HEIGHT,
-                BLOCK_WIDTH};
+        return {RIGHT_GRID_X + (SIDE_GRID_HEIGHT - 1 - cell.y) * BLOCK_HEIGHT, SIDE_GRID_Y + (SIDE_GRID_WIDTH - 1 - cell.x) * BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH};
     }
 
-    bool PuzzleGame::sameCell(const CellRef &a, const CellRef &b) const {
-        return a.gridIndex == b.gridIndex && a.x == b.x && a.y == b.y;
-    }
+    bool PuzzleGame::sameCell(const CellRef &a, const CellRef &b) const { return a.gridIndex == b.gridIndex && a.x == b.x && a.y == b.y; }
 
     bool PuzzleGame::findNextVisualMatch(const CellRef &current, int color, int dx, int dy, CellRef &next) const {
         const CellBounds currentBounds = cellBounds(current);
@@ -151,9 +136,7 @@ namespace mutatris {
                         std::vector<CellRef> run{start};
                         CellRef current = start;
                         while (findNextVisualMatch(current, startBlock->color, dx, dy, current)) {
-                            if (std::any_of(run.begin(), run.end(), [&](const CellRef &cell) {
-                                    return sameCell(cell, current);
-                                })) {
+                            if (std::any_of(run.begin(), run.end(), [&](const CellRef &cell) { return sameCell(cell, current); })) {
                                 break;
                             }
                             run.push_back(current);

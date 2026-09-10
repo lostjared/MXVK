@@ -59,12 +59,9 @@ namespace space {
 #endif
 
 #if defined(ASTEROIDS_NET_HAS_MINIUPNPC)
-        int get_valid_igd(UPNPDev *devices, UPNPUrls &urls, IGDdatas &data, char *local_address,
-                          std::size_t local_address_size, [[maybe_unused]] char *external_address,
-                          [[maybe_unused]] std::size_t external_address_size) {
+        int get_valid_igd(UPNPDev *devices, UPNPUrls &urls, IGDdatas &data, char *local_address, std::size_t local_address_size, [[maybe_unused]] char *external_address, [[maybe_unused]] std::size_t external_address_size) {
 #if MINIUPNPC_API_VERSION >= 21
-            return UPNP_GetValidIGD(devices, &urls, &data, local_address, static_cast<int>(local_address_size), external_address,
-                                    static_cast<int>(external_address_size));
+            return UPNP_GetValidIGD(devices, &urls, &data, local_address, static_cast<int>(local_address_size), external_address, static_cast<int>(external_address_size));
 #else
             return UPNP_GetValidIGD(devices, &urls, &data, local_address, static_cast<int>(local_address_size));
 #endif
@@ -84,8 +81,7 @@ namespace space {
             IGDdatas data{};
             char local_address[64]{};
             char external_address[64]{};
-            if (devices != nullptr &&
-                get_valid_igd(devices, urls, data, local_address, sizeof(local_address), external_address, sizeof(external_address)) > 0) {
+            if (devices != nullptr && get_valid_igd(devices, urls, data, local_address, sizeof(local_address), external_address, sizeof(external_address)) > 0) {
                 UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype, port.c_str(), "UDP", nullptr);
                 FreeUPNPUrls(&urls);
             }
@@ -125,14 +121,9 @@ namespace space {
         IGDdatas data{};
         char local_address[64]{};
         char external_address[64]{};
-        const int igd_result = devices == nullptr
-                                   ? 0
-                                   : get_valid_igd(devices, urls, data, local_address, sizeof(local_address), external_address,
-                                                   sizeof(external_address));
+        const int igd_result = devices == nullptr ? 0 : get_valid_igd(devices, urls, data, local_address, sizeof(local_address), external_address, sizeof(external_address));
         if (igd_result > 0) {
-            const int result = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(),
-                                                   local_address, "asteroids-net", "UDP", nullptr,
-                                                   std::to_string(MAPPING_LIFETIME_SECONDS).c_str());
+            const int result = UPNP_AddPortMapping(urls.controlURL, data.first.servicetype, port.c_str(), port.c_str(), local_address, "asteroids-net", "UDP", nullptr, std::to_string(MAPPING_LIFETIME_SECONDS).c_str());
             if (result == UPNPCOMMAND_SUCCESS) {
                 if (external_address[0] == '\0')
                     UPNP_GetExternalIPAddress(urls.controlURL, data.first.servicetype, external_address);

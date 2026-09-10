@@ -22,7 +22,7 @@ namespace example {
     namespace {
         constexpr int MATRIX_SURFACE_WIDTH = 1280;
         constexpr int MATRIX_SURFACE_HEIGHT = 720;
-    }
+    } // namespace
 
     using Clock = std::chrono::steady_clock;
 
@@ -30,12 +30,7 @@ namespace example {
 
     class MatrixRainBackdrop {
       public:
-        MatrixRainBackdrop(PlanetWindow &window,
-                           const std::string &assetRoot,
-                           bool binaryGlyphMode,
-                           int fontSize,
-                           const std::string &fontPath,
-                           const std::string &color);
+        MatrixRainBackdrop(PlanetWindow &window, const std::string &assetRoot, bool binaryGlyphMode, int fontSize, const std::string &fontPath, const std::string &color);
         ~MatrixRainBackdrop();
 
         void onSwapchainAboutToRecreate();
@@ -49,19 +44,7 @@ namespace example {
 
     class PlanetWindow : public mxvk::VK_Window {
       public:
-        PlanetWindow(const std::string &filename,
-                     const std::string &path,
-                     const std::string &title,
-                     int width,
-                     int height,
-                     bool fullscreen,
-                     bool enable_vsync,
-                     bool binary,
-                     int font_size,
-                     const std::string &font_path,
-                     const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(path.empty() ? std::string(PLANET_ASSET_DIR) : path) {
+        PlanetWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, bool binary, int font_size, const std::string &font_path, const std::string &color) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot(path.empty() ? std::string(PLANET_ASSET_DIR) : path) {
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/saturn.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/saturn.tex";
             const std::string textureBasePath = assetRoot + "/data";
@@ -143,9 +126,7 @@ namespace example {
 
             const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(pitchDegrees), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -162,9 +143,7 @@ namespace example {
             model.render(cmd, imageIndex, false);
         }
 
-        void renderBackgroundSprite(mxvk::VK_Sprite &sprite, VkCommandBuffer cmd) {
-            renderStandaloneSprite(sprite, cmd);
-        }
+        void renderBackgroundSprite(mxvk::VK_Sprite &sprite, VkCommandBuffer cmd) { renderStandaloneSprite(sprite, cmd); }
 
       private:
         std::string assetRoot;
@@ -180,12 +159,7 @@ namespace example {
         float mouseSensitivity = 0.35f;
     };
 
-    MatrixRainBackdrop::MatrixRainBackdrop(PlanetWindow &window,
-                                           const std::string &assetRootPath,
-                                           bool binaryGlyphMode,
-                                           int fontSize,
-                                           const std::string &fontPath,
-                                           const std::string &color)
+    MatrixRainBackdrop::MatrixRainBackdrop(PlanetWindow &window, const std::string &assetRootPath, bool binaryGlyphMode, int fontSize, const std::string &fontPath, const std::string &color)
         : rain([&]() {
               matrix::RainConfig config = matrix::make_matrix_rain_config(assetRootPath, binaryGlyphMode);
               config.surface_width = MATRIX_SURFACE_WIDTH;
@@ -203,11 +177,9 @@ namespace example {
         lastFrame = Clock::now();
     }
 
-    MatrixRainBackdrop::~MatrixRainBackdrop() {
-    }
+    MatrixRainBackdrop::~MatrixRainBackdrop() {}
 
-    void MatrixRainBackdrop::onSwapchainAboutToRecreate() {
-    }
+    void MatrixRainBackdrop::onSwapchainAboutToRecreate() {}
 
     void MatrixRainBackdrop::onSwapchainRecreated(PlanetWindow &window) {
         if (rain) {
@@ -239,9 +211,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        example::PlanetWindow window(
-            args.filename, args.path, "MXVK Planet Example", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary,
-            args.font_size, args.font_path, args.color);
+        example::PlanetWindow window(args.filename, args.path, "MXVK Planet Example", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary, args.font_size, args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

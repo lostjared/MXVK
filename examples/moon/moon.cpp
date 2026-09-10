@@ -91,15 +91,7 @@ namespace example {
 
     class MoonWindow : public mxvk::VK_Window {
       public:
-        MoonWindow(const std::string &filename,
-                   const std::string &path,
-                   const std::string &fragment_path,
-                   const std::string &title,
-                   int width,
-                   int height,
-                   bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root(path.empty() ? std::string(MOON_ASSET_DIR) : path) {
+        MoonWindow(const std::string &filename, const std::string &path, const std::string &fragment_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root(path.empty() ? std::string(MOON_ASSET_DIR) : path) {
             const std::string model_path = filename.empty() ? (asset_root + "/data/moon.obj") : filename;
             const std::string texture_base_path = asset_root + "/data";
             const std::string vert_path = asset_root + "/data/model.vert.spv";
@@ -206,9 +198,7 @@ namespace example {
             }
 
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             glm::mat4 moon_rotation = glm::rotate(glm::mat4(1.0f), glm::radians(pitch_degrees), glm::vec3(1.0f, 0.0f, 0.0f));
             moon_rotation = glm::rotate(moon_rotation, glm::radians(yaw_degrees), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -330,9 +320,7 @@ namespace example {
             return basis;
         }
 
-        [[nodiscard]] static glm::mat4 pyramidTransform(const glm::mat4 &moon_rotation,
-                                                        const mxvk::VKAbstractModel &pyramid,
-                                                        const PyramidPlacement &placement) {
+        [[nodiscard]] static glm::mat4 pyramidTransform(const glm::mat4 &moon_rotation, const mxvk::VKAbstractModel &pyramid, const PyramidPlacement &placement) {
             constexpr float MOON_RADIUS = 1.28f;
             const glm::vec3 normal = glm::normalize(placement.surface_normal);
             const float surface_offset = MOON_RADIUS + (placement.scale * 0.55f);

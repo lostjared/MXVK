@@ -4,9 +4,7 @@
 
 namespace mutatris {
 
-    GameGrid::GameGrid()
-        : gamePiece(this) {
-    }
+    GameGrid::GameGrid() : gamePiece(this) {}
 
     void GameGrid::initGrid(int width, int height) {
         gridWidth = width;
@@ -29,8 +27,6 @@ namespace mutatris {
         return &cells[static_cast<std::size_t>(y * gridWidth + x)];
     }
 
-    bool GameGrid::canMoveDown() const {
-        return gamePiece.getDirection() == 3 || gamePiece.checkLocation(gamePiece.getX(), gamePiece.getY()) || gamePiece.getY() != 0;
-    }
+    bool GameGrid::canMoveDown() const { return gamePiece.getDirection() == 3 || gamePiece.checkLocation(gamePiece.getX(), gamePiece.getY()) || gamePiece.getY() != 0; }
 
 } // namespace mutatris

@@ -20,11 +20,7 @@ namespace example {
         };
 
       public:
-        StaticWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root((path.empty() ? std::string(static_example_ASSET_DIR) : path) + "/data") {
-            setClearColor(0.02f, 0.03f, 0.06f, 1.0f);
-        }
+        StaticWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), shader_root((path.empty() ? std::string(static_example_ASSET_DIR) : path) + "/data") { setClearColor(0.02f, 0.03f, 0.06f, 1.0f); }
 
         ~StaticWindow() override {
             if (device != VK_NULL_HANDLE) {
@@ -39,9 +35,7 @@ namespace example {
             }
         }
 
-        void onSwapchainAboutToRecreate() override {
-            destroyGraphicsPipeline();
-        }
+        void onSwapchainAboutToRecreate() override { destroyGraphicsPipeline(); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
             if (!ensureGraphicsPipeline()) {
@@ -57,13 +51,7 @@ namespace example {
             const float height = static_cast<float>(extent.height);
             const PushConstants push_constants{elapsed_seconds, width, height, static_cast<float>(frame_index++)};
 
-            vkCmdPushConstants(
-                cmd,
-                pipeline_layout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                0,
-                sizeof(PushConstants),
-                &push_constants);
+            vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &push_constants);
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
@@ -170,11 +158,7 @@ namespace example {
                 depth_stencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState color_blend_attachment{};
-                color_blend_attachment.colorWriteMask =
-                    VK_COLOR_COMPONENT_R_BIT |
-                    VK_COLOR_COMPONENT_G_BIT |
-                    VK_COLOR_COMPONENT_B_BIT |
-                    VK_COLOR_COMPONENT_A_BIT;
+                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 color_blend_attachment.blendEnable = VK_FALSE;
 
                 VkPipelineColorBlendStateCreateInfo color_blending{};

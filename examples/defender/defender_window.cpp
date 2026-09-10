@@ -17,9 +17,7 @@
 
 namespace defender {
 
-    DefenderWindow::DefenderWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-        : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-          asset_root((path.empty() || path == ".") ? std::string(DEFENDER_ASSET_DIR) : path) {
+    DefenderWindow::DefenderWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("Defender Starfield Demo", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root((path.empty() || path == ".") ? std::string(DEFENDER_ASSET_DIR) : path) {
         setClearColor(0.0f, 0.0f, 0.01f, 1.0f);
         setFont(asset_root + "/data/font.ttf", DEFAULT_FONT_SIZE);
         hud_font.reset(asset_root + "/data/font.ttf", HUD_FONT_SIZE);
@@ -34,15 +32,8 @@ namespace defender {
             asteroid_model.setShaders(this, model_vert, model_frag);
         }
 
-        intro_sprite = createSprite(
-            asset_root + "/data/intro.png",
-            asset_root + "/data/sprite.vert.spv",
-            asset_root + "/data/intro.frag.spv");
-        fade_overlay_sprite = createSprite(
-            1,
-            1,
-            asset_root + "/data/sprite.vert.spv",
-            asset_root + "/data/fade_overlay.frag.spv");
+        intro_sprite = createSprite(asset_root + "/data/intro.png", asset_root + "/data/sprite.vert.spv", asset_root + "/data/intro.frag.spv");
+        fade_overlay_sprite = createSprite(1, 1, asset_root + "/data/sprite.vert.spv", asset_root + "/data/fade_overlay.frag.spv");
         const uint32_t black_pixel = 0xFF000000u;
         fade_overlay_sprite->updateTexture(&black_pixel, 1, 1);
         attachPostProcessingShader(asset_root + "/data/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);

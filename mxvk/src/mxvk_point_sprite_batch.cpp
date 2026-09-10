@@ -11,15 +11,9 @@
 
 namespace mxvk {
 
-    VK_PointSpriteBatch::~VK_PointSpriteBatch() {
-        cleanup();
-    }
+    VK_PointSpriteBatch::~VK_PointSpriteBatch() { cleanup(); }
 
-    void VK_PointSpriteBatch::load(VK_Window *window,
-                                   const std::string &texture_path_value,
-                                   const std::string &vertex_shader_path_value,
-                                   const std::string &fragment_shader_path_value,
-                                   size_t max_vertex_count) {
+    void VK_PointSpriteBatch::load(VK_Window *window, const std::string &texture_path_value, const std::string &vertex_shader_path_value, const std::string &fragment_shader_path_value, size_t max_vertex_count) {
         if (window == nullptr) {
             throw mxvk::Exception("VK_PointSpriteBatch::load called with null window");
         }
@@ -43,8 +37,7 @@ namespace mxvk {
         fragment_shader_path = fragment_shader_path_value;
         max_vertices = max_vertex_count;
 
-        if (context.device == VK_NULL_HANDLE || context.physical_device == VK_NULL_HANDLE ||
-            context.graphics_queue == VK_NULL_HANDLE || context.command_pool == VK_NULL_HANDLE) {
+        if (context.device == VK_NULL_HANDLE || context.physical_device == VK_NULL_HANDLE || context.graphics_queue == VK_NULL_HANDLE || context.command_pool == VK_NULL_HANDLE) {
             throw mxvk::Exception("Cannot create point-sprite batch before Vulkan render resources are available");
         }
         if (color_attachment_format == VK_FORMAT_UNDEFINED || image_count == 0) {
@@ -124,15 +117,7 @@ namespace mxvk {
         VkBuffer buffers[] = {vertex_buffer.buffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(cmd, 0, 1, buffers, offsets);
-        vkCmdBindDescriptorSets(
-            cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline_layout,
-            0,
-            1,
-            &descriptor_sets[image_index],
-            0,
-            nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[image_index], 0, nullptr);
         vkCmdDraw(cmd, static_cast<uint32_t>(active_vertices), 1, 0, 0);
     }
 
@@ -170,18 +155,11 @@ namespace mxvk {
     }
 
     void VK_PointSpriteBatch::create_vertex_buffer() {
-        create_buffer(
-            context,
-            sizeof(PointSpriteVertex) * static_cast<VkDeviceSize>(max_vertices),
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            vertex_buffer);
+        create_buffer(context, sizeof(PointSpriteVertex) * static_cast<VkDeviceSize>(max_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertex_buffer);
         map_buffer(context.device, vertex_buffer);
     }
 
-    void VK_PointSpriteBatch::destroy_vertex_buffer() {
-        destroy_buffer(context.device, vertex_buffer);
-    }
+    void VK_PointSpriteBatch::destroy_vertex_buffer() { destroy_buffer(context.device, vertex_buffer); }
 
     void VK_PointSpriteBatch::create_swapchain_resources() {
         create_descriptor_set_layout();
@@ -236,12 +214,7 @@ namespace mxvk {
     void VK_PointSpriteBatch::create_uniform_buffers() {
         uniform_buffers.resize(image_count);
         for (auto &buffer : uniform_buffers) {
-            create_buffer(
-                context,
-                sizeof(UniformBufferObject),
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                buffer);
+            create_buffer(context, sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buffer);
             map_buffer(context.device, buffer);
         }
     }
@@ -397,8 +370,7 @@ namespace mxvk {
             depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
             VkPipelineColorBlendAttachmentState blend{};
-            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                   VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             blend.blendEnable = VK_TRUE;
             blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             blend.dstColorBlendFactor = additive_blending ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -473,8 +445,6 @@ namespace mxvk {
         }
     }
 
-    std::vector<char> VK_PointSpriteBatch::read_shader_file(const std::string &path) const {
-        return mxvk::load_spv(path);
-    }
+    std::vector<char> VK_PointSpriteBatch::read_shader_file(const std::string &path) const { return mxvk::load_spv(path); }
 
 } // namespace mxvk

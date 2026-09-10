@@ -40,6 +40,7 @@ namespace defender {
         void onSwapchainRecreated() override;
         void onPrepareFrameRendering(VkCommandBuffer cmd, uint32_t image_index) override;
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override;
+
       private:
         std::string asset_root;
         std::chrono::steady_clock::time_point last_frame_time = std::chrono::steady_clock::now();
@@ -183,13 +184,7 @@ namespace defender {
         [[nodiscard]] float ufo_collision_radius(const Ufo &ufo) const;
         [[nodiscard]] bool enemy_spawn_is_clear(const glm::vec3 &position, float radius, const Ufo *ignored_ufo, const Asteroid *ignored_asteroid) const;
         void clamp_enemy_to_world_y(glm::vec3 &position, glm::vec3 &velocity, float radius);
-        void separate_enemies(glm::vec3 &first_position,
-                              glm::vec3 &first_velocity,
-                              float first_radius,
-                              glm::vec3 &second_position,
-                              glm::vec3 &second_velocity,
-                              float second_radius,
-                              float restitution);
+        void separate_enemies(glm::vec3 &first_position, glm::vec3 &first_velocity, float first_radius, glm::vec3 &second_position, glm::vec3 &second_velocity, float second_radius, float restitution);
         void resolve_enemy_overlaps();
         [[nodiscard]] int current_ufo_frame(const Ufo &ufo) const;
         [[nodiscard]] float current_ufo_pulse(const Ufo &ufo) const;
@@ -204,11 +199,7 @@ namespace defender {
         void create_flame_mesh();
         void create_flame_pipeline();
         void draw_engine_flame(VkCommandBuffer cmd, const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &projection);
-        void create_buffer(VkDeviceSize size,
-                           VkBufferUsageFlags usage,
-                           VkMemoryPropertyFlags properties,
-                           VkBuffer &buffer,
-                           VkDeviceMemory &buffer_memory) const;
+        void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory) const;
         [[nodiscard]] uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
         void fire_projectile();
         void update_projectiles(float dt);

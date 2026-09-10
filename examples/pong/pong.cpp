@@ -18,8 +18,8 @@
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "mxvk/argz.hpp"
 #include "mxvk/mxvk.hpp"
@@ -85,8 +85,7 @@ namespace {
         float rotationSpeed = 0.0f;
         bool isRotating = false;
 
-        Paddle(const glm::vec3 &pos, const glm::vec3 &sz)
-            : position(pos), size(sz) {}
+        Paddle(const glm::vec3 &pos, const glm::vec3 &sz) : position(pos), size(sz) {}
 
         void update(float deltaTime) {
             if (!isRotating) {
@@ -127,8 +126,7 @@ namespace {
         glm::vec3 lastImpactPos{0.0f};
         glm::quat rollingOrientation{1.0f, 0.0f, 0.0f, 0.0f};
 
-        explicit Ball(const glm::vec3 &pos, const glm::vec3 &vel, float r)
-            : position(pos), velocity(vel), radius(r), speed(glm::length(vel)) {}
+        explicit Ball(const glm::vec3 &pos, const glm::vec3 &vel, float r) : position(pos), velocity(vel), radius(r), speed(glm::length(vel)) {}
 
         void resetBall() {
             position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -191,9 +189,7 @@ namespace {
         }
 
       private:
-        static float clampf(float value, float minv, float maxv) {
-            return std::max(minv, std::min(value, maxv));
-        }
+        static float clampf(float value, float minv, float maxv) { return std::max(minv, std::min(value, maxv)); }
 
         void updateRollingOrientation(const glm::vec3 &movement) {
             const float distance = glm::length(movement);
@@ -260,16 +256,7 @@ namespace {
 
     class PongWindow final : public mxvk::VK_Window {
       public:
-        PongWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path),
-              dataRoot(assetRoot + "/data"),
-              shaderRoot(dataRoot),
-              paddle1(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
-              paddle2(glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)),
-              ball(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.3f, 0.0f), 0.05f),
-              fallbackWidth(width),
-              fallbackHeight(height) {
+        PongWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("-[ MXVK Pong ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot((path.empty() || path == ".") ? std::string(pong_ASSET_DIR) : path), dataRoot(assetRoot + "/data"), shaderRoot(dataRoot), paddle1(glm::vec3(-1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)), paddle2(glm::vec3(1.5f, 0.0f, 0.0f), glm::vec3(0.1f, 0.4f, 0.1f)), ball(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.5f, 0.3f, 0.0f), 0.05f), fallbackWidth(width), fallbackHeight(height) {
             std::srand(static_cast<unsigned>(std::time(nullptr)));
             setFont(dataRoot + "/font.ttf", 24);
             initModels();
@@ -293,9 +280,7 @@ namespace {
             ballModel.cleanup(this);
         }
 
-        void onSwapchainAboutToRecreate() override {
-            cleanupStarSwapchainResources();
-        }
+        void onSwapchainAboutToRecreate() override { cleanupStarSwapchainResources(); }
 
         void onSwapchainRecreated() override {
             paddleModel1.resize(this);
@@ -447,11 +432,7 @@ namespace {
             drawStarfield(cmd, imageIndex, extent);
 
             const glm::mat4 view = buildViewMatrix();
-            glm::mat4 proj = glm::perspective(
-                glm::radians(35.0f),
-                static_cast<float>(extent.width) / static_cast<float>(extent.height),
-                0.1f,
-                100.0f);
+            glm::mat4 proj = glm::perspective(glm::radians(35.0f), static_cast<float>(extent.width) / static_cast<float>(extent.height), 0.1f, 100.0f);
             proj[1][1] *= -1.0f;
 
             drawModel(cmd, imageIndex, paddleModel1, paddle1.modelMatrix(), glm::vec3(0.3f, 0.6f, 1.0f), view, proj);
@@ -594,13 +575,7 @@ namespace {
             return view;
         }
 
-        void drawModel(VkCommandBuffer cmd,
-                       uint32_t imageIndex,
-                       mxvk::VKAbstractModel &model,
-                       const glm::mat4 &world,
-                       const glm::vec3 &color,
-                       const glm::mat4 &view,
-                       const glm::mat4 &proj) {
+        void drawModel(VkCommandBuffer cmd, uint32_t imageIndex, mxvk::VKAbstractModel &model, const glm::mat4 &world, const glm::vec3 &color, const glm::mat4 &view, const glm::mat4 &proj) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = world;
             ubo.view = view;
@@ -760,10 +735,7 @@ namespace {
             for (int i = 0; i < 35 && particles.size() < static_cast<size_t>(maxParticles); ++i) {
                 Particle p;
                 p.position = impactPos;
-                p.velocity = normal * static_cast<float>((std::rand() % 50) / 10.0f + 0.5f) +
-                             glm::vec3(0.0f,
-                                       static_cast<float>((std::rand() % 60) - 30) / 30.0f,
-                                       static_cast<float>((std::rand() % 40) - 20) / 40.0f);
+                p.velocity = normal * static_cast<float>((std::rand() % 50) / 10.0f + 0.5f) + glm::vec3(0.0f, static_cast<float>((std::rand() % 60) - 30) / 30.0f, static_cast<float>((std::rand() % 40) - 20) / 40.0f);
                 p.life = 0.6f;
                 p.color = paddleColor;
                 particles.push_back(p);
@@ -780,9 +752,7 @@ namespace {
             activeParticleCount = 0;
             auto *particleBufferData = static_cast<ParticleVertex *>(mappedParticleData);
 
-            particles.erase(
-                std::remove_if(particles.begin(), particles.end(), [](const Particle &p) { return p.life <= 0.0f; }),
-                particles.end());
+            particles.erase(std::remove_if(particles.begin(), particles.end(), [](const Particle &p) { return p.life <= 0.0f; }), particles.end());
 
             for (auto &p : particles) {
                 if (p.life <= 0.0f || activeParticleCount >= static_cast<uint32_t>(maxParticles)) {
@@ -802,12 +772,7 @@ namespace {
 
         void createParticleBuffer() {
             const VkDeviceSize bufferSize = sizeof(ParticleVertex) * maxParticles;
-            createBuffer(
-                bufferSize,
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                particleBuffer,
-                particleBufferMemory);
+            createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, particleBuffer, particleBufferMemory);
 
             VK_CHECK_RESULT(vkMapMemory(device, particleBufferMemory, 0, bufferSize, 0, &mappedParticleData));
         }
@@ -867,12 +832,7 @@ namespace {
             particleUniformBufferMapped.resize(imageCount, nullptr);
 
             for (size_t i = 0; i < imageCount; ++i) {
-                createBuffer(
-                    bufferSize,
-                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    particleUniformBuffers[i],
-                    particleUniformBufferMemories[i]);
+                createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, particleUniformBuffers[i], particleUniformBufferMemories[i]);
                 VK_CHECK_RESULT(vkMapMemory(device, particleUniformBufferMemories[i], 0, bufferSize, 0, &particleUniformBufferMapped[i]));
             }
         }
@@ -938,11 +898,7 @@ namespace {
             }
         }
 
-        void updateParticleUniform(uint32_t imageIndex,
-                                   [[maybe_unused]] const VkExtent2D &extent,
-                                   const glm::mat4 &view,
-                                   const glm::mat4 &proj,
-                                   float timeSeconds) {
+        void updateParticleUniform(uint32_t imageIndex, [[maybe_unused]] const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &proj, float timeSeconds) {
             if (imageIndex >= particleUniformBufferMapped.size() || particleUniformBufferMapped[imageIndex] == nullptr) {
                 return;
             }
@@ -994,15 +950,7 @@ namespace {
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindDescriptorSets(
-                cmd,
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                particlePipelineLayout,
-                0,
-                1,
-                &particleDescriptorSets[imageIndex],
-                0,
-                nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, particlePipelineLayout, 0, 1, &particleDescriptorSets[imageIndex], 0, nullptr);
 
             vkCmdDraw(cmd, activeParticleCount, 1, 0, 0);
         }
@@ -1044,9 +992,7 @@ namespace {
             return glm::vec3(r, g, b);
         }
 
-        float magnitudeToSize(float magnitude) const {
-            return glm::clamp(15.0f - magnitude * 2.0f, 1.0f, 25.0f);
-        }
+        float magnitudeToSize(float magnitude) const { return glm::clamp(15.0f - magnitude * 2.0f, 1.0f, 25.0f); }
 
         float magnitudeToAlpha(float magnitude) const {
             const float alpha = (6.5f - magnitude) / 6.5f;
@@ -1191,27 +1137,14 @@ namespace {
 
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-            createBuffer(
-                imageSize,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                stagingBuffer,
-                stagingBufferMemory);
+            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
             void *data = nullptr;
             VK_CHECK_RESULT(vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data));
             std::memcpy(data, starImg->pixels, static_cast<size_t>(imageSize));
             vkUnmapMemory(device, stagingBufferMemory);
 
-            createImage(
-                static_cast<uint32_t>(starImg->w),
-                static_cast<uint32_t>(starImg->h),
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                starTexture,
-                starTextureMemory);
+            createImage(static_cast<uint32_t>(starImg->w), static_cast<uint32_t>(starImg->h), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, starTexture, starTextureMemory);
 
             transitionImageLayout(starTexture, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, starTexture, static_cast<uint32_t>(starImg->w), static_cast<uint32_t>(starImg->h));
@@ -1242,12 +1175,7 @@ namespace {
 
         void createStarVertexBuffer() {
             const VkDeviceSize bufferSize = sizeof(StarVertex) * static_cast<VkDeviceSize>(numStars);
-            createBuffer(
-                bufferSize,
-                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                starVertexBuffer,
-                starVertexBufferMemory);
+            createBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, starVertexBuffer, starVertexBufferMemory);
 
             VK_CHECK_RESULT(vkMapMemory(device, starVertexBufferMemory, 0, bufferSize, 0, &starVertexBufferMapped));
         }
@@ -1282,12 +1210,7 @@ namespace {
             starUniformBufferMapped.resize(imageCount, nullptr);
 
             for (size_t i = 0; i < imageCount; ++i) {
-                createBuffer(
-                    bufferSize,
-                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    starUniformBuffers[i],
-                    starUniformBufferMemories[i]);
+                createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, starUniformBuffers[i], starUniformBufferMemories[i]);
                 VK_CHECK_RESULT(vkMapMemory(device, starUniformBufferMemories[i], 0, bufferSize, 0, &starUniformBufferMapped[i]));
             }
         }
@@ -1468,8 +1391,7 @@ namespace {
                 depthStencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-                colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+                colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 colorBlendAttachment.blendEnable = VK_TRUE;
                 colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
                 colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -1579,11 +1501,7 @@ namespace {
             }
         }
 
-        void updateStarUniform(uint32_t imageIndex,
-                               [[maybe_unused]] const VkExtent2D &extent,
-                               const glm::mat4 &view,
-                               const glm::mat4 &proj,
-                               float timeSeconds) {
+        void updateStarUniform(uint32_t imageIndex, [[maybe_unused]] const VkExtent2D &extent, const glm::mat4 &view, const glm::mat4 &proj, float timeSeconds) {
             if (imageIndex >= starUniformBufferMapped.size() || starUniformBufferMapped[imageIndex] == nullptr) {
                 return;
             }
@@ -1608,11 +1526,7 @@ namespace {
             updateStarfield(deltaTime);
 
             const glm::mat4 view = buildViewMatrix();
-            glm::mat4 proj = glm::perspective(
-                glm::radians(60.0f),
-                static_cast<float>(extent.width) / static_cast<float>(extent.height),
-                0.1f,
-                1000.0f);
+            glm::mat4 proj = glm::perspective(glm::radians(60.0f), static_cast<float>(extent.width) / static_cast<float>(extent.height), 0.1f, 1000.0f);
             proj[1][1] *= -1.0f;
 
             updateStarUniform(imageIndex, extent, view, proj, SDL_GetTicks() * 0.001f);
@@ -1637,15 +1551,7 @@ namespace {
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(cmd, 0, 1, vertexBuffers, offsets);
 
-            vkCmdBindDescriptorSets(
-                cmd,
-                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                starPipelineLayout,
-                0,
-                1,
-                &starDescriptorSets[imageIndex],
-                0,
-                nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, starPipelineLayout, 0, 1, &starDescriptorSets[imageIndex], 0, nullptr);
 
             vkCmdDraw(cmd, static_cast<uint32_t>(numStars), 1, 0, 0);
         }
@@ -1740,8 +1646,7 @@ namespace {
                 depthStencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-                colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+                colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 colorBlendAttachment.blendEnable = VK_TRUE;
                 colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
                 colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -1845,11 +1750,7 @@ namespace {
             SDL_free(ids);
         }
 
-        void createBuffer(VkDeviceSize size,
-                          VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties,
-                          VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory) const {
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
             VkBuffer newBuffer = VK_NULL_HANDLE;
             VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -1936,14 +1837,7 @@ namespace {
             vkFreeCommandBuffers(device, command_pool, 1, &commandBuffer);
         }
 
-        void createImage(uint32_t width,
-                         uint32_t height,
-                         VkFormat format,
-                         VkImageTiling tiling,
-                         VkImageUsageFlags usage,
-                         VkMemoryPropertyFlags properties,
-                         VkImage &image,
-                         VkDeviceMemory &memory) const {
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) const {
             VkImage newImage = VK_NULL_HANDLE;
             VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -2011,10 +1905,7 @@ namespace {
             return imageView;
         }
 
-        void transitionImageLayout(VkImage image,
-                                   VkFormat,
-                                   VkImageLayout oldLayout,
-                                   VkImageLayout newLayout) const {
+        void transitionImageLayout(VkImage image, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const {
             VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
             VkImageMemoryBarrier barrier{};
@@ -2047,17 +1938,7 @@ namespace {
                 throw mxvk::Exception("Unsupported image layout transition");
             }
 
-            vkCmdPipelineBarrier(
-                commandBuffer,
-                sourceStage,
-                destinationStage,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                1,
-                &barrier);
+            vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
             endSingleTimeCommands(commandBuffer);
         }
@@ -2076,13 +1957,7 @@ namespace {
             region.imageOffset = {0, 0, 0};
             region.imageExtent = {width, height, 1};
 
-            vkCmdCopyBufferToImage(
-                commandBuffer,
-                buffer,
-                image,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1,
-                &region);
+            vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
             endSingleTimeCommands(commandBuffer);
         }

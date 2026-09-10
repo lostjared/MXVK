@@ -26,9 +26,7 @@ namespace mxvk {
         float normal[3]{};
 
         /** @brief Byte-wise equality used for index compression. */
-        bool operator==(const VKVertex &other) const {
-            return std::memcmp(this, &other, sizeof(VKVertex)) == 0;
-        }
+        bool operator==(const VKVertex &other) const { return std::memcmp(this, &other, sizeof(VKVertex)) == 0; }
     };
 
     /** @brief Hash functor for VKVertex. */
@@ -90,10 +88,7 @@ namespace mxvk {
          * @param textureBasePath Base path used to resolve relative texture paths.
          * @param positionScale Uniform scale applied to positions.
          */
-        void load(const std::string &path,
-                  const std::string &textureManifestPath,
-                  const std::string &textureBasePath,
-                  float positionScale = 1.0f);
+        void load(const std::string &path, const std::string &textureManifestPath, const std::string &textureBasePath, float positionScale = 1.0f);
 
         /**
          * @brief Export the loaded model as Wavefront OBJ plus MTL.
@@ -105,11 +100,7 @@ namespace mxvk {
         /**
          * @brief Load a model/manifest pair and export it as Wavefront OBJ plus MTL.
          */
-        static void exportOBJ(const std::string &modelPath,
-                              const std::string &textureManifestPath,
-                              const std::string &textureBasePath,
-                              const std::string &objPath,
-                              float positionScale = 1.0f);
+        static void exportOBJ(const std::string &modelPath, const std::string &textureManifestPath, const std::string &textureBasePath, const std::string &objPath, float positionScale = 1.0f);
 
         /**
          * @brief Upload parsed geometry to device-local GPU buffers.
@@ -118,8 +109,7 @@ namespace mxvk {
          * @param commandPool Command pool used for transfer command buffer allocation.
          * @param graphicsQueue Queue used to submit transfer commands.
          */
-        void upload(VkDevice device, VkPhysicalDevice physicalDevice,
-                    VkCommandPool commandPool, VkQueue graphicsQueue);
+        void upload(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue);
 
         /**
          * @brief Release owned GPU buffers.
@@ -169,17 +159,11 @@ namespace mxvk {
         VkBuffer indexBufferHandle = VK_NULL_HANDLE;
         VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
 
-        static void createBuffer(VkDevice device, VkPhysicalDevice physicalDevice,
-                                 VkDeviceSize size, VkBufferUsageFlags usage,
-                                 VkMemoryPropertyFlags properties,
-                                 VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+        static void createBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
 
-        static uint32_t findMemoryType(VkPhysicalDevice physicalDevice,
-                                       uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        static uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-        static void copyBuffer(VkDevice device, VkCommandPool commandPool,
-                               VkQueue graphicsQueue,
-                               VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        static void copyBuffer(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
         void loadOBJ(const std::string &path, float positionScale);
         void loadMXMOD(const std::string &path, float positionScale);

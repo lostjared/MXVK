@@ -330,9 +330,7 @@ namespace defender {
                 glm::vec3{0.42f, 0.20f, 1.0f},
                 glm::vec3{1.0f, 0.18f, 0.84f},
             };
-            const std::size_t color_index = std::min(
-                laser_colors.size() - 1,
-                static_cast<std::size_t>(space::random_float(0.0f, static_cast<float>(laser_colors.size()))));
+            const std::size_t color_index = std::min(laser_colors.size() - 1, static_cast<std::size_t>(space::random_float(0.0f, static_cast<float>(laser_colors.size()))));
             const glm::vec3 &laser_color = laser_colors[color_index];
             const glm::vec4 glow_color{
                 std::clamp(laser_color.r * (0.55f + 0.45f * flash), 0.0f, 1.0f),
@@ -414,17 +412,10 @@ namespace defender {
                 if (particle == nullptr) {
                     return;
                 }
-                const glm::vec3 dir = space::normalize_or_zero(glm::vec3(
-                    space::random_float(-1.0f, 1.0f),
-                    space::random_float(-0.75f, 0.75f),
-                    space::random_float(-0.35f, 0.35f)));
+                const glm::vec3 dir = space::normalize_or_zero(glm::vec3(space::random_float(-1.0f, 1.0f), space::random_float(-0.75f, 0.75f), space::random_float(-0.35f, 0.35f)));
                 particle->position = position + dir * space::random_float(0.1f, 0.8f) * visual_scale;
                 particle->velocity = dir * space::random_float(wave.min_speed, wave.max_speed) * speed_scale;
-                particle->color = glm::vec4(
-                    wave_color.r * space::random_float(0.9f, 1.1f),
-                    wave_color.g * space::random_float(0.9f, 1.1f),
-                    wave_color.b * space::random_float(0.9f, 1.1f),
-                    0.1f);
+                particle->color = glm::vec4(wave_color.r * space::random_float(0.9f, 1.1f), wave_color.g * space::random_float(0.9f, 1.1f), wave_color.b * space::random_float(0.9f, 1.1f), 0.1f);
                 particle->color_flash = color_flash;
                 particle->size = space::random_float(wave.min_size, wave.max_size) * visual_scale;
                 particle->lifetime = 0.0f;
@@ -474,9 +465,7 @@ namespace defender {
                     glm::vec3{0.45f, 0.18f, 1.0f},
                     glm::vec3{1.0f, 0.20f, 0.85f},
                 };
-                const std::size_t color_index = std::min(
-                    flash_colors.size() - 1,
-                    static_cast<std::size_t>(space::random_float(0.0f, static_cast<float>(flash_colors.size()))));
+                const std::size_t color_index = std::min(flash_colors.size() - 1, static_cast<std::size_t>(space::random_float(0.0f, static_cast<float>(flash_colors.size()))));
                 const glm::vec3 &flash_color = flash_colors[color_index];
                 particle.color.r = flash_color.r * space::random_float(0.85f, 1.0f);
                 particle.color.g = flash_color.g * space::random_float(0.85f, 1.0f);

@@ -25,9 +25,7 @@
 namespace {
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
@@ -40,9 +38,7 @@ namespace {
         return surface;
     }
 
-    [[nodiscard]] std::filesystem::path pyramid_path(const std::string &asset_path) {
-        return std::filesystem::path(asset_path) / "data" / "pyramid.plg";
-    }
+    [[nodiscard]] std::filesystem::path pyramid_path(const std::string &asset_path) { return std::filesystem::path(asset_path) / "data" / "pyramid.plg"; }
 
     struct FaceDraw {
         std::array<mxvk::vec4D, 3> points{};
@@ -58,12 +54,7 @@ namespace {
 namespace example {
     class Math3DPyramidWindow : public mxvk::VK_Window {
       public:
-        Math3DPyramidWindow(const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              frame_width(framebuffer.width),
-              frame_height(framebuffer.height),
-              fallback_width(width),
-              fallback_height(height) {
+        Math3DPyramidWindow(const std::string &asset_path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), frame_width(framebuffer.width), frame_height(framebuffer.height), fallback_width(width), fallback_height(height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
 
@@ -180,13 +171,9 @@ namespace example {
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
         }
 
-        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
-            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
-        }
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const { return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color)); }
 
-        void clear_frame(mxvk::MXCOLOR color) {
-            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
-        }
+        void clear_frame(mxvk::MXCOLOR color) { SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color)); }
 
         void put_pixel(int x, int y, mxvk::MXCOLOR color) {
             if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
@@ -202,9 +189,7 @@ namespace example {
             const mxvk::vec4D &a = face.points[0];
             const mxvk::vec4D &b = face.points[1];
             const mxvk::vec4D &c = face.points[2];
-            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) {
-                return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x);
-            };
+            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) { return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x); };
 
             const float area = edge(b, c, a.x, a.y);
             if (std::abs(area) <= mxvk::EPSILON) {
@@ -227,18 +212,13 @@ namespace example {
                         continue;
                     }
 
-                    const float reciprocal_depth =
-                        weight_a / a.z +
-                        weight_b / b.z +
-                        weight_c / c.z;
+                    const float reciprocal_depth = weight_a / a.z + weight_b / b.z + weight_c / c.z;
                     if (reciprocal_depth <= mxvk::EPSILON) {
                         continue;
                     }
 
                     const float depth = 1.0f / reciprocal_depth;
-                    const std::size_t pixel_index =
-                        static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) +
-                        static_cast<std::size_t>(x);
+                    const std::size_t pixel_index = static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) + static_cast<std::size_t>(x);
                     if (depth >= depth_buffer[pixel_index]) {
                         continue;
                     }
@@ -247,14 +227,8 @@ namespace example {
                     const float perspective_a = (weight_a / a.z) * depth;
                     const float perspective_b = (weight_b / b.z) * depth;
                     const float perspective_c = (weight_c / c.z) * depth;
-                    const float u =
-                        face.texcoords[0].x * perspective_a +
-                        face.texcoords[1].x * perspective_b +
-                        face.texcoords[2].x * perspective_c;
-                    const float v =
-                        face.texcoords[0].y * perspective_a +
-                        face.texcoords[1].y * perspective_b +
-                        face.texcoords[2].y * perspective_c;
+                    const float u = face.texcoords[0].x * perspective_a + face.texcoords[1].x * perspective_b + face.texcoords[2].x * perspective_c;
+                    const float v = face.texcoords[0].y * perspective_a + face.texcoords[1].y * perspective_b + face.texcoords[2].y * perspective_c;
                     put_pixel(x, y, mxvk::shade_color(gradient_color(u, v), face.intensity));
                 }
             }
@@ -269,19 +243,12 @@ namespace example {
             constexpr mxvk::MXCOLOR TOP_LEFT = mxvk::MXVK_RGB(155, 105, 255);
             constexpr mxvk::MXCOLOR TOP_RIGHT = mxvk::MXVK_RGB(255, 82, 197);
             const auto bilinear_channel = [&](auto component) {
-                const float bottom =
-                    static_cast<float>(component(BOTTOM_LEFT)) +
-                    (static_cast<float>(component(BOTTOM_RIGHT)) - static_cast<float>(component(BOTTOM_LEFT))) * u;
-                const float top =
-                    static_cast<float>(component(TOP_LEFT)) +
-                    (static_cast<float>(component(TOP_RIGHT)) - static_cast<float>(component(TOP_LEFT))) * u;
+                const float bottom = static_cast<float>(component(BOTTOM_LEFT)) + (static_cast<float>(component(BOTTOM_RIGHT)) - static_cast<float>(component(BOTTOM_LEFT))) * u;
+                const float top = static_cast<float>(component(TOP_LEFT)) + (static_cast<float>(component(TOP_RIGHT)) - static_cast<float>(component(TOP_LEFT))) * u;
                 return std::clamp(static_cast<int>(std::lround(bottom + (top - bottom) * v)), 0, 255);
             };
 
-            return mxvk::MXVK_RGB(
-                bilinear_channel(mxvk::color_r),
-                bilinear_channel(mxvk::color_g),
-                bilinear_channel(mxvk::color_b));
+            return mxvk::MXVK_RGB(bilinear_channel(mxvk::color_r), bilinear_channel(mxvk::color_g), bilinear_channel(mxvk::color_b));
         }
 
         [[nodiscard]] static mxvk::vec4D project_to_screen(const mxvk::vec4D &point, int width, int height) {

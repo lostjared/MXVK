@@ -16,9 +16,9 @@
 #include <glm/glm.hpp>
 
 #include "mxvk/argz.hpp"
-#include "mxvk/mxvk_controller.hpp"
 #include "mxvk/mxvk.hpp"
 #include "mxvk/mxvk_abstract_model.hpp"
+#include "mxvk/mxvk_controller.hpp"
 #include "mxvk/mxvk_exception.hpp"
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)
 #include "mxvk/mxvk_sound.hpp"
@@ -72,9 +72,7 @@ namespace {
         bool stuck = true;
     };
 
-    [[nodiscard]] float clampf(float value, float low, float high) {
-        return std::max(low, std::min(value, high));
-    }
+    [[nodiscard]] float clampf(float value, float low, float high) { return std::max(low, std::min(value, high)); }
 
     [[nodiscard]] bool check_collision(const Ball &ball, const Box &object) {
         const glm::vec3 half_extents(object.size.x * 0.5f, object.size.y * 0.5f, 0.0f);
@@ -86,11 +84,7 @@ namespace {
 
     class BreakoutWindow final : public mxvk::VK_Window {
       public:
-        BreakoutWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MXVK 3D Breakout", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root((path.empty() || path == ".") ? std::string(breakout_ASSET_DIR) : path),
-              data_root(asset_root + "/data"),
-              shader_root(data_root) {
+        BreakoutWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MXVK 3D Breakout", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root((path.empty() || path == ".") ? std::string(breakout_ASSET_DIR) : path), data_root(asset_root + "/data"), shader_root(data_root) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             setFont(data_root + "/font.ttf", 24);
 
@@ -151,10 +145,7 @@ namespace {
             }
 
             if (screen == Screen::Intro) {
-                if ((e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_SPACE)) ||
-                    (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) ||
-                    e.type == SDL_EVENT_FINGER_DOWN ||
-                    is_gamepad_start_button(e)) {
+                if ((e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_RETURN || e.key.key == SDLK_SPACE)) || (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) || e.type == SDL_EVENT_FINGER_DOWN || is_gamepad_start_button(e)) {
                     screen = Screen::Game;
                     reset_game();
                 }
@@ -281,12 +272,7 @@ namespace {
         }
 
       private:
-        enum class Screen {
-            Intro,
-            Game,
-            GameOver,
-            Complete
-        };
+        enum class Screen { Intro, Game, GameOver, Complete };
 
         std::string asset_root;
         std::string data_root;
@@ -525,13 +511,9 @@ namespace {
             }
         }
 
-        void clamp_paddle() {
-            paddle.position.x = clampf(paddle.position.x, GAME_LEFT, GAME_RIGHT);
-        }
+        void clamp_paddle() { paddle.position.x = clampf(paddle.position.x, GAME_LEFT, GAME_RIGHT); }
 
-        void adjust_zoom(float delta) {
-            zoom = clampf(zoom + delta, MIN_ZOOM, MAX_ZOOM);
-        }
+        void adjust_zoom(float delta) { zoom = clampf(zoom + delta, MIN_ZOOM, MAX_ZOOM); }
 
         [[nodiscard]] static float normalized_gamepad_axis(Sint16 value) {
             if (std::abs(static_cast<int>(value)) <= GAMEPAD_DEAD_ZONE) {
@@ -543,9 +525,7 @@ namespace {
             return static_cast<float>(value) / 32767.0f;
         }
 
-        [[nodiscard]] bool gamepad_button(SDL_GamepadButton button) const {
-            return controller.active() && controller.getButton(button);
-        }
+        [[nodiscard]] bool gamepad_button(SDL_GamepadButton button) const { return controller.active() && controller.getButton(button); }
 
         void update_gamepad_controls(float delta) {
             if (!controller.active()) {
@@ -592,14 +572,7 @@ namespace {
             return false;
         }
 
-        void draw_model(VkCommandBuffer cmd,
-                        uint32_t image_index,
-                        mxvk::VKAbstractModel &model,
-                        const Box &box,
-                        const glm::mat4 &view,
-                        const glm::mat4 &proj,
-                        const glm::vec3 &tint,
-                        float model_scale = MODEL_SCALE) {
+        void draw_model(VkCommandBuffer cmd, uint32_t image_index, mxvk::VKAbstractModel &model, const Box &box, const glm::mat4 &view, const glm::mat4 &proj, const glm::vec3 &tint, float model_scale = MODEL_SCALE) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::translate(glm::mat4(1.0f), box.position);
             ubo.model = glm::rotate(ubo.model, glm::radians(box.rotation), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -649,16 +622,12 @@ namespace {
             printText(text, width / 2 - 200, screen_height() / 2, {255, 255, 255, 255});
         }
 
-        [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_model(std::string_view manifest) {
-            return load_model("cube.mxmod.z", manifest);
-        }
+        [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_model(std::string_view manifest) { return load_model("cube.mxmod.z", manifest); }
 
         [[nodiscard]] std::unique_ptr<mxvk::VKAbstractModel> load_model(std::string_view model_path, std::string_view manifest) {
             auto model = std::make_unique<mxvk::VKAbstractModel>();
             model->load(this, data_root + "/" + std::string(model_path), data_root + "/" + std::string(manifest), data_root, 1.0f);
-            model->setShaders(this,
-                              shader_root + "/breakout_model.vert.spv",
-                              shader_root + "/breakout_model.frag.spv");
+            model->setShaders(this, shader_root + "/breakout_model.vert.spv", shader_root + "/breakout_model.frag.spv");
             return model;
         }
 
@@ -696,13 +665,9 @@ namespace {
             }
         }
 
-        [[nodiscard]] int screen_width() const {
-            return swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : 1280;
-        }
+        [[nodiscard]] int screen_width() const { return swapchain_extent.width > 0U ? static_cast<int>(swapchain_extent.width) : 1280; }
 
-        [[nodiscard]] int screen_height() const {
-            return swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : 720;
-        }
+        [[nodiscard]] int screen_height() const { return swapchain_extent.height > 0U ? static_cast<int>(swapchain_extent.height) : 720; }
 
         void play_ping() {
 #if defined(MXVK_WITH_MIXER) || defined(WITH_MIXER)

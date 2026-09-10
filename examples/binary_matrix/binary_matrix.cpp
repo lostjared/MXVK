@@ -142,18 +142,7 @@ namespace {
 namespace example {
     class BinaryMatrixWindow final : public mxvk::VK_Window {
       public:
-        BinaryMatrixWindow(const std::string &path,
-                           const std::string &title,
-                           const int width,
-                           const int height,
-                           const bool fullscreen,
-                           const bool enable_vsync,
-                           const int requested_glyph_size,
-                           const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(path.empty() ? std::string(binary_matrix_ASSET_DIR) : path),
-              glyph_size(requested_glyph_size),
-              rng(std::random_device{}()) {
+        BinaryMatrixWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen, const bool enable_vsync, const int requested_glyph_size, const std::string &color) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot(path.empty() ? std::string(binary_matrix_ASSET_DIR) : path), glyph_size(requested_glyph_size), rng(std::random_device{}()) {
             if (assetRoot == ".") {
                 assetRoot = binary_matrix_ASSET_DIR;
             }
@@ -243,9 +232,7 @@ namespace example {
             dt = std::clamp(dt, 0.0f, 1.0f / 15.0f);
 
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const float yaw = glm::radians(cameraYaw);
             const float pitch = glm::radians(cameraPitch);
@@ -413,10 +400,7 @@ namespace example {
                 }
                 level = std::clamp(level, 0, trailLevels);
                 const SDL_Color tintColor = matrixTrailColor(level);
-                const glm::vec4 tint(static_cast<float>(tintColor.r) / 255.0f,
-                                     static_cast<float>(tintColor.g) / 255.0f,
-                                     static_cast<float>(tintColor.b) / 255.0f,
-                                     static_cast<float>(tintColor.a) / 255.0f);
+                const glm::vec4 tint(static_cast<float>(tintColor.r) / 255.0f, static_cast<float>(tintColor.g) / 255.0f, static_cast<float>(tintColor.b) / 255.0f, static_cast<float>(tintColor.a) / 255.0f);
 
                 const int cell = static_cast<int>(std::floor(stream.head)) - tail;
                 const bool drawOne = ((stream.bitSeed + column * 13 + cell * 17 + tail * 3 + frameCounter / 3) & 1) != 0;
@@ -435,10 +419,7 @@ namespace example {
                 return;
             }
 
-            backgroundSprite->setShaderParams(backgroundTime,
-                                              static_cast<float>(mouseX),
-                                              static_cast<float>(mouseY),
-                                              mousePressed ? 1.0f : 0.0f);
+            backgroundSprite->setShaderParams(backgroundTime, static_cast<float>(mouseX), static_cast<float>(mouseY), mousePressed ? 1.0f : 0.0f);
             backgroundSprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
         }
 
@@ -525,8 +506,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::BinaryMatrixWindow window(
-            args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.font_size, args.color);
+        example::BinaryMatrixWindow window(args.path, "-[ MXVK Binary Matrix ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.font_size, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

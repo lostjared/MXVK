@@ -7,19 +7,11 @@
 #include <iostream>
 
 namespace mxvk {
-    Font::Font(const std::string &fontPath, int fontSize) {
-        reset(fontPath, fontSize);
-    }
+    Font::Font(const std::string &fontPath, int fontSize) { reset(fontPath, fontSize); }
 
-    Font::~Font() {
-        reset();
-    }
+    Font::~Font() { reset(); }
 
-    Font::Font(Font &&other) noexcept
-        : font(std::exchange(other.font, nullptr)),
-          font_path(std::move(other.font_path)),
-          font_size(std::exchange(other.font_size, 0)),
-          ownsTtfInit(std::exchange(other.ownsTtfInit, false)) {}
+    Font::Font(Font &&other) noexcept : font(std::exchange(other.font, nullptr)), font_path(std::move(other.font_path)), font_size(std::exchange(other.font_size, 0)), ownsTtfInit(std::exchange(other.ownsTtfInit, false)) {}
 
     Font &Font::operator=(Font &&other) noexcept {
         if (this != &other) {
@@ -68,9 +60,7 @@ namespace mxvk {
         ownsTtfInit = true;
     }
 
-    VK_Text::VK_Text(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue,
-                     VkCommandPool cmdPool, const std::string &fontPath, int fontSize)
-        : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
+    VK_Text::VK_Text(VkDevice dev, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool, const std::string &fontPath, int fontSize) : device(dev), physicalDevice(physDev), graphicsQueue(gQueue), commandPool(cmdPool) {
 
         if (!TTF_Init()) {
             throw mxvk::Exception("Failed to initialize SDL_ttf: " + std::string(SDL_GetError()));
@@ -135,13 +125,7 @@ namespace mxvk {
         }
 
         const size_t removeCount = textureCache.size() - MAX_CACHED_TEXTURES;
-        std::nth_element(
-            entries.begin(),
-            entries.begin() + static_cast<std::ptrdiff_t>(removeCount),
-            entries.end(),
-            [](const auto &lhs, const auto &rhs) {
-                return lhs.first < rhs.first;
-            });
+        std::nth_element(entries.begin(), entries.begin() + static_cast<std::ptrdiff_t>(removeCount), entries.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
 
         for (size_t i = 0; i < removeCount; ++i) {
             auto it = textureCache.find(entries[i].second);
@@ -153,9 +137,7 @@ namespace mxvk {
         }
     }
 
-    void VK_Text::createDescriptorPool() {
-        createDescriptorPool(maxPoolSets);
-    }
+    void VK_Text::createDescriptorPool() { createDescriptorPool(maxPoolSets); }
 
     void VK_Text::createDescriptorPool(uint32_t maxSets) {
         VkDescriptorPoolSize poolSize{};
@@ -295,17 +277,11 @@ namespace mxvk {
         return imageView;
     }
 
-    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col) {
-        printTextG_SolidWithFont(text, x, y, col, font);
-    }
+    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col) { printTextG_SolidWithFont(text, x, y, col, font); }
 
-    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont) {
-        printTextG_SolidWithFont(text, x, y, col, textFont);
-    }
+    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont) { printTextG_SolidWithFont(text, x, y, col, textFont); }
 
-    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, const Font &textFont) {
-        printTextG_SolidWithFont(text, x, y, col, textFont.get());
-    }
+    void VK_Text::printTextG_Solid(const std::string &text, int x, int y, const SDL_Color &col, const Font &textFont) { printTextG_SolidWithFont(text, x, y, col, textFont.get()); }
 
     void VK_Text::printTextG_SolidWithFont(const std::string &text, int x, int y, const SDL_Color &col, TTF_Font *textFont) {
         if (text.empty() || !textFont)
@@ -387,13 +363,9 @@ namespace mxvk {
 
             bool uploadSucceeded = false;
             try {
-                createImage(rgbaSurface->w, rgbaSurface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uploadedImage, uploadedImageMemory);
+                createImage(rgbaSurface->w, rgbaSurface->h, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uploadedImage, uploadedImageMemory);
 
-                createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             stagingBuffer, stagingMemory);
+                createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
                 void *data = nullptr;
                 VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
@@ -450,8 +422,7 @@ namespace mxvk {
             quad.textImageView = uploadedImageView;
 
             // Store in cache
-            textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView,
-                                 quad.width, quad.height, ++cacheUseSerial};
+            textureCache[key] = {quad.textImage, quad.textImageMemory, quad.textImageView, quad.width, quad.height, ++cacheUseSerial};
         }
 
         // Build the screen-space quad (position-dependent, not cached)
@@ -472,18 +443,14 @@ namespace mxvk {
         try {
             void *data;
             VkDeviceSize vertexSize = quad.vertices.size() * sizeof(TextVertex);
-            createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         quad.vertexBuffer, quad.vertexBufferMemory);
+            createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, quad.vertexBuffer, quad.vertexBufferMemory);
 
             VK_CHECK_RESULT(vkMapMemory(device, quad.vertexBufferMemory, 0, vertexSize, 0, &data));
             memcpy(data, quad.vertices.data(), vertexSize);
             vkUnmapMemory(device, quad.vertexBufferMemory);
 
             VkDeviceSize indexSize = quad.indices.size() * sizeof(uint16_t);
-            createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         quad.indexBuffer, quad.indexBufferMemory);
+            createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, quad.indexBuffer, quad.indexBufferMemory);
 
             VK_CHECK_RESULT(vkMapMemory(device, quad.indexBufferMemory, 0, indexSize, 0, &data));
             memcpy(data, quad.indices.data(), indexSize);
@@ -502,8 +469,7 @@ namespace mxvk {
         textQuads.emplace_back(std::move(quad));
     }
 
-    void VK_Text::renderText(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                             uint32_t screenWidth, uint32_t screenHeight) {
+    void VK_Text::renderText(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout, uint32_t screenWidth, uint32_t screenHeight) {
 
         struct TextPushConstants {
             float screenWidth;
@@ -543,11 +509,7 @@ namespace mxvk {
             return;
         }
         if (queue_idle_result != VK_SUCCESS) {
-            throw mxvk::Exception(std::format(
-                "Fatal : VkResult is \"{}\" in {} at line {}",
-                static_cast<int>(queue_idle_result),
-                __FILE__,
-                __LINE__));
+            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(queue_idle_result), __FILE__, __LINE__));
         }
 
         textQuads.clear();
@@ -557,9 +519,7 @@ namespace mxvk {
         pruneCache();
     }
 
-    void VK_Text::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                               VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                               VkDeviceMemory &bufferMemory) {
+    void VK_Text::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
         VkBuffer newBuffer = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -601,9 +561,7 @@ namespace mxvk {
         bufferMemory = newMemory;
     }
 
-    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height) {
-        return getTextDimensions(text, width, height, font);
-    }
+    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height) { return getTextDimensions(text, width, height, font); }
 
     bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height, TTF_Font *textFont) {
         if (text.empty() || !textFont) {
@@ -616,9 +574,7 @@ namespace mxvk {
         return TTF_GetStringSize(textFont, text.c_str(), 0, &width, &height);
     }
 
-    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height, const Font &textFont) {
-        return getTextDimensions(text, width, height, textFont.get());
-    }
+    bool VK_Text::getTextDimensions(const std::string &text, int &width, int &height, const Font &textFont) { return getTextDimensions(text, width, height, textFont.get()); }
 
     uint32_t VK_Text::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
         VkPhysicalDeviceMemoryProperties memProperties;
@@ -736,9 +692,7 @@ namespace mxvk {
         return true;
     }
 
-    void VK_Text::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                              VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                              VkImage &image, VkDeviceMemory &imageMemory) {
+    void VK_Text::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory) {
         VkImage newImage = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 

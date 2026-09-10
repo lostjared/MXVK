@@ -31,8 +31,7 @@ namespace mxvk {
      */
     class VK_Console {
       public:
-        using CommandCallback =
-            std::function<bool(VK_Window &window, const std::vector<std::string> &args, std::ostream &output)>;
+        using CommandCallback = std::function<bool(VK_Window &window, const std::vector<std::string> &args, std::ostream &output)>;
 
         VK_Console() = default;
 

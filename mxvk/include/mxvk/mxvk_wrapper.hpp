@@ -33,8 +33,7 @@ namespace mxvk {
      *
      * @tparam T A raw pointer type (must satisfy WrapType concept).
      */
-    template <WrapType T>
-    class Wrapper {
+    template <WrapType T> class Wrapper {
       public:
         /** @brief Default constructor — initialises to nullopt (no value). */
         Wrapper() = default;
@@ -89,9 +88,7 @@ namespace mxvk {
          * @brief Check whether a non-null value is held.
          * @return @c true if a non-null pointer is stored.
          */
-        [[nodiscard]] bool has_value() const noexcept {
-            return type.has_value() && type.value() != nullptr;
-        }
+        [[nodiscard]] bool has_value() const noexcept { return type.has_value() && type.value() != nullptr; }
 
         /** @brief Check if a value is present and non-null. */
         [[nodiscard]] explicit operator bool() const noexcept { return has_value(); }
@@ -146,6 +143,5 @@ namespace mxvk {
 } // namespace mxvk
 
 namespace mx {
-    template <mxvk::WrapType T>
-    using Wrapper = mxvk::Wrapper<T>;
+    template <mxvk::WrapType T> using Wrapper = mxvk::Wrapper<T>;
 } // namespace mx

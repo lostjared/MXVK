@@ -82,11 +82,7 @@ namespace defender {
 
         flame_vertex_count = static_cast<uint32_t>(vertices.size());
         const VkDeviceSize buffer_size = sizeof(space::FlameVertex) * static_cast<VkDeviceSize>(vertices.size());
-        create_buffer(buffer_size,
-                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                      flame_vertex_buffer,
-                      flame_vertex_buffer_memory);
+        create_buffer(buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, flame_vertex_buffer, flame_vertex_buffer_memory);
 
         void *data = nullptr;
         if (vkMapMemory(device, flame_vertex_buffer_memory, 0, buffer_size, 0, &data) != VK_SUCCESS || data == nullptr) {
@@ -187,8 +183,7 @@ namespace defender {
             depth_stencil.stencilTestEnable = VK_FALSE;
 
             VkPipelineColorBlendAttachmentState color_blend_attachment{};
-            color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             color_blend_attachment.blendEnable = VK_TRUE;
             color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -287,12 +282,7 @@ namespace defender {
         pc.params = glm::vec4(elapsed_seconds, std::clamp(ship.current_speed / ship.max_speed, 0.0f, 2.0f), boost_active ? 1.0f : 0.0f, 0.0f);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, flame_pipeline);
-        vkCmdPushConstants(cmd,
-                           flame_pipeline_layout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(pc),
-                           &pc);
+        vkCmdPushConstants(cmd, flame_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
         VkBuffer vertex_buffers[] = {flame_vertex_buffer};
         VkDeviceSize offsets[] = {0};
@@ -300,11 +290,7 @@ namespace defender {
         vkCmdDraw(cmd, flame_vertex_count, 1, 0, 0);
     }
 
-    void DefenderWindow::create_buffer(VkDeviceSize size,
-                                       VkBufferUsageFlags usage,
-                                       VkMemoryPropertyFlags properties,
-                                       VkBuffer &buffer,
-                                       VkDeviceMemory &buffer_memory) const {
+    void DefenderWindow::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory) const {
         VkBufferCreateInfo buffer_info{};
         buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         buffer_info.size = size;

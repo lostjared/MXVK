@@ -54,11 +54,7 @@ namespace example {
         };
 
       public:
-        FractalWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)),
-              shaderRoot(((path.empty() || path == ".") ? std::string(fractal_zoom_ASSET_DIR) : path) + "/data") {
-        }
+        FractalWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("-[ Fractal Zoom - MXVK ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), reference_orbit_samples(static_cast<size_t>(reference_orbit_capacity)), shaderRoot(((path.empty() || path == ".") ? std::string(fractal_zoom_ASSET_DIR) : path) + "/data") {}
 
         ~FractalWindow() override {
 #if defined(MXWRITE_ENABLED)
@@ -121,9 +117,7 @@ namespace example {
             }
         }
 
-        void proc() override {
-            updateKeyboardNavigation();
-        }
+        void proc() override { updateKeyboardNavigation(); }
 
         void render() override {
 #if defined(MXWRITE_ENABLED)
@@ -145,9 +139,7 @@ namespace example {
             destroyFractalResources();
         }
 
-        void onSwapchainRecreated() override {
-            createFractalPipeline();
-        }
+        void onSwapchainRecreated() override { createFractalPipeline(); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
             if (fractal_pipeline == VK_NULL_HANDLE || fractal_pipeline_layout == VK_NULL_HANDLE) {
@@ -172,45 +164,21 @@ namespace example {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fractal_pipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, fractal_pipeline_layout, 0, 1, &fractal_descriptor_sets[image_index], 0, nullptr);
 
-            const FractalPushConstants push_constants{
-                center_x.convert_to<PushScalar>(),
-                center_y.convert_to<PushScalar>(),
-                (ReferenceScalar(1) / zoom).convert_to<PushScalar>(),
-                static_cast<PushScalar>(std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count()),
-                static_cast<PushScalar>(extent.width),
-                static_cast<PushScalar>(extent.height),
-                max_iterations,
-                palette_index,
-                orbit_length,
-                0};
+            const FractalPushConstants push_constants{center_x.convert_to<PushScalar>(), center_y.convert_to<PushScalar>(), (ReferenceScalar(1) / zoom).convert_to<PushScalar>(), static_cast<PushScalar>(std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count()), static_cast<PushScalar>(extent.width), static_cast<PushScalar>(extent.height), max_iterations, palette_index, orbit_length, 0};
 
-            vkCmdPushConstants(
-                cmd,
-                fractal_pipeline_layout,
-                VK_SHADER_STAGE_FRAGMENT_BIT,
-                0,
-                sizeof(push_constants),
-                &push_constants);
+            vkCmdPushConstants(cmd, fractal_pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push_constants), &push_constants);
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
 
       private:
-        static ReferenceScalar minReferenceScalar(const ReferenceScalar &a, const ReferenceScalar &b) {
-            return (a < b) ? a : b;
-        }
+        static ReferenceScalar minReferenceScalar(const ReferenceScalar &a, const ReferenceScalar &b) { return (a < b) ? a : b; }
 
-        static ReferenceScalar maxReferenceScalar(const ReferenceScalar &a, const ReferenceScalar &b) {
-            return (a > b) ? a : b;
-        }
+        static ReferenceScalar maxReferenceScalar(const ReferenceScalar &a, const ReferenceScalar &b) { return (a > b) ? a : b; }
 
-        static ReferenceScalar clampReferenceScalar(const ReferenceScalar &value, const ReferenceScalar &minimum, const ReferenceScalar &maximum) {
-            return maxReferenceScalar(minReferenceScalar(value, maximum), minimum);
-        }
+        static ReferenceScalar clampReferenceScalar(const ReferenceScalar &value, const ReferenceScalar &minimum, const ReferenceScalar &maximum) { return maxReferenceScalar(minReferenceScalar(value, maximum), minimum); }
 
-        static float toOrbitSampleScalar(const ReferenceScalar &value) {
-            return value.convert_to<float>();
-        }
+        static float toOrbitSampleScalar(const ReferenceScalar &value) { return value.convert_to<float>(); }
 
         void handleKey(SDL_Keycode key) {
             switch (key) {
@@ -281,11 +249,7 @@ namespace example {
             encode_options.tune = "zerolatency";
             encode_options.realtime = true;
             encode_options.block_when_full = false;
-            if (!video_writer.open(video_output_path,
-                                   static_cast<int>(extent.width),
-                                   static_cast<int>(extent.height),
-                                   video_fps,
-                                   encode_options)) {
+            if (!video_writer.open(video_output_path, static_cast<int>(extent.width), static_cast<int>(extent.height), video_fps, encode_options)) {
                 std::cerr << "fractal_zoom: failed to open MXWrite output file: " << video_output_path << "\n";
                 return;
             }
@@ -301,10 +265,7 @@ namespace example {
                 video_record_height = 0;
                 return;
             }
-            std::cout << std::format("fractal_zoom: recording video to {} at {}x{} 60 FPS\n",
-                                     video_output_path,
-                                     video_record_width,
-                                     video_record_height);
+            std::cout << std::format("fractal_zoom: recording video to {} at {}x{} 60 FPS\n", video_output_path, video_record_width, video_record_height);
         }
 
         void closeVideoWriter() {
@@ -384,12 +345,8 @@ namespace example {
                 throw mxvk::Exception("recording requires swapchain transfer-source support");
             }
 
-            recording_format_is_bgra =
-                swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
-                swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
-            const bool format_is_rgba =
-                swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
-                swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
+            recording_format_is_bgra = swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
+            const bool format_is_rgba = swapchain_format == VK_FORMAT_R8G8B8A8_UNORM || swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
             if (!recording_format_is_bgra && !format_is_rgba) {
                 throw mxvk::Exception(std::format("unsupported recording swapchain format: {}", static_cast<int>(swapchain_format)));
             }
@@ -419,12 +376,7 @@ namespace example {
             for (size_t i = 0; i < recording_readbacks.size(); ++i) {
                 RecordingReadbackSlot &slot = recording_readbacks[i];
                 slot.command_buffer = command_buffers[i];
-                createBuffer(
-                    recording_image_bytes,
-                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    slot.buffer,
-                    slot.memory);
+                createBuffer(recording_image_bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, slot.buffer, slot.memory);
                 if (vkCreateFence(device, &fence_info, nullptr, &slot.fence) != VK_SUCCESS) {
                     destroyRecordingReadbacks(false);
                     throw mxvk::Exception("failed to create recording readback fence");
@@ -433,9 +385,7 @@ namespace example {
             }
 
             recording_worker_stop = false;
-            recording_worker = std::jthread([this](std::stop_token stop_token) {
-                recordingWorkerLoop(stop_token);
-            });
+            recording_worker = std::jthread([this](std::stop_token stop_token) { recordingWorkerLoop(stop_token); });
             recording_readbacks_ready = true;
         }
 
@@ -514,9 +464,7 @@ namespace example {
             while (true) {
                 pumpCompletedRecordingReadbacks(true);
                 std::unique_lock<std::mutex> lock(recording_mutex);
-                const bool idle = std::ranges::all_of(recording_readbacks, [](const RecordingReadbackSlot &slot) {
-                    return !slot.in_flight && !slot.queued;
-                });
+                const bool idle = std::ranges::all_of(recording_readbacks, [](const RecordingReadbackSlot &slot) { return !slot.in_flight && !slot.queued; });
                 if (idle) {
                     return;
                 }
@@ -634,13 +582,7 @@ namespace example {
             copy_region.imageSubresource.baseArrayLayer = 0;
             copy_region.imageSubresource.layerCount = 1;
             copy_region.imageExtent = {video_record_width, video_record_height, 1};
-            vkCmdCopyImageToBuffer(
-                slot.command_buffer,
-                swapchain_images[image_index],
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                slot.buffer,
-                1,
-                &copy_region);
+            vkCmdCopyImageToBuffer(slot.command_buffer, swapchain_images[image_index], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, slot.buffer, 1, &copy_region);
 
             VkImageMemoryBarrier2 to_present_barrier{};
             to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -692,9 +634,7 @@ namespace example {
                 size_t slot_index = 0;
                 {
                     std::unique_lock<std::mutex> lock(recording_mutex);
-                    recording_cv.wait(lock, [this, &stop_token] {
-                        return recording_worker_stop || stop_token.stop_requested() || !recording_ready_slots.empty();
-                    });
+                    recording_cv.wait(lock, [this, &stop_token] { return recording_worker_stop || stop_token.stop_requested() || !recording_ready_slots.empty(); });
                     if ((recording_worker_stop || stop_token.stop_requested()) && recording_ready_slots.empty()) {
                         break;
                     }
@@ -752,9 +692,7 @@ namespace example {
             std::error_code error;
             std::filesystem::create_directories(snapshot_dir, error);
             if (error) {
-                std::cerr << std::format("fractal_zoom: failed to create snapshot directory '{}': {}\n",
-                                         snapshot_dir.string(),
-                                         error.message());
+                std::cerr << std::format("fractal_zoom: failed to create snapshot directory '{}': {}\n", snapshot_dir.string(), error.message());
                 return;
             }
 
@@ -766,15 +704,7 @@ namespace example {
             localtime_r(&now, &local_time);
 #endif
 
-            const std::string filename = std::format(
-                "fractal_zoom_snapshot.{:04d}-{:02d}-{:02d}.{:02d}-{:02d}-{:02d}-{:04d}.png",
-                local_time.tm_year + 1900,
-                local_time.tm_mon + 1,
-                local_time.tm_mday,
-                local_time.tm_hour,
-                local_time.tm_min,
-                local_time.tm_sec,
-                snapshot_index++);
+            const std::string filename = std::format("fractal_zoom_snapshot.{:04d}-{:02d}-{:02d}.{:02d}-{:02d}-{:02d}-{:04d}.png", local_time.tm_year + 1900, local_time.tm_mon + 1, local_time.tm_mday, local_time.tm_hour, local_time.tm_min, local_time.tm_sec, snapshot_index++);
 
             const std::filesystem::path snapshot_path = snapshot_dir / filename;
             try {
@@ -1025,11 +955,7 @@ namespace example {
                 depth_stencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState color_blend_attachment{};
-                color_blend_attachment.colorWriteMask =
-                    VK_COLOR_COMPONENT_R_BIT |
-                    VK_COLOR_COMPONENT_G_BIT |
-                    VK_COLOR_COMPONENT_B_BIT |
-                    VK_COLOR_COMPONENT_A_BIT;
+                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 color_blend_attachment.blendEnable = VK_FALSE;
 
                 VkPipelineColorBlendStateCreateInfo color_blending{};
@@ -1305,11 +1231,7 @@ namespace example {
                     const ReferenceScalar mid_x = (tile.min_uv_x + tile.max_uv_x) * ReferenceScalar("0.5");
                     const ReferenceScalar mid_y = (tile.min_uv_y + tile.max_uv_y) * ReferenceScalar("0.5");
                     const int child_depth = tile.depth + 1;
-                    const std::array<ReferenceTile, 4> children{
-                        ReferenceTile{tile.min_uv_x, tile.min_uv_y, mid_x, mid_y, child_depth},
-                        ReferenceTile{mid_x, tile.min_uv_y, tile.max_uv_x, mid_y, child_depth},
-                        ReferenceTile{tile.min_uv_x, mid_y, mid_x, tile.max_uv_y, child_depth},
-                        ReferenceTile{mid_x, mid_y, tile.max_uv_x, tile.max_uv_y, child_depth}};
+                    const std::array<ReferenceTile, 4> children{ReferenceTile{tile.min_uv_x, tile.min_uv_y, mid_x, mid_y, child_depth}, ReferenceTile{mid_x, tile.min_uv_y, tile.max_uv_x, mid_y, child_depth}, ReferenceTile{tile.min_uv_x, mid_y, mid_x, tile.max_uv_y, child_depth}, ReferenceTile{mid_x, mid_y, tile.max_uv_x, tile.max_uv_y, child_depth}};
 
                     tiles.erase(tiles.begin() + static_cast<std::ptrdiff_t>(tile_index));
                     tiles.insert(tiles.begin() + static_cast<std::ptrdiff_t>(tile_index), children.begin(), children.end());
@@ -1328,11 +1250,7 @@ namespace example {
                 writeReferenceMetadata(reference_index, tile, orbit_base, sample_count, ref_uv_x, ref_uv_y);
             }
 
-            reference_orbit_samples[0] = {
-                static_cast<float>(reference_count),
-                static_cast<float>(reference_metadata_capacity),
-                static_cast<float>(reference_orbit_stride),
-                0.0f};
+            reference_orbit_samples[0] = {static_cast<float>(reference_count), static_cast<float>(reference_metadata_capacity), static_cast<float>(reference_orbit_stride), 0.0f};
 
             cached_reference_count = reference_count;
             reference_orbit_dirty = false;
@@ -1383,11 +1301,7 @@ namespace example {
             ReferenceScalar z_y = 0;
             int sample_count = 1;
 
-            reference_orbit_samples[orbit_base] = {
-                toOrbitSampleScalar(z_x),
-                toOrbitSampleScalar(z_y),
-                1.0f,
-                0.0f};
+            reference_orbit_samples[orbit_base] = {toOrbitSampleScalar(z_x), toOrbitSampleScalar(z_y), 1.0f, 0.0f};
 
             for (int i = 0; i < iteration_count && sample_count < reference_orbit_stride; ++i) {
                 const ReferenceScalar next_x = z_x * z_x - z_y * z_y + c_x;
@@ -1396,11 +1310,7 @@ namespace example {
                 z_x = next_x;
                 z_y = next_y;
 
-                reference_orbit_samples[orbit_base + static_cast<size_t>(sample_count)] = {
-                    toOrbitSampleScalar(z_x),
-                    toOrbitSampleScalar(z_y),
-                    0.0f,
-                    0.0f};
+                reference_orbit_samples[orbit_base + static_cast<size_t>(sample_count)] = {toOrbitSampleScalar(z_x), toOrbitSampleScalar(z_y), 0.0f, 0.0f};
                 ++sample_count;
 
                 const ReferenceScalar mag2 = z_x * z_x + z_y * z_y;
@@ -1415,25 +1325,12 @@ namespace example {
 
         void writeReferenceMetadata(int reference_index, const ReferenceTile &tile, size_t orbit_base, int sample_count, const ReferenceScalar &ref_uv_x, const ReferenceScalar &ref_uv_y) {
             const size_t metadata_base = 1 + static_cast<size_t>(reference_index) * 2;
-            reference_orbit_samples[metadata_base] = {
-                toOrbitSampleScalar(tile.min_uv_x),
-                toOrbitSampleScalar(tile.min_uv_y),
-                toOrbitSampleScalar(tile.max_uv_x),
-                toOrbitSampleScalar(tile.max_uv_y)};
-            reference_orbit_samples[metadata_base + 1] = {
-                toOrbitSampleScalar(ref_uv_x),
-                toOrbitSampleScalar(ref_uv_y),
-                static_cast<float>(orbit_base),
-                static_cast<float>(sample_count)};
+            reference_orbit_samples[metadata_base] = {toOrbitSampleScalar(tile.min_uv_x), toOrbitSampleScalar(tile.min_uv_y), toOrbitSampleScalar(tile.max_uv_x), toOrbitSampleScalar(tile.max_uv_y)};
+            reference_orbit_samples[metadata_base + 1] = {toOrbitSampleScalar(ref_uv_x), toOrbitSampleScalar(ref_uv_y), static_cast<float>(orbit_base), static_cast<float>(sample_count)};
         }
 
         bool isReferenceTileStable(const ReferenceTile &tile, size_t orbit_base, int sample_count, const ReferenceScalar &ref_uv_x, const ReferenceScalar &ref_uv_y, int iteration_count) const {
-            const std::array<std::pair<ReferenceScalar, ReferenceScalar>, 5> sample_points{
-                std::pair{tile.min_uv_x, tile.min_uv_y},
-                std::pair{tile.max_uv_x, tile.min_uv_y},
-                std::pair{tile.min_uv_x, tile.max_uv_y},
-                std::pair{tile.max_uv_x, tile.max_uv_y},
-                std::pair{(tile.min_uv_x + tile.max_uv_x) * ReferenceScalar("0.5"), (tile.min_uv_y + tile.max_uv_y) * ReferenceScalar("0.5")}};
+            const std::array<std::pair<ReferenceScalar, ReferenceScalar>, 5> sample_points{std::pair{tile.min_uv_x, tile.min_uv_y}, std::pair{tile.max_uv_x, tile.min_uv_y}, std::pair{tile.min_uv_x, tile.max_uv_y}, std::pair{tile.max_uv_x, tile.max_uv_y}, std::pair{(tile.min_uv_x + tile.max_uv_x) * ReferenceScalar("0.5"), (tile.min_uv_y + tile.max_uv_y) * ReferenceScalar("0.5")}};
 
             for (const auto &[sample_uv_x, sample_uv_y] : sample_points) {
                 const float delta_c_x = ((sample_uv_x - ref_uv_x) / zoom).convert_to<float>();
@@ -1592,9 +1489,7 @@ namespace example {
         uint64_t reference_orbit_generation = 1;
         std::chrono::steady_clock::time_point last_reference_rebuild_time{};
 
-        static constexpr size_t referenceOrbitBase(int reference_index) {
-            return static_cast<size_t>(reference_metadata_capacity) + static_cast<size_t>(reference_index) * static_cast<size_t>(reference_orbit_stride);
-        }
+        static constexpr size_t referenceOrbitBase(int reference_index) { return static_cast<size_t>(reference_metadata_capacity) + static_cast<size_t>(reference_index) * static_cast<size_t>(reference_orbit_stride); }
 
         ReferenceScalar center_x = ReferenceScalar("-0.5");
         ReferenceScalar center_y = ReferenceScalar(0);

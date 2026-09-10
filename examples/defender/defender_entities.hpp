@@ -9,18 +9,9 @@
 
 namespace defender {
 
-    enum class GameMode {
-        Intro,
-        IntroFadeIn,
-        Countdown,
-        Playing
-    };
+    enum class GameMode { Intro, IntroFadeIn, Countdown, Playing };
 
-    enum class UfoSpriteSet : std::size_t {
-        Classic = 0,
-        Ufox = 1,
-        Alien = 2
-    };
+    enum class UfoSpriteSet : std::size_t { Classic = 0, Ufox = 1, Alien = 2 };
 
     struct Ufo {
         glm::vec3 position{0.0f};

@@ -18,9 +18,7 @@ namespace space {
         initialized = true;
     }
 
-    void StarField::setSprite(mxvk::VK_Sprite3D *sprite_batch) {
-        sprite = sprite_batch;
-    }
+    void StarField::setSprite(mxvk::VK_Sprite3D *sprite_batch) { sprite = sprite_batch; }
 
     void StarField::resize(mxvk::VK_Window *window) {
         if (sprite != nullptr) {
@@ -39,11 +37,7 @@ namespace space {
             const float twinkle = 0.65f + 0.35f * std::sin(elapsed_time * star.twinkle_speed + star.twinkle_phase);
             const float fade = std::clamp(1.0f - ((distance - min_radius) / (max_radius - min_radius)), 0.2f, 0.7f);
             const float brightness = star.brightness * twinkle * fade;
-            star.color = glm::vec4(
-                std::clamp(star.base_color.r * brightness, 0.0f, 1.0f),
-                std::clamp(star.base_color.g * brightness, 0.0f, 1.0f),
-                std::clamp(star.base_color.b * brightness, 0.0f, 1.0f),
-                std::clamp(0.2f + brightness, 0.0f, 1.0f));
+            star.color = glm::vec4(std::clamp(star.base_color.r * brightness, 0.0f, 1.0f), std::clamp(star.base_color.g * brightness, 0.0f, 1.0f), std::clamp(star.base_color.b * brightness, 0.0f, 1.0f), std::clamp(0.2f + brightness, 0.0f, 1.0f));
         }
     }
 
@@ -64,10 +58,7 @@ namespace space {
         star.position.x = center.x + radius * std::sin(phi) * std::cos(theta);
         star.position.y = center.y + radius * std::sin(phi) * std::sin(theta);
         star.position.z = center.z + radius * std::cos(phi);
-        star.velocity = glm::vec3(
-            random_float(-0.06f, 0.06f),
-            random_float(-0.06f, 0.06f),
-            random_float(-0.06f, 0.06f));
+        star.velocity = glm::vec3(random_float(-0.06f, 0.06f), random_float(-0.06f, 0.06f), random_float(-0.06f, 0.06f));
 
         const float roll = random_float(0.0f, 1.0f);
         if (roll < 0.5f) {

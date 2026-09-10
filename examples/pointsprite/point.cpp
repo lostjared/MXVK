@@ -59,11 +59,7 @@ namespace example {
 
     class PointSpriteWindow : public mxvk::VK_Window {
       public:
-        PointSpriteWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MXVK Point Sprite Tux", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              data_root(data_root),
-              tuxes(MAX_TUXES),
-              vertices(MAX_TUXES) {
+        PointSpriteWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MXVK Point Sprite Tux", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), data_root(data_root), tuxes(MAX_TUXES), vertices(MAX_TUXES) {
             setClearColor(0.0f, 0.0f, 0.0f, 0.0f);
             reset_tuxes(DEFAULT_TUXES);
             last_update_time = SDL_GetTicks();
@@ -89,9 +85,7 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            point_batch.resize(this);
-        }
+        void onSwapchainRecreated() override { point_batch.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
             if (!ensure_resources()) {
@@ -120,12 +114,7 @@ namespace example {
                 return false;
             }
 
-            point_batch.load(
-                this,
-                data_root + "/tux.png",
-                data_root + "/pointsprite.vert.spv",
-                data_root + "/pointsprite.frag.spv",
-                vertices.size());
+            point_batch.load(this, data_root + "/tux.png", data_root + "/pointsprite.vert.spv", data_root + "/pointsprite.frag.spv", vertices.size());
             point_batch.set_additive_blending(false);
             point_batch.set_depth_test_enabled(false);
             point_batch.set_depth_write_enabled(false);
@@ -178,9 +167,7 @@ namespace example {
             }
         }
 
-        void reset_size_scale() {
-            size_scale = 1.0f;
-        }
+        void reset_size_scale() { size_scale = 1.0f; }
 
         void scale_tuxes(float factor) {
             const float previous_scale = size_scale;

@@ -30,14 +30,10 @@ concept ClockPolicy = requires(T clock, std::string_view name) {
 class SteadyClockPolicy {
   public:
     /** @brief Record the beginning of a timed interval. */
-    void start() {
-        start_time = std::chrono::steady_clock::now();
-    }
+    void start() { start_time = std::chrono::steady_clock::now(); }
 
     /** @brief Record the end of a timed interval. */
-    void stop() {
-        stop_time = std::chrono::steady_clock::now();
-    }
+    void stop() { stop_time = std::chrono::steady_clock::now(); }
 
     /**
      * @brief Print the recorded interval in milliseconds and nanoseconds.
@@ -48,12 +44,8 @@ class SteadyClockPolicy {
     void echo(std::string_view name) const {
         const auto elapsed = stop_time - start_time;
         std::cout << "Stopwatch [" << name << "]\n"
-                  << "Timer was active for : "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
-                  << " Milliseconds\n"
-                  << "Timer was active for : "
-                  << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()
-                  << " Nanoseconds\n";
+                  << "Timer was active for : " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << " Milliseconds\n"
+                  << "Timer was active for : " << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() << " Nanoseconds\n";
     }
 
     /**
@@ -78,14 +70,10 @@ class SteadyClockPolicy {
 class HighResolutionClockPolicy {
   public:
     /** @brief Record the beginning of a timed interval. */
-    void start() {
-        start_time = std::chrono::high_resolution_clock::now();
-    }
+    void start() { start_time = std::chrono::high_resolution_clock::now(); }
 
     /** @brief Record the end of a timed interval. */
-    void stop() {
-        stop_time = std::chrono::high_resolution_clock::now();
-    }
+    void stop() { stop_time = std::chrono::high_resolution_clock::now(); }
 
     /**
      * @brief Print the recorded interval in milliseconds and nanoseconds.
@@ -96,12 +84,8 @@ class HighResolutionClockPolicy {
     void echo(std::string_view name) const {
         const auto elapsed = stop_time - start_time;
         std::cout << "Stopwatch [" << name << "]\n"
-                  << "Timer was active for : "
-                  << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()
-                  << " Milliseconds\n"
-                  << "Timer was active for : "
-                  << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()
-                  << " Nanoseconds\n";
+                  << "Timer was active for : " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << " Milliseconds\n"
+                  << "Timer was active for : " << std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() << " Nanoseconds\n";
     }
 
     /**
@@ -129,16 +113,13 @@ class HighResolutionClockPolicy {
  * @note The stopwatch stores its name as a `std::string_view`. The referenced
  * string must remain valid for the lifetime of the stopwatch.
  */
-template <ClockPolicy T>
-class StopWatch {
+template <ClockPolicy T> class StopWatch {
   public:
     /**
      * @brief Construct and immediately start a stopwatch.
      * @param name Descriptive name printed with the timing result.
      */
-    explicit StopWatch(std::string_view name) : time_name(name) {
-        Start(name);
-    }
+    explicit StopWatch(std::string_view name) : time_name(name) { Start(name); }
 
     /** @brief Stop and print the timer if it is still running. */
     ~StopWatch() {
@@ -185,9 +166,7 @@ class StopWatch {
      * @brief Print the interval recorded by the clock policy.
      * @param name Descriptive name shown with the timing result.
      */
-    void Echo(std::string_view name) const {
-        clock_interface.echo(name);
-    }
+    void Echo(std::string_view name) const { clock_interface.echo(name); }
 
     /**
      * @brief Query the time elapsed since the most recent Start().
@@ -196,9 +175,7 @@ class StopWatch {
      * SteadyClockPolicy returns milliseconds, while
      * HighResolutionClockPolicy returns nanoseconds.
      */
-    unsigned long TimePassed() const {
-        return clock_interface.timePassed();
-    }
+    unsigned long TimePassed() const { return clock_interface.timePassed(); }
 
   private:
     std::string_view time_name;

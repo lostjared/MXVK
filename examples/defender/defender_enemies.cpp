@@ -59,11 +59,7 @@ namespace defender {
     void DefenderWindow::respawn_ufo(Ufo &ufo, bool initial_spawn) {
         const float side = space::random_float(0.0f, 1.0f) < 0.5f ? -1.0f : 1.0f;
         ufo.velocity = glm::vec3(-side * space::random_float(3.5f, 8.5f), space::random_float(-0.8f, 0.8f), 0.0f);
-        ufo.tint = glm::vec4(
-            space::random_float(0.82f, 1.0f),
-            space::random_float(0.88f, 1.0f),
-            space::random_float(0.90f, 1.0f),
-            1.0f);
+        ufo.tint = glm::vec4(space::random_float(0.82f, 1.0f), space::random_float(0.88f, 1.0f), space::random_float(0.90f, 1.0f), 1.0f);
         ufo.base_size = space::random_float(3.6f, 4.4f);
         ufo.phase = space::random_float(0.0f, 2.0f * space::PI);
         ufo.bob_speed = space::random_float(1.1f, 2.8f);
@@ -115,14 +111,8 @@ namespace defender {
         asteroid.scale = space::random_float(0.72f, 2.15f);
         asteroid.collision_radius = asteroid.scale * 1.25f;
         asteroid.velocity = glm::vec3(-side * space::random_float(1.8f, 5.6f), space::random_float(-0.55f, 0.55f), 0.0f);
-        asteroid.rotation = glm::vec3(
-            space::random_float(0.0f, 360.0f),
-            space::random_float(0.0f, 360.0f),
-            space::random_float(0.0f, 360.0f));
-        asteroid.angular_velocity = glm::vec3(
-            space::random_float(-74.0f, 74.0f),
-            space::random_float(-105.0f, 105.0f),
-            space::random_float(-62.0f, 62.0f));
+        asteroid.rotation = glm::vec3(space::random_float(0.0f, 360.0f), space::random_float(0.0f, 360.0f), space::random_float(0.0f, 360.0f));
+        asteroid.angular_velocity = glm::vec3(space::random_float(-74.0f, 74.0f), space::random_float(-105.0f, 105.0f), space::random_float(-62.0f, 62.0f));
         for (int attempt = 0; attempt < ENEMY_SPAWN_ATTEMPTS; ++attempt) {
             const float distance = initial_spawn ? space::random_float(-WORLD_HALF_WIDTH, WORLD_HALF_WIDTH) : side * space::random_float(36.0f, 68.0f);
             const glm::vec3 candidate{wrap_world_x(camera_center_x + distance), space::random_float(WORLD_BOTTOM + asteroid.collision_radius, playable_world_top - asteroid.collision_radius), space::random_float(-1.7f, 1.3f)};
@@ -198,13 +188,7 @@ namespace defender {
         }
     }
 
-    void DefenderWindow::separate_enemies(glm::vec3 &first_position,
-                                          glm::vec3 &first_velocity,
-                                          float first_radius,
-                                          glm::vec3 &second_position,
-                                          glm::vec3 &second_velocity,
-                                          float second_radius,
-                                          float restitution) {
+    void DefenderWindow::separate_enemies(glm::vec3 &first_position, glm::vec3 &first_velocity, float first_radius, glm::vec3 &second_position, glm::vec3 &second_velocity, float second_radius, float restitution) {
         const float second_x = nearest_world_x(second_position.x, first_position.x);
         const glm::vec2 delta{second_x - first_position.x, second_position.y - first_position.y};
         const float min_distance = first_radius + second_radius;
@@ -305,13 +289,9 @@ namespace defender {
         }
     }
 
-    [[nodiscard]] int DefenderWindow::current_ufo_frame(const Ufo &ufo) const {
-        return static_cast<int>(std::floor(elapsed_seconds * 12.0f + ufo.phase * 1.7f)) % UFO_ANIMATION_FRAMES;
-    }
+    [[nodiscard]] int DefenderWindow::current_ufo_frame(const Ufo &ufo) const { return static_cast<int>(std::floor(elapsed_seconds * 12.0f + ufo.phase * 1.7f)) % UFO_ANIMATION_FRAMES; }
 
-    [[nodiscard]] float DefenderWindow::current_ufo_pulse(const Ufo &ufo) const {
-        return 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f;
-    }
+    [[nodiscard]] float DefenderWindow::current_ufo_pulse(const Ufo &ufo) const { return 1.0f + std::sin(elapsed_seconds * 2.2f + ufo.phase) * 0.04f; }
 
     [[nodiscard]] glm::vec2 DefenderWindow::ufo_draw_size(const Ufo &ufo, float pulse) const {
         if (ufo.sprite_set == UfoSpriteSet::Alien) {
@@ -344,8 +324,7 @@ namespace defender {
             const float left_y = terrain_height(left_x);
             const float right_y = terrain_height(right_x);
             const glm::vec2 delta{right_x - left_x, right_y - left_y};
-            terrain_sprite->drawSprite({(left_x + right_x) * 0.5f, (left_y + right_y) * 0.5f, 0.0f},
-                                       {glm::length(delta), TERRAIN_LINE_WIDTH}, terrain_color, std::atan2(delta.y, delta.x));
+            terrain_sprite->drawSprite({(left_x + right_x) * 0.5f, (left_y + right_y) * 0.5f, 0.0f}, {glm::length(delta), TERRAIN_LINE_WIDTH}, terrain_color, std::atan2(delta.y, delta.x));
         }
     }
 

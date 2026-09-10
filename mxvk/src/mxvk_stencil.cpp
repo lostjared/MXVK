@@ -7,19 +7,9 @@
 #include <vector>
 
 namespace mxvk {
-    VK_Stencil::~VK_Stencil() {
-        destroy();
-    }
+    VK_Stencil::~VK_Stencil() { destroy(); }
 
-    void VK_Stencil::initialize(const VulkanContext &context,
-                                VkExtent2D extent,
-                                VkFormat color_format,
-                                VkFormat depth_format,
-                                VkPipelineCache pipeline_cache,
-                                const std::string &mask_vertex_shader,
-                                const std::string &mask_fragment_shader,
-                                const std::string &content_vertex_shader,
-                                const std::string &content_fragment_shader) {
+    void VK_Stencil::initialize(const VulkanContext &context, VkExtent2D extent, VkFormat color_format, VkFormat depth_format, VkPipelineCache pipeline_cache, const std::string &mask_vertex_shader, const std::string &mask_fragment_shader, const std::string &content_vertex_shader, const std::string &content_fragment_shader) {
         destroy();
         vk_context = context;
         stencil_extent = extent;
@@ -116,24 +106,13 @@ namespace mxvk {
         vkCmdDraw(cmd, 3, 1, 0, 0);
     }
 
-    bool VK_Stencil::valid() const noexcept {
-        return vk_context.device != VK_NULL_HANDLE && image != VK_NULL_HANDLE && view != VK_NULL_HANDLE &&
-               stencil_extent.width > 0U && stencil_extent.height > 0U;
-    }
+    bool VK_Stencil::valid() const noexcept { return vk_context.device != VK_NULL_HANDLE && image != VK_NULL_HANDLE && view != VK_NULL_HANDLE && stencil_extent.width > 0U && stencil_extent.height > 0U; }
 
     void VK_Stencil::create_resources() {
         if (vk_context.device == VK_NULL_HANDLE || stencil_extent.width == 0U || stencil_extent.height == 0U) {
             return;
         }
-        create_image(vk_context,
-                     stencil_extent.width,
-                     stencil_extent.height,
-                     stencil_image_format,
-                     VK_IMAGE_TILING_OPTIMAL,
-                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     image,
-                     memory);
+        create_image(vk_context, stencil_extent.width, stencil_extent.height, stencil_image_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
         view = create_image_view(vk_context.device, image, stencil_image_format, VK_IMAGE_ASPECT_STENCIL_BIT);
         image_initialized = false;
     }
@@ -148,8 +127,7 @@ namespace mxvk {
         layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         layout_info.pushConstantRangeCount = 1;
         layout_info.pPushConstantRanges = &push_constant;
-        if (vkCreatePipelineLayout(vk_context.device, &layout_info, nullptr, &mask_layout) != VK_SUCCESS ||
-            vkCreatePipelineLayout(vk_context.device, &layout_info, nullptr, &content_layout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(vk_context.device, &layout_info, nullptr, &mask_layout) != VK_SUCCESS || vkCreatePipelineLayout(vk_context.device, &layout_info, nullptr, &content_layout) != VK_SUCCESS) {
             throw mxvk::Exception("failed to create stencil pipeline layout");
         }
 
@@ -223,10 +201,7 @@ namespace mxvk {
         throw mxvk::Exception("failed to find a supported Vulkan stencil format");
     }
 
-    VkPipeline VK_Stencil::create_pipeline(const std::string &vertex_shader,
-                                           const std::string &fragment_shader,
-                                           VkPipelineLayout layout,
-                                           bool writes_stencil) const {
+    VkPipeline VK_Stencil::create_pipeline(const std::string &vertex_shader, const std::string &fragment_shader, VkPipelineLayout layout, bool writes_stencil) const {
         const std::vector<char> vert_bytes = load_spv(vertex_shader);
         const std::vector<char> frag_bytes = load_spv(fragment_shader);
         const VkShaderModule vert_module = create_shader_module(vk_context.device, vert_bytes);

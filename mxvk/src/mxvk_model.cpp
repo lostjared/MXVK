@@ -15,16 +15,7 @@
 
 namespace mxvk {
 
-    MXModel::MXModel(MXModel &&other) noexcept
-        : verticesData(std::move(other.verticesData)),
-          indicesData(std::move(other.indicesData)),
-          subMeshList(std::move(other.subMeshList)),
-          materialList(std::move(other.materialList)),
-          mtlLibraryPath(std::move(other.mtlLibraryPath)),
-          vertexBufferHandle(other.vertexBufferHandle),
-          vertexBufferMemory(other.vertexBufferMemory),
-          indexBufferHandle(other.indexBufferHandle),
-          indexBufferMemory(other.indexBufferMemory) {
+    MXModel::MXModel(MXModel &&other) noexcept : verticesData(std::move(other.verticesData)), indicesData(std::move(other.indicesData)), subMeshList(std::move(other.subMeshList)), materialList(std::move(other.materialList)), mtlLibraryPath(std::move(other.mtlLibraryPath)), vertexBufferHandle(other.vertexBufferHandle), vertexBufferMemory(other.vertexBufferMemory), indexBufferHandle(other.indexBufferHandle), indexBufferMemory(other.indexBufferMemory) {
         other.vertexBufferHandle = VK_NULL_HANDLE;
         other.vertexBufferMemory = VK_NULL_HANDLE;
         other.indexBufferHandle = VK_NULL_HANDLE;
@@ -140,17 +131,14 @@ namespace mxvk {
                 fieldBegin = slashPos + 1;
             }
 
-            if (!parseOBJIndexValue(fields[0], index.position) ||
-                !parseOBJIndexValue(fields[1], index.texcoord) ||
-                !parseOBJIndexValue(fields[2], index.normal)) {
+            if (!parseOBJIndexValue(fields[0], index.position) || !parseOBJIndexValue(fields[1], index.texcoord) || !parseOBJIndexValue(fields[2], index.normal)) {
                 return false;
             }
 
             return index.position != 0;
         }
 
-        template <typename T>
-        [[nodiscard]] int resolveOBJIndex(int objIndex, const std::vector<T> &values) {
+        template <typename T> [[nodiscard]] int resolveOBJIndex(int objIndex, const std::vector<T> &values) {
             if (objIndex > 0) {
                 return objIndex - 1;
             }
@@ -223,12 +211,7 @@ namespace mxvk {
             return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
         }
 
-        [[nodiscard]] bool pointInProjectedTriangle(const VKVertex &point,
-                                                    const VKVertex &a,
-                                                    const VKVertex &b,
-                                                    const VKVertex &c,
-                                                    int dropAxis,
-                                                    float windingSign) {
+        [[nodiscard]] bool pointInProjectedTriangle(const VKVertex &point, const VKVertex &a, const VKVertex &b, const VKVertex &c, int dropAxis, float windingSign) {
             constexpr float epsilon = 1e-6f;
             const float ab = edgeCross2(a, b, point, dropAxis) * windingSign;
             const float bc = edgeCross2(b, c, point, dropAxis) * windingSign;
@@ -291,12 +274,7 @@ namespace mxvk {
                         if (test == previous || test == current || test == next) {
                             continue;
                         }
-                        if (pointInProjectedTriangle(face[test].vertex,
-                                                     face[previous].vertex,
-                                                     face[current].vertex,
-                                                     face[next].vertex,
-                                                     dropAxis,
-                                                     windingSign)) {
+                        if (pointInProjectedTriangle(face[test].vertex, face[previous].vertex, face[current].vertex, face[next].vertex, dropAxis, windingSign)) {
                             containsPoint = true;
                             break;
                         }
@@ -377,8 +355,7 @@ namespace mxvk {
             std::string mapToken{};
             while (stream >> mapToken) {
                 if (!mapToken.empty() && mapToken[0] == '-') {
-                    if (mapToken == "-blendu" || mapToken == "-blendv" || mapToken == "-cc" ||
-                        mapToken == "-clamp" || mapToken == "-imfchan" || mapToken == "-type") {
+                    if (mapToken == "-blendu" || mapToken == "-blendv" || mapToken == "-cc" || mapToken == "-clamp" || mapToken == "-imfchan" || mapToken == "-type") {
                         stream >> mapToken;
                     } else if (mapToken == "-mm") {
                         stream >> mapToken;
@@ -401,9 +378,7 @@ namespace mxvk {
             return mapPath;
         }
 
-        void parseMTLStream(std::istream &file,
-                            const std::string &textureBasePath,
-                            std::vector<MXMaterial> &materials) {
+        void parseMTLStream(std::istream &file, const std::string &textureBasePath, std::vector<MXMaterial> &materials) {
             MXMaterial *current = nullptr;
             std::string line{};
             while (std::getline(file, line)) {
@@ -465,16 +440,14 @@ namespace mxvk {
             return materialPath.filename().string();
         }
 
-        [[nodiscard]] std::string materialNameForTextureIndex(uint32_t textureIndex,
-                                                              const std::vector<MXMaterial> &materials) {
+        [[nodiscard]] std::string materialNameForTextureIndex(uint32_t textureIndex, const std::vector<MXMaterial> &materials) {
             if (textureIndex < static_cast<uint32_t>(materials.size()) && !materials[textureIndex].name.empty()) {
                 return materials[textureIndex].name;
             }
             return "material_" + std::to_string(textureIndex);
         }
 
-        [[nodiscard]] std::string mtlTextureReferencePath(const std::filesystem::path &mtlPath,
-                                                          const std::string &texturePath) {
+        [[nodiscard]] std::string mtlTextureReferencePath(const std::filesystem::path &mtlPath, const std::string &texturePath) {
             if (texturePath.empty()) {
                 return {};
             }
@@ -514,9 +487,7 @@ namespace mxvk {
             out << '\n';
         }
 
-        [[nodiscard]] MXMODParseResult parseMXMODStream(std::istream &file,
-                                                        const std::string &sourcePath,
-                                                        float positionScale) {
+        [[nodiscard]] MXMODParseResult parseMXMODStream(std::istream &file, const std::string &sourcePath, float positionScale) {
             struct TriBlock {
                 uint32_t textureIndex = 0;
                 std::vector<Vec3> pos{};
@@ -724,38 +695,26 @@ namespace mxvk {
 
         if (path.ends_with(".obj")) {
             loadOBJ(path, positionScale);
-            logMXModelStep("load complete (.obj): vertices=" + std::to_string(verticesData.size()) +
-                               ", indices=" + std::to_string(indicesData.size()) +
-                               ", submeshes=" + std::to_string(subMeshList.size()),
-                           true);
+            logMXModelStep("load complete (.obj): vertices=" + std::to_string(verticesData.size()) + ", indices=" + std::to_string(indicesData.size()) + ", submeshes=" + std::to_string(subMeshList.size()), true);
             return;
         }
 
         if (path.ends_with(".mxmod")) {
             loadMXMOD(path, positionScale);
-            logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(verticesData.size()) +
-                               ", indices=" + std::to_string(indicesData.size()) +
-                               ", submeshes=" + std::to_string(subMeshList.size()),
-                           true);
+            logMXModelStep("load complete (.mxmod): vertices=" + std::to_string(verticesData.size()) + ", indices=" + std::to_string(indicesData.size()) + ", submeshes=" + std::to_string(subMeshList.size()), true);
             return;
         }
 
         if (path.ends_with(".mxmod.z")) {
             loadMXMODZ(path, positionScale);
-            logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(verticesData.size()) +
-                               ", indices=" + std::to_string(indicesData.size()) +
-                               ", submeshes=" + std::to_string(subMeshList.size()),
-                           true);
+            logMXModelStep("load complete (.mxmod.z): vertices=" + std::to_string(verticesData.size()) + ", indices=" + std::to_string(indicesData.size()) + ", submeshes=" + std::to_string(subMeshList.size()), true);
             return;
         }
 
         throw mxvk::Exception("MXModel::load unsupported file format: " + path);
     }
 
-    void MXModel::load(const std::string &path,
-                       const std::string &textureManifestPath,
-                       const std::string &textureBasePath,
-                       float positionScale) {
+    void MXModel::load(const std::string &path, const std::string &textureManifestPath, const std::string &textureBasePath, float positionScale) {
         load(path, positionScale);
         if (!textureManifestPath.empty()) {
             loadTextureManifest(textureManifestPath, textureBasePath);
@@ -771,9 +730,7 @@ namespace mxvk {
         }
 
         const std::filesystem::path objOutputPath(objPath);
-        const std::filesystem::path mtlOutputPath = mtlPath.empty()
-                                                        ? objOutputPath.parent_path() / objOutputPath.stem().concat(".mtl")
-                                                        : std::filesystem::path(mtlPath);
+        const std::filesystem::path mtlOutputPath = mtlPath.empty() ? objOutputPath.parent_path() / objOutputPath.stem().concat(".mtl") : std::filesystem::path(mtlPath);
 
         if (!objOutputPath.parent_path().empty()) {
             std::filesystem::create_directories(objOutputPath.parent_path());
@@ -817,11 +774,7 @@ namespace mxvk {
             }
         }
 
-        const auto hasOutputMaterial = [&outputMaterials](const std::string &name) {
-            return std::any_of(outputMaterials.begin(), outputMaterials.end(), [&name](const MXMaterial &material) {
-                return material.name == name;
-            });
-        };
+        const auto hasOutputMaterial = [&outputMaterials](const std::string &name) { return std::any_of(outputMaterials.begin(), outputMaterials.end(), [&name](const MXMaterial &material) { return material.name == name; }); };
 
         const auto ensureOutputMaterial = [&outputMaterials, &hasOutputMaterial](const std::string &name) {
             if (hasOutputMaterial(name)) {
@@ -836,9 +789,7 @@ namespace mxvk {
             ensureOutputMaterial("material_0");
         } else {
             for (const SubMesh &sm : subMeshList) {
-                const std::string materialName = !sm.materialName.empty()
-                                                     ? sm.materialName
-                                                     : materialNameForTextureIndex(sm.textureIndex, outputMaterials);
+                const std::string materialName = !sm.materialName.empty() ? sm.materialName : materialNameForTextureIndex(sm.textureIndex, outputMaterials);
                 ensureOutputMaterial(materialName);
             }
         }
@@ -877,19 +828,13 @@ namespace mxvk {
             emitFaces(0, static_cast<uint32_t>(indicesData.size()), "material_0");
         } else {
             for (const SubMesh &sm : subMeshList) {
-                const std::string materialName = !sm.materialName.empty()
-                                                     ? sm.materialName
-                                                     : materialNameForTextureIndex(sm.textureIndex, materialList);
+                const std::string materialName = !sm.materialName.empty() ? sm.materialName : materialNameForTextureIndex(sm.textureIndex, materialList);
                 emitFaces(sm.firstIndex, sm.indexCount, materialName);
             }
         }
     }
 
-    void MXModel::exportOBJ(const std::string &modelPath,
-                            const std::string &textureManifestPath,
-                            const std::string &textureBasePath,
-                            const std::string &objPath,
-                            float positionScale) {
+    void MXModel::exportOBJ(const std::string &modelPath, const std::string &textureManifestPath, const std::string &textureBasePath, const std::string &objPath, float positionScale) {
         MXModel model{};
         model.load(modelPath, textureManifestPath, textureBasePath, positionScale);
         model.exportOBJ(objPath);
@@ -1146,10 +1091,8 @@ namespace mxvk {
         compressIndices();
     }
 
-    void MXModel::upload(VkDevice device, VkPhysicalDevice physicalDevice,
-                         VkCommandPool commandPool, VkQueue graphicsQueue) {
-        if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE ||
-            commandPool == VK_NULL_HANDLE || graphicsQueue == VK_NULL_HANDLE) {
+    void MXModel::upload(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue graphicsQueue) {
+        if (device == VK_NULL_HANDLE || physicalDevice == VK_NULL_HANDLE || commandPool == VK_NULL_HANDLE || graphicsQueue == VK_NULL_HANDLE) {
             throw mxvk::Exception("MXModel::upload requires valid Vulkan handles");
         }
         if (verticesData.empty() || indicesData.empty()) {
@@ -1165,17 +1108,11 @@ namespace mxvk {
 
         VkBuffer stagingVertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingVertexMemory = VK_NULL_HANDLE;
-        createBuffer(device, physicalDevice, vertexBufferSize,
-                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingVertexBuffer, stagingVertexMemory);
+        createBuffer(device, physicalDevice, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingVertexBuffer, stagingVertexMemory);
 
         VkBuffer stagingIndexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingIndexMemory = VK_NULL_HANDLE;
-        createBuffer(device, physicalDevice, indexBufferSize,
-                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingIndexBuffer, stagingIndexMemory);
+        createBuffer(device, physicalDevice, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingIndexBuffer, stagingIndexMemory);
 
         void *vertexData = nullptr;
         vkMapMemory(device, stagingVertexMemory, 0, vertexBufferSize, 0, &vertexData);
@@ -1187,15 +1124,9 @@ namespace mxvk {
         std::memcpy(indexData, indicesData.data(), static_cast<size_t>(indexBufferSize));
         vkUnmapMemory(device, stagingIndexMemory);
 
-        createBuffer(device, physicalDevice, vertexBufferSize,
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     vertexBufferHandle, vertexBufferMemory);
+        createBuffer(device, physicalDevice, vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferHandle, vertexBufferMemory);
 
-        createBuffer(device, physicalDevice, indexBufferSize,
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     indexBufferHandle, indexBufferMemory);
+        createBuffer(device, physicalDevice, indexBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferHandle, indexBufferMemory);
 
         copyBuffer(device, commandPool, graphicsQueue, stagingVertexBuffer, vertexBufferHandle, vertexBufferSize);
         copyBuffer(device, commandPool, graphicsQueue, stagingIndexBuffer, indexBufferHandle, indexBufferSize);
@@ -1213,8 +1144,7 @@ namespace mxvk {
             return;
         }
 
-        const bool hadBuffers = vertexBufferHandle != VK_NULL_HANDLE || indexBufferHandle != VK_NULL_HANDLE ||
-                                vertexBufferMemory != VK_NULL_HANDLE || indexBufferMemory != VK_NULL_HANDLE;
+        const bool hadBuffers = vertexBufferHandle != VK_NULL_HANDLE || indexBufferHandle != VK_NULL_HANDLE || vertexBufferMemory != VK_NULL_HANDLE || indexBufferMemory != VK_NULL_HANDLE;
         if (hadBuffers) {
             logMXModelStep("teardown begin", true);
         }
@@ -1255,8 +1185,7 @@ namespace mxvk {
     }
 
     void MXModel::drawSubMesh(VkCommandBuffer cmd, size_t index) const {
-        if (cmd == VK_NULL_HANDLE || index >= subMeshList.size() ||
-            vertexBufferHandle == VK_NULL_HANDLE || indexBufferHandle == VK_NULL_HANDLE) {
+        if (cmd == VK_NULL_HANDLE || index >= subMeshList.size() || vertexBufferHandle == VK_NULL_HANDLE || indexBufferHandle == VK_NULL_HANDLE) {
             return;
         }
 
@@ -1273,10 +1202,7 @@ namespace mxvk {
         vkCmdDrawIndexed(cmd, sm.indexCount, 1, sm.firstIndex, 0, 0);
     }
 
-    void MXModel::createBuffer(VkDevice device, VkPhysicalDevice physicalDevice,
-                               VkDeviceSize size, VkBufferUsageFlags usage,
-                               VkMemoryPropertyFlags properties,
-                               VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
+    void MXModel::createBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) {
         if (size == 0) {
             throw mxvk::Exception("MXModel::createBuffer cannot allocate zero-sized buffer");
         }
@@ -1320,8 +1246,7 @@ namespace mxvk {
         }
     }
 
-    uint32_t MXModel::findMemoryType(VkPhysicalDevice physicalDevice,
-                                     uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    uint32_t MXModel::findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
         VkPhysicalDeviceMemoryProperties memProperties{};
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
 
@@ -1336,9 +1261,7 @@ namespace mxvk {
         throw mxvk::Exception("MXModel::findMemoryType failed to find suitable memory type");
     }
 
-    void MXModel::copyBuffer(VkDevice device, VkCommandPool commandPool,
-                             VkQueue graphicsQueue,
-                             VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+    void MXModel::copyBuffer(VkDevice device, VkCommandPool commandPool, VkQueue graphicsQueue, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
         if (size == 0) {
             return;
         }
@@ -1432,9 +1355,7 @@ namespace mxvk {
 
         materialList.clear();
 
-        std::string manifestTextureBase = textureBasePath.empty()
-                                              ? std::filesystem::path(path).parent_path().string()
-                                              : textureBasePath;
+        std::string manifestTextureBase = textureBasePath.empty() ? std::filesystem::path(path).parent_path().string() : textureBasePath;
 
         if (isMtlLike) {
             std::istringstream stream{};

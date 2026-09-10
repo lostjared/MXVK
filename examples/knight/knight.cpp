@@ -67,11 +67,7 @@ namespace knight {
 
     class KnightsTourWindow : public mxvk::VK_Window {
       public:
-        KnightsTourWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync)
-            : mxvk::VK_Window("Knights Tour", width, height, fullscreen, MXVK_VALIDATION, enableVsync),
-              assetRoot((path.empty() || path == ".") ? std::string(KNIGHT_ASSET_DIR) : path),
-              fontPath(assetRoot + "/data/font.ttf"),
-              introStarted(SDL_GetTicks()) {
+        KnightsTourWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync) : mxvk::VK_Window("Knights Tour", width, height, fullscreen, MXVK_VALIDATION, enableVsync), assetRoot((path.empty() || path == ".") ? std::string(KNIGHT_ASSET_DIR) : path), fontPath(assetRoot + "/data/font.ttf"), introStarted(SDL_GetTicks()) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             setFont(fontPath, TEXT_SIZE);
             loadWindowIcon();
@@ -158,10 +154,7 @@ namespace knight {
         }
 
       private:
-        enum class Screen {
-            Intro,
-            Tour
-        };
+        enum class Screen { Intro, Tour };
 
         static constexpr float DESIGN_WIDTH = 640.0f;
         static constexpr float DESIGN_HEIGHT = 480.0f;
@@ -197,8 +190,7 @@ namespace knight {
                 return;
             }
 
-            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(
-                mxvk::LoadPNG((assetRoot + "/data/knight.png").c_str()), SDL_DestroySurface);
+            std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(mxvk::LoadPNG((assetRoot + "/data/knight.png").c_str()), SDL_DestroySurface);
             if (icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), icon.get())) {
                 std::cerr << std::format("knight: could not set window icon: {}\n", SDL_GetError());
             }
@@ -226,12 +218,7 @@ namespace knight {
             currentFontSize = desiredSize;
         }
 
-        void printScaledText(const std::string &text, int x, int y, float scaleX, float scaleY) {
-            printText(text,
-                      static_cast<int>(std::lround(x * scaleX)),
-                      static_cast<int>(std::lround(y * scaleY)),
-                      SDL_Color{255, 255, 255, 255});
-        }
+        void printScaledText(const std::string &text, int x, int y, float scaleX, float scaleY) { printText(text, static_cast<int>(std::lround(x * scaleX)), static_cast<int>(std::lround(y * scaleY)), SDL_Color{255, 255, 255, 255}); }
 
         void printMoveCount(float scaleX, float scaleY) {
             const std::string text = std::format("Moves: {}", tour.getMoves());
@@ -242,10 +229,7 @@ namespace knight {
             if (getTextDimensions(text, textWidth, textHeight)) {
                 x = std::max(0, static_cast<int>(swapchain_extent.width) - textWidth - rightMargin);
             }
-            printText(text,
-                      x,
-                      static_cast<int>(std::lround(TEXT_OFFSET_Y * scaleY)),
-                      SDL_Color{255, 255, 255, 255});
+            printText(text, x, static_cast<int>(std::lround(TEXT_OFFSET_Y * scaleY)), SDL_Color{255, 255, 255, 255});
         }
 
         void resetTourFromMousePosition(float mouseX, float mouseY) {
@@ -268,9 +252,7 @@ namespace knight {
         resetTour();
     }
 
-    void Tour::initializeBoard() {
-        board.resize(BOARD_SIZE, std::vector<int>(BOARD_SIZE, 0));
-    }
+    void Tour::initializeBoard() { board.resize(BOARD_SIZE, std::vector<int>(BOARD_SIZE, 0)); }
 
     void Tour::clearBoard() {
         for (auto &row : board) {
@@ -278,11 +260,7 @@ namespace knight {
         }
     }
 
-    bool Tour::isValidMove(const Position &position) const {
-        return position.row >= 0 && position.row < BOARD_SIZE &&
-               position.col >= 0 && position.col < BOARD_SIZE &&
-               board[position.row][position.col] == 0;
-    }
+    bool Tour::isValidMove(const Position &position) const { return position.row >= 0 && position.row < BOARD_SIZE && position.col >= 0 && position.col < BOARD_SIZE && board[position.row][position.col] == 0; }
 
     int Tour::getDegree(const Position &position) const {
         int count = 0;
@@ -309,9 +287,7 @@ namespace knight {
             }
         }
 
-        std::sort(nextMoves.begin(), nextMoves.end(), [](const auto &left, const auto &right) {
-            return left.first < right.first;
-        });
+        std::sort(nextMoves.begin(), nextMoves.end(), [](const auto &left, const auto &right) { return left.first < right.first; });
 
         for (const auto &[degree, nextPosition] : nextMoves) {
             [[maybe_unused]] const int moveDegree = degree;
@@ -328,9 +304,7 @@ namespace knight {
         return false;
     }
 
-    void Tour::resetTour() {
-        resetTour(std::rand() % BOARD_SIZE, std::rand() % BOARD_SIZE);
-    }
+    void Tour::resetTour() { resetTour(std::rand() % BOARD_SIZE, std::rand() % BOARD_SIZE); }
 
     void Tour::resetTour(int startRow, int startCol) {
         if (startRow < 0 || startRow >= BOARD_SIZE || startCol < 0 || startCol >= BOARD_SIZE) {
@@ -356,8 +330,7 @@ namespace knight {
 
         const int col = localX / CELL_SIZE;
         const int row = localY / CELL_SIZE;
-        if (row >= BOARD_SIZE || col >= BOARD_SIZE ||
-            localX % CELL_SIZE >= CELL_DRAW_SIZE || localY % CELL_SIZE >= CELL_DRAW_SIZE) {
+        if (row >= BOARD_SIZE || col >= BOARD_SIZE || localX % CELL_SIZE >= CELL_DRAW_SIZE || localY % CELL_SIZE >= CELL_DRAW_SIZE) {
             return;
         }
 
@@ -389,22 +362,12 @@ namespace knight {
                     cell = &redCell;
                 }
 
-                cell->drawSpriteRect(
-                    static_cast<int>(std::lround((START_X + col * CELL_SIZE) * scaleX)),
-                    static_cast<int>(std::lround((START_Y + row * CELL_SIZE) * scaleY)),
-                    static_cast<int>(std::lround(CELL_DRAW_SIZE * scaleX)),
-                    static_cast<int>(std::lround(CELL_DRAW_SIZE * scaleY)));
+                cell->drawSpriteRect(static_cast<int>(std::lround((START_X + col * CELL_SIZE) * scaleX)), static_cast<int>(std::lround((START_Y + row * CELL_SIZE) * scaleY)), static_cast<int>(std::lround(CELL_DRAW_SIZE * scaleX)), static_cast<int>(std::lround(CELL_DRAW_SIZE * scaleY)));
             }
         }
     }
 
-    void Tour::drawKnight(mxvk::VK_Sprite &texture, float scaleX, float scaleY) const {
-        texture.drawSpriteRect(
-            static_cast<int>(std::lround((START_X + knightPos.col * CELL_SIZE + 5) * scaleX)),
-            static_cast<int>(std::lround((START_Y + knightPos.row * CELL_SIZE + 5) * scaleY)),
-            static_cast<int>(std::lround(KNIGHT_SIZE * scaleX)),
-            static_cast<int>(std::lround(KNIGHT_SIZE * scaleY)));
-    }
+    void Tour::drawKnight(mxvk::VK_Sprite &texture, float scaleX, float scaleY) const { texture.drawSpriteRect(static_cast<int>(std::lround((START_X + knightPos.col * CELL_SIZE + 5) * scaleX)), static_cast<int>(std::lround((START_Y + knightPos.row * CELL_SIZE + 5) * scaleY)), static_cast<int>(std::lround(KNIGHT_SIZE * scaleX)), static_cast<int>(std::lround(KNIGHT_SIZE * scaleY))); }
 } // namespace knight
 
 int main(int argc, char **argv) {

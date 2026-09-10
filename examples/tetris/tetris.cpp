@@ -116,10 +116,7 @@ namespace {
 
     class HighScores {
       public:
-        explicit HighScores(std::filesystem::path filePath)
-            : filePath(std::move(filePath)) {
-            load();
-        }
+        explicit HighScores(std::filesystem::path filePath) : filePath(std::move(filePath)) { load(); }
 
         void addScore(std::string name, int score) {
             normalizeName(name);
@@ -135,13 +132,9 @@ namespace {
             return score > scoreEntries.back().score;
         }
 
-        [[nodiscard]] const std::vector<HighScoreEntry> &entries() const {
-            return scoreEntries;
-        }
+        [[nodiscard]] const std::vector<HighScoreEntry> &entries() const { return scoreEntries; }
 
-        [[nodiscard]] int bestScore() const {
-            return scoreEntries.empty() ? 0 : scoreEntries.front().score;
-        }
+        [[nodiscard]] int bestScore() const { return scoreEntries.empty() ? 0 : scoreEntries.front().score; }
 
         void write() const {
             std::ofstream out(filePath, std::ios::trunc);
@@ -295,12 +288,7 @@ namespace {
 
     class TetrisWindow final : public mxvk::VK_Window {
       public:
-        TetrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path),
-              dataRoot(assetRoot + "/data"),
-              shaderRoot(dataRoot),
-              highScores(resolveScoreFilePath()) {
+        TetrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("-[ MXVK 3D Tetris ]-", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot((path.empty() || path == ".") ? std::string(tetris_ASSET_DIR) : path), dataRoot(assetRoot + "/data"), shaderRoot(dataRoot), highScores(resolveScoreFilePath()) {
             std::random_device rd;
             rng.seed(rd());
             setFont(dataRoot + "/font.ttf", 22);
@@ -312,26 +300,11 @@ namespace {
             ensureMusicPlaying();
 #endif
             background = createSprite(dataRoot + "/psychedelic_background.png");
-            backgroundTransitionSprite = createSprite(
-                dataRoot + "/psychedelic_background.png",
-                shaderRoot + "/sprite.vert.spv",
-                shaderRoot + "/tetris_background_transition.frag.spv");
-            menuBackgroundSprite = createSprite(
-                dataRoot + "/start_screen.png",
-                shaderRoot + "/sprite.vert.spv",
-                shaderRoot + "/tetris_screen_fade.frag.spv");
-            highScoresBackgroundSprite = createSprite(
-                dataRoot + "/high_scores_screen.png",
-                shaderRoot + "/sprite.vert.spv",
-                shaderRoot + "/tetris_screen_fade.frag.spv");
-            creditsBackgroundSprite = createSprite(
-                dataRoot + "/credits_screen.png",
-                shaderRoot + "/sprite.vert.spv",
-                shaderRoot + "/tetris_screen_fade.frag.spv");
-            multiplayerBackgroundSprite = createSprite(
-                dataRoot + "/multiplayer_screen.png",
-                shaderRoot + "/sprite.vert.spv",
-                shaderRoot + "/tetris_screen_fade.frag.spv");
+            backgroundTransitionSprite = createSprite(dataRoot + "/psychedelic_background.png", shaderRoot + "/sprite.vert.spv", shaderRoot + "/tetris_background_transition.frag.spv");
+            menuBackgroundSprite = createSprite(dataRoot + "/start_screen.png", shaderRoot + "/sprite.vert.spv", shaderRoot + "/tetris_screen_fade.frag.spv");
+            highScoresBackgroundSprite = createSprite(dataRoot + "/high_scores_screen.png", shaderRoot + "/sprite.vert.spv", shaderRoot + "/tetris_screen_fade.frag.spv");
+            creditsBackgroundSprite = createSprite(dataRoot + "/credits_screen.png", shaderRoot + "/sprite.vert.spv", shaderRoot + "/tetris_screen_fade.frag.spv");
+            multiplayerBackgroundSprite = createSprite(dataRoot + "/multiplayer_screen.png", shaderRoot + "/sprite.vert.spv", shaderRoot + "/tetris_screen_fade.frag.spv");
             previewBorderSprite = createSprite(1, 1);
             const uint32_t whitePixel = 0xFFFFFFFFu;
             previewBorderSprite->updateTexture(&whitePixel, 1, 1);
@@ -339,9 +312,7 @@ namespace {
                 blockPreviewSprites[i] = createSprite(dataRoot + "/" + blockTextureFiles[i]);
             }
             gameOverSprite = createSprite(dataRoot + "/gameover.png");
-            introSprite = createSprite(dataRoot + "/intro.png",
-                                       shaderRoot + "/tetris_intro.vert.spv",
-                                       shaderRoot + "/tetris_intro.frag.spv");
+            introSprite = createSprite(dataRoot + "/intro.png", shaderRoot + "/tetris_intro.vert.spv", shaderRoot + "/tetris_intro.frag.spv");
             introStart = std::chrono::steady_clock::now();
             initModels();
             initCreditsModel();
@@ -364,9 +335,7 @@ namespace {
         }
 
         void onSwapchainRecreated() override {
-            forEachModel([this](mxvk::VKAbstractModel &model) {
-                model.resize(this);
-            });
+            forEachModel([this](mxvk::VKAbstractModel &model) { model.resize(this); });
         }
 
         void event(SDL_Event &e) override {
@@ -581,21 +550,16 @@ namespace {
             block.color = color;
             block.model = std::make_unique<mxvk::VKAbstractModel>();
             block.model->load(this, dataRoot + "/cube.mxmod.z", dataRoot + "/" + textureManifests[color], dataRoot, 1.0f);
-            block.model->setShaders(this,
-                                    shaderRoot + "/tetris_piece.vert.spv",
-                                    shaderRoot + "/tetris_piece.frag.spv");
+            block.model->setShaders(this, shaderRoot + "/tetris_piece.vert.spv", shaderRoot + "/tetris_piece.frag.spv");
             return block;
         }
 
         void cleanupModels() {
-            forEachModel([this](mxvk::VKAbstractModel &model) {
-                model.cleanup(this);
-            });
+            forEachModel([this](mxvk::VKAbstractModel &model) { model.cleanup(this); });
             lockedBlocks.clear();
         }
 
-        template <typename Fn>
-        void forEachModel(Fn fn) {
+        template <typename Fn> void forEachModel(Fn fn) {
             for (LockedBlock &locked : lockedBlocks) {
                 if (locked.block.model) {
                     fn(*locked.block.model);
@@ -618,14 +582,8 @@ namespace {
 
         void initCreditsModel() {
             creditsTuxModel = std::make_unique<mxvk::VKAbstractModel>();
-            creditsTuxModel->load(this,
-                                  dataRoot + "/tux/tux.obj",
-                                  dataRoot + "/tux/tux.mtl",
-                                  dataRoot + "/tux",
-                                  0.35f);
-            creditsTuxModel->setShaders(this,
-                                        shaderRoot + "/tetris_model.vert.spv",
-                                        shaderRoot + "/tetris_model.frag.spv");
+            creditsTuxModel->load(this, dataRoot + "/tux/tux.obj", dataRoot + "/tux/tux.mtl", dataRoot + "/tux", 0.35f);
+            creditsTuxModel->setShaders(this, shaderRoot + "/tetris_model.vert.spv", shaderRoot + "/tetris_model.frag.spv");
         }
 
         void resetGame() {
@@ -1189,8 +1147,7 @@ namespace {
             const Sint16 rightX = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
             const Sint16 rightY = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
 
-            const int moveDirection = (leftX < -gamepadDeadzone) ? -1 : (leftX > gamepadDeadzone) ? 1
-                                                                                                  : 0;
+            const int moveDirection = (leftX < -gamepadDeadzone) ? -1 : (leftX > gamepadDeadzone) ? 1 : 0;
             if (moveDirection == 0) {
                 gamepadMoveDirection = 0;
                 gamepadMoveHeldSeconds = 0.0f;
@@ -1203,9 +1160,7 @@ namespace {
                     movePiece(gamepadMoveDirection, 0);
                 } else {
                     gamepadMoveHeldSeconds += deltaSeconds;
-                    const float threshold = (gamepadMoveHeldSeconds < gamepadMoveInitialDelaySeconds)
-                                                ? gamepadMoveInitialDelaySeconds
-                                                : gamepadMoveRepeatSeconds;
+                    const float threshold = (gamepadMoveHeldSeconds < gamepadMoveInitialDelaySeconds) ? gamepadMoveInitialDelaySeconds : gamepadMoveRepeatSeconds;
                     gamepadMoveRepeatTimer += deltaSeconds;
                     if (gamepadMoveRepeatTimer >= threshold) {
                         movePiece(gamepadMoveDirection, 0);
@@ -1233,9 +1188,7 @@ namespace {
                 gridYaw += static_cast<float>(rightX) * gamepadStickScale * gamepadStickRotateSpeed * deltaSeconds;
             }
             if (std::abs(rightY) > gamepadDeadzone) {
-                gridPitch = std::clamp(gridPitch - static_cast<float>(rightY) * gamepadStickScale * gamepadStickPitchSpeed * deltaSeconds,
-                                       -70.0f,
-                                       70.0f);
+                gridPitch = std::clamp(gridPitch - static_cast<float>(rightY) * gamepadStickScale * gamepadStickPitchSpeed * deltaSeconds, -70.0f, 70.0f);
             }
 
             constexpr float gamepadZoomSpeed = 3.2f;
@@ -1440,9 +1393,7 @@ namespace {
             goToHighScores();
         }
 
-        [[nodiscard]] char currentNameCharacter() const {
-            return nameCharacters[nameCharIndex % nameCharacterCount];
-        }
+        [[nodiscard]] char currentNameCharacter() const { return nameCharacters[nameCharIndex % nameCharacterCount]; }
 
         void cycleNameCharacter(int delta) {
             if (!enteringName) {
@@ -1518,13 +1469,9 @@ namespace {
             requestScreen(AppScreen::HighScores);
         }
 
-        void goToCredits() {
-            requestScreen(AppScreen::Credits);
-        }
+        void goToCredits() { requestScreen(AppScreen::Credits); }
 
-        void goToNetworkMultiplayer() {
-            requestScreen(AppScreen::NetworkMultiplayer);
-        }
+        void goToNetworkMultiplayer() { requestScreen(AppScreen::NetworkMultiplayer); }
 
         void requestScreen(AppScreen nextScreen) {
             if (screen == nextScreen && !screenTransitionActive) {
@@ -1957,9 +1904,7 @@ namespace {
             lockedBlocks = std::move(remaining);
         }
 
-        [[nodiscard]] bool isClearingRow(int y) const {
-            return lineClearActive && y >= 0 && y < boardHeight && clearingRows[y];
-        }
+        [[nodiscard]] bool isClearingRow(int y) const { return lineClearActive && y >= 0 && y < boardHeight && clearingRows[y]; }
 
         [[nodiscard]] bool isLineClearVisible() const {
             const auto now = std::chrono::steady_clock::now();
@@ -2012,14 +1957,7 @@ namespace {
             return model;
         }
 
-        void drawBlock(VkCommandBuffer cmd,
-                       uint32_t imageIndex,
-                       BlockModel &block,
-                       int x,
-                       int y,
-                       int color,
-                       const glm::mat4 &view,
-                       const glm::mat4 &proj) {
+        void drawBlock(VkCommandBuffer cmd, uint32_t imageIndex, BlockModel &block, int x, int y, int color, const glm::mat4 &view, const glm::mat4 &proj) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = blockMatrix(x, y);
             ubo.view = view;
@@ -2040,13 +1978,7 @@ namespace {
             }
         }
 
-        void drawFrameBlock(VkCommandBuffer cmd,
-                            uint32_t imageIndex,
-                            BlockModel &block,
-                            int x,
-                            int y,
-                            const glm::mat4 &view,
-                            const glm::mat4 &proj) {
+        void drawFrameBlock(VkCommandBuffer cmd, uint32_t imageIndex, BlockModel &block, int x, int y, const glm::mat4 &view, const glm::mat4 &proj) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = blockMatrix(x, y, cubeScale * 0.82f);
             ubo.view = view;
@@ -2265,10 +2197,7 @@ namespace {
                     const bool hasScore = i < scores.size();
                     const std::string nameText = hasScore ? scores[i].name : "---";
                     const std::string scoreText = hasScore ? std::format("{}", scores[i].score) : "---";
-                    printText(std::format("{:>2}. {}", i + 1U, nameText),
-                              listLeftX,
-                              rowY,
-                              withAlpha(SDL_Color{255, 255, 255, 255}));
+                    printText(std::format("{:>2}. {}", i + 1U, nameText), listLeftX, rowY, withAlpha(SDL_Color{255, 255, 255, 255}));
                     int scoreWidth = 0;
                     int scoreHeight = 0;
                     if (getTextDimensions(scoreText, scoreWidth, scoreHeight)) {
@@ -2317,10 +2246,7 @@ namespace {
                 }
                 if (enteringName) {
                     printCenteredText("New high score", centerX, baseY + 82, withGameOverAlpha(SDL_Color{255, 220, 120, 255}));
-                    printCenteredText(std::format("Name: {}", playerName.empty() ? "_" : playerName),
-                                      centerX,
-                                      baseY + 118,
-                                      withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
+                    printCenteredText(std::format("Name: {}", playerName.empty() ? "_" : playerName), centerX, baseY + 118, withGameOverAlpha(SDL_Color{255, 255, 255, 255}));
                     printCenteredText(std::format("Pick: [{}]", currentNameCharacter()), centerX, baseY + 154, withGameOverAlpha(SDL_Color{120, 255, 255, 255}));
                     printCenteredText("Up/Down choose, A/Space add", centerX, baseY + 190, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));
                     printCenteredText("X/Enter save, B/Backspace delete", centerX, baseY + 224, withGameOverAlpha(SDL_Color{200, 200, 200, 255}));

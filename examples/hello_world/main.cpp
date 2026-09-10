@@ -18,11 +18,7 @@ namespace example {
         };
 
       public:
-        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root((path.empty() ? std::string(HELLO_WORLD_ASSET_DIR) : path) + "/data") {
-            setClearColor(0.02f, 0.03f, 0.06f, 1.0f);
-        }
+        ExampleWindow(const std::string path, const std::string &text, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(text, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), shader_root((path.empty() ? std::string(HELLO_WORLD_ASSET_DIR) : path) + "/data") { setClearColor(0.02f, 0.03f, 0.06f, 1.0f); }
 
         ~ExampleWindow() override {
             if (device != VK_NULL_HANDLE) {
@@ -31,9 +27,7 @@ namespace example {
             destroyGraphicsPipeline();
         }
 
-        void onSwapchainAboutToRecreate() override {
-            destroyGraphicsPipeline();
-        }
+        void onSwapchainAboutToRecreate() override { destroyGraphicsPipeline(); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
             if (!ensureGraphicsPipeline()) {
@@ -45,17 +39,10 @@ namespace example {
             const auto now = std::chrono::steady_clock::now();
             const float elapsed_seconds = std::chrono::duration<float>(now - start_time).count();
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect =
-                (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const PushConstants push_constants{elapsed_seconds, aspect};
-            vkCmdPushConstants(
-                cmd,
-                pipeline_layout,
-                VK_SHADER_STAGE_VERTEX_BIT,
-                0,
-                sizeof(PushConstants),
-                &push_constants);
+            vkCmdPushConstants(cmd, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &push_constants);
 
             vkCmdDraw(cmd, 3, 1, 0, 0);
         }
@@ -161,11 +148,7 @@ namespace example {
                 depth_stencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState color_blend_attachment{};
-                color_blend_attachment.colorWriteMask =
-                    VK_COLOR_COMPONENT_R_BIT |
-                    VK_COLOR_COMPONENT_G_BIT |
-                    VK_COLOR_COMPONENT_B_BIT |
-                    VK_COLOR_COMPONENT_A_BIT;
+                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 color_blend_attachment.blendEnable = VK_FALSE;
 
                 VkPipelineColorBlendStateCreateInfo color_blending{};

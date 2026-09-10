@@ -16,9 +16,7 @@ namespace example {
 
     class GlitchCubeWindow : public mxvk::VK_Window {
       public:
-        GlitchCubeWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot((path.empty() || path == ".") ? std::string(GLITCH_CUBE_ASSET_DIR) : path) {
+        GlitchCubeWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot((path.empty() || path == ".") ? std::string(GLITCH_CUBE_ASSET_DIR) : path) {
             const std::string shaderRoot = assetRoot + "/data";
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/cube.mxmod.z") : filename;
             const std::string textureManifestPath = assetRoot + "/data/cube.tex";
@@ -106,17 +104,13 @@ namespace example {
             printText(std::format("Current scale: {:.1f}", cubeScale), 25, 165, {230, 245, 255, 255});
         }
 
-        void onSwapchainRecreated() override {
-            model.resize(this);
-        }
+        void onSwapchainRecreated() override { model.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const float elapsedSeconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
             const VkExtent2D extent = getSwapchainExtent();
 
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const float rotationAngle = elapsedSeconds * glm::radians(50.0f);
 
@@ -127,10 +121,7 @@ namespace example {
 
             const float yawRadians = glm::radians(yawDegrees);
             const float pitchRadians = glm::radians(pitchDegrees);
-            const glm::vec3 cameraPos{
-                cameraDistance * std::cos(pitchRadians) * std::sin(yawRadians),
-                cameraDistance * std::sin(pitchRadians),
-                cameraDistance * std::cos(pitchRadians) * std::cos(yawRadians)};
+            const glm::vec3 cameraPos{cameraDistance * std::cos(pitchRadians) * std::sin(yawRadians), cameraDistance * std::sin(pitchRadians), cameraDistance * std::cos(pitchRadians) * std::cos(yawRadians)};
 
             ubo.view = glm::lookAt(cameraPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             ubo.proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);

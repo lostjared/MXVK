@@ -94,9 +94,7 @@ namespace mxvk {
         return keyIt->second;
     }
 
-    void VK_Config::setItem(const std::string &section, const std::string &key, const std::string &value) {
-        values[section][key] = {key, value};
-    }
+    void VK_Config::setItem(const std::string &section, const std::string &key, const std::string &value) { values[section][key] = {key, value}; }
 
     std::vector<std::string> VK_Config::splitByComma(const std::string &str) const {
         std::vector<std::string> result;
@@ -112,9 +110,7 @@ namespace mxvk {
         return result;
     }
 
-    VK_Config::VK_Config(const std::string &filePath) : file_name(filePath) {
-        loadFile(filePath);
-    }
+    VK_Config::VK_Config(const std::string &filePath) : file_name(filePath) { loadFile(filePath); }
 
     VK_Config::~VK_Config() {
         if (!file_name.empty()) {

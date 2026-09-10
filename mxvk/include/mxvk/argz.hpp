@@ -99,13 +99,7 @@ concept StringType = std::is_class_v<T> && requires(T type) {
 }
 
 /** @brief Discriminator for option kind used inside Argument. */
-enum class ArgType {
-    ARG_SINGLE,
-    ARG_SINGLE_VALUE,
-    ARG_DOUBLE,
-    ARG_DOUBLE_VALUE,
-    ARG_NONE
-};
+enum class ArgType { ARG_SINGLE, ARG_SINGLE_VALUE, ARG_DOUBLE, ARG_DOUBLE_VALUE, ARG_NONE };
 
 /**
  * @struct Argument
@@ -116,8 +110,7 @@ enum class ArgType {
  * matched code (or @c '-' for bare positional arguments) and @c arg_value holds
  * any associated value string.
  */
-template <StringType String>
-struct Argument {
+template <StringType String> struct Argument {
     String arg_name;  ///< Long option name (e.g. @c "output").
     int arg_letter;   ///< Short option code (e.g. @c 'o') or unique integer for long-only options.
     String arg_value; ///< Value string supplied after the option, if any.
@@ -143,8 +136,7 @@ struct Argument {
  * @brief Holds the raw @c argv strings converted to the target @c String type.
  * @tparam String String type satisfying StringType.
  */
-template <StringType String>
-struct ArgumentData {
+template <StringType String> struct ArgumentData {
     std::vector<String> args; ///< Converted argv entries (argv[1] … argv[argc-1]).
     int argc;                 ///< Original argc value.
     ~ArgumentData() = default;
@@ -174,8 +166,7 @@ struct ArgumentData {
  * @brief Exception thrown by Argz::proc() on unrecognised or malformed options.
  * @tparam String String type satisfying StringType.
  */
-template <StringType String>
-class ArgException {
+template <StringType String> class ArgException {
   public:
     ArgException() = default;
     ArgException(const String &s) : value{s} {}
@@ -193,8 +184,7 @@ class ArgException {
  * Options are registered with addOption*() before parsing.
  * Call proc() in a loop until it returns @c -1 to iterate over all arguments.
  */
-template <StringType String>
-class Argz {
+template <StringType String> class Argz {
   public:
     ~Argz() = default;
     Argz() = default;
@@ -502,8 +492,7 @@ class Argz {
      * @tparam T Output stream type (e.g. @c std::ostream, @c std::wostream).
      * @param cout Destination stream.
      */
-    template <typename T>
-    void help(T &cout) {
+    template <typename T> void help(T &cout) {
         using char_type = typename std::decay<decltype(*std::declval<T>().rdbuf())>::type::char_type;
         const bool use_color = supportsColor(cout);
         auto write_ansi = [&](const char *seq) {
@@ -581,8 +570,7 @@ class Argz {
     std::unordered_map<int, Argument<String>> arg_info;
 
   private:
-    template <typename Stream>
-    static bool supportsColor(const Stream &stream) {
+    template <typename Stream> static bool supportsColor(const Stream &stream) {
         if constexpr (std::is_same_v<Stream, std::ostream>) {
             if (&stream != &std::cout) {
                 return false;
@@ -807,13 +795,7 @@ struct Arguments {
     constexpr std::string_view exe_extension = ".exe";
     if (name.size() >= exe_extension.size()) {
         const std::string::size_type extension_pos = name.size() - exe_extension.size();
-        const bool has_exe_extension = std::ranges::equal(name.begin() + static_cast<std::ptrdiff_t>(extension_pos),
-                                                          name.end(),
-                                                          exe_extension.begin(),
-                                                          exe_extension.end(),
-                                                          [](char left, char right) {
-                                                              return std::tolower(static_cast<unsigned char>(left)) == std::tolower(static_cast<unsigned char>(right));
-                                                          });
+        const bool has_exe_extension = std::ranges::equal(name.begin() + static_cast<std::ptrdiff_t>(extension_pos), name.end(), exe_extension.begin(), exe_extension.end(), [](char left, char right) { return std::tolower(static_cast<unsigned char>(left)) == std::tolower(static_cast<unsigned char>(right)); });
         if (has_exe_extension) {
             name.erase(extension_pos);
         }

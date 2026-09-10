@@ -32,7 +32,7 @@ void exit_signal(int) {
 int main(int argc, char **argv) {
     if (argc != 2) {
         std::cerr << "server: Invalid arguments\n"
-        << argv[0] << " <port>\n";
+                  << argv[0] << " <port>\n";
         return EXIT_FAILURE;
     }
     mxnetwork::MXNetworkInit net_init;
@@ -64,18 +64,19 @@ int main(int argc, char **argv) {
                         ssize_t bytes = 0;
                         if ((bytes = sfd.read_all(buffer, 255)) > 0) {
                             buffer[bytes] = '\0';
-                    std::string value{buffer};
-                    if (value.find("exit") != std::string::npos) {
-                        active_loop.store(false);
-                        std::cerr << "server: Exiting..\n";
-                        shutdown(sockfd, SHUT_RDWR);
-                        return;
-                    }
-                    std::cout << value << "\n";
+                            std::string value{buffer};
+                            if (value.find("exit") != std::string::npos) {
+                                active_loop.store(false);
+                                std::cerr << "server: Exiting..\n";
+                                shutdown(sockfd, SHUT_RDWR);
+                                return;
+                            }
+                            std::cout << value << "\n";
                         } else {
                             std::cerr << "Error reading stream.\n";
                         }
-                    }, std::move(*s));
+                    },
+                                  std::move(*s));
 
                     t.detach();
                 } else {

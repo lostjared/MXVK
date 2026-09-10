@@ -37,9 +37,7 @@ namespace {
 
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
@@ -91,20 +89,14 @@ namespace {
                 const float y = std::cos(phi);
                 for (int longitude = 0; longitude <= longitude_segments; ++longitude) {
                     const float theta = static_cast<float>(longitude) * 2.0f * mxvk::PI / static_cast<float>(longitude_segments);
-                    mesh.vertices.emplace_back(
-                        ring_radius * std::cos(theta),
-                        y,
-                        ring_radius * std::sin(theta),
-                        1.0f);
+                    mesh.vertices.emplace_back(ring_radius * std::cos(theta), y, ring_radius * std::sin(theta), 1.0f);
                 }
             }
 
             const std::size_t row_size = static_cast<std::size_t>(longitude_segments + 1);
             for (int latitude = 0; latitude < latitude_segments; ++latitude) {
                 for (int longitude = 0; longitude < longitude_segments; ++longitude) {
-                    const std::size_t first =
-                        static_cast<std::size_t>(latitude) * row_size +
-                        static_cast<std::size_t>(longitude);
+                    const std::size_t first = static_cast<std::size_t>(latitude) * row_size + static_cast<std::size_t>(longitude);
                     const std::size_t second = first + row_size;
                     mesh.triangles.push_back({{first, second, first + 1}});
                     mesh.triangles.push_back({{first + 1, second, second + 1}});
@@ -124,10 +116,7 @@ namespace {
 
     class SoftwareRenderer {
       public:
-        SoftwareRenderer(int width, int height)
-            : frame_width(width),
-              frame_height(height),
-              depth_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) {
+        SoftwareRenderer(int width, int height) : frame_width(width), frame_height(height), depth_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) {
             frame_surface.reset(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
             if (frame_surface == nullptr) {
                 throw mxvk::Exception(std::format("3dmath_pong: failed to create framebuffer: {}", SDL_GetError()));
@@ -139,17 +128,11 @@ namespace {
             camera_rotation.BuildXYZ(17.0f, -8.0f, 0.0f);
         }
 
-        [[nodiscard]] SDL_Surface *surface() const {
-            return frame_surface.get();
-        }
+        [[nodiscard]] SDL_Surface *surface() const { return frame_surface.get(); }
 
-        [[nodiscard]] int width() const {
-            return frame_width;
-        }
+        [[nodiscard]] int width() const { return frame_width; }
 
-        [[nodiscard]] int height() const {
-            return frame_height;
-        }
+        [[nodiscard]] int height() const { return frame_height; }
 
         void begin_frame() {
             std::ranges::fill(depth_buffer, std::numeric_limits<float>::infinity());
@@ -173,11 +156,7 @@ namespace {
             std::vector<mxvk::vec4D> projected_vertices(instance.mesh.vertices.size());
             for (std::size_t index = 0; index < instance.mesh.vertices.size(); ++index) {
                 const mxvk::vec4D &vertex = instance.mesh.vertices[index];
-                mxvk::vec4D transformed(
-                    vertex.x * instance.scale.x,
-                    vertex.y * instance.scale.y,
-                    vertex.z * instance.scale.z,
-                    1.0f);
+                mxvk::vec4D transformed(vertex.x * instance.scale.x, vertex.y * instance.scale.y, vertex.z * instance.scale.z, 1.0f);
                 transformed = object_rotation.MulVec(transformed);
                 transformed += instance.position;
                 transformed = camera_rotation.MulVec(transformed);
@@ -205,11 +184,7 @@ namespace {
 
                 const float diffuse = std::max(0.0f, normal.DotProduct(light_direction));
                 const float intensity = std::clamp(0.32f + diffuse * 0.68f, 0.0f, 1.0f);
-                rasterize_triangle(
-                    projected_vertices[triangle.indices[0]],
-                    projected_vertices[triangle.indices[1]],
-                    projected_vertices[triangle.indices[2]],
-                    mxvk::shade_color(instance.color, intensity));
+                rasterize_triangle(projected_vertices[triangle.indices[0]], projected_vertices[triangle.indices[1]], projected_vertices[triangle.indices[2]], mxvk::shade_color(instance.color, intensity));
             }
         }
 
@@ -227,12 +202,8 @@ namespace {
                 0b1111011,
             };
             const std::uint8_t segments = SEGMENTS[static_cast<std::size_t>(std::clamp(digit, 0, 9))];
-            const auto horizontal = [this, scale, color](int left, int top) {
-                fill_rectangle(left + scale, top, scale * 3, scale, color);
-            };
-            const auto vertical = [this, scale, color](int left, int top) {
-                fill_rectangle(left, top + scale, scale, scale * 3, color);
-            };
+            const auto horizontal = [this, scale, color](int left, int top) { fill_rectangle(left + scale, top, scale * 3, scale, color); };
+            const auto vertical = [this, scale, color](int left, int top) { fill_rectangle(left, top + scale, scale, scale * 3, color); };
             if ((segments & 0b1000000U) != 0U)
                 horizontal(x, y);
             if ((segments & 0b0100000U) != 0U)
@@ -267,23 +238,13 @@ namespace {
             return value;
         }
 
-        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
-            return SDL_MapRGBA(
-                frame_format,
-                nullptr,
-                mxvk::color_r(color),
-                mxvk::color_g(color),
-                mxvk::color_b(color),
-                mxvk::color_a(color));
-        }
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const { return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color)); }
 
         void put_pixel(int x, int y, mxvk::MXCOLOR color) {
             if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {
                 return;
             }
-            auto *row =
-                static_cast<std::uint8_t *>(frame_surface->pixels) +
-                static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch);
+            auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch);
             *(reinterpret_cast<std::uint32_t *>(row) + x) = map_color(color);
         }
 
@@ -307,9 +268,7 @@ namespace {
         }
 
         void rasterize_triangle(const mxvk::vec4D &a, const mxvk::vec4D &b, const mxvk::vec4D &c, mxvk::MXCOLOR color) {
-            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) {
-                return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x);
-            };
+            const auto edge = [](const mxvk::vec4D &first, const mxvk::vec4D &second, float x, float y) { return (x - first.x) * (second.y - first.y) - (y - first.y) * (second.x - first.x); };
             const float area = edge(b, c, a.x, a.y);
             if (std::abs(area) <= mxvk::EPSILON) {
                 return;
@@ -334,9 +293,7 @@ namespace {
                         continue;
                     }
                     const float depth = 1.0f / reciprocal_depth;
-                    const std::size_t pixel_index =
-                        static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) +
-                        static_cast<std::size_t>(x);
+                    const std::size_t pixel_index = static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_width) + static_cast<std::size_t>(x);
                     if (depth >= depth_buffer[pixel_index]) {
                         continue;
                     }
@@ -349,10 +306,7 @@ namespace {
 
     class PongGame {
       public:
-        PongGame()
-            : random_engine(std::random_device{}()) {
-            reset();
-        }
+        PongGame() : random_engine(std::random_device{}()) { reset(); }
 
         void reset() {
             player_y = 0.0f;
@@ -363,17 +317,11 @@ namespace {
             reset_ball(random_direction());
         }
 
-        void toggle_pause() {
-            paused = !paused;
-        }
+        void toggle_pause() { paused = !paused; }
 
-        void set_player_position(float position) {
-            player_y = std::clamp(position, paddle_minimum_y(), paddle_maximum_y());
-        }
+        void set_player_position(float position) { player_y = std::clamp(position, paddle_minimum_y(), paddle_maximum_y()); }
 
-        void move_player(float movement) {
-            set_player_position(player_y + movement);
-        }
+        void move_player(float movement) { set_player_position(player_y + movement); }
 
         void update(float delta_seconds) {
             if (paused) {
@@ -424,13 +372,9 @@ namespace {
         bool paused = false;
         std::mt19937 random_engine;
 
-        [[nodiscard]] static float paddle_minimum_y() {
-            return -COURT_HALF_HEIGHT + PADDLE_HALF_HEIGHT + 0.08f;
-        }
+        [[nodiscard]] static float paddle_minimum_y() { return -COURT_HALF_HEIGHT + PADDLE_HALF_HEIGHT + 0.08f; }
 
-        [[nodiscard]] static float paddle_maximum_y() {
-            return COURT_HALF_HEIGHT - PADDLE_HALF_HEIGHT - 0.08f;
-        }
+        [[nodiscard]] static float paddle_maximum_y() { return COURT_HALF_HEIGHT - PADDLE_HALF_HEIGHT - 0.08f; }
 
         [[nodiscard]] float random_direction() {
             std::uniform_int_distribution<int> distribution(0, 1);
@@ -449,10 +393,8 @@ namespace {
             if (ball_velocity.x * outgoing_direction >= 0.0f) {
                 return;
             }
-            const bool horizontal_overlap =
-                std::abs(ball_position.x - paddle_x) <= PADDLE_HALF_WIDTH + BALL_RADIUS;
-            const bool vertical_overlap =
-                std::abs(ball_position.y - paddle_y) <= PADDLE_HALF_HEIGHT + BALL_RADIUS;
+            const bool horizontal_overlap = std::abs(ball_position.x - paddle_x) <= PADDLE_HALF_WIDTH + BALL_RADIUS;
+            const bool vertical_overlap = std::abs(ball_position.y - paddle_y) <= PADDLE_HALF_HEIGHT + BALL_RADIUS;
             if (!horizontal_overlap || !vertical_overlap) {
                 return;
             }
@@ -472,11 +414,7 @@ namespace {
 namespace example {
     class Math3DPongWindow final : public mxvk::VK_Window {
       public:
-        Math3DPongWindow(bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
-            : mxvk::VK_Window("MXVK 3D Math Pong", WINDOW_WIDTH, WINDOW_HEIGHT, fullscreen, MXVK_VALIDATION, enable_vsync),
-              renderer(framebuffer.width, framebuffer.height),
-              cube_mesh(Mesh::cube()),
-              ball_mesh(Mesh::sphere(8, 12)) {
+        Math3DPongWindow(bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer) : mxvk::VK_Window("MXVK 3D Math Pong", WINDOW_WIDTH, WINDOW_HEIGHT, fullscreen, MXVK_VALIDATION, enable_vsync), renderer(framebuffer.width, framebuffer.height), cube_mesh(Mesh::cube()), ball_mesh(Mesh::sphere(8, 12)) {
             setClearColor(0.01f, 0.02f, 0.04f, 1.0f);
             mxvk::BuildTables();
         }
@@ -498,8 +436,7 @@ namespace example {
                 }
             }
             if (event.type == SDL_EVENT_MOUSE_MOTION) {
-                const float normalized =
-                    1.0f - 2.0f * event.motion.y / static_cast<float>(std::max(1, output_height));
+                const float normalized = 1.0f - 2.0f * event.motion.y / static_cast<float>(std::max(1, output_height));
                 game.set_player_position(normalized * COURT_HALF_HEIGHT);
             }
         }
@@ -534,9 +471,7 @@ namespace example {
 
         void update_game() {
             const auto now = std::chrono::steady_clock::now();
-            const float delta_seconds = std::min(
-                std::chrono::duration<float>(now - previous_frame_time).count(),
-                0.05f);
+            const float delta_seconds = std::min(std::chrono::duration<float>(now - previous_frame_time).count(), 0.05f);
             previous_frame_time = now;
 
             const bool *keyboard = SDL_GetKeyboardState(nullptr);
@@ -560,20 +495,11 @@ namespace example {
             draw_cuboid({0.0f, -COURT_HALF_HEIGHT - 0.07f, 0.08f, 1.0f}, {2.72f, 0.07f, 0.12f, 0.0f}, mxvk::MXVK_RGB(45, 198, 255));
 
             for (int dash = -4; dash <= 4; ++dash) {
-                draw_cuboid(
-                    {0.0f, static_cast<float>(dash) * 0.31f, 0.11f, 1.0f},
-                    {0.025f, 0.09f, 0.025f, 0.0f},
-                    mxvk::MXVK_RGB(112, 151, 180));
+                draw_cuboid({0.0f, static_cast<float>(dash) * 0.31f, 0.11f, 1.0f}, {0.025f, 0.09f, 0.025f, 0.0f}, mxvk::MXVK_RGB(112, 151, 180));
             }
 
-            draw_cuboid(
-                {-PADDLE_X, game.player_position(), -0.02f, 1.0f},
-                {PADDLE_HALF_WIDTH, PADDLE_HALF_HEIGHT, 0.18f, 0.0f},
-                mxvk::MXVK_RGB(30, 144, 255));
-            draw_cuboid(
-                {PADDLE_X, game.computer_position(), -0.02f, 1.0f},
-                {PADDLE_HALF_WIDTH, PADDLE_HALF_HEIGHT, 0.18f, 0.0f},
-                mxvk::MXVK_RGB(255, 65, 112));
+            draw_cuboid({-PADDLE_X, game.player_position(), -0.02f, 1.0f}, {PADDLE_HALF_WIDTH, PADDLE_HALF_HEIGHT, 0.18f, 0.0f}, mxvk::MXVK_RGB(30, 144, 255));
+            draw_cuboid({PADDLE_X, game.computer_position(), -0.02f, 1.0f}, {PADDLE_HALF_WIDTH, PADDLE_HALF_HEIGHT, 0.18f, 0.0f}, mxvk::MXVK_RGB(255, 65, 112));
 
             const float rotation = static_cast<float>(SDL_GetTicks()) * 0.18f;
             renderer.draw_mesh({
@@ -586,18 +512,8 @@ namespace example {
 
             const int score_scale = std::max(2, std::min(renderer.width(), renderer.height()) / 80);
             const int score_y = score_scale * 3;
-            renderer.draw_digit(
-                renderer.width() / 2 - score_scale * 10,
-                score_y,
-                game.left_score() % 10,
-                score_scale,
-                mxvk::MXVK_RGB(80, 183, 255));
-            renderer.draw_digit(
-                renderer.width() / 2 + score_scale * 4,
-                score_y,
-                game.right_score() % 10,
-                score_scale,
-                mxvk::MXVK_RGB(255, 91, 133));
+            renderer.draw_digit(renderer.width() / 2 - score_scale * 10, score_y, game.left_score() % 10, score_scale, mxvk::MXVK_RGB(80, 183, 255));
+            renderer.draw_digit(renderer.width() / 2 + score_scale * 4, score_y, game.right_score() % 10, score_scale, mxvk::MXVK_RGB(255, 91, 133));
             if (game.is_paused()) {
                 renderer.draw_pause_indicator();
             }
@@ -618,9 +534,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        const FramebufferDimensions framebuffer = args.framebufferSpecified
-                                                      ? args.framebuffer
-                                                      : FramebufferDimensions{DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT};
+        const FramebufferDimensions framebuffer = args.framebufferSpecified ? args.framebuffer : FramebufferDimensions{DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT};
         example::Math3DPongWindow window(args.fullscreen, args.enable_vsync, framebuffer);
         window.loop();
     } catch (mxvk::Exception &exception) {

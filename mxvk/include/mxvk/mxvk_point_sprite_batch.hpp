@@ -76,11 +76,7 @@ namespace mxvk {
          * @param max_vertices Maximum number of point vertices the batch can draw.
          * @throws mxvk::Exception on invalid input or Vulkan resource failure.
          */
-        void load(VK_Window *window,
-                  const std::string &texture_path,
-                  const std::string &vertex_shader_path,
-                  const std::string &fragment_shader_path,
-                  size_t max_vertices);
+        void load(VK_Window *window, const std::string &texture_path, const std::string &vertex_shader_path, const std::string &fragment_shader_path, size_t max_vertices);
 
         /**
          * @brief Recreate swapchain-dependent resources after a window resize.

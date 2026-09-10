@@ -22,9 +22,7 @@ namespace example {
             }
         }
 
-        void proc() override {
-            printText("Hello World", 15, 15, SDL_Color{255, 255, 255, 255});
-        }
+        void proc() override { printText("Hello World", 15, 15, SDL_Color{255, 255, 255, 255}); }
     };
 } // namespace example
 

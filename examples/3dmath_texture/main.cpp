@@ -24,9 +24,7 @@
 namespace {
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
@@ -129,11 +127,7 @@ namespace {
                 std::uint8_t b = 0;
                 std::uint8_t a = 0;
                 SDL_GetRGBA(src[x], format, nullptr, &r, &g, &b, &a);
-                texture.pixels[static_cast<std::size_t>(y * texture.width + x)] =
-                    (static_cast<mxvk::MXCOLOR>(a) << 24U) |
-                    (static_cast<mxvk::MXCOLOR>(r) << 16U) |
-                    (static_cast<mxvk::MXCOLOR>(g) << 8U) |
-                    static_cast<mxvk::MXCOLOR>(b);
+                texture.pixels[static_cast<std::size_t>(y * texture.width + x)] = (static_cast<mxvk::MXCOLOR>(a) << 24U) | (static_cast<mxvk::MXCOLOR>(r) << 16U) | (static_cast<mxvk::MXCOLOR>(g) << 8U) | static_cast<mxvk::MXCOLOR>(b);
             }
         }
 
@@ -144,13 +138,7 @@ namespace {
 namespace example {
     class Math3DTextureWindow : public mxvk::VK_Window {
       public:
-        Math3DTextureWindow(const Arguments &args, const std::string &title)
-            : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
-              texture(load_texture(resolve_texture_path(args))),
-              frame_width(args.framebuffer.width),
-              frame_height(args.framebuffer.height),
-              fallback_width(args.width),
-              fallback_height(args.height) {
+        Math3DTextureWindow(const Arguments &args, const std::string &title) : mxvk::VK_Window(title, args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync), texture(load_texture(resolve_texture_path(args))), frame_width(args.framebuffer.width), frame_height(args.framebuffer.height), fallback_width(args.width), fallback_height(args.height) {
             setClearColor(0.012f, 0.015f, 0.022f, 1.0f);
             mxvk::BuildTables();
         }
@@ -232,9 +220,7 @@ namespace example {
                 faces.push_back({indices, center.z, intensity});
             }
 
-            std::ranges::sort(faces, [](const FaceDraw &left, const FaceDraw &right) {
-                return left.depth > right.depth;
-            });
+            std::ranges::sort(faces, [](const FaceDraw &left, const FaceDraw &right) { return left.depth > right.depth; });
 
             for (const FaceDraw &face : faces) {
                 const auto index0 = static_cast<std::size_t>(face.indices[0]);
@@ -283,13 +269,9 @@ namespace example {
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
         }
 
-        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
-            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
-        }
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const { return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color)); }
 
-        void clear_frame(mxvk::MXCOLOR color) {
-            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
-        }
+        void clear_frame(mxvk::MXCOLOR color) { SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color)); }
 
         void put_shaded_pixel_unchecked(int x, int y, mxvk::MXCOLOR color, std::uint16_t intensity) {
             auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + (static_cast<std::size_t>(y) * static_cast<std::size_t>(frame_surface->pitch));
@@ -366,8 +348,7 @@ namespace example {
                 float v_over_z = row_v_over_z;
 
                 for (int x = min_x; x <= max_x; ++x) {
-                    if ((positive_area && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) ||
-                        (!positive_area && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
+                    if ((positive_area && w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f) || (!positive_area && w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f)) {
                         if (std::fabs(inv_z) > mxvk::EPSILON) {
                             const float reciprocal_z = 1.0f / inv_z;
                             const float u = u_over_z * reciprocal_z;

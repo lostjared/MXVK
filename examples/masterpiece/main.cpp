@@ -97,16 +97,11 @@ namespace {
         return asset_root;
     }
 
-    std::filesystem::path scorePath(const std::filesystem::path &asset_root) {
-        return asset_root / "data" / "scores.dat";
-    }
+    std::filesystem::path scorePath(const std::filesystem::path &asset_root) { return asset_root / "data" / "scores.dat"; }
 
     class HighScores {
       public:
-        explicit HighScores(std::filesystem::path file_path)
-            : file_path(std::move(file_path)) {
-            load();
-        }
+        explicit HighScores(std::filesystem::path file_path) : file_path(std::move(file_path)) { load(); }
 
         void add(std::string name, int score) {
             normalize(name);
@@ -122,9 +117,7 @@ namespace {
             return score > entries.back().score;
         }
 
-        [[nodiscard]] const std::vector<ScoreEntry> &list() const {
-            return entries;
-        }
+        [[nodiscard]] const std::vector<ScoreEntry> &list() const { return entries; }
 
       private:
         std::filesystem::path file_path;
@@ -244,11 +237,7 @@ namespace example {
 
     class MasterPieceWindow final : public mxvk::VK_Window {
       public:
-        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MasterPiece", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root(resolveAssetRoot(path)),
-              puzzle_asset_root(resolvePuzzleAssetRoot(resolveAssetRoot(path))),
-              high_scores(scorePath(asset_root)) {
+        MasterPieceWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MasterPiece", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root(resolveAssetRoot(path)), puzzle_asset_root(resolvePuzzleAssetRoot(resolveAssetRoot(path))), high_scores(scorePath(asset_root)) {
             setClearColor(0.02f, 0.02f, 0.03f, 1.0f);
 
             const std::string font_path = dataPath("font.ttf");
@@ -262,9 +251,7 @@ namespace example {
             tryOpenFirstGamepad();
         }
 
-        ~MasterPieceWindow() override {
-            closeGamepad();
-        }
+        ~MasterPieceWindow() override { closeGamepad(); }
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_QUIT) {
@@ -426,17 +413,11 @@ namespace example {
         bool score_added = false;
         bool waiting_for_spawn = false;
 
-        static bool isConfirmKey(SDL_Keycode key) {
-            return key == SDLK_RETURN || key == SDLK_SPACE;
-        }
+        static bool isConfirmKey(SDL_Keycode key) { return key == SDLK_RETURN || key == SDLK_SPACE; }
 
-        static int scaled(int value, float scale) {
-            return std::max(1, static_cast<int>(std::lround(static_cast<float>(value) * scale)));
-        }
+        static int scaled(int value, float scale) { return std::max(1, static_cast<int>(std::lround(static_cast<float>(value) * scale))); }
 
-        static int scaledPos(int value, float scale) {
-            return static_cast<int>(std::lround(static_cast<float>(value) * scale));
-        }
+        static int scaledPos(int value, float scale) { return static_cast<int>(std::lround(static_cast<float>(value) * scale)); }
 
         static int flashingSpriteIndex(int x, int y, Uint64 now) {
             const Uint64 tick = now / 18U;
@@ -470,9 +451,7 @@ namespace example {
             return result;
         }
 
-        std::string dataPath(const char *name) const {
-            return (asset_root / "data" / name).string();
-        }
+        std::string dataPath(const char *name) const { return (asset_root / "data" / name).string(); }
 
         std::string puzzleDataPath(const char *name) const {
             const std::filesystem::path shared_path = puzzle_asset_root / "data" / name;
@@ -482,13 +461,9 @@ namespace example {
             return dataPath(name);
         }
 
-        mxvk::VK_Sprite *loadPngSprite(const char *name) {
-            return createSprite(dataPath(name));
-        }
+        mxvk::VK_Sprite *loadPngSprite(const char *name) { return createSprite(dataPath(name)); }
 
-        mxvk::VK_Sprite *loadEffectSprite(const char *name) {
-            return createSprite(dataPath(name), "", dataPath("intro.frag.spv"));
-        }
+        mxvk::VK_Sprite *loadEffectSprite(const char *name) { return createSprite(dataPath(name), "", dataPath("intro.frag.spv")); }
 
         mxvk::VK_Sprite *makeSolidPixel(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) {
             const std::array<std::uint8_t, 4> pixel{r, g, b, a};
@@ -667,14 +642,12 @@ namespace example {
                         SDL_StopTextInput(window.get());
                         setScreen(Screen::Scores);
                     }
-                } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START ||
-                           button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
                     setScreen(Screen::Menu);
                 }
                 break;
             case Screen::Credits:
-                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START ||
-                    button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
+                if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START || button == SDL_GAMEPAD_BUTTON_EAST || button == SDL_GAMEPAD_BUTTON_BACK) {
                     setScreen(Screen::Menu);
                 }
                 break;
@@ -908,9 +881,7 @@ namespace example {
                 int cx = x;
                 int cy = y;
 
-                while (cx >= 0 && cy >= 0 && cx < board_cols && cy < board_rows &&
-                       board[static_cast<std::size_t>(cy)][static_cast<std::size_t>(cx)].color == color &&
-                       board[static_cast<std::size_t>(cy)][static_cast<std::size_t>(cx)].flash_until == 0U) {
+                while (cx >= 0 && cy >= 0 && cx < board_cols && cy < board_rows && board[static_cast<std::size_t>(cy)][static_cast<std::size_t>(cx)].color == color && board[static_cast<std::size_t>(cy)][static_cast<std::size_t>(cx)].flash_until == 0U) {
                     ++length;
                     cx += dx;
                     cy += dy;
@@ -943,12 +914,10 @@ namespace example {
                     if (y == 0 || board[static_cast<std::size_t>(y - 1)][static_cast<std::size_t>(x)].color != cell.color) {
                         mark_run(x, y, 0, 1);
                     }
-                    if (x == 0 || y == 0 ||
-                        board[static_cast<std::size_t>(y - 1)][static_cast<std::size_t>(x - 1)].color != cell.color) {
+                    if (x == 0 || y == 0 || board[static_cast<std::size_t>(y - 1)][static_cast<std::size_t>(x - 1)].color != cell.color) {
                         mark_run(x, y, 1, 1);
                     }
-                    if (x == board_cols - 1 || y == 0 ||
-                        board[static_cast<std::size_t>(y - 1)][static_cast<std::size_t>(x + 1)].color != cell.color) {
+                    if (x == board_cols - 1 || y == 0 || board[static_cast<std::size_t>(y - 1)][static_cast<std::size_t>(x + 1)].color != cell.color) {
                         mark_run(x, y, -1, 1);
                     }
                 }
@@ -984,8 +953,7 @@ namespace example {
                 for (int y = board_rows - 1; y >= 0; --y) {
                     if (board[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)].color != 0) {
                         if (write_row != y) {
-                            board[static_cast<std::size_t>(write_row)][static_cast<std::size_t>(x)] =
-                                board[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)];
+                            board[static_cast<std::size_t>(write_row)][static_cast<std::size_t>(x)] = board[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)];
                             board[static_cast<std::size_t>(y)][static_cast<std::size_t>(x)] = {};
                         }
                         --write_row;
@@ -1006,8 +974,7 @@ namespace example {
 
             for (int i = 0; i < piece_height; ++i) {
                 const int row = piece.y + i;
-                board[static_cast<std::size_t>(row)][static_cast<std::size_t>(piece.x)].color =
-                    std::clamp(piece.colors[static_cast<std::size_t>(i)], 1, 9);
+                board[static_cast<std::size_t>(row)][static_cast<std::size_t>(piece.x)].color = std::clamp(piece.colors[static_cast<std::size_t>(i)], 1, 9);
             }
 
             if (resolveMatches(now)) {
@@ -1081,8 +1048,7 @@ namespace example {
             const float elapsed = static_cast<float>(SDL_GetTicks()) / 1000.0f;
             background_menu->setShaderParams(elapsed, 0.0f, 0.0f, 1.0f);
             drawSprite(background_menu, 0, 0, layout.width, layout.height);
-            drawSprite(overlay, scaled(30, layout.scale_x), scaled(70, layout.scale_y),
-                       layout.width - scaled(60, layout.scale_x), layout.height - scaled(120, layout.scale_y));
+            drawSprite(overlay, scaled(30, layout.scale_x), scaled(70, layout.scale_y), layout.width - scaled(60, layout.scale_x), layout.height - scaled(120, layout.scale_y));
 
             drawCenteredText("High Scores", scaled(72, layout.scale_y), SDL_Color{255, 245, 200, 255}, title_font);
 
@@ -1107,12 +1073,9 @@ namespace example {
             const float elapsed = static_cast<float>(SDL_GetTicks()) / 1000.0f;
             background_menu->setShaderParams(elapsed, 0.0f, 0.0f, 1.0f);
             drawSprite(background_menu, 0, 0, layout.width, layout.height);
-            drawSprite(overlay, scaled(30, layout.scale_x), scaled(85, layout.scale_y),
-                       layout.width - scaled(60, layout.scale_x), scaled(260, layout.scale_y));
+            drawSprite(overlay, scaled(30, layout.scale_x), scaled(85, layout.scale_y), layout.width - scaled(60, layout.scale_x), scaled(260, layout.scale_y));
             const int logo_w = layout.width / 2;
-            const int logo_h = static_cast<int>(std::lround(
-                static_cast<float>(logo_w) * static_cast<float>(mxvk_logo->getHeight()) /
-                static_cast<float>(mxvk_logo->getWidth())));
+            const int logo_h = static_cast<int>(std::lround(static_cast<float>(logo_w) * static_cast<float>(mxvk_logo->getHeight()) / static_cast<float>(mxvk_logo->getWidth())));
             const int logo_x = (layout.width - logo_w) / 2;
             const int logo_y = (layout.height - logo_h) / 2;
             drawSprite(mxvk_logo, logo_x, logo_y, logo_w, logo_h);
@@ -1153,11 +1116,7 @@ namespace example {
                     const int x = game_board_start_x + i * (game_block_width + game_block_spacing);
                     const int y = game_board_start_y + j * (game_block_height + game_block_spacing) + 10;
 
-                    blocks[static_cast<std::size_t>(sprite_index)]->drawSpriteRect(
-                        static_cast<int>(static_cast<float>(x) * scaleX),
-                        static_cast<int>(static_cast<float>(y) * scaleY) + 10,
-                        static_cast<int>(static_cast<float>(game_block_width) * scaleX),
-                        static_cast<int>(static_cast<float>(game_block_height) * scaleY));
+                    blocks[static_cast<std::size_t>(sprite_index)]->drawSpriteRect(static_cast<int>(static_cast<float>(x) * scaleX), static_cast<int>(static_cast<float>(y) * scaleY) + 10, static_cast<int>(static_cast<float>(game_block_width) * scaleX), static_cast<int>(static_cast<float>(game_block_height) * scaleY));
                 }
             }
 
@@ -1173,11 +1132,7 @@ namespace example {
 
                 const int x = game_board_start_x + piece.x * (game_block_width + game_block_spacing);
                 const int y = game_board_start_y + row * (game_block_height + game_block_spacing) + 10;
-                blocks[static_cast<std::size_t>(std::clamp(piece.colors[static_cast<std::size_t>(i)], 0, 9))]->drawSpriteRect(
-                    static_cast<int>(static_cast<float>(x) * scaleX),
-                    static_cast<int>(static_cast<float>(y) * scaleY) + 10,
-                    static_cast<int>(static_cast<float>(game_block_width) * scaleX),
-                    static_cast<int>(static_cast<float>(game_block_height) * scaleY));
+                blocks[static_cast<std::size_t>(std::clamp(piece.colors[static_cast<std::size_t>(i)], 0, 9))]->drawSpriteRect(static_cast<int>(static_cast<float>(x) * scaleX), static_cast<int>(static_cast<float>(y) * scaleY) + 10, static_cast<int>(static_cast<float>(game_block_width) * scaleX), static_cast<int>(static_cast<float>(game_block_height) * scaleY));
             }
         }
 
@@ -1187,25 +1142,13 @@ namespace example {
 
             for (int i = 0; i < piece_height; ++i) {
                 const int sprite_index = std::clamp(piece.next_colors[static_cast<std::size_t>(i)], 0, 9);
-                blocks[static_cast<std::size_t>(sprite_index)]->drawSpriteRect(
-                    static_cast<int>(static_cast<float>(bx) * scaleX),
-                    static_cast<int>(static_cast<float>(by + i * (game_block_height + game_block_spacing)) * scaleY),
-                    static_cast<int>(static_cast<float>(game_block_width) * scaleX),
-                    static_cast<int>(static_cast<float>(game_block_height) * scaleY));
+                blocks[static_cast<std::size_t>(sprite_index)]->drawSpriteRect(static_cast<int>(static_cast<float>(bx) * scaleX), static_cast<int>(static_cast<float>(by + i * (game_block_height + game_block_spacing)) * scaleY), static_cast<int>(static_cast<float>(game_block_width) * scaleX), static_cast<int>(static_cast<float>(game_block_height) * scaleY));
             }
         }
 
         void drawHud(float scaleX, float scaleY) {
-            printText(std::format("Score: {}", score),
-                      static_cast<int>(200.0f * scaleX),
-                      static_cast<int>(80.0f * scaleY) - 24,
-                      SDL_Color{255, 255, 255, 255},
-                      ui_font);
-            printText(std::format("Tabs: {}", lines),
-                      static_cast<int>(310.0f * scaleX),
-                      static_cast<int>(80.0f * scaleY) - 24,
-                      SDL_Color{255, 255, 255, 255},
-                      ui_font);
+            printText(std::format("Score: {}", score), static_cast<int>(200.0f * scaleX), static_cast<int>(80.0f * scaleY) - 24, SDL_Color{255, 255, 255, 255}, ui_font);
+            printText(std::format("Tabs: {}", lines), static_cast<int>(310.0f * scaleX), static_cast<int>(80.0f * scaleY) - 24, SDL_Color{255, 255, 255, 255}, ui_font);
         }
 
         void handleControllerAxis(Sint16 lx, Sint16 ly) {

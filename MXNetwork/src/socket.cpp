@@ -1,6 +1,6 @@
 #include "mxnetwork/socket.hpp"
-#include <exception>
 #include <cstring>
+#include <exception>
 #include <format>
 #include <iostream>
 #include <string>

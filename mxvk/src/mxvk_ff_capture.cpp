@@ -28,16 +28,12 @@ namespace mxvk {
             return av_q2d(rational);
         }
 
-        [[nodiscard]] bool convertBt2020Yuv10LimitedToRgba16(
-            const AVFrame *source, std::vector<uint16_t> &rgba, int &width,
-            int &height, int &pitch, bool flipY) {
-            if (source == nullptr || source->data[0] == nullptr ||
-                source->data[1] == nullptr) {
+        [[nodiscard]] bool convertBt2020Yuv10LimitedToRgba16(const AVFrame *source, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
+            if (source == nullptr || source->data[0] == nullptr || source->data[1] == nullptr) {
                 return false;
             }
             const bool p010 = source->format == AV_PIX_FMT_P010LE;
-            if (!p010 && (source->format != AV_PIX_FMT_YUV420P10LE ||
-                          source->data[2] == nullptr)) {
+            if (!p010 && (source->format != AV_PIX_FMT_YUV420P10LE || source->data[2] == nullptr)) {
                 return false;
             }
 
@@ -47,16 +43,12 @@ namespace mxvk {
             if (width <= 0 || height <= 0) {
                 return false;
             }
-            rgba.resize(static_cast<size_t>(width) *
-                        static_cast<size_t>(height) * 4U);
+            rgba.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4U);
 
             const int sampleShift = p010 ? 6 : 0;
-            const auto sample10 = [sampleShift](
-                                      const uint8_t *plane, int stride,
-                                      int x, int y) {
+            const auto sample10 = [sampleShift](const uint8_t *plane, int stride, int x, int y) {
                 uint16_t raw = 0;
-                std::memcpy(&raw, plane + static_cast<size_t>(y) * stride + static_cast<size_t>(x) * 2U,
-                            sizeof(raw));
+                std::memcpy(&raw, plane + static_cast<size_t>(y) * stride + static_cast<size_t>(x) * 2U, sizeof(raw));
                 return static_cast<int>(raw >> sampleShift);
             };
 
@@ -68,47 +60,31 @@ namespace mxvk {
             constexpr float INV_C = 1.0F / 896.0F;
 
             for (int y = 0; y < height; ++y) {
-                uint16_t *destination =
-                    rgba.data() + static_cast<size_t>(y) * width * 4U;
+                uint16_t *destination = rgba.data() + static_cast<size_t>(y) * width * 4U;
                 const int chromaY = y >> 1;
                 for (int x = 0; x < width; ++x) {
                     const int chromaX = x >> 1;
-                    const int ySample =
-                        sample10(source->data[0], source->linesize[0], x, y);
+                    const int ySample = sample10(source->data[0], source->linesize[0], x, y);
                     int cbSample = 0;
                     int crSample = 0;
                     if (p010) {
-                        cbSample =
-                            sample10(source->data[1], source->linesize[1],
-                                     chromaX * 2, chromaY);
-                        crSample =
-                            sample10(source->data[1], source->linesize[1],
-                                     chromaX * 2 + 1, chromaY);
+                        cbSample = sample10(source->data[1], source->linesize[1], chromaX * 2, chromaY);
+                        crSample = sample10(source->data[1], source->linesize[1], chromaX * 2 + 1, chromaY);
                     } else {
-                        cbSample =
-                            sample10(source->data[1], source->linesize[1],
-                                     chromaX, chromaY);
-                        crSample =
-                            sample10(source->data[2], source->linesize[2],
-                                     chromaX, chromaY);
+                        cbSample = sample10(source->data[1], source->linesize[1], chromaX, chromaY);
+                        crSample = sample10(source->data[2], source->linesize[2], chromaX, chromaY);
                     }
 
                     const float yValue = (ySample - 64) * INV_Y;
                     const float cb = (cbSample - 512) * INV_C;
                     const float cr = (crSample - 512) * INV_C;
-                    const float red =
-                        std::clamp(yValue + CR_R * cr, 0.0F, 1.0F);
-                    const float green = std::clamp(
-                        yValue + CB_G * cb + CR_G * cr, 0.0F, 1.0F);
-                    const float blue =
-                        std::clamp(yValue + CB_B * cb, 0.0F, 1.0F);
+                    const float red = std::clamp(yValue + CR_R * cr, 0.0F, 1.0F);
+                    const float green = std::clamp(yValue + CB_G * cb + CR_G * cr, 0.0F, 1.0F);
+                    const float blue = std::clamp(yValue + CB_B * cb, 0.0F, 1.0F);
 
-                    destination[x * 4 + 0] =
-                        static_cast<uint16_t>(red * 65535.0F + 0.5F);
-                    destination[x * 4 + 1] =
-                        static_cast<uint16_t>(green * 65535.0F + 0.5F);
-                    destination[x * 4 + 2] =
-                        static_cast<uint16_t>(blue * 65535.0F + 0.5F);
+                    destination[x * 4 + 0] = static_cast<uint16_t>(red * 65535.0F + 0.5F);
+                    destination[x * 4 + 1] = static_cast<uint16_t>(green * 65535.0F + 0.5F);
+                    destination[x * 4 + 2] = static_cast<uint16_t>(blue * 65535.0F + 0.5F);
                     destination[x * 4 + 3] = UINT16_MAX;
                 }
             }
@@ -116,11 +92,8 @@ namespace mxvk {
             if (flipY) {
                 std::vector<uint16_t> row(static_cast<size_t>(width) * 4U);
                 for (int y = 0; y < height / 2; ++y) {
-                    uint16_t *top =
-                        rgba.data() + static_cast<size_t>(y) * width * 4U;
-                    uint16_t *bottom =
-                        rgba.data() +
-                        static_cast<size_t>(height - 1 - y) * width * 4U;
+                    uint16_t *top = rgba.data() + static_cast<size_t>(y) * width * 4U;
+                    uint16_t *bottom = rgba.data() + static_cast<size_t>(height - 1 - y) * width * 4U;
                     std::copy_n(top, row.size(), row.data());
                     std::copy_n(bottom, row.size(), top);
                     std::copy_n(row.data(), row.size(), bottom);
@@ -142,27 +115,17 @@ namespace mxvk {
             context.nMaxThreadsPerBlock = properties.maxThreadsPerBlock;
             context.nSharedMemPerBlock = properties.sharedMemPerBlock;
 
-            cudaDeviceGetAttribute(
-                &context.nCudaDevAttrComputeCapabilityMajor,
-                cudaDevAttrComputeCapabilityMajor,
-                context.nCudaDeviceId);
-            cudaDeviceGetAttribute(
-                &context.nCudaDevAttrComputeCapabilityMinor,
-                cudaDevAttrComputeCapabilityMinor,
-                context.nCudaDeviceId);
+            cudaDeviceGetAttribute(&context.nCudaDevAttrComputeCapabilityMajor, cudaDevAttrComputeCapabilityMajor, context.nCudaDeviceId);
+            cudaDeviceGetAttribute(&context.nCudaDevAttrComputeCapabilityMinor, cudaDevAttrComputeCapabilityMinor, context.nCudaDeviceId);
             cudaStreamGetFlags(stream, &context.nStreamFlags);
             return context;
         }
 #endif
     } // namespace
 
-    VK_FF_Capture::~VK_FF_Capture() {
-        close();
-    }
+    VK_FF_Capture::~VK_FF_Capture() { close(); }
 
-    bool VK_FF_Capture::open(const std::string &filename) {
-        return open(filename, -1);
-    }
+    bool VK_FF_Capture::open(const std::string &filename) { return open(filename, -1); }
 
     bool VK_FF_Capture::open(const std::string &filename, int cuda_device) {
         close();
@@ -235,18 +198,8 @@ namespace mxvk {
             frameFps = 30.0;
         }
 
-        const std::string decodeMode =
-            hardwareDecode && hardwareDecodeDevice >= 0
-                ? std::format("cuda:{}", hardwareDecodeDevice)
-            : hardwareDecode ? "cuda"
-                             : "software";
-        std::cout << std::format(
-            "mxvk_ff_capture: opened {} ({}x{}, {:.3f} fps, decode={})\n",
-            filename,
-            frameWidth,
-            frameHeight,
-            frameFps,
-            decodeMode);
+        const std::string decodeMode = hardwareDecode && hardwareDecodeDevice >= 0 ? std::format("cuda:{}", hardwareDecodeDevice) : hardwareDecode ? "cuda" : "software";
+        std::cout << std::format("mxvk_ff_capture: opened {} ({}x{}, {:.3f} fps, decode={})\n", filename, frameWidth, frameHeight, frameFps, decodeMode);
         return true;
     }
 
@@ -256,11 +209,8 @@ namespace mxvk {
         }
 
         AVStream *stream = formatCtx->streams[videoStream];
-        const int64_t timestamp = stream->start_time == AV_NOPTS_VALUE
-                                      ? 0
-                                      : stream->start_time;
-        if (av_seek_frame(formatCtx, videoStream, timestamp,
-                          AVSEEK_FLAG_BACKWARD) < 0) {
+        const int64_t timestamp = stream->start_time == AV_NOPTS_VALUE ? 0 : stream->start_time;
+        if (av_seek_frame(formatCtx, videoStream, timestamp, AVSEEK_FLAG_BACKWARD) < 0) {
             std::cout << "mxvk_ff_capture: failed to seek to start\n";
             return false;
         }
@@ -333,8 +283,7 @@ namespace mxvk {
         return converted;
     }
 
-    bool VK_FF_Capture::readRgba16(std::vector<uint16_t> &rgba, int &width,
-                                   int &height, int &pitch, bool flipY) {
+    bool VK_FF_Capture::readRgba16(std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         if (!is_open()) {
             return false;
         }
@@ -342,8 +291,7 @@ namespace mxvk {
         if (!decodeNextFrame()) {
             return false;
         }
-        const bool converted =
-            convertFrameToRgba16(frame, rgba, width, height, pitch, flipY);
+        const bool converted = convertFrameToRgba16(frame, rgba, width, height, pitch, flipY);
         av_frame_unref(frame);
         return converted;
     }
@@ -419,8 +367,7 @@ namespace mxvk {
         return formats[0];
     }
 
-    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder,
-                                           int cuda_device) {
+    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder, int cuda_device) {
         const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
         if (deviceType == AV_HWDEVICE_TYPE_NONE) {
             return false;
@@ -438,8 +385,7 @@ namespace mxvk {
             }
         }
 
-        const std::string deviceName =
-            cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
+        const std::string deviceName = cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
         const char *device = deviceName.empty() ? nullptr : deviceName.c_str();
         if (av_hwdevice_ctx_create(&hwDeviceCtx, deviceType, device, nullptr, 0) < 0) {
             hwPixFmt = AV_PIX_FMT_NONE;
@@ -472,18 +418,7 @@ namespace mxvk {
         uint8_t *dstData[4] = {rgba.data(), nullptr, nullptr, nullptr};
         int dstLinesize[4] = {pitch, 0, 0, 0};
 
-        swsCtx = sws_getCachedContext(
-            swsCtx,
-            sourceFrame->width,
-            sourceFrame->height,
-            static_cast<AVPixelFormat>(sourceFrame->format),
-            width,
-            height,
-            AV_PIX_FMT_RGBA,
-            SWS_BILINEAR,
-            nullptr,
-            nullptr,
-            nullptr);
+        swsCtx = sws_getCachedContext(swsCtx, sourceFrame->width, sourceFrame->height, static_cast<AVPixelFormat>(sourceFrame->format), width, height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
         if (swsCtx == nullptr) {
             return false;
         }
@@ -498,9 +433,7 @@ namespace mxvk {
         return true;
     }
 
-    bool VK_FF_Capture::convertFrameToRgba16(
-        const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width,
-        int &height, int &pitch, bool flipY) {
+    bool VK_FF_Capture::convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         const AVFrame *sourceFrame = decodedFrame;
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
             av_frame_unref(swFrame);
@@ -512,22 +445,12 @@ namespace mxvk {
             sourceFrame = swFrame;
         }
 
-        const AVColorSpace colorSpace =
-            sourceFrame->colorspace != AVCOL_SPC_UNSPECIFIED
-                ? sourceFrame->colorspace
-                : codecCtx->colorspace;
-        const AVColorRange colorRange =
-            sourceFrame->color_range != AVCOL_RANGE_UNSPECIFIED
-                ? sourceFrame->color_range
-                : codecCtx->color_range;
-        if (colorSpace == AVCOL_SPC_BT2020_NCL &&
-            colorRange != AVCOL_RANGE_JPEG &&
-            convertBt2020Yuv10LimitedToRgba16(
-                sourceFrame, rgba, width, height, pitch, flipY)) {
+        const AVColorSpace colorSpace = sourceFrame->colorspace != AVCOL_SPC_UNSPECIFIED ? sourceFrame->colorspace : codecCtx->colorspace;
+        const AVColorRange colorRange = sourceFrame->color_range != AVCOL_RANGE_UNSPECIFIED ? sourceFrame->color_range : codecCtx->color_range;
+        if (colorSpace == AVCOL_SPC_BT2020_NCL && colorRange != AVCOL_RANGE_JPEG && convertBt2020Yuv10LimitedToRgba16(sourceFrame, rgba, width, height, pitch, flipY)) {
             if (!rgba16_conversion_logged) {
-                std::cout
-                    << "mxvk_ff_capture: preserving 10-bit BT.2020 NCL input "
-                       "through native RGBA16 conversion\n";
+                std::cout << "mxvk_ff_capture: preserving 10-bit BT.2020 NCL input "
+                             "through native RGBA16 conversion\n";
                 rgba16_conversion_logged = true;
             }
             return true;
@@ -540,16 +463,12 @@ namespace mxvk {
             return false;
         }
 
-        rgba.resize(static_cast<size_t>(width) *
-                    static_cast<size_t>(height) * 4U);
+        rgba.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4U);
         auto *bytes = reinterpret_cast<uint8_t *>(rgba.data());
         uint8_t *dstData[4] = {bytes, nullptr, nullptr, nullptr};
         int dstLinesize[4] = {pitch, 0, 0, 0};
 
-        swsCtx = sws_getCachedContext(
-            swsCtx, sourceFrame->width, sourceFrame->height,
-            static_cast<AVPixelFormat>(sourceFrame->format), width, height,
-            AV_PIX_FMT_RGBA64, SWS_BILINEAR, nullptr, nullptr, nullptr);
+        swsCtx = sws_getCachedContext(swsCtx, sourceFrame->width, sourceFrame->height, static_cast<AVPixelFormat>(sourceFrame->format), width, height, AV_PIX_FMT_RGBA64, SWS_BILINEAR, nullptr, nullptr, nullptr);
         if (swsCtx == nullptr) {
             return false;
         }
@@ -570,24 +489,16 @@ namespace mxvk {
         default:
             break;
         }
-        const int *sourceCoefficients =
-            sws_getCoefficients(sourceColorSpace);
-        const int *destinationCoefficients =
-            sws_getCoefficients(SWS_CS_BT2020);
-        sws_setColorspaceDetails(
-            swsCtx, sourceCoefficients,
-            colorRange == AVCOL_RANGE_JPEG ? 1 : 0,
-            destinationCoefficients, 1, 0, 1 << 16, 1 << 16);
+        const int *sourceCoefficients = sws_getCoefficients(sourceColorSpace);
+        const int *destinationCoefficients = sws_getCoefficients(SWS_CS_BT2020);
+        sws_setColorspaceDetails(swsCtx, sourceCoefficients, colorRange == AVCOL_RANGE_JPEG ? 1 : 0, destinationCoefficients, 1, 0, 1 << 16, 1 << 16);
         if (!rgba16_conversion_logged) {
-            std::cout
-                << "mxvk_ff_capture: preserving high-bit-depth input through "
-                   "FFmpeg RGBA64 conversion\n";
+            std::cout << "mxvk_ff_capture: preserving high-bit-depth input through "
+                         "FFmpeg RGBA64 conversion\n";
             rgba16_conversion_logged = true;
         }
 
-        const int scaledRows =
-            sws_scale(swsCtx, sourceFrame->data, sourceFrame->linesize, 0,
-                      sourceFrame->height, dstData, dstLinesize);
+        const int scaledRows = sws_scale(swsCtx, sourceFrame->data, sourceFrame->linesize, 0, sourceFrame->height, dstData, dstLinesize);
         if (scaledRows != height) {
             return false;
         }
@@ -595,8 +506,7 @@ namespace mxvk {
             std::vector<uint8_t> row(static_cast<size_t>(pitch));
             for (int y = 0; y < height / 2; ++y) {
                 uint8_t *top = bytes + static_cast<size_t>(y) * pitch;
-                uint8_t *bottom =
-                    bytes + static_cast<size_t>(height - 1 - y) * pitch;
+                uint8_t *bottom = bytes + static_cast<size_t>(height - 1 - y) * pitch;
                 std::memcpy(row.data(), top, static_cast<size_t>(pitch));
                 std::memcpy(top, bottom, static_cast<size_t>(pitch));
                 std::memcpy(bottom, row.data(), static_cast<size_t>(pitch));
@@ -619,25 +529,20 @@ namespace mxvk {
                 gpuNv12.create(height + (height / 2), width, CV_8UC1);
                 cudaStream_t cudaStream = mxvk::cuda_stream_handle(stream);
                 if (decoder_surface_copy_event == nullptr) {
-                    const cudaError_t event_result = cudaEventCreateWithFlags(
-                        &decoder_surface_copy_event, cudaEventDisableTiming);
+                    const cudaError_t event_result = cudaEventCreateWithFlags(&decoder_surface_copy_event, cudaEventDisableTiming);
                     if (event_result != cudaSuccess) {
-                        std::cout << "mxvk_ff_capture: CUDA decoder-surface event creation failed: "
-                                  << cudaGetErrorString(event_result) << "\n";
+                        std::cout << "mxvk_ff_capture: CUDA decoder-surface event creation failed: " << cudaGetErrorString(event_result) << "\n";
                         return false;
                     }
                 }
 
                 const auto synchronize_decoder_surface_copy = [&]() {
-                    cudaError_t result =
-                        cudaEventSynchronize(decoder_surface_copy_event);
+                    cudaError_t result = cudaEventSynchronize(decoder_surface_copy_event);
                     if (result != cudaSuccess) {
-                        std::cout << "mxvk_ff_capture: CUDA decoder-surface copy barrier failed: "
-                                  << cudaGetErrorString(result) << "\n";
+                        std::cout << "mxvk_ff_capture: CUDA decoder-surface copy barrier failed: " << cudaGetErrorString(result) << "\n";
                         result = cudaStreamSynchronize(cudaStream);
                         if (result != cudaSuccess) {
-                            std::cout << "mxvk_ff_capture: CUDA capture-stream synchronization failed: "
-                                      << cudaGetErrorString(result) << "\n";
+                            std::cout << "mxvk_ff_capture: CUDA capture-stream synchronization failed: " << cudaGetErrorString(result) << "\n";
                             return false;
                         }
                     }
@@ -648,30 +553,14 @@ namespace mxvk {
                     return true;
                 };
 
-                cudaError_t result = cudaMemcpy2DAsync(
-                    gpuNv12.ptr(),
-                    gpuNv12.step,
-                    decodedFrame->data[0],
-                    static_cast<size_t>(decodedFrame->linesize[0]),
-                    static_cast<size_t>(width),
-                    static_cast<size_t>(height),
-                    cudaMemcpyDeviceToDevice,
-                    cudaStream);
+                cudaError_t result = cudaMemcpy2DAsync(gpuNv12.ptr(), gpuNv12.step, decodedFrame->data[0], static_cast<size_t>(decodedFrame->linesize[0]), static_cast<size_t>(width), static_cast<size_t>(height), cudaMemcpyDeviceToDevice, cudaStream);
                 if (result != cudaSuccess) {
                     std::cout << "mxvk_ff_capture: CUDA NV12 luma copy failed: " << cudaGetErrorString(result) << "\n";
                     cudaStreamSynchronize(cudaStream);
                     return false;
                 }
 
-                result = cudaMemcpy2DAsync(
-                    gpuNv12.ptr(height),
-                    gpuNv12.step,
-                    decodedFrame->data[1],
-                    static_cast<size_t>(decodedFrame->linesize[1]),
-                    static_cast<size_t>(width),
-                    static_cast<size_t>(height / 2),
-                    cudaMemcpyDeviceToDevice,
-                    cudaStream);
+                result = cudaMemcpy2DAsync(gpuNv12.ptr(height), gpuNv12.step, decodedFrame->data[1], static_cast<size_t>(decodedFrame->linesize[1]), static_cast<size_t>(width), static_cast<size_t>(height / 2), cudaMemcpyDeviceToDevice, cudaStream);
                 if (result != cudaSuccess) {
                     std::cout << "mxvk_ff_capture: CUDA NV12 chroma copy failed: " << cudaGetErrorString(result) << "\n";
                     cudaStreamSynchronize(cudaStream);
@@ -680,8 +569,7 @@ namespace mxvk {
 
                 result = cudaEventRecord(decoder_surface_copy_event, cudaStream);
                 if (result != cudaSuccess) {
-                    std::cout << "mxvk_ff_capture: CUDA decoder-surface event record failed: "
-                              << cudaGetErrorString(result) << "\n";
+                    std::cout << "mxvk_ff_capture: CUDA decoder-surface event record failed: " << cudaGetErrorString(result) << "\n";
                     cudaStreamSynchronize(cudaStream);
                     return false;
                 }
@@ -696,13 +584,7 @@ namespace mxvk {
                 };
                 const NppiSize roi{width, height};
                 const NppStreamContext nppContext = makeNppStreamContext(cudaStream);
-                NppStatus nppStatus = nppiNV12ToRGB_8u_P2C3R_Ctx(
-                    srcPlanes,
-                    static_cast<int>(gpuNv12.step),
-                    static_cast<Npp8u *>(gpuRgb.ptr()),
-                    static_cast<int>(gpuRgb.step),
-                    roi,
-                    nppContext);
+                NppStatus nppStatus = nppiNV12ToRGB_8u_P2C3R_Ctx(srcPlanes, static_cast<int>(gpuNv12.step), static_cast<Npp8u *>(gpuRgb.ptr()), static_cast<int>(gpuRgb.step), roi, nppContext);
                 if (nppStatus != NPP_SUCCESS) {
                     std::cout << "mxvk_ff_capture: NPP NV12 to RGB conversion failed: " << static_cast<int>(nppStatus) << "\n";
                     synchronize_decoder_surface_copy();
@@ -710,15 +592,7 @@ namespace mxvk {
                 }
 
                 const int rgbaOrder[4] = {0, 1, 2, 3};
-                nppStatus = nppiSwapChannels_8u_C3C4R_Ctx(
-                    static_cast<const Npp8u *>(gpuRgb.ptr()),
-                    static_cast<int>(gpuRgb.step),
-                    static_cast<Npp8u *>(gpuRgba.ptr()),
-                    static_cast<int>(gpuRgba.step),
-                    roi,
-                    rgbaOrder,
-                    255,
-                    nppContext);
+                nppStatus = nppiSwapChannels_8u_C3C4R_Ctx(static_cast<const Npp8u *>(gpuRgb.ptr()), static_cast<int>(gpuRgb.step), static_cast<Npp8u *>(gpuRgba.ptr()), static_cast<int>(gpuRgba.step), roi, rgbaOrder, 255, nppContext);
                 if (nppStatus != NPP_SUCCESS) {
                     std::cout << "mxvk_ff_capture: NPP RGB to RGBA conversion failed: " << static_cast<int>(nppStatus) << "\n";
                     synchronize_decoder_surface_copy();

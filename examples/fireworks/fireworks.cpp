@@ -54,10 +54,7 @@ namespace example {
 
     class FireworksWindow : public mxvk::VK_Window {
       public:
-        FireworksWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("Fireworks - [3D Particle Effect]", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              data_root(data_root),
-              vertices(MAX_PARTICLES) {
+        FireworksWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("Fireworks - [3D Particle Effect]", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), data_root(data_root), vertices(MAX_PARTICLES) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             setFont(data_root + "/font.ttf", 24);
             last_update_time = SDL_GetTicks();
@@ -84,9 +81,7 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            point_batch.resize(this);
-        }
+        void onSwapchainRecreated() override { point_batch.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
             if (!ensure_resources()) {
@@ -115,12 +110,7 @@ namespace example {
                 return false;
             }
 
-            point_batch.load(
-                this,
-                data_root + "/star.png",
-                data_root + "/fireworks.vert.spv",
-                data_root + "/fireworks.frag.spv",
-                vertices.size());
+            point_batch.load(this, data_root + "/star.png", data_root + "/fireworks.vert.spv", data_root + "/fireworks.frag.spv", vertices.size());
             point_batch.set_additive_blending(true);
             point_batch.set_depth_test_enabled(false);
             point_batch.set_depth_write_enabled(false);
@@ -128,9 +118,7 @@ namespace example {
             return true;
         }
 
-        void trigger_random_explosion() {
-            trigger_explosion(glm::vec3(random_float(-3.0f, 3.0f), random_float(-3.0f, 3.0f), 0.0f));
-        }
+        void trigger_random_explosion() { trigger_explosion(glm::vec3(random_float(-3.0f, 3.0f), random_float(-3.0f, 3.0f), 0.0f)); }
 
         void trigger_explosion(const glm::vec3 &origin) {
             if (explosions.size() >= MAX_EXPLOSIONS) {
@@ -165,19 +153,11 @@ namespace example {
                 }
             }
 
-            std::erase_if(explosions, [](const Explosion &explosion) {
-                return std::ranges::none_of(explosion.particles, [](const Particle &particle) {
-                    return particle.lifetime > 0.0f;
-                });
-            });
+            std::erase_if(explosions, [](const Explosion &explosion) { return std::ranges::none_of(explosion.particles, [](const Particle &particle) { return particle.lifetime > 0.0f; }); });
         }
 
         [[nodiscard]] bool has_active_particles() const {
-            return std::ranges::any_of(explosions, [](const Explosion &explosion) {
-                return std::ranges::any_of(explosion.particles, [](const Particle &particle) {
-                    return particle.lifetime > 0.0f;
-                });
-            });
+            return std::ranges::any_of(explosions, [](const Explosion &explosion) { return std::ranges::any_of(explosion.particles, [](const Particle &particle) { return particle.lifetime > 0.0f; }); });
         }
 
         void write_vertices() {

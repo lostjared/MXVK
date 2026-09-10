@@ -82,9 +82,7 @@ namespace mxvk {
          * @param frag   Fragment shader path.
          * @return @c true on success.
          */
-        bool createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue,
-                         VkCommandPool cmdPool, size_t width, size_t height,
-                         const std::string &vert, const std::string &frag);
+        bool createImage(VkDevice device, VkPhysicalDevice physDev, VkQueue gQueue, VkCommandPool cmdPool, size_t width, size_t height, const std::string &vert, const std::string &frag);
 
         /**
          * @brief Access the backing sprite.

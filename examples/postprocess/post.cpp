@@ -30,9 +30,7 @@ namespace example {
 
     class PostprocessWindow : public mxvk::VK_Window {
       public:
-        PostprocessWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MXVK Postprocess Chain", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root((path.empty() || path == ".") ? std::string(postprocess_ASSET_DIR) : path) {
+        PostprocessWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MXVK Postprocess Chain", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root((path.empty() || path == ".") ? std::string(postprocess_ASSET_DIR) : path) {
             resizeCanvas(width, height);
             sprite = createSprite(canvas.get());
             attachEffects(loadEffects(asset_root + "/data/shaders.txt"));
@@ -64,12 +62,8 @@ namespace example {
 
       private:
         static std::string trim(std::string value) {
-            const auto first = std::ranges::find_if(value, [](unsigned char ch) {
-                return !std::isspace(ch);
-            });
-            const auto last = std::ranges::find_if(value | std::views::reverse, [](unsigned char ch) {
-                return !std::isspace(ch);
-            }).base();
+            const auto first = std::ranges::find_if(value, [](unsigned char ch) { return !std::isspace(ch); });
+            const auto last = std::ranges::find_if(value | std::views::reverse, [](unsigned char ch) { return !std::isspace(ch); }).base();
             if (first >= last) {
                 return {};
             }

@@ -41,13 +41,9 @@ namespace defender {
         return x - WORLD_HALF_WIDTH;
     }
 
-    [[nodiscard]] inline float wrapped_delta_x(float target, float origin) {
-        return wrap_world_x(target - origin);
-    }
+    [[nodiscard]] inline float wrapped_delta_x(float target, float origin) { return wrap_world_x(target - origin); }
 
-    [[nodiscard]] inline float nearest_world_x(float target, float origin) {
-        return origin + wrapped_delta_x(target, origin);
-    }
+    [[nodiscard]] inline float nearest_world_x(float target, float origin) { return origin + wrapped_delta_x(target, origin); }
 
     [[nodiscard]] inline glm::vec3 nearest_world_position(glm::vec3 position, float origin_x) {
         position.x = nearest_world_x(position.x, origin_x);

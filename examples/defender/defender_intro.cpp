@@ -310,11 +310,7 @@ namespace defender {
             }
             const bool show_number = ((countdown_timer / 167U) % 2U) == 0U;
             if (show_number) {
-                printText(number,
-                          static_cast<int>(extent.width) / 2 - text_w / 2,
-                          static_cast<int>(extent.height) / 2 - text_h / 2,
-                          {255, 255, 255, 255},
-                          countdown_font);
+                printText(number, static_cast<int>(extent.width) / 2 - text_w / 2, static_cast<int>(extent.height) / 2 - text_h / 2, {255, 255, 255, 255}, countdown_font);
             }
         } else {
             const std::string launch = "MISSION START!";
@@ -324,11 +320,7 @@ namespace defender {
                 text_w = 440;
                 text_h = 48;
             }
-            printText(launch,
-                      static_cast<int>(extent.width) / 2 - text_w / 2,
-                      static_cast<int>(extent.height) / 2 - text_h / 2,
-                      {0, 255, 255, 255},
-                      countdown_font);
+            printText(launch, static_cast<int>(extent.width) / 2 - text_w / 2, static_cast<int>(extent.height) / 2 - text_h / 2, {0, 255, 255, 255}, countdown_font);
         }
     }
 

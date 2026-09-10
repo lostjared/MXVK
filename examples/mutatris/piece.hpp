@@ -27,9 +27,7 @@ namespace mutatris {
         [[nodiscard]] int getX() const { return x; }
         [[nodiscard]] int getY() const { return y; }
         [[nodiscard]] int getDirection() const { return direction; }
-        [[nodiscard]] const Block *at(int index) const {
-            return index >= 0 && index < static_cast<int>(blocks.size()) ? &blocks[static_cast<std::size_t>(index)] : nullptr;
-        }
+        [[nodiscard]] const Block *at(int index) const { return index >= 0 && index < static_cast<int>(blocks.size()) ? &blocks[static_cast<std::size_t>(index)] : nullptr; }
 
       private:
         std::array<Block, 3> blocks{};

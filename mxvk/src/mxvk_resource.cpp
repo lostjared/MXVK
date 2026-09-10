@@ -45,9 +45,7 @@ namespace mxvk {
         }
     } // namespace
 
-    uint32_t find_memory_type(VkPhysicalDevice physical_device,
-                              uint32_t type_filter,
-                              VkMemoryPropertyFlags properties) {
+    uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties) {
         if (physical_device == VK_NULL_HANDLE) {
             throw mxvk::Exception("find_memory_type requires a valid physical device");
         }
@@ -55,8 +53,7 @@ namespace mxvk {
         VkPhysicalDeviceMemoryProperties memory_properties{};
         vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
         for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
-            if ((type_filter & (1U << i)) &&
-                (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+            if ((type_filter & (1U << i)) && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
                 return i;
             }
         }
@@ -64,11 +61,7 @@ namespace mxvk {
         throw mxvk::Exception("failed to find suitable Vulkan memory type");
     }
 
-    void create_buffer(const VulkanContext &context,
-                       VkDeviceSize size,
-                       VkBufferUsageFlags usage,
-                       VkMemoryPropertyFlags properties,
-                       BufferResource &buffer) {
+    void create_buffer(const VulkanContext &context, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, BufferResource &buffer) {
         validate_context(context);
         if (size == 0) {
             throw mxvk::Exception("create_buffer requires a non-zero size");
@@ -139,15 +132,7 @@ namespace mxvk {
         buffer.mapped = nullptr;
     }
 
-    void create_image(const VulkanContext &context,
-                      uint32_t width,
-                      uint32_t height,
-                      VkFormat format,
-                      VkImageTiling tiling,
-                      VkImageUsageFlags usage,
-                      VkMemoryPropertyFlags properties,
-                      VkImage &image,
-                      VkDeviceMemory &memory) {
+    void create_image(const VulkanContext &context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) {
         validate_context(context);
         if (width == 0 || height == 0) {
             throw mxvk::Exception("create_image requires non-zero dimensions");
@@ -204,10 +189,7 @@ namespace mxvk {
         }
     }
 
-    VkImageView create_image_view(VkDevice device,
-                                  VkImage image,
-                                  VkFormat format,
-                                  VkImageAspectFlags aspect) {
+    VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect) {
         VkImageViewCreateInfo view_info{};
         view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         view_info.image = image;
@@ -279,10 +261,7 @@ namespace mxvk {
         vkFreeCommandBuffers(context.device, context.command_pool, 1, &command_buffer);
     }
 
-    void copy_buffer(const VulkanContext &context,
-                     VkBuffer source,
-                     VkBuffer destination,
-                     VkDeviceSize size) {
+    void copy_buffer(const VulkanContext &context, VkBuffer source, VkBuffer destination, VkDeviceSize size) {
         if (size == 0) {
             return;
         }
@@ -304,11 +283,7 @@ namespace mxvk {
         end_one_time_commands(context, command_buffer);
     }
 
-    void transition_image_layout(VkCommandBuffer command_buffer,
-                                 VkImage image,
-                                 VkImageLayout old_layout,
-                                 VkImageLayout new_layout,
-                                 VkImageAspectFlags aspect) {
+    void transition_image_layout(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect) {
         VkImageMemoryBarrier2 barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         barrier.oldLayout = old_layout;
@@ -344,11 +319,7 @@ namespace mxvk {
         vkCmdPipelineBarrier2(command_buffer, &dependency);
     }
 
-    void copy_buffer_to_image(VkCommandBuffer command_buffer,
-                              VkBuffer buffer,
-                              VkImage image,
-                              uint32_t width,
-                              uint32_t height) {
+    void copy_buffer_to_image(VkCommandBuffer command_buffer, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
         VkBufferImageCopy2 region{};
         region.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
         region.bufferOffset = 0;
@@ -371,10 +342,7 @@ namespace mxvk {
         vkCmdCopyBufferToImage2(command_buffer, &copy_info);
     }
 
-    void create_texture_from_surface(const VulkanContext &context,
-                                     SDL_Surface *surface,
-                                     TextureResource &texture,
-                                     VkFormat format) {
+    void create_texture_from_surface(const VulkanContext &context, SDL_Surface *surface, TextureResource &texture, VkFormat format) {
         validate_upload_context(context);
         if (surface == nullptr || surface->pixels == nullptr || surface->w <= 0 || surface->h <= 0) {
             throw mxvk::Exception("create_texture_from_surface requires a valid SDL surface");
@@ -396,24 +364,12 @@ namespace mxvk {
 
         BufferResource staging{};
         try {
-            create_buffer(context,
-                          image_size,
-                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                          staging);
+            create_buffer(context, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging);
             map_buffer(context.device, staging);
             std::memcpy(staging.mapped, tight_pixels.data(), tight_pixels.size());
             unmap_buffer(context.device, staging);
 
-            create_image(context,
-                         width,
-                         height,
-                         format,
-                         VK_IMAGE_TILING_OPTIMAL,
-                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                         texture.image,
-                         texture.memory);
+            create_image(context, width, height, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture.image, texture.memory);
 
             const VkCommandBuffer cmd = begin_one_time_commands(context);
             transition_image_layout(cmd, texture.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -434,10 +390,7 @@ namespace mxvk {
         }
     }
 
-    void create_texture_from_png(const VulkanContext &context,
-                                 const std::string &path,
-                                 TextureResource &texture,
-                                 VkFormat format) {
+    void create_texture_from_png(const VulkanContext &context, const std::string &path, TextureResource &texture, VkFormat format) {
         std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> surface(mxvk::LoadPNG(path.c_str()), SDL_DestroySurface);
         if (surface == nullptr) {
             throw mxvk::Exception(std::format("failed to load texture PNG: {}", path));

@@ -13,9 +13,7 @@ namespace space {
     MultiplayerSession::~MultiplayerSession() { stop(); }
 
     namespace {
-        std::string packet_name(const std::array<char, 32> &name) {
-            return std::string(name.data(), strnlen(name.data(), name.size()));
-        }
+        std::string packet_name(const std::array<char, 32> &name) { return std::string(name.data(), strnlen(name.data(), name.size())); }
 
         void set_packet_name(std::array<char, 32> &output, const std::string &name) {
             const std::size_t size = std::min(name.size(), output.size() - 1U);
@@ -128,8 +126,7 @@ namespace space {
             if (received < 0) {
                 break;
             }
-            if (received != static_cast<ssize_t>(sizeof(packet)) || packet.magic != Packet{}.magic ||
-                packet.version != Packet{}.version || packet.size != sizeof(Packet)) {
+            if (received != static_cast<ssize_t>(sizeof(packet)) || packet.magic != Packet{}.magic || packet.version != Packet{}.version || packet.size != sizeof(Packet)) {
                 continue;
             }
 
@@ -199,9 +196,7 @@ namespace space {
     bool MultiplayerSession::is_host() const { return host_role; }
     std::uint8_t MultiplayerSession::local_player_id() const { return assigned_player_id; }
 
-    std::size_t MultiplayerSession::player_count() const {
-        return static_cast<std::size_t>(std::count(connected_players.begin(), connected_players.end(), true));
-    }
+    std::size_t MultiplayerSession::player_count() const { return static_cast<std::size_t>(std::count(connected_players.begin(), connected_players.end(), true)); }
 
     const std::array<std::string, NETWORK_PLAYER_COUNT> &MultiplayerSession::player_names() const { return names; }
     const std::array<bool, NETWORK_PLAYER_COUNT> &MultiplayerSession::player_connected() const { return connected_players; }

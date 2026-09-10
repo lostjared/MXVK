@@ -65,11 +65,7 @@ namespace space {
 
     class Asteroids3DWindow : public mxvk::VK_Window {
       public:
-        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt)
-            : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path),
-              shader_root(resolve_shader_root(asset_root)),
-              crt_enabled(enable_crt) {
+        Asteroids3DWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync, bool enable_crt) : mxvk::VK_Window("3D Asteroids", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), asset_root((path.empty() || path == ".") ? std::string(ASTEROIDS3D_ASSET_DIR) : path), shader_root(resolve_shader_root(asset_root)), crt_enabled(enable_crt) {
             if (asset_root == ".") {
                 asset_root = ASTEROIDS3D_ASSET_DIR;
             }
@@ -77,8 +73,7 @@ namespace space {
             const char *video_driver = SDL_GetCurrentVideoDriver();
             const bool uses_wayland = video_driver != nullptr && std::strcmp(video_driver, "wayland") == 0;
             if (!uses_wayland) {
-                std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(
-                    mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
+                std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> window_icon(mxvk::LoadPNG((asset_root + "/data/asteroids_icon.png").c_str()), SDL_DestroySurface);
                 if (window_icon != nullptr && !SDL_SetWindowIcon(getSDLWindow(), window_icon.get())) {
                     std::cerr << "asteroids3d: could not set SDL window icon: " << SDL_GetError() << '\n';
                 }
@@ -131,10 +126,7 @@ namespace space {
         }
 
         void event(SDL_Event &e) override {
-            if (e.type == SDL_EVENT_GAMEPAD_ADDED ||
-                e.type == SDL_EVENT_GAMEPAD_REMOVED ||
-                e.type == SDL_EVENT_JOYSTICK_ADDED ||
-                e.type == SDL_EVENT_JOYSTICK_REMOVED) {
+            if (e.type == SDL_EVENT_GAMEPAD_ADDED || e.type == SDL_EVENT_GAMEPAD_REMOVED || e.type == SDL_EVENT_JOYSTICK_ADDED || e.type == SDL_EVENT_JOYSTICK_REMOVED) {
                 if (e.type == SDL_EVENT_GAMEPAD_ADDED || e.type == SDL_EVENT_GAMEPAD_REMOVED) {
                     controller.connectEvent(e);
                 }
@@ -172,16 +164,12 @@ namespace space {
                 log_game(std::string("CRT effect ") + (crt_enabled ? "enabled." : "disabled."));
                 return;
             }
-            if (mode == GameMode::Intro &&
-                e.type == SDL_EVENT_KEY_DOWN &&
-                (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN)) {
+            if (mode == GameMode::Intro && e.type == SDL_EVENT_KEY_DOWN && (e.key.key == SDLK_SPACE || e.key.key == SDLK_RETURN)) {
                 intro_fade = 0.01f;
                 log_game("Intro skipped. Starting game.");
                 return;
             }
-            if (mode == GameMode::Intro &&
-                e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN &&
-                e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
+            if (mode == GameMode::Intro && e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH) {
                 intro_fade = 0.01f;
                 log_game("Intro skipped from controller. Starting game.");
                 return;
@@ -207,8 +195,7 @@ namespace space {
                     log_game("Game restarted from controller.");
                     return;
                 }
-                if ((mode == GameMode::GameOver || mode == GameMode::GameComplete) &&
-                    (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH || e.gbutton.button == SDL_GAMEPAD_BUTTON_START)) {
+                if ((mode == GameMode::GameOver || mode == GameMode::GameComplete) && (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH || e.gbutton.button == SDL_GAMEPAD_BUTTON_START)) {
                     prepare_restart_from_game_over();
                     log_game("End screen acknowledged from controller. Returning to intro.");
                     return;
@@ -551,21 +538,8 @@ namespace space {
                 }
 
                 if (cmd == "status") {
-                    const char *mode_name = (mode == GameMode::Intro) ? "intro" : (mode == GameMode::Loading)    ? "loading"
-                                                                              : (mode == GameMode::Playing)      ? "playing"
-                                                                              : (mode == GameMode::GameComplete) ? "complete"
-                                                                                                                 : "gameover";
-                    out << "Mode: " << mode_name << '\n'
-                        << "Score: " << ship.score << '\n'
-                        << "Lives: " << std::max(0, ship.lives) << '\n'
-                        << "Asteroids: " << active_asteroids() << '\n'
-                        << "Time left: " << format_round_time() << '\n'
-                        << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n'
-                        << "Control scheme: " << (mouse_look_controls ? "keyboard/mouse" : "classic keyboard") << '\n'
-                        << "Camera: " << (first_person_camera ? "first person" : "chase") << '\n'
-                        << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n'
-                        << "Controller: " << controller_status() << '\n'
-                        << "Debug HUD: " << (debug_menu ? "on" : "off") << '\n';
+                    const char *mode_name = (mode == GameMode::Intro) ? "intro" : (mode == GameMode::Loading) ? "loading" : (mode == GameMode::Playing) ? "playing" : (mode == GameMode::GameComplete) ? "complete" : "gameover";
+                    out << "Mode: " << mode_name << '\n' << "Score: " << ship.score << '\n' << "Lives: " << std::max(0, ship.lives) << '\n' << "Asteroids: " << active_asteroids() << '\n' << "Time left: " << format_round_time() << '\n' << "Speed: " << ship.current_speed << " / " << ship.max_speed << '\n' << "Control scheme: " << (mouse_look_controls ? "keyboard/mouse" : "classic keyboard") << '\n' << "Camera: " << (first_person_camera ? "first person" : "chase") << '\n' << "Controls: " << (inverted_controls ? "inverted" : "arcade") << '\n' << "Controller: " << controller_status() << '\n' << "Debug HUD: " << (debug_menu ? "on" : "off") << '\n';
                     return true;
                 }
 
@@ -644,9 +618,7 @@ namespace space {
             }
         }
 
-        std::string controller_status() const {
-            return controller.active() ? ("Connected: " + controller.name()) : "Disconnected";
-        }
+        std::string controller_status() const { return controller.active() ? ("Connected: " + controller.name()) : "Disconnected"; }
 
         float controller_axis(SDL_GamepadAxis axis) const {
             if (!controller.active()) {
@@ -659,10 +631,7 @@ namespace space {
                 return 0.0f;
             }
 
-            const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) /
-                                                    (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)),
-                                                0.0f,
-                                                1.0f);
+            const float normalized = std::clamp((magnitude - static_cast<float>(CONTROLLER_DEAD_ZONE)) / (CONTROLLER_AXIS_MAX - static_cast<float>(CONTROLLER_DEAD_ZONE)), 0.0f, 1.0f);
             const float curved = normalized * normalized;
             return raw_value < 0 ? -curved : curved;
         }
@@ -742,10 +711,7 @@ namespace space {
         void load_loading_screen_resources() {
             set_ui_font_size(18);
 
-            intro_sprite = createSprite(
-                asset_root + "/data/intro.png",
-                asset_root + "/data/sprite.vert.spv",
-                shader_root + "/intro.frag.spv");
+            intro_sprite = createSprite(asset_root + "/data/intro.png", asset_root + "/data/sprite.vert.spv", shader_root + "/intro.frag.spv");
             matrix::RainConfig intro_rain_config = matrix::make_matrix_rain_config(asset_root, false);
             intro_rain_config.color = "#ff0000";
             intro_rain_config.surface_width = INTRO_RAIN_TEXTURE_WIDTH;
@@ -1053,12 +1019,7 @@ namespace space {
             }
 
             asteroids[slot_index].model_index = static_cast<int>(model_variant);
-            asteroid_models[slot_index].load(
-                this,
-                asset_root + "/" + asteroid_paths[model_variant],
-                texture_path,
-                asset_root + "/data",
-                1.0f);
+            asteroid_models[slot_index].load(this, asset_root + "/" + asteroid_paths[model_variant], texture_path, asset_root + "/data", 1.0f);
             asteroid_models[slot_index].setShaders(this, model_vert, model_frag);
             asteroid_models[slot_index].setBackfaceCulling(false);
         }
@@ -1118,17 +1079,10 @@ namespace space {
             for (int i = 0; i < 7; ++i) {
                 glm::vec3 position{0.0f};
                 do {
-                    position = glm::vec3(
-                        random_float(-90.0f, 90.0f),
-                        random_float(-50.0f, 50.0f),
-                        random_float(-90.0f, 90.0f));
+                    position = glm::vec3(random_float(-90.0f, 90.0f), random_float(-50.0f, 50.0f), random_float(-90.0f, 90.0f));
                 } while (glm::length(position - ship.position) < 28.0f);
 
-                spawn_asteroid(position,
-                               glm::vec3(random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f)),
-                               random_float(2.8f, 7.0f),
-                               0,
-                               random_int(0, 2));
+                spawn_asteroid(position, glm::vec3(random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f), random_float(-0.8f, 0.8f)), random_float(2.8f, 7.0f), 0, random_int(0, 2));
             }
             log_game("Initial asteroid field spawned.");
         }
@@ -1300,9 +1254,7 @@ namespace space {
                 }
             }
 
-            const bool firing = keys[SDL_SCANCODE_SPACE] ||
-                                controller.getButton(SDL_GAMEPAD_BUTTON_SOUTH) ||
-                                controller.getAxis(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > CONTROLLER_DEAD_ZONE;
+            const bool firing = keys[SDL_SCANCODE_SPACE] || controller.getButton(SDL_GAMEPAD_BUTTON_SOUTH) || controller.getAxis(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > CONTROLLER_DEAD_ZONE;
             if (firing) {
                 if (can_fire()) {
                     fire_projectile();
@@ -1377,9 +1329,7 @@ namespace space {
             return degrees;
         }
 
-        static float ease_angle_degrees(float current, float target, float blend) {
-            return current + normalize_degrees(target - current) * std::clamp(blend, 0.0f, 1.0f);
-        }
+        static float ease_angle_degrees(float current, float target, float blend) { return current + normalize_degrees(target - current) * std::clamp(blend, 0.0f, 1.0f); }
 
         glm::vec3 asteroid_field_center() const {
             glm::vec3 sum{0.0f};
@@ -1399,12 +1349,7 @@ namespace space {
 
         bool ship_is_outside_return_volume() const {
             constexpr float RETURN_PADDING = 18.0f;
-            return ship.position.x < BOUNDARY_X_MIN - RETURN_PADDING ||
-                   ship.position.x > BOUNDARY_X_MAX + RETURN_PADDING ||
-                   ship.position.y < BOUNDARY_Y_MIN - RETURN_PADDING ||
-                   ship.position.y > BOUNDARY_Y_MAX + RETURN_PADDING ||
-                   ship.position.z < BOUNDARY_Z_MIN - RETURN_PADDING ||
-                   ship.position.z > BOUNDARY_Z_MAX + RETURN_PADDING;
+            return ship.position.x < BOUNDARY_X_MIN - RETURN_PADDING || ship.position.x > BOUNDARY_X_MAX + RETURN_PADDING || ship.position.y < BOUNDARY_Y_MIN - RETURN_PADDING || ship.position.y > BOUNDARY_Y_MAX + RETURN_PADDING || ship.position.z < BOUNDARY_Z_MIN - RETURN_PADDING || ship.position.z > BOUNDARY_Z_MAX + RETURN_PADDING;
         }
 
         void update_ship_return_to_field(float dt) {
@@ -1607,13 +1552,7 @@ namespace space {
                 child->rotation_speed = asteroid.rotation_speed * random_float(0.8f, 1.5f);
                 child->model_index = asteroid.model_index;
                 child->velocity = child_velocity;
-                log_game(std::format(
-                    "Asteroid child {} spawned at ({:.1f}, {:.1f}, {:.1f}) radius {:.1f}.",
-                    i + 1,
-                    child->position.x,
-                    child->position.y,
-                    child->position.z,
-                    child->radius));
+                log_game(std::format("Asteroid child {} spawned at ({:.1f}, {:.1f}, {:.1f}) radius {:.1f}.", i + 1, child->position.x, child->position.y, child->position.z, child->radius));
             }
 
             if (radius >= 25.0f) {
@@ -1723,21 +1662,13 @@ namespace space {
         }
 
         glm::vec3 transform_ship_collision_offset(const glm::vec3 &local_position) const {
-            const glm::mat4 model = build_model_matrix(
-                glm::vec3(0.0f),
-                ship.rotation,
-                rendered_ship_scale(),
-                ship_model.modelCenterOffset());
+            const glm::mat4 model = build_model_matrix(glm::vec3(0.0f), ship.rotation, rendered_ship_scale(), ship_model.modelCenterOffset());
             return glm::vec3(model * glm::vec4(local_position, 1.0f));
         }
 
-        float rendered_ship_scale() const {
-            return SHIP_MODEL_SCALE * ship_model.modelRenderScale();
-        }
+        float rendered_ship_scale() const { return SHIP_MODEL_SCALE * ship_model.modelRenderScale(); }
 
-        float swept_point_distance_to_asteroid(const glm::vec3 &previous_position,
-                                               const glm::vec3 &current_position,
-                                               const glm::vec3 &asteroid_position) const {
+        float swept_point_distance_to_asteroid(const glm::vec3 &previous_position, const glm::vec3 &current_position, const glm::vec3 &asteroid_position) const {
             const glm::vec3 segment = current_position - previous_position;
             const float segment_length_sq = glm::dot(segment, segment);
             glm::vec3 closest_point = current_position;
@@ -1773,13 +1704,9 @@ namespace space {
             spawn_ship_explosion(ship.position);
         }
 
-        void spawn_asteroid_explosion(const glm::vec3 &position) {
-            spawn_gl_explosion(position);
-        }
+        void spawn_asteroid_explosion(const glm::vec3 &position) { spawn_gl_explosion(position); }
 
-        void spawn_ship_explosion(const glm::vec3 &position) {
-            spawn_gl_explosion(position);
-        }
+        void spawn_ship_explosion(const glm::vec3 &position) { spawn_gl_explosion(position); }
 
         void spawn_gl_explosion(const glm::vec3 &position) {
             struct ExplosionWave {
@@ -1822,15 +1749,8 @@ namespace space {
                     const float offset = 0.8f + 0.2f * static_cast<float>(wave_index) / static_cast<float>(WAVE_COUNT);
                     const float speed = random_float(wave.min_speed, wave.max_speed);
                     particle->position = position + dir * offset;
-                    particle->velocity = dir * speed + glm::vec3(
-                                                           random_float(-5.0f, 5.0f),
-                                                           random_float(-5.0f, 5.0f),
-                                                           random_float(-5.0f, 5.0f));
-                    particle->color = glm::vec4(
-                        wave.color.r * random_float(0.9f, 1.1f),
-                        wave.color.g * random_float(0.9f, 1.1f),
-                        wave.color.b * random_float(0.9f, 1.1f),
-                        0.1f);
+                    particle->velocity = dir * speed + glm::vec3(random_float(-5.0f, 5.0f), random_float(-5.0f, 5.0f), random_float(-5.0f, 5.0f));
+                    particle->color = glm::vec4(wave.color.r * random_float(0.9f, 1.1f), wave.color.g * random_float(0.9f, 1.1f), wave.color.b * random_float(0.9f, 1.1f), 0.1f);
                     particle->size = random_float(wave.min_size, wave.max_size);
                     particle->lifetime = 0.0f;
                     particle->max_lifetime = random_float(wave.min_lifetime, wave.max_lifetime);
@@ -1841,24 +1761,13 @@ namespace space {
             log_game(std::format("Explosion spawned {} particles.", spawned));
         }
 
-        void spawn_particles(const glm::vec3 &position,
-                             const glm::vec4 &color,
-                             int count,
-                             float min_speed,
-                             float max_speed,
-                             float min_size,
-                             float max_size,
-                             float min_lifetime,
-                             float max_lifetime) {
+        void spawn_particles(const glm::vec3 &position, const glm::vec4 &color, int count, float min_speed, float max_speed, float min_size, float max_size, float min_lifetime, float max_lifetime) {
             for (int i = 0; i < count; ++i) {
                 Particle *particle = find_free_particle();
                 if (particle == nullptr) {
                     return;
                 }
-                const glm::vec3 dir = normalize_or_zero(glm::vec3(
-                    random_float(-1.0f, 1.0f),
-                    random_float(-1.0f, 1.0f),
-                    random_float(-1.0f, 1.0f)));
+                const glm::vec3 dir = normalize_or_zero(glm::vec3(random_float(-1.0f, 1.0f), random_float(-1.0f, 1.0f), random_float(-1.0f, 1.0f)));
                 particle->position = position;
                 particle->velocity = dir * random_float(min_speed, max_speed);
                 particle->color = color;
@@ -2076,8 +1985,7 @@ namespace space {
                 mxvk::UniformBufferObject ubo{};
                 const float scale = asteroid.radius;
                 mxvk::VKAbstractModel &asteroid_model = asteroid_models[i];
-                ubo.model = build_model_matrix(asteroid.position, asteroid.rotation, scale * asteroid_model.modelRenderScale(),
-                                               asteroid_model.modelCenterOffset());
+                ubo.model = build_model_matrix(asteroid.position, asteroid.rotation, scale * asteroid_model.modelRenderScale(), asteroid_model.modelCenterOffset());
                 ubo.view = view_matrix;
                 ubo.proj = projection_matrix;
                 ubo.fx = glm::vec4(camera_position, elapsed_seconds);
@@ -2093,11 +2001,7 @@ namespace space {
                 }
                 const float life_factor = 1.0f - (projectile.lifetime / PROJECTILE_LIFETIME);
                 const float pulse = (0.55f + 0.22f * (1.0f - life_factor)) * (0.9f + 0.1f * std::sin(elapsed_seconds * 12.0f));
-                const glm::vec4 color = glm::vec4(
-                    std::clamp(projectile.color.r * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
-                    std::clamp(projectile.color.g * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
-                    std::clamp(projectile.color.b * (0.9f + 0.1f * life_factor), 0.0f, 1.0f),
-                    std::clamp(projectile.color.a * (0.65f + 0.35f * life_factor), 0.0f, 1.0f));
+                const glm::vec4 color = glm::vec4(std::clamp(projectile.color.r * (0.9f + 0.1f * life_factor), 0.0f, 1.0f), std::clamp(projectile.color.g * (0.9f + 0.1f * life_factor), 0.0f, 1.0f), std::clamp(projectile.color.b * (0.9f + 0.1f * life_factor), 0.0f, 1.0f), std::clamp(projectile.color.a * (0.65f + 0.35f * life_factor), 0.0f, 1.0f));
                 projectile_sprite->drawSprite(projectile.position, glm::vec2(pulse), color);
             }
         }
@@ -2107,9 +2011,7 @@ namespace space {
                 if (!particle.active) {
                     continue;
                 }
-                effect_sprite->drawSprite(particle.position,
-                                          glm::vec2(particle.size),
-                                          particle.color);
+                effect_sprite->drawSprite(particle.position, glm::vec2(particle.size), particle.color);
             }
         }
 
@@ -2183,11 +2085,7 @@ namespace space {
 
             flame_vertex_count = static_cast<uint32_t>(vertices.size());
             const VkDeviceSize buffer_size = sizeof(FlameVertex) * static_cast<VkDeviceSize>(vertices.size());
-            create_buffer(buffer_size,
-                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                          flame_vertex_buffer,
-                          flame_vertex_buffer_memory);
+            create_buffer(buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, flame_vertex_buffer, flame_vertex_buffer_memory);
 
             void *data = nullptr;
             if (vkMapMemory(device, flame_vertex_buffer_memory, 0, buffer_size, 0, &data) != VK_SUCCESS || data == nullptr) {
@@ -2288,8 +2186,7 @@ namespace space {
                 depth_stencil.stencilTestEnable = VK_FALSE;
 
                 VkPipelineColorBlendAttachmentState color_blend_attachment{};
-                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+                color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 color_blend_attachment.blendEnable = VK_TRUE;
                 color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
                 color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -2389,12 +2286,7 @@ namespace space {
             pc.params = glm::vec4(elapsed_seconds, ship.current_speed / ship.max_speed, 0.0f, 0.0f);
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, flame_pipeline);
-            vkCmdPushConstants(cmd,
-                               flame_pipeline_layout,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0,
-                               sizeof(pc),
-                               &pc);
+            vkCmdPushConstants(cmd, flame_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
 
             VkBuffer vertex_buffers[] = {flame_vertex_buffer};
             VkDeviceSize offsets[] = {0};
@@ -2402,11 +2294,7 @@ namespace space {
             vkCmdDraw(cmd, flame_vertex_count, 1, 0, 0);
         }
 
-        void create_buffer(VkDeviceSize size,
-                           VkBufferUsageFlags usage,
-                           VkMemoryPropertyFlags properties,
-                           VkBuffer &buffer,
-                           VkDeviceMemory &buffer_memory) const {
+        void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory) const {
             VkBufferCreateInfo buffer_info{};
             buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
             buffer_info.size = size;
@@ -2586,9 +2474,7 @@ namespace space {
                 const int dot_y = center_y + static_cast<int>((relative.y / RADAR_RANGE) * half_size);
                 const int dot_size = std::clamp(static_cast<int>(asteroid.radius * 0.55f), 3, 8);
                 const float altitude = std::clamp((asteroid.position.y - BOUNDARY_Y_MIN) / (BOUNDARY_Y_MAX - BOUNDARY_Y_MIN), 0.0f, 1.0f);
-                const glm::vec4 dot_color = clamped_to_edge
-                                                ? glm::vec4{1.0f, 0.38f, 0.16f, 0.9f}
-                                                : glm::vec4{1.0f, 0.55f + altitude * 0.28f, 0.18f, 1.0f};
+                const glm::vec4 dot_color = clamped_to_edge ? glm::vec4{1.0f, 0.38f, 0.16f, 0.9f} : glm::vec4{1.0f, 0.55f + altitude * 0.28f, 0.18f, 1.0f};
                 draw_ui_rect(dot_x - dot_size / 2, dot_y - dot_size / 2, dot_size, dot_size, dot_color);
             }
 
@@ -2648,10 +2534,7 @@ namespace space {
             return count;
         }
 
-        void draw_end_screen([[maybe_unused]] uint32_t image_index,
-                             [[maybe_unused]] float aspect,
-                             const std::string &title,
-                             const SDL_Color &title_color) {
+        void draw_end_screen([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect, const std::string &title, const SDL_Color &title_color) {
             set_ui_font_size(32);
             const SDL_Color white{255, 255, 255, 255};
             const SDL_Color yellow{255, 220, 120, 255};
@@ -2663,10 +2546,7 @@ namespace space {
             int title_w = 0;
             int title_h = 0;
             if (getTextDimensions(title.c_str(), title_w, title_h)) {
-                printText(title.c_str(),
-                          static_cast<int>(extent.width) / 2 - title_w / 2,
-                          static_cast<int>(extent.height) / 2 - title_h,
-                          title_color);
+                printText(title.c_str(), static_cast<int>(extent.width) / 2 - title_w / 2, static_cast<int>(extent.height) / 2 - title_h, title_color);
             } else {
                 printText(title.c_str(), 24, 20, title_color);
             }
@@ -2674,10 +2554,7 @@ namespace space {
             int score_w = 0;
             int score_h = 0;
             if (getTextDimensions(score_text.c_str(), score_w, score_h)) {
-                printText(score_text.c_str(),
-                          static_cast<int>(extent.width) / 2 - score_w / 2,
-                          static_cast<int>(extent.height) / 2 + 10,
-                          white);
+                printText(score_text.c_str(), static_cast<int>(extent.width) / 2 - score_w / 2, static_cast<int>(extent.height) / 2 + 10, white);
             } else {
                 printText(score_text.c_str(), 24, 70, white);
             }
@@ -2685,25 +2562,18 @@ namespace space {
             int prompt_w = 0;
             int prompt_h = 0;
             if (getTextDimensions(prompt.c_str(), prompt_w, prompt_h)) {
-                printText(prompt.c_str(),
-                          static_cast<int>(extent.width) / 2 - prompt_w / 2,
-                          static_cast<int>(extent.height) / 2 + score_h + 28,
-                          yellow);
+                printText(prompt.c_str(), static_cast<int>(extent.width) / 2 - prompt_w / 2, static_cast<int>(extent.height) / 2 + score_h + 28, yellow);
             } else {
                 printText(prompt.c_str(), 24, 100, yellow);
             }
         }
 
-        void draw_game_over([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect) {
-            draw_end_screen(image_index, aspect, "Game over", SDL_Color{235, 60, 60, 255});
-        }
+        void draw_game_over([[maybe_unused]] uint32_t image_index, [[maybe_unused]] float aspect) { draw_end_screen(image_index, aspect, "Game over", SDL_Color{235, 60, 60, 255}); }
 
         VkCommandBuffer current_command_buffer = VK_NULL_HANDLE;
         float last_delta_time = 1.0f / 60.0f;
 
-        std::string vec3_string(const glm::vec3 &value) const {
-            return std::to_string(value.x) + ", " + std::to_string(value.y) + ", " + std::to_string(value.z);
-        }
+        std::string vec3_string(const glm::vec3 &value) const { return std::to_string(value.x) + ", " + std::to_string(value.y) + ", " + std::to_string(value.z); }
 
         float nearest_asteroid_distance() const {
             float nearest = 999999.0f;

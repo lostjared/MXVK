@@ -43,9 +43,7 @@ namespace mxvk {
         refreshVisibleLineCount();
     }
 
-    void VK_Console::setCommandCallback(CommandCallback callback) {
-        commandCallback = std::move(callback);
-    }
+    void VK_Console::setCommandCallback(CommandCallback callback) { commandCallback = std::move(callback); }
 
     void VK_Console::setPrompt(const std::string &prompt) {
         if (!prompt.empty()) {
@@ -77,13 +75,9 @@ namespace mxvk {
         }
     }
 
-    void VK_Console::show() noexcept {
-        setVisible(true);
-    }
+    void VK_Console::show() noexcept { setVisible(true); }
 
-    void VK_Console::hide() noexcept {
-        setVisible(false);
-    }
+    void VK_Console::hide() noexcept { setVisible(false); }
 
     void VK_Console::toggle() noexcept {
         if (visible) {
@@ -93,9 +87,7 @@ namespace mxvk {
         }
     }
 
-    bool VK_Console::isVisible() const noexcept {
-        return visible || fade_alpha > 0.0f || fade_active;
-    }
+    bool VK_Console::isVisible() const noexcept { return visible || fade_alpha > 0.0f || fade_active; }
 
     void VK_Console::setMaxLines(const std::size_t maxLines) {
         max_lines = std::max<std::size_t>(1, maxLines);
@@ -104,18 +96,14 @@ namespace mxvk {
         scroll_offset = std::min(scroll_offset, maxScrollOffset());
     }
 
-    void VK_Console::setMaxVisibleLines(const std::size_t maxVisibleLines) {
-        max_visible_lines = std::max<std::size_t>(1, maxVisibleLines);
-    }
+    void VK_Console::setMaxVisibleLines(const std::size_t maxVisibleLines) { max_visible_lines = std::max<std::size_t>(1, maxVisibleLines); }
 
     void VK_Console::invalidateLayoutCache() {
         invalidateWrappedCache();
         scroll_offset = std::min(scroll_offset, maxScrollOffset());
     }
 
-    const std::string &VK_Console::inputBuffer() const noexcept {
-        return input;
-    }
+    const std::string &VK_Console::inputBuffer() const noexcept { return input; }
 
     void VK_Console::printLine(const std::string &line, const SDL_Color color) {
         std::size_t start = 0;
@@ -156,9 +144,7 @@ namespace mxvk {
         history_index = -1;
     }
 
-    void VK_Console::pushOutputLine(std::string line) {
-        pushOutputLine(std::move(line), text_color);
-    }
+    void VK_Console::pushOutputLine(std::string line) { pushOutputLine(std::move(line), text_color); }
 
     void VK_Console::pushOutputLine(std::string line, const SDL_Color color) {
         if (max_total_chars > 0 && line.size() > max_total_chars) {
@@ -178,9 +164,7 @@ namespace mxvk {
         wrapped_cache_dirty = true;
     }
 
-    std::size_t VK_Console::effectiveVisibleLineCount() const noexcept {
-        return std::max<std::size_t>(1, std::min(max_visible_lines, last_visible_line_count));
-    }
+    std::size_t VK_Console::effectiveVisibleLineCount() const noexcept { return std::max<std::size_t>(1, std::min(max_visible_lines, last_visible_line_count)); }
 
     std::size_t VK_Console::maxScrollOffset() const noexcept {
         const int width = usableTextWidth();
@@ -591,13 +575,9 @@ namespace mxvk {
         scrollbar_thumb_y = scrollbar_y + std::clamp(offset_px, 0, travel);
     }
 
-    bool VK_Console::isPointInScrollbar(const int x, const int y) const noexcept {
-        return scrollbar_h > 0 && x >= scrollbar_x && x < (scrollbar_x + scrollbar_w) && y >= scrollbar_y && y < (scrollbar_y + scrollbar_h);
-    }
+    bool VK_Console::isPointInScrollbar(const int x, const int y) const noexcept { return scrollbar_h > 0 && x >= scrollbar_x && x < (scrollbar_x + scrollbar_w) && y >= scrollbar_y && y < (scrollbar_y + scrollbar_h); }
 
-    bool VK_Console::isPointInScrollbarThumb(const int x, const int y) const noexcept {
-        return scrollbar_thumb_h > 0 && x >= scrollbar_x && x < (scrollbar_x + scrollbar_w) && y >= scrollbar_thumb_y && y < (scrollbar_thumb_y + scrollbar_thumb_h);
-    }
+    bool VK_Console::isPointInScrollbarThumb(const int x, const int y) const noexcept { return scrollbar_thumb_h > 0 && x >= scrollbar_x && x < (scrollbar_x + scrollbar_w) && y >= scrollbar_thumb_y && y < (scrollbar_thumb_y + scrollbar_thumb_h); }
 
     void VK_Console::updateScrollFromThumbY(const int thumbY) {
         const std::size_t max_offset = maxScrollOffset();
@@ -857,18 +837,11 @@ namespace mxvk {
                 SDL_DestroySurface(surface);
             }
 
-            scroll_thumb_sprite->drawSpriteRect(scrollbar_x,
-                                                consoleSpriteY(scrollbar_thumb_y, scrollbar_thumb_h),
-                                                scrollbar_w,
-                                                scrollbar_thumb_h);
+            scroll_thumb_sprite->drawSpriteRect(scrollbar_x, consoleSpriteY(scrollbar_thumb_y, scrollbar_thumb_h), scrollbar_w, scrollbar_thumb_h);
         }
 
         if (scroll_offset > 0) {
-            windowPtr->printText(std::format("^ {} line(s) newer below", scroll_offset),
-                                 panel_x + padding,
-                                 input_y - line_height,
-                                 scaledColor(info_color),
-                                 console_font);
+            windowPtr->printText(std::format("^ {} line(s) newer below", scroll_offset), panel_x + padding, input_y - line_height, scaledColor(info_color), console_font);
         }
 
         const Uint64 now = SDL_GetTicksNS();

@@ -20,9 +20,7 @@ namespace example {
 
     class DarkWindow : public mxvk::VK_Window {
       public:
-        DarkWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot((path.empty() || path == ".") ? std::string(DARK_ASSET_DIR) : path) {
+        DarkWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot((path.empty() || path == ".") ? std::string(DARK_ASSET_DIR) : path) {
             fallbackWidth = width;
             fallbackHeight = height;
 
@@ -123,16 +121,11 @@ namespace example {
             }
 
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const float yawRadians = glm::radians(yawDegrees);
             const float pitchRadians = glm::radians(pitchDegrees);
-            const glm::vec3 cameraPos{
-                cameraDistance * std::cos(pitchRadians) * std::sin(yawRadians),
-                0.35f + cameraDistance * std::sin(pitchRadians),
-                cameraDistance * std::cos(pitchRadians) * std::cos(yawRadians)};
+            const glm::vec3 cameraPos{cameraDistance * std::cos(pitchRadians) * std::sin(yawRadians), 0.35f + cameraDistance * std::sin(pitchRadians), cameraDistance * std::cos(pitchRadians) * std::cos(yawRadians)};
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), autoSpinRadians, glm::vec3(0.0f, 1.0f, 0.0f));

@@ -35,9 +35,7 @@ namespace mxvk {
             std::longjmp(err->jump_buffer, 1);
         }
 
-        [[nodiscard]] bool WriteJpegFromRgb24Surface(const SDL_Surface *surface,
-                                                     const char *filename,
-                                                     const int quality) {
+        [[nodiscard]] bool WriteJpegFromRgb24Surface(const SDL_Surface *surface, const char *filename, const int quality) {
             if (surface == nullptr || filename == nullptr) {
                 std::cerr << "mxvk: Invalid JPEG save parameters.\n";
                 return false;
@@ -67,8 +65,7 @@ namespace mxvk {
             jpeg_start_compress(&cinfo, TRUE);
 
             while (cinfo.next_scanline < cinfo.image_height) {
-                JSAMPROW row = static_cast<JSAMPROW>(
-                    static_cast<void *>(static_cast<Uint8 *>(surface->pixels) + (cinfo.next_scanline * surface->pitch)));
+                JSAMPROW row = static_cast<JSAMPROW>(static_cast<void *>(static_cast<Uint8 *>(surface->pixels) + (cinfo.next_scanline * surface->pitch)));
                 jpeg_write_scanlines(&cinfo, &row, 1);
             }
 
@@ -126,8 +123,7 @@ namespace mxvk {
         }
 
         while (cinfo.output_scanline < cinfo.output_height) {
-            JSAMPROW row = static_cast<JSAMPROW>(
-                static_cast<void *>(static_cast<Uint8 *>(rgb_surface->pixels) + (cinfo.output_scanline * rgb_surface->pitch)));
+            JSAMPROW row = static_cast<JSAMPROW>(static_cast<void *>(static_cast<Uint8 *>(rgb_surface->pixels) + (cinfo.output_scanline * rgb_surface->pitch)));
             jpeg_read_scanlines(&cinfo, &row, 1);
         }
 
@@ -188,13 +184,9 @@ namespace mxvk {
         return WriteJpegFromRgb24Surface(source_surface, filename, quality);
     }
 
-    SDL_Surface *LoadJPEG(const char *filename) {
-        return VK_JPEG::Load(filename);
-    }
+    SDL_Surface *LoadJPEG(const char *filename) { return VK_JPEG::Load(filename); }
 
-    bool SaveJPEG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, const int quality) {
-        return VK_JPEG::SaveTexture(texture, renderer, filename, quality);
-    }
+    bool SaveJPEG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, const int quality) { return VK_JPEG::SaveTexture(texture, renderer, filename, quality); }
 
 } // namespace mxvk
 

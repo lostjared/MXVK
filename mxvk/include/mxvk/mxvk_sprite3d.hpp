@@ -54,10 +54,7 @@ namespace mxvk {
          * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
          * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
          */
-        void load(VK_Window *window,
-                  const std::string &pngPath,
-                  const std::string &vertexShaderPath = "",
-                  const std::string &fragmentShaderPath = "");
+        void load(VK_Window *window, const std::string &pngPath, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
          * @brief Load sprite texture and build the 3D billboard pipeline from an SDL surface.
@@ -66,10 +63,7 @@ namespace mxvk {
          * @param vertexShaderPath Optional custom vertex shader SPIR-V path.
          * @param fragmentShaderPath Optional custom fragment shader SPIR-V path.
          */
-        void load(VK_Window *window,
-                  SDL_Surface *surface,
-                  const std::string &vertexShaderPath = "",
-                  const std::string &fragmentShaderPath = "");
+        void load(VK_Window *window, SDL_Surface *surface, const std::string &vertexShaderPath = "", const std::string &fragmentShaderPath = "");
 
         /**
          * @brief Upload the current camera matrices for one swapchain image.
@@ -86,10 +80,7 @@ namespace mxvk {
          * @param color Per-sprite tint color.
          * @param rotationRadians Rotation around the camera-facing axis.
          */
-        void drawSprite(const glm::vec3 &position,
-                        const glm::vec2 &size,
-                        const glm::vec4 &color = glm::vec4(1.0f),
-                        float rotationRadians = 0.0f);
+        void drawSprite(const glm::vec3 &position, const glm::vec2 &size, const glm::vec4 &color = glm::vec4(1.0f), float rotationRadians = 0.0f);
 
         /**
          * @brief Record all queued billboard draws into the given command buffer.
@@ -235,11 +226,7 @@ namespace mxvk {
          * @param buffer Output buffer handle.
          * @param bufferMemory Output device memory handle.
          */
-        void createBuffer(VkDeviceSize size,
-                          VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties,
-                          VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory) const;
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const;
         /** @brief Find a suitable memory type index for the requested properties. */
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
         /** @brief Begin a one-time command buffer on the sprite command pool. */
@@ -257,14 +244,7 @@ namespace mxvk {
          * @param image Output image handle.
          * @param imageMemory Output device memory handle.
          */
-        void createImage(uint32_t width,
-                         uint32_t height,
-                         VkFormat format,
-                         VkImageTiling tiling,
-                         VkImageUsageFlags usage,
-                         VkMemoryPropertyFlags properties,
-                         VkImage &image,
-                         VkDeviceMemory &imageMemory) const;
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory) const;
         /** @brief Create an image view for the sprite texture. */
         [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format) const;
         /** @brief Transition an image between layouts for upload and sampling. */

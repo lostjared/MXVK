@@ -98,8 +98,7 @@ namespace mxvk {
          * Ten-bit YUV/P010 sources retain their component precision. Values
          * remain transfer-encoded; this method does not linearize PQ or HLG.
          */
-        bool readRgba16(std::vector<uint16_t> &rgba, int &width, int &height,
-                        int &pitch, bool flipY = false);
+        bool readRgba16(std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY = false);
 #ifdef MXVK_CUDA
         /**
          * @brief Decode the next frame as a CUDA-resident RGBA8 image.
@@ -128,9 +127,7 @@ namespace mxvk {
         bool initHardwareDevice(const AVCodec *decoder, int cuda_device);
         bool decodeNextFrame();
         bool convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY);
-        bool convertFrameToRgba16(const AVFrame *decodedFrame,
-                                  std::vector<uint16_t> &rgba, int &width,
-                                  int &height, int &pitch, bool flipY);
+        bool convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY);
 #ifdef MXVK_CUDA
         bool convertFrameToGpuRgba(const AVFrame *decodedFrame, cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream, bool flipY);
 #endif

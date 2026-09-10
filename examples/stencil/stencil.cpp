@@ -13,11 +13,7 @@
 namespace example {
     class StencilWindow : public mxvk::VK_Window {
       public:
-        StencilWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MXVK Stencil", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root((path.empty() ? std::string(STENCIL_ASSET_DIR) : path) + "/data") {
-            setClearColor(0.015f, 0.018f, 0.025f, 1.0f);
-        }
+        StencilWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MXVK Stencil", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), shader_root((path.empty() ? std::string(STENCIL_ASSET_DIR) : path) + "/data") { setClearColor(0.015f, 0.018f, 0.025f, 1.0f); }
 
         ~StencilWindow() override {
             if (device != VK_NULL_HANDLE) {
@@ -26,9 +22,7 @@ namespace example {
             stencil.reset();
         }
 
-        void onSwapchainAboutToRecreate() override {
-            stencil.reset();
-        }
+        void onSwapchainAboutToRecreate() override { stencil.reset(); }
 
         void onPrepareFrameRendering(VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) override {
             ensure_stencil();
@@ -37,9 +31,7 @@ namespace example {
             }
         }
 
-        void onConfigureDepthStencilAttachments(VkRenderingAttachmentInfo &depth_attachment,
-                                                VkRenderingAttachmentInfo &stencil_attachment,
-                                                [[maybe_unused]] uint32_t image_index) override {
+        void onConfigureDepthStencilAttachments(VkRenderingAttachmentInfo &depth_attachment, VkRenderingAttachmentInfo &stencil_attachment, [[maybe_unused]] uint32_t image_index) override {
             depth_attachment.imageView = VK_NULL_HANDLE;
             if (stencil) {
                 stencil->configure_attachment(stencil_attachment);
@@ -54,9 +46,7 @@ namespace example {
             const auto now = std::chrono::steady_clock::now();
             const float elapsed = std::chrono::duration<float>(now - start_time).count();
             const VkExtent2D current_extent = getSwapchainExtent();
-            const float aspect = current_extent.height > 0U
-                                     ? static_cast<float>(current_extent.width) / static_cast<float>(current_extent.height)
-                                     : 1.0f;
+            const float aspect = current_extent.height > 0U ? static_cast<float>(current_extent.width) / static_cast<float>(current_extent.height) : 1.0f;
 
             const mxvk::VK_Stencil::PushConstants push{
                 .time = elapsed,
@@ -77,13 +67,21 @@ namespace example {
 
             if (!stencil) {
                 stencil = std::make_unique<mxvk::VK_Stencil>();
-                stencil->initialize(mxvk::VulkanContext{
-                                        .device = getDevice(),
-                                        .physical_device = getPhysicalDevice(),
-                                        .graphics_queue = getGraphicsQueue(),
-                                        .command_pool = getCommandPool(),
-                                    },
-                                    current_extent, getSwapchainFormat(), VK_FORMAT_UNDEFINED, getPipelineCache(), shader_root + "/fullscreen.vert.spv", shader_root + "/mandala_mask.frag.spv", shader_root + "/content_fullscreen.vert.spv", shader_root + "/stencil_fill.frag.spv");
+                stencil->initialize(
+                    mxvk::VulkanContext{
+                        .device = getDevice(),
+                        .physical_device = getPhysicalDevice(),
+                        .graphics_queue = getGraphicsQueue(),
+                        .command_pool = getCommandPool(),
+                    },
+                    current_extent,
+                    getSwapchainFormat(),
+                    VK_FORMAT_UNDEFINED,
+                    getPipelineCache(),
+                    shader_root + "/fullscreen.vert.spv",
+                    shader_root + "/mandala_mask.frag.spv",
+                    shader_root + "/content_fullscreen.vert.spv",
+                    shader_root + "/stencil_fill.frag.spv");
             } else {
                 stencil->resize(current_extent);
             }

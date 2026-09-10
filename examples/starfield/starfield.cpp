@@ -19,14 +19,7 @@
 
 namespace {
 
-    enum class StarType {
-        NORMAL,
-        BRIGHT,
-        BLUE,
-        ORANGE,
-        RED,
-        YELLOW
-    };
+    enum class StarType { NORMAL, BRIGHT, BLUE, ORANGE, RED, YELLOW };
 
     struct Particle {
         float x = 0.0f;
@@ -114,11 +107,7 @@ namespace example {
 
     class StarfieldWindow : public mxvk::VK_Window {
       public:
-        StarfieldWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("MXVK Starfield", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              data_root(data_root),
-              particles(NUM_PARTICLES),
-              vertices(NUM_PARTICLES * WARP_TRAIL_SEGMENTS) {
+        StarfieldWindow(const std::string &data_root, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("MXVK Starfield", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), data_root(data_root), particles(NUM_PARTICLES), vertices(NUM_PARTICLES * WARP_TRAIL_SEGMENTS) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             init_particles();
             last_update_time = SDL_GetTicks();
@@ -141,9 +130,7 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            point_batch.resize(this);
-        }
+        void onSwapchainRecreated() override { point_batch.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t image_index) override {
             if (!ensure_starfield_resources()) {
@@ -174,12 +161,7 @@ namespace example {
                 return false;
             }
 
-            point_batch.load(
-                this,
-                data_root + "/star.png",
-                data_root + "/starfield.vert.spv",
-                data_root + "/starfield.frag.spv",
-                vertices.size());
+            point_batch.load(this, data_root + "/star.png", data_root + "/starfield.vert.spv", data_root + "/starfield.frag.spv", vertices.size());
             point_batch.set_additive_blending(true);
             point_batch.set_depth_test_enabled(false);
             point_batch.set_depth_write_enabled(false);
@@ -318,10 +300,7 @@ namespace example {
             glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
             projection[1][1] *= -1.0f;
 
-            const glm::vec3 camera_pos(
-                camera_zoom * std::sin(glm::radians(camera_rotation)),
-                0.0f,
-                camera_zoom * std::cos(glm::radians(camera_rotation)));
+            const glm::vec3 camera_pos(camera_zoom * std::sin(glm::radians(camera_rotation)), 0.0f, camera_zoom * std::cos(glm::radians(camera_rotation)));
             const glm::mat4 view = glm::lookAt(camera_pos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
             return projection * view;
         }

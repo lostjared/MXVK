@@ -11,9 +11,7 @@
 namespace example {
     class FireWindow : public mxvk::VK_Window {
       public:
-        FireWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window("Fire - Procedural Shader", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              shader_root((path.empty() ? std::string(FIRE_ASSET_DIR) : path) + "/data") {
+        FireWindow(const std::string &path, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window("Fire - Procedural Shader", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), shader_root((path.empty() ? std::string(FIRE_ASSET_DIR) : path) + "/data") {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             attachPostProcessingShader(shader_root + "/fire.frag.spv");
             setPostProcessingShaderTimeEnabled(true);
@@ -28,13 +26,7 @@ namespace example {
             }
         }
 
-        void proc() override {
-            setPostProcessingShaderParams(
-                0.0f,
-                0.5f,
-                0.78f,
-                zoom);
-        }
+        void proc() override { setPostProcessingShaderParams(0.0f, 0.5f, 0.78f, zoom); }
 
       private:
         std::string shader_root;

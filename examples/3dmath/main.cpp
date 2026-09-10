@@ -21,9 +21,7 @@
 namespace {
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
@@ -41,12 +39,7 @@ namespace {
 namespace example {
     class Math3DWindow : public mxvk::VK_Window {
       public:
-        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              frame_width(framebuffer.width),
-              frame_height(framebuffer.height),
-              fallback_width(width),
-              fallback_height(height) {
+        Math3DWindow(const std::string &, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync, const FramebufferDimensions &framebuffer) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), frame_width(framebuffer.width), frame_height(framebuffer.height), fallback_width(width), fallback_height(height) {
             setClearColor(0.015f, 0.016f, 0.022f, 1.0f);
             mxvk::BuildTables();
         }
@@ -93,9 +86,7 @@ namespace example {
 
             const int pixel_size = std::max(1, frame_width / 360);
             mxvk::PipeLine pipeline;
-            pipeline.Begin(frame_width, frame_height, [this, pixel_size](int x, int y, mxvk::MXCOLOR color) {
-                put_block(x, y, pixel_size, color);
-            });
+            pipeline.Begin(frame_width, frame_height, [this, pixel_size](int x, int y, mxvk::MXCOLOR color) { put_block(x, y, pixel_size, color); });
             pipeline.DrawPolys(render_list);
             pipeline.End();
 
@@ -128,13 +119,9 @@ namespace example {
             frame_sprite->setTextureFilter(VK_FILTER_NEAREST);
         }
 
-        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const {
-            return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color));
-        }
+        [[nodiscard]] std::uint32_t map_color(mxvk::MXCOLOR color) const { return SDL_MapRGBA(frame_format, nullptr, mxvk::color_r(color), mxvk::color_g(color), mxvk::color_b(color), mxvk::color_a(color)); }
 
-        void clear_frame(mxvk::MXCOLOR color) {
-            SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color));
-        }
+        void clear_frame(mxvk::MXCOLOR color) { SDL_FillSurfaceRect(frame_surface.get(), nullptr, map_color(color)); }
 
         void put_pixel(int x, int y, mxvk::MXCOLOR color) {
             if (x < 0 || y < 0 || x >= frame_width || y >= frame_height) {

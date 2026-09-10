@@ -107,14 +107,10 @@ namespace mxvk {
                 field_begin = slash + 1;
             }
 
-            return parse_obj_index_value(fields[0], index.position) &&
-                   parse_obj_index_value(fields[1], index.texcoord) &&
-                   parse_obj_index_value(fields[2], index.normal) &&
-                   index.position != 0;
+            return parse_obj_index_value(fields[0], index.position) && parse_obj_index_value(fields[1], index.texcoord) && parse_obj_index_value(fields[2], index.normal) && index.position != 0;
         }
 
-        template <typename T>
-        [[nodiscard]] inline int resolve_obj_index(int index, const std::vector<T> &values) {
+        template <typename T> [[nodiscard]] inline int resolve_obj_index(int index, const std::vector<T> &values) {
             if (index > 0) {
                 return index - 1;
             }
@@ -140,9 +136,7 @@ namespace mxvk {
             std::string token;
             while (stream >> token) {
                 if (!token.empty() && token.front() == '-') {
-                    if (token == "-blendu" || token == "-blendv" || token == "-cc" ||
-                        token == "-clamp" || token == "-imfchan" || token == "-type" ||
-                        token == "-bm" || token == "-boost" || token == "-texres") {
+                    if (token == "-blendu" || token == "-blendv" || token == "-cc" || token == "-clamp" || token == "-imfchan" || token == "-type" || token == "-bm" || token == "-boost" || token == "-texres") {
                         stream >> token;
                     } else if (token == "-mm") {
                         stream >> token >> token;
@@ -257,8 +251,7 @@ namespace mxvk {
             for (std::size_t index = 0; index < face.size(); ++index) {
                 const OBJVertex &a = face[index];
                 const OBJVertex &b = face[(index + 1) % face.size()];
-                area += a.position[(drop_axis + 1) % 3] * b.position[(drop_axis + 2) % 3] -
-                        b.position[(drop_axis + 1) % 3] * a.position[(drop_axis + 2) % 3];
+                area += a.position[(drop_axis + 1) % 3] * b.position[(drop_axis + 2) % 3] - b.position[(drop_axis + 1) % 3] * a.position[(drop_axis + 2) % 3];
             }
             return area;
         }
@@ -275,14 +268,10 @@ namespace mxvk {
 
         [[nodiscard]] inline bool obj_point_in_triangle(const OBJVertex &point, const OBJVertex &a, const OBJVertex &b, const OBJVertex &c, int drop_axis, float winding) {
             constexpr float OBJ_EPSILON = 1.0e-6f;
-            return obj_edge_cross(a, b, point, drop_axis) * winding >= -OBJ_EPSILON &&
-                   obj_edge_cross(b, c, point, drop_axis) * winding >= -OBJ_EPSILON &&
-                   obj_edge_cross(c, a, point, drop_axis) * winding >= -OBJ_EPSILON;
+            return obj_edge_cross(a, b, point, drop_axis) * winding >= -OBJ_EPSILON && obj_edge_cross(b, c, point, drop_axis) * winding >= -OBJ_EPSILON && obj_edge_cross(c, a, point, drop_axis) * winding >= -OBJ_EPSILON;
         }
 
-        inline void append_obj_triangle(const std::vector<OBJVertex> &face, std::size_t a, std::size_t b, std::size_t c, const std::string &material_name, const std::string &object_name, std::vector<OBJTriangle> &triangles) {
-            triangles.push_back({{face[a], face[b], face[c]}, material_name, object_name});
-        }
+        inline void append_obj_triangle(const std::vector<OBJVertex> &face, std::size_t a, std::size_t b, std::size_t c, const std::string &material_name, const std::string &object_name, std::vector<OBJTriangle> &triangles) { triangles.push_back({{face[a], face[b], face[c]}, material_name, object_name}); }
 
         inline void triangulate_obj_face(const std::vector<OBJVertex> &face, const std::string &material_name, const std::string &object_name, std::vector<OBJTriangle> &triangles) {
             if (face.size() < 3) {
@@ -326,8 +315,7 @@ namespace mxvk {
 
                     bool contains_point = false;
                     for (const std::size_t test : remaining) {
-                        if (test != previous && test != current && test != next &&
-                            obj_point_in_triangle(face[test], face[previous], face[current], face[next], drop_axis, winding)) {
+                        if (test != previous && test != current && test != next && obj_point_in_triangle(face[test], face[previous], face[current], face[next], drop_axis, winding)) {
                             contains_point = true;
                             break;
                         }
@@ -381,24 +369,21 @@ namespace mxvk {
                 stream >> tag;
                 if (tag == "v") {
                     std::array<float, 3> position{};
-                    if (!(stream >> position[0] >> position[1] >> position[2]) ||
-                        !std::isfinite(position[0]) || !std::isfinite(position[1]) || !std::isfinite(position[2])) {
+                    if (!(stream >> position[0] >> position[1] >> position[2]) || !std::isfinite(position[0]) || !std::isfinite(position[1]) || !std::isfinite(position[2])) {
                         error = "invalid vertex at line " + std::to_string(line_number);
                         return false;
                     }
                     positions.push_back(position);
                 } else if (tag == "vt") {
                     std::array<float, 2> texcoord{};
-                    if (!(stream >> texcoord[0] >> texcoord[1]) ||
-                        !std::isfinite(texcoord[0]) || !std::isfinite(texcoord[1])) {
+                    if (!(stream >> texcoord[0] >> texcoord[1]) || !std::isfinite(texcoord[0]) || !std::isfinite(texcoord[1])) {
                         error = "invalid texture coordinate at line " + std::to_string(line_number);
                         return false;
                     }
                     texcoords.push_back(texcoord);
                 } else if (tag == "vn") {
                     std::array<float, 3> normal{};
-                    if (!(stream >> normal[0] >> normal[1] >> normal[2]) ||
-                        !std::isfinite(normal[0]) || !std::isfinite(normal[1]) || !std::isfinite(normal[2])) {
+                    if (!(stream >> normal[0] >> normal[1] >> normal[2]) || !std::isfinite(normal[0]) || !std::isfinite(normal[1]) || !std::isfinite(normal[2])) {
                         error = "invalid normal at line " + std::to_string(line_number);
                         return false;
                     }
@@ -469,8 +454,7 @@ namespace mxvk {
                 error = "no geometry found";
                 return false;
             }
-            if (!loaded.material_library_path.empty() &&
-                !load_mtl_file(loaded.material_library_path, loaded.materials, error)) {
+            if (!loaded.material_library_path.empty() && !load_mtl_file(loaded.material_library_path, loaded.materials, error)) {
                 return false;
             }
 

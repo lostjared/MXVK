@@ -71,9 +71,7 @@ namespace example {
                 if (std::abs(flake.z) < modelDepthClearance) {
                     flake.z = (flake.z >= 0.0f) ? modelDepthClearance : -modelDepthClearance;
                 }
-                flake.rotation += (flake.rotationSpeed + std::sin(windTime + flake.rotationAngle) *
-                                                             flake.rotationSpeedIntensity * 0.5f) *
-                                  deltaSeconds;
+                flake.rotation += (flake.rotationSpeed + std::sin(windTime + flake.rotationAngle) * flake.rotationSpeedIntensity * 0.5f) * deltaSeconds;
                 if (flake.rotation > twoPi) {
                     flake.rotation -= twoPi;
                 } else if (flake.rotation < -twoPi) {
@@ -99,10 +97,7 @@ namespace example {
                     continue;
                 }
 
-                snowSprite->drawSprite(glm::vec3(flake.x, flake.y, flake.z),
-                                       glm::vec2(flake.size, flake.size),
-                                       glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                       flake.rotation);
+                snowSprite->drawSprite(glm::vec3(flake.x, flake.y, flake.z), glm::vec2(flake.size, flake.size), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), flake.rotation);
             }
 
             snowSprite->render(cmd, imageIndex);
@@ -110,9 +105,7 @@ namespace example {
         }
 
       private:
-        static float randomSignedCoordinate() {
-            return static_cast<float>(std::rand() % 900 - 450) / 100.0f;
-        }
+        static float randomSignedCoordinate() { return static_cast<float>(std::rand() % 900 - 450) / 100.0f; }
 
         static float randomDepth() {
             const float depthRange = 2.5f - modelDepthClearance;
@@ -134,8 +127,7 @@ namespace example {
             flake.rotationAngle = static_cast<float>(std::rand() % 360) * (pi / 180.0f);
             flake.rotationDirection = (std::rand() % 2) ? 1.0f : -1.0f;
             flake.rotationIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
-            flake.rotationSpeed = flake.rotationDirection * (0.8f + flake.rotationIntensity * 2.0f) +
-                                  ((static_cast<float>(std::rand() % 100) / 1000.0f) - 0.05f);
+            flake.rotationSpeed = flake.rotationDirection * (0.8f + flake.rotationIntensity * 2.0f) + ((static_cast<float>(std::rand() % 100) / 1000.0f) - 0.05f);
             flake.rotationSize = 0.01f + static_cast<float>(std::rand() % 100) / 4000.0f;
             flake.rotationSpeedSize = (static_cast<float>(std::rand() % 100) / 2000.0f) - 0.025f;
             flake.rotationSpeedIntensity = static_cast<float>(std::rand() % 100) / 100.0f;
@@ -149,9 +141,7 @@ namespace example {
 
     class ModelWindow : public mxvk::VK_Window {
       public:
-        ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot((path.empty() || path == ".") ? std::string(tux_example_ASSET_DIR) : path) {
+        ModelWindow(const std::string &filename, const std::string &path, const std::string &title, int width, int height, bool fullscreen, bool enable_vsync) : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot((path.empty() || path == ".") ? std::string(tux_example_ASSET_DIR) : path) {
             const std::string shaderRoot = assetRoot + "/data";
             const std::string modelPath = filename.empty() ? (assetRoot + "/data/tux.obj") : filename;
             const std::string vertPath = shaderRoot + "/model.vert.spv";
@@ -182,13 +172,9 @@ namespace example {
             }
         }
 
-        void proc() override {
-            printText("Tux Example", 15, 15, {255, 255, 255, 255});
-        }
+        void proc() override { printText("Tux Example", 15, 15, {255, 255, 255, 255}); }
 
-        void onSwapchainRecreated() override {
-            model.resize(this);
-        }
+        void onSwapchainRecreated() override { model.resize(this); }
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const auto now = std::chrono::steady_clock::now();
@@ -207,9 +193,7 @@ namespace example {
             lastSnowUpdate = now;
             snow.update(deltaSeconds);
 
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             mxvk::UniformBufferObject ubo{};
             ubo.model = glm::rotate(glm::mat4(1.0f), elapsedSeconds * autoSpinSpeed, glm::vec3(0.0f, 1.0f, 0.0f));

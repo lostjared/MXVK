@@ -237,10 +237,7 @@ namespace space {
      * @param center_offset Model-space center correction.
      * @return Composed model matrix.
      */
-    inline glm::mat4 build_model_matrix(const glm::vec3 &position,
-                                        const glm::vec3 &rotation_degrees,
-                                        float scale,
-                                        const glm::vec3 &center_offset) {
+    inline glm::mat4 build_model_matrix(const glm::vec3 &position, const glm::vec3 &rotation_degrees, float scale, const glm::vec3 &center_offset) {
         glm::mat4 model(1.0f);
         model = glm::translate(model, position);
         model = glm::rotate(model, glm::radians(rotation_degrees.y), glm::vec3(0.0f, 1.0f, 0.0f));

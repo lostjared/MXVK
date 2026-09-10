@@ -67,15 +67,7 @@ namespace mxvk {
          *
          * Existing resources are destroyed before the new resources are created.
          */
-        void initialize(const VulkanContext &context,
-                        VkExtent2D extent,
-                        VkFormat color_format,
-                        VkFormat depth_format,
-                        VkPipelineCache pipeline_cache,
-                        const std::string &mask_vertex_shader,
-                        const std::string &mask_fragment_shader,
-                        const std::string &content_vertex_shader,
-                        const std::string &content_fragment_shader);
+        void initialize(const VulkanContext &context, VkExtent2D extent, VkFormat color_format, VkFormat depth_format, VkPipelineCache pipeline_cache, const std::string &mask_vertex_shader, const std::string &mask_fragment_shader, const std::string &content_vertex_shader, const std::string &content_fragment_shader);
 
         /** @brief Release all Vulkan resources and reset the helper to an empty state. */
         void destroy();
@@ -147,10 +139,7 @@ namespace mxvk {
          * @param writes_stencil True for the mask pass, false for the stencil-tested content pass.
          * @return Created Vulkan graphics pipeline.
          */
-        [[nodiscard]] VkPipeline create_pipeline(const std::string &vertex_shader,
-                                                 const std::string &fragment_shader,
-                                                 VkPipelineLayout layout,
-                                                 bool writes_stencil) const;
+        [[nodiscard]] VkPipeline create_pipeline(const std::string &vertex_shader, const std::string &fragment_shader, VkPipelineLayout layout, bool writes_stencil) const;
 
         VulkanContext vk_context{};
         VkExtent2D stencil_extent{};

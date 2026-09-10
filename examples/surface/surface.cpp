@@ -20,7 +20,7 @@ namespace surface {
 
     class SurfaceWindow : public mxvk::VK_Window {
 
-    public:
+      public:
         SurfaceWindow(std::string shader_path, int width, int height, bool full, bool enable_vsync) : mxvk::VK_Window(" -[ MXVK Skeleton ] - ", width, height, full, MXVK_VALIDATION, enable_vsync) {
             std::cout << "surface: started example.\n";
             if (!resize_canvas_to_swapchain()) {
@@ -30,15 +30,15 @@ namespace surface {
         }
         void event(SDL_Event &e) override {
             switch (e.type) {
-                case SDL_EVENT_KEY_DOWN:
-                    if (e.key.key == SDLK_ESCAPE) {
-                        exit();
-                        return;
-                    }
-                    break;
-                case SDL_EVENT_QUIT:
+            case SDL_EVENT_KEY_DOWN:
+                if (e.key.key == SDLK_ESCAPE) {
                     exit();
                     return;
+                }
+                break;
+            case SDL_EVENT_QUIT:
+                exit();
+                return;
             }
         }
         void proc() override {
@@ -63,11 +63,9 @@ namespace surface {
             surf->drawSpriteRect(0, 0, target_width, target_height);
         }
 
-        void onSwapchainRecreated() override {
-            resize_canvas_to_swapchain();
-        }
+        void onSwapchainRecreated() override { resize_canvas_to_swapchain(); }
 
-    private:
+      private:
         bool resize_canvas_to_swapchain() {
             if (!ensureRenderResources()) {
                 return false;

@@ -86,11 +86,7 @@ namespace mxvk {
          * @param textureBasePath Optional base path for texture files in the manifest.
          * @param scale Uniform mesh scale.
          */
-        void load(VK_Window *window,
-                  const std::string &modelPath,
-                  const std::string &textureManifestPath,
-                  const std::string &textureBasePath,
-                  float scale = 1.0f);
+        void load(VK_Window *window, const std::string &modelPath, const std::string &textureManifestPath, const std::string &textureBasePath, float scale = 1.0f);
 
         /**
          * @brief Consume pre-parsed mesh data and build Vulkan state.
@@ -100,11 +96,7 @@ namespace mxvk {
          * @param textureBasePath Optional base path for texture files in the manifest.
          * @param scale Uniform mesh scale. Kept for API compatibility.
          */
-        void load(VK_Window *window,
-                  MXModel &&model,
-                  const std::string &textureManifestPath,
-                  const std::string &textureBasePath,
-                  [[maybe_unused]] float scale = 1.0f);
+        void load(VK_Window *window, MXModel &&model, const std::string &textureManifestPath, const std::string &textureBasePath, [[maybe_unused]] float scale = 1.0f);
 
         /**
          * @brief Configure custom shader paths and rebuild pipelines.
@@ -166,18 +158,10 @@ namespace mxvk {
          * @param ubo Transform/effect payload copied into vertex-stage push constants.
          * @param wireframe Render using the optional wireframe pipeline when available.
          */
-        void renderWithPushConstants(VkCommandBuffer cmd,
-                                     uint32_t imageIndex,
-                                     size_t textureIndex,
-                                     const UniformBufferObject &ubo,
-                                     bool wireframe = false);
+        void renderWithPushConstants(VkCommandBuffer cmd, uint32_t imageIndex, size_t textureIndex, const UniformBufferObject &ubo, bool wireframe = false);
 
         /** Render using a non-owning shader-readable image view as texture slot zero. */
-        void renderWithExternalTexture(VkCommandBuffer cmd,
-                                       uint32_t imageIndex,
-                                       VkImageView textureView,
-                                       const UniformBufferObject &ubo,
-                                       bool wireframe = false);
+        void renderWithExternalTexture(VkCommandBuffer cmd, uint32_t imageIndex, VkImageView textureView, const UniformBufferObject &ubo, bool wireframe = false);
 
         /**
          * @brief Rebuild swapchain-dependent resources after resize.
@@ -279,16 +263,11 @@ namespace mxvk {
         void loadTexturesFromMTL(const std::string &textureBasePath);
         void createFallbackTexture();
 
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory) const;
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const;
         [[nodiscard]] uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
         [[nodiscard]] VkCommandBuffer beginSingleTimeCommands() const;
         void endSingleTimeCommands(VkCommandBuffer commandBuffer) const;
-        void createImage(uint32_t width, uint32_t height, VkFormat format,
-                         VkImageTiling tiling, VkImageUsageFlags usage,
-                         VkMemoryPropertyFlags properties, VkImage &image,
-                         VkDeviceMemory &memory) const;
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) const;
         void createTextureImage(uint32_t width, uint32_t height, TextureEntry &texture) const;
 #ifdef MXVK_CUDA
         void createCudaExportableImage(uint32_t width, uint32_t height, TextureEntry &texture) const;
@@ -296,8 +275,7 @@ namespace mxvk {
         [[nodiscard]] bool ensureTextureCudaInterop(TextureEntry &texture) const;
         [[nodiscard]] bool transitionTextureForCudaWrite(TextureEntry &texture) const;
         [[nodiscard]] bool transitionTextureForShaderRead(TextureEntry &texture) const;
-        [[nodiscard]] bool updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels,
-                                                        uint32_t width, uint32_t height, uint32_t pitch) const;
+        [[nodiscard]] bool updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels, uint32_t width, uint32_t height, uint32_t pitch) const;
         void recreatePrimaryTextureForCuda(TextureEntry &texture, uint32_t width, uint32_t height);
 #endif
         [[nodiscard]] VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const;
@@ -310,8 +288,7 @@ namespace mxvk {
         void destroyUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        void updateTextureDescriptor(VkDescriptorSet descriptorSet,
-                                     VkImageView imageView) const;
+        void updateTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView) const;
         void createPipelines();
 
         void destroyPipelines();

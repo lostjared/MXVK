@@ -1,10 +1,10 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cmath>
-#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -176,9 +176,7 @@ namespace walk {
                 if (collectible.type == Collectible::Type::Bird) {
                     const glm::vec3 delta = point - center;
                     const float halfSide = collectible.radius;
-                    if (std::abs(delta.x) <= halfSide &&
-                        std::abs(delta.y) <= halfSide &&
-                        std::abs(delta.z) <= halfSide) {
+                    if (std::abs(delta.x) <= halfSide && std::abs(delta.y) <= halfSide && std::abs(delta.z) <= halfSide) {
                         indexOut = i;
                         return true;
                     }
@@ -229,9 +227,7 @@ namespace walk {
             const int gridZ = mazeGridZ;
             cellSize = (size * 2.0f) / static_cast<float>(gridX);
 
-            auto indexFor = [gridX](int x, int z) {
-                return z * gridX + x;
-            };
+            auto indexFor = [gridX](int x, int z) { return z * gridX + x; };
 
             std::vector<Cell> grid(static_cast<size_t>(gridX * gridZ));
             std::vector<std::pair<int, int>> stack;
@@ -341,9 +337,7 @@ namespace walk {
             constexpr float adjacencyEpsilon = 0.001f;
             constexpr float quantizeScale = 1000.0f;
 
-            const auto quantize = [](float value) {
-                return static_cast<int>(std::lround(value * quantizeScale));
-            };
+            const auto quantize = [](float value) { return static_cast<int>(std::lround(value * quantizeScale)); };
 
             std::vector<NormalizedWall> normalized;
             normalized.reserve(wallSegments.size());
@@ -551,11 +545,7 @@ namespace walk {
             glm::vec4 fx{0.0f};
         };
 
-        void load(mxvk::VK_Window *targetWindow,
-                  const std::string &textureManifestPath,
-                  const std::string &textureBasePath,
-                  const std::vector<char> &vertSpv,
-                  const std::vector<char> &fragSpv) {
+        void load(mxvk::VK_Window *targetWindow, const std::string &textureManifestPath, const std::string &textureBasePath, const std::vector<char> &vertSpv, const std::vector<char> &fragSpv) {
             if (targetWindow == nullptr) {
                 throw mxvk::Exception("walk: raw pillar renderer requires a valid window");
             }
@@ -617,12 +607,7 @@ namespace walk {
             window = nullptr;
         }
 
-        void render(VkCommandBuffer cmd,
-                    uint32_t imageIndex,
-                    const std::vector<PillarInstance> &pillars,
-                    const glm::mat4 &view,
-                    const glm::mat4 &proj,
-                    const glm::vec4 &fx) {
+        void render(VkCommandBuffer cmd, uint32_t imageIndex, const std::vector<PillarInstance> &pillars, const glm::mat4 &view, const glm::mat4 &proj, const glm::vec4 &fx) {
             if (cmd == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
                 return;
             }
@@ -637,14 +622,7 @@ namespace walk {
             std::memcpy(uniformBuffersMapped[imageIndex], &uniforms, sizeof(PillarUniforms));
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            vkCmdBindDescriptorSets(cmd,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout,
-                                    0,
-                                    1,
-                                    &descriptorSets[imageIndex],
-                                    0,
-                                    nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
 
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
@@ -674,11 +652,7 @@ namespace walk {
             throw mxvk::Exception("walk: failed to find suitable memory type for raw pillar renderer");
         }
 
-        void createBuffer(VkDeviceSize size,
-                          VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties,
-                          VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory) const {
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
             VkBufferCreateInfo bufferInfo{};
             bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
             bufferInfo.size = size;
@@ -718,14 +692,7 @@ namespace walk {
             }
         }
 
-        void createImage(uint32_t width,
-                         uint32_t height,
-                         VkFormat format,
-                         VkImageTiling tiling,
-                         VkImageUsageFlags usage,
-                         VkMemoryPropertyFlags properties,
-                         VkImage &image,
-                         VkDeviceMemory &memory) const {
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) const {
             VkImageCreateInfo imageInfo{};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -898,9 +865,7 @@ namespace walk {
             VkPhysicalDeviceProperties deviceProperties{};
             vkGetPhysicalDeviceProperties(window->getPhysicalDevice(), &deviceProperties);
             const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
-            const float anisotropyLevel = anisotropySupported
-                                              ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
-                                              : 1.0f;
+            const float anisotropyLevel = anisotropySupported ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy) : 1.0f;
 
             VkSamplerCreateInfo samplerInfo{};
             samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -964,11 +929,7 @@ namespace walk {
             uniformBuffersMapped.resize(frameCount, nullptr);
 
             for (size_t i = 0; i < frameCount; ++i) {
-                createBuffer(sizeof(PillarUniforms),
-                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             uniformBuffers[i],
-                             uniformBufferMemory[i]);
+                createBuffer(sizeof(PillarUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBufferMemory[i]);
                 vkMapMemory(window->getDevice(), uniformBufferMemory[i], 0, sizeof(PillarUniforms), 0, &uniformBuffersMapped[i]);
             }
         }
@@ -1310,111 +1271,120 @@ namespace walk {
                 const float xTop = std::cos(angle);
                 const float zTop = std::sin(angle);
                 const float u = static_cast<float>(i) / static_cast<float>(segments);
-                vertices.insert(vertices.end(), {
-                                                    xBottom,
-                                                    0.0f,
-                                                    zBottom,
-                                                    u,
-                                                    0.0f,
-                                                    xBottom,
-                                                    0.0f,
-                                                    zBottom,
-                                                });
-                vertices.insert(vertices.end(), {
-                                                    xTop,
-                                                    1.0f,
-                                                    zTop,
-                                                    u,
-                                                    1.0f,
-                                                    xTop,
-                                                    0.0f,
-                                                    zTop,
-                                                });
+                vertices.insert(vertices.end(),
+                                {
+                                    xBottom,
+                                    0.0f,
+                                    zBottom,
+                                    u,
+                                    0.0f,
+                                    xBottom,
+                                    0.0f,
+                                    zBottom,
+                                });
+                vertices.insert(vertices.end(),
+                                {
+                                    xTop,
+                                    1.0f,
+                                    zTop,
+                                    u,
+                                    1.0f,
+                                    xTop,
+                                    0.0f,
+                                    zTop,
+                                });
             }
 
             for (int i = 0; i < segments; ++i) {
                 const int current = i * 2;
                 const int next = (i + 1) * 2;
-                indices.insert(indices.end(), {
-                                                  static_cast<uint32_t>(current),
-                                                  static_cast<uint32_t>(current + 1),
-                                                  static_cast<uint32_t>(next),
-                                                  static_cast<uint32_t>(next),
-                                                  static_cast<uint32_t>(current + 1),
-                                                  static_cast<uint32_t>(next + 1),
-                                              });
+                indices.insert(indices.end(),
+                               {
+                                   static_cast<uint32_t>(current),
+                                   static_cast<uint32_t>(current + 1),
+                                   static_cast<uint32_t>(next),
+                                   static_cast<uint32_t>(next),
+                                   static_cast<uint32_t>(current + 1),
+                                   static_cast<uint32_t>(next + 1),
+                               });
             }
 
             const uint32_t bottomCenterIndex = static_cast<uint32_t>(vertices.size() / 8);
-            vertices.insert(vertices.end(), {
-                                                0.0f,
-                                                baseDepth,
-                                                0.0f,
-                                                0.5f,
-                                                0.5f,
-                                                0.0f,
-                                                -1.0f,
-                                                0.0f,
-                                            });
+            vertices.insert(vertices.end(),
+                            {
+                                0.0f,
+                                baseDepth,
+                                0.0f,
+                                0.5f,
+                                0.5f,
+                                0.0f,
+                                -1.0f,
+                                0.0f,
+                            });
 
             const uint32_t bottomCapStart = static_cast<uint32_t>(vertices.size() / 8);
             for (int i = 0; i <= segments; ++i) {
                 const float angle = static_cast<float>(i) / static_cast<float>(segments) * 2.0f * 3.14159265358979323846f;
                 const float x = std::cos(angle) * bottomCapScale;
                 const float z = std::sin(angle) * bottomCapScale;
-                vertices.insert(vertices.end(), {
-                                                    x,
-                                                    0.0f,
-                                                    z,
-                                                    0.5f + x * 0.5f / bottomCapScale,
-                                                    0.5f + z * 0.5f / bottomCapScale,
-                                                    0.0f,
-                                                    -1.0f,
-                                                    0.0f,
-                                                });
+                vertices.insert(vertices.end(),
+                                {
+                                    x,
+                                    0.0f,
+                                    z,
+                                    0.5f + x * 0.5f / bottomCapScale,
+                                    0.5f + z * 0.5f / bottomCapScale,
+                                    0.0f,
+                                    -1.0f,
+                                    0.0f,
+                                });
             }
             for (int i = 0; i < segments; ++i) {
-                indices.insert(indices.end(), {
-                                                  bottomCenterIndex,
-                                                  bottomCapStart + static_cast<uint32_t>(i + 1),
-                                                  bottomCapStart + static_cast<uint32_t>(i),
-                                              });
+                indices.insert(indices.end(),
+                               {
+                                   bottomCenterIndex,
+                                   bottomCapStart + static_cast<uint32_t>(i + 1),
+                                   bottomCapStart + static_cast<uint32_t>(i),
+                               });
             }
 
             const uint32_t topCenterIndex = static_cast<uint32_t>(vertices.size() / 8);
-            vertices.insert(vertices.end(), {
-                                                0.0f,
-                                                1.0f,
-                                                0.0f,
-                                                0.5f,
-                                                0.5f,
-                                                0.0f,
-                                                1.0f,
-                                                0.0f,
-                                            });
+            vertices.insert(vertices.end(),
+                            {
+                                0.0f,
+                                1.0f,
+                                0.0f,
+                                0.5f,
+                                0.5f,
+                                0.0f,
+                                1.0f,
+                                0.0f,
+                            });
 
             const uint32_t topCapStart = static_cast<uint32_t>(vertices.size() / 8);
             for (int i = 0; i <= segments; ++i) {
                 const float angle = static_cast<float>(i) / static_cast<float>(segments) * 2.0f * 3.14159265358979323846f;
                 const float x = std::cos(angle);
                 const float z = std::sin(angle);
-                vertices.insert(vertices.end(), {
-                                                    x,
-                                                    1.0f,
-                                                    z,
-                                                    0.5f + x * 0.5f,
-                                                    0.5f + z * 0.5f,
-                                                    0.0f,
-                                                    1.0f,
-                                                    0.0f,
-                                                });
+                vertices.insert(vertices.end(),
+                                {
+                                    x,
+                                    1.0f,
+                                    z,
+                                    0.5f + x * 0.5f,
+                                    0.5f + z * 0.5f,
+                                    0.0f,
+                                    1.0f,
+                                    0.0f,
+                                });
             }
             for (int i = 0; i < segments; ++i) {
-                indices.insert(indices.end(), {
-                                                  topCenterIndex,
-                                                  topCapStart + static_cast<uint32_t>(i),
-                                                  topCapStart + static_cast<uint32_t>(i + 1),
-                                              });
+                indices.insert(indices.end(),
+                               {
+                                   topCenterIndex,
+                                   topCapStart + static_cast<uint32_t>(i),
+                                   topCapStart + static_cast<uint32_t>(i + 1),
+                               });
             }
 
             vertexCount = static_cast<uint32_t>(vertices.size() / 8);
@@ -1428,21 +1398,13 @@ namespace walk {
                 pillarVertices[i].normal = glm::vec3(vertices[base + 5], vertices[base + 6], vertices[base + 7]);
             }
 
-            createBuffer(static_cast<VkDeviceSize>(pillarVertices.size() * sizeof(PillarVertex)),
-                         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         vertexBuffer,
-                         vertexMemory);
+            createBuffer(static_cast<VkDeviceSize>(pillarVertices.size() * sizeof(PillarVertex)), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexBuffer, vertexMemory);
             void *mapped = nullptr;
             vkMapMemory(window->getDevice(), vertexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, pillarVertices.data(), pillarVertices.size() * sizeof(PillarVertex));
             vkUnmapMemory(window->getDevice(), vertexMemory);
 
-            createBuffer(static_cast<VkDeviceSize>(indices.size() * sizeof(uint32_t)),
-                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         indexBuffer,
-                         indexMemory);
+            createBuffer(static_cast<VkDeviceSize>(indices.size() * sizeof(uint32_t)), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexBuffer, indexMemory);
             vkMapMemory(window->getDevice(), indexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, indices.data(), indices.size() * sizeof(uint32_t));
             vkUnmapMemory(window->getDevice(), indexMemory);
@@ -1460,24 +1422,14 @@ namespace walk {
 
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-            createBuffer(imageSize,
-                         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         stagingBuffer,
-                         stagingMemory);
+            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
             vkMapMemory(window->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
             vkUnmapMemory(window->getDevice(), stagingMemory);
 
-            createImage(width, height,
-                        VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        textureImage,
-                        textureMemory);
+            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureMemory);
 
             transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, textureImage, width, height);
@@ -1532,11 +1484,7 @@ namespace walk {
             glm::vec4 fx{0.0f};
         };
 
-        void load(mxvk::VK_Window *targetWindow,
-                  const std::string &textureManifestPath,
-                  const std::string &textureBasePath,
-                  const std::vector<char> &vertexShaderSpv,
-                  const std::vector<char> &fragmentShaderSpv) {
+        void load(mxvk::VK_Window *targetWindow, const std::string &textureManifestPath, const std::string &textureBasePath, const std::vector<char> &vertexShaderSpv, const std::vector<char> &fragmentShaderSpv) {
             if (targetWindow == nullptr) {
                 throw mxvk::Exception("walk: raw wall renderer requires a valid window");
             }
@@ -1598,13 +1546,7 @@ namespace walk {
             window = nullptr;
         }
 
-        void render(VkCommandBuffer cmd,
-                    uint32_t imageIndex,
-                    const std::vector<WallSegment> &walls,
-                    float wallThickness,
-                    const glm::mat4 &view,
-                    const glm::mat4 &proj,
-                    const glm::vec4 &fx) {
+        void render(VkCommandBuffer cmd, uint32_t imageIndex, const std::vector<WallSegment> &walls, float wallThickness, const glm::mat4 &view, const glm::mat4 &proj, const glm::vec4 &fx) {
             if (cmd == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
                 return;
             }
@@ -1619,14 +1561,7 @@ namespace walk {
             std::memcpy(uniformBuffersMapped[imageIndex], &uniforms, sizeof(WallUniforms));
 
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            vkCmdBindDescriptorSets(cmd,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout,
-                                    0,
-                                    1,
-                                    &descriptorSets[imageIndex],
-                                    0,
-                                    nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
 
             const VkDeviceSize offset = 0;
             vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
@@ -1666,11 +1601,7 @@ namespace walk {
             throw mxvk::Exception("walk: failed to find suitable memory type for raw wall renderer");
         }
 
-        void createBuffer(VkDeviceSize size,
-                          VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties,
-                          VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory) const {
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
             VkBufferCreateInfo bufferInfo{};
             bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
             bufferInfo.size = size;
@@ -1718,11 +1649,7 @@ namespace walk {
             verts.reserve(24);
             inds.reserve(36);
 
-            const auto addFace = [&verts, &inds](const glm::vec3 &v0,
-                                                 const glm::vec3 &v1,
-                                                 const glm::vec3 &v2,
-                                                 const glm::vec3 &v3,
-                                                 const glm::vec3 &normal) {
+            const auto addFace = [&verts, &inds](const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2, const glm::vec3 &v3, const glm::vec3 &normal) {
                 const uint32_t base = static_cast<uint32_t>(verts.size());
                 verts.push_back({v0, glm::vec2(0.0f, 0.0f), normal});
                 verts.push_back({v1, glm::vec2(1.0f, 0.0f), normal});
@@ -1746,21 +1673,13 @@ namespace walk {
             vertexCount = static_cast<uint32_t>(verts.size());
             indexCount = static_cast<uint32_t>(inds.size());
 
-            createBuffer(static_cast<VkDeviceSize>(verts.size() * sizeof(WallVertex)),
-                         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         vertexBuffer,
-                         vertexMemory);
+            createBuffer(static_cast<VkDeviceSize>(verts.size() * sizeof(WallVertex)), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexBuffer, vertexMemory);
             void *mapped = nullptr;
             vkMapMemory(window->getDevice(), vertexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, verts.data(), verts.size() * sizeof(WallVertex));
             vkUnmapMemory(window->getDevice(), vertexMemory);
 
-            createBuffer(static_cast<VkDeviceSize>(inds.size() * sizeof(uint32_t)),
-                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         indexBuffer,
-                         indexMemory);
+            createBuffer(static_cast<VkDeviceSize>(inds.size() * sizeof(uint32_t)), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexBuffer, indexMemory);
             vkMapMemory(window->getDevice(), indexMemory, 0, VK_WHOLE_SIZE, 0, &mapped);
             std::memcpy(mapped, inds.data(), inds.size() * sizeof(uint32_t));
             vkUnmapMemory(window->getDevice(), indexMemory);
@@ -1778,24 +1697,14 @@ namespace walk {
 
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-            createBuffer(imageSize,
-                         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         stagingBuffer,
-                         stagingMemory);
+            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
             vkMapMemory(window->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
             std::memcpy(mapped, surface->pixels, static_cast<size_t>(imageSize));
             vkUnmapMemory(window->getDevice(), stagingMemory);
 
-            createImage(width, height,
-                        VK_FORMAT_R8G8B8A8_UNORM,
-                        VK_IMAGE_TILING_OPTIMAL,
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        textureImage,
-                        textureMemory);
+            createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureMemory);
 
             transitionImageLayout(textureImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, textureImage, width, height);
@@ -1818,9 +1727,7 @@ namespace walk {
             VkPhysicalDeviceProperties deviceProperties{};
             vkGetPhysicalDeviceProperties(window->getPhysicalDevice(), &deviceProperties);
             const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
-            const float anisotropyLevel = anisotropySupported
-                                              ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
-                                              : 1.0f;
+            const float anisotropyLevel = anisotropySupported ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy) : 1.0f;
 
             VkSamplerCreateInfo samplerInfo{};
             samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1884,11 +1791,7 @@ namespace walk {
             uniformBuffersMapped.resize(frameCount, nullptr);
 
             for (size_t i = 0; i < frameCount; ++i) {
-                createBuffer(sizeof(WallUniforms),
-                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             uniformBuffers[i],
-                             uniformBufferMemory[i]);
+                createBuffer(sizeof(WallUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBufferMemory[i]);
                 vkMapMemory(window->getDevice(), uniformBufferMemory[i], 0, sizeof(WallUniforms), 0, &uniformBuffersMapped[i]);
             }
         }
@@ -2210,14 +2113,7 @@ namespace walk {
             }
         }
 
-        void createImage(uint32_t width,
-                         uint32_t height,
-                         VkFormat format,
-                         VkImageTiling tiling,
-                         VkImageUsageFlags usage,
-                         VkMemoryPropertyFlags properties,
-                         VkImage &image,
-                         VkDeviceMemory &memory) const {
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) const {
             VkImageCreateInfo imageInfo{};
             imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -2412,21 +2308,14 @@ namespace walk {
 
     class WalkWindow final : public mxvk::VK_IOWindow {
       public:
-        WalkWindow(const Arguments &args)
-            : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen, args.enable_vsync),
-              assetRoot((args.path.empty() || args.path == ".") ? std::string(WALK_ASSET_DIR) : args.path),
-              shaderRoot(assetRoot + "/data"),
-              modelRoot(assetRoot + "/data") {
+        WalkWindow(const Arguments &args) : mxvk::VK_IOWindow(args.path, "FPS Maze Room - MXVK", args.width, args.height, args.fullscreen, args.enable_vsync), assetRoot((args.path.empty() || args.path == ".") ? std::string(WALK_ASSET_DIR) : args.path), shaderRoot(assetRoot + "/data"), modelRoot(assetRoot + "/data") {
             logEnv(std::format("initializing window {}x{} (fullscreen={})", args.width, args.height, args.fullscreen ? "true" : "false"));
             logEnv(std::format("asset root: {}", assetRoot));
             logEnv(std::format("model root: {}", modelRoot));
 
             std::mt19937 rng(static_cast<uint32_t>(std::chrono::high_resolution_clock::now().time_since_epoch().count()));
             world.generate(rng());
-            logEnv(std::format("world generated (walls={}, pillars={}, collectibles={})",
-                               world.walls().size(),
-                               world.pillars().size(),
-                               world.collectibles().size()));
+            logEnv(std::format("world generated (walls={}, pillars={}, collectibles={})", world.walls().size(), world.pillars().size(), world.collectibles().size()));
             setClearColor(100.0f / 255.0f, 181.0f / 255.0f, 246.0f / 255.0f, 1.0f);
 
             cameraPos = world.startPosition();
@@ -2458,27 +2347,16 @@ namespace walk {
             loadModel(bulletModel, modelRoot + "/sphere.mxmod.z", "", "", vertPath, bulletFragPath);
 
             logEnv("loading wall renderer assets");
-            rawWallRenderer.load(this,
-                                 groundTexManifest,
-                                 assetRoot + "/data",
-                                 loadSpv(pillarVertPath),
-                                 loadSpv(wallFragPath));
+            rawWallRenderer.load(this, groundTexManifest, assetRoot + "/data", loadSpv(pillarVertPath), loadSpv(wallFragPath));
             logEnv("wall renderer ready");
 
             logEnv("loading pillar renderer assets");
-            rawPillarRenderer.load(this,
-                                   groundTexManifest,
-                                   assetRoot + "/data",
-                                   loadSpv(pillarVertPath),
-                                   loadSpv(pillarFragPath));
+            rawPillarRenderer.load(this, groundTexManifest, assetRoot + "/data", loadSpv(pillarVertPath), loadSpv(pillarFragPath));
             logEnv("pillar renderer ready");
 
-            loadModel(saturnModel, assetRoot + "/data/saturn.mxmod.z",
-                      assetRoot + "/data/planet.tex", assetRoot + "/data", vertPath, objectFragPath);
-            loadModel(birdModel, assetRoot + "/data/tux.obj",
-                      assetRoot + "/data/tux.mtl", assetRoot + "/data", vertPath, objectFragPath);
-            loadModel(blasterModel, assetRoot + "/data/blaster.obj",
-                      assetRoot + "/data/blaster.mtl", assetRoot + "/data", vertPath, objectFragPath);
+            loadModel(saturnModel, assetRoot + "/data/saturn.mxmod.z", assetRoot + "/data/planet.tex", assetRoot + "/data", vertPath, objectFragPath);
+            loadModel(birdModel, assetRoot + "/data/tux.obj", assetRoot + "/data/tux.mtl", assetRoot + "/data", vertPath, objectFragPath);
+            loadModel(blasterModel, assetRoot + "/data/blaster.obj", assetRoot + "/data/blaster.mtl", assetRoot + "/data", vertPath, objectFragPath);
             normalizeCollectiblesToModel();
 
             pointParticleVertSpv = shaderRoot + "/particle_points.vert.spv";
@@ -2510,10 +2388,7 @@ namespace walk {
         }
 
         void event(SDL_Event &e) override {
-            const bool is_left_double_click =
-                (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
-                 e.button.button == SDL_BUTTON_LEFT &&
-                 e.button.clicks >= 2);
+            const bool is_left_double_click = (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT && e.button.clicks >= 2);
 
             if (is_left_double_click) {
                 if (SDL_Window *const sdlWindow = getSDLWindow(); sdlWindow != nullptr) {
@@ -2657,9 +2532,7 @@ namespace walk {
 
         void onRecordCustomRendering(VkCommandBuffer cmd, uint32_t imageIndex) override {
             const VkExtent2D extent = getSwapchainExtent();
-            const float aspect = (extent.height > 0U)
-                                     ? static_cast<float>(extent.width) / static_cast<float>(extent.height)
-                                     : 1.0f;
+            const float aspect = (extent.height > 0U) ? static_cast<float>(extent.width) / static_cast<float>(extent.height) : 1.0f;
 
             const glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
@@ -2672,23 +2545,13 @@ namespace walk {
                 constexpr float floorHalfSize = 100.0f;
                 constexpr float floorThickness = 0.04f;
                 const glm::vec3 extent = floorModel.modelAxisExtent();
-                const glm::vec3 srcScale(
-                    (floorHalfSize * 2.0f) / std::max(extent.x, 1e-4f),
-                    floorThickness / std::max(extent.y, 1e-4f),
-                    (floorHalfSize * 2.0f) / std::max(extent.z, 1e-4f));
+                const glm::vec3 srcScale((floorHalfSize * 2.0f) / std::max(extent.x, 1e-4f), floorThickness / std::max(extent.y, 1e-4f), (floorHalfSize * 2.0f) / std::max(extent.z, 1e-4f));
                 glm::mat4 floorWorld = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.02f, 0.0f));
                 floorWorld = glm::scale(floorWorld, srcScale);
-                renderModel(cmd, imageIndex, floorModel, floorWorld, view, proj,
-                            glm::vec4(0.0f, 0.0f, 0.0f, t), false);
+                renderModel(cmd, imageIndex, floorModel, floorWorld, view, proj, glm::vec4(0.0f, 0.0f, 0.0f, t), false);
             }
 
-            rawWallRenderer.render(cmd,
-                                   imageIndex,
-                                   world.walls(),
-                                   world.wallThickness(),
-                                   view,
-                                   proj,
-                                   glm::vec4(0.58f, 0.58f, 0.65f, t));
+            rawWallRenderer.render(cmd, imageIndex, world.walls(), world.wallThickness(), view, proj, glm::vec4(0.58f, 0.58f, 0.65f, t));
 
             rawPillarRenderer.render(cmd, imageIndex, world.pillars(), view, proj, glm::vec4(0.0f, 0.0f, 0.0f, t));
 
@@ -2707,13 +2570,7 @@ namespace walk {
             }
 
             if (!visible()) {
-                renderRawModel(cmd,
-                               imageIndex,
-                               blasterModel,
-                               blasterWorldTransform(),
-                               view,
-                               proj,
-                               glm::vec4(cameraPos, 0.0f));
+                renderRawModel(cmd, imageIndex, blasterModel, blasterWorldTransform(), view, proj, glm::vec4(cameraPos, 0.0f));
             }
 
             for (const Projectile &bullet : bullets) {
@@ -2782,8 +2639,7 @@ namespace walk {
             const std::string &cmd = args[0];
 
             if (cmd == "spawn_random" || (cmd == "spawn" && args.size() >= 2 && args[1] == "random")) {
-                const int attempts = (args.size() >= 3 && cmd == "spawn") ? parseIntOrDefault(args[2], 128)
-                                                                          : ((args.size() >= 2 && cmd == "spawn_random") ? parseIntOrDefault(args[1], 128) : 128);
+                const int attempts = (args.size() >= 3 && cmd == "spawn") ? parseIntOrDefault(args[2], 128) : ((args.size() >= 2 && cmd == "spawn_random") ? parseIntOrDefault(args[1], 128) : 128);
                 glm::vec3 candidate = cameraPos;
                 if (!sampleNavigablePoint(1.7f, 0.68f, candidate, std::max(1, attempts))) {
                     candidate = world.startPosition();
@@ -2875,9 +2731,7 @@ namespace walk {
                     }
                 }
 
-                out << std::format("Added {} collectible(s). Active collectibles: {}",
-                                   added,
-                                   world.activeCollectibles());
+                out << std::format("Added {} collectible(s). Active collectibles: {}", added, world.activeCollectibles());
                 resolveCollectibleClusters(2.0f, 4);
                 logEnv(std::format("command: add_collectibles requested={} added={}", toAdd, added));
                 return true;
@@ -2963,8 +2817,7 @@ namespace walk {
             }
 
             if (cmd == "regen_world") {
-                const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng())))
-                                                         : rng();
+                const uint32_t seed = (args.size() >= 2) ? static_cast<uint32_t>(parseIntOrDefault(args[1], static_cast<int>(rng()))) : rng();
                 world.generate(seed);
                 normalizeCollectiblesToModel();
                 cameraPos = world.startPosition();
@@ -2975,11 +2828,7 @@ namespace walk {
                 explosionParticles.clear();
                 destroyedCount = 0;
 
-                out << std::format("Regenerated world with seed {} (walls={}, pillars={}, collectibles={})",
-                                   seed,
-                                   world.walls().size(),
-                                   world.pillars().size(),
-                                   world.collectibles().size());
+                out << std::format("Regenerated world with seed {} (walls={}, pillars={}, collectibles={})", seed, world.walls().size(), world.pillars().size(), world.collectibles().size());
                 logEnv(std::format("command: regen_world seed={}", seed));
                 return true;
             }
@@ -3062,10 +2911,7 @@ namespace walk {
                                    objectFragSpv,
                                    bulletFragSpv);
                 if (!postProcessingShaders.empty()) {
-                    out << std::format("  post_fx  {} of {} {}\n",
-                                       postProcessingShaderIndex + 1,
-                                       postProcessingShaders.size(),
-                                       currentPostProcessingShader());
+                    out << std::format("  post_fx  {} of {} {}\n", postProcessingShaderIndex + 1, postProcessingShaders.size(), currentPostProcessingShader());
                 }
                 return true;
             }
@@ -3094,9 +2940,7 @@ namespace walk {
                 << "  regen_world [seed]               Regenerate maze, pillars, and collectibles";
         }
 
-        void logEnv(const std::string &message) {
-            print(std::format("[walk] {}", message), {255, 100, 255, 255});
-        }
+        void logEnv(const std::string &message) { print(std::format("[walk] {}", message), {255, 100, 255, 255}); }
 
         [[nodiscard]] static std::string trimLine(std::string value) {
             auto begin = value.begin();
@@ -3202,9 +3046,7 @@ namespace walk {
             }
         }
 
-        [[nodiscard]] const std::string &currentPostProcessingShader() const {
-            return postProcessingShaders[static_cast<std::size_t>(postProcessingShaderIndex)];
-        }
+        [[nodiscard]] const std::string &currentPostProcessingShader() const { return postProcessingShaders[static_cast<std::size_t>(postProcessingShaderIndex)]; }
 
         void applyPostProcessingShaderSelection() {
             if (postProcessingShaders.empty()) {
@@ -3217,10 +3059,7 @@ namespace walk {
                 postProcessingStartTime = std::chrono::steady_clock::now();
                 previousPostProcessingTime = postProcessingStartTime;
                 setPostProcessingEnabled(true);
-                logEnv(std::format("post-processing shader {} of {}: {}",
-                                   postProcessingShaderIndex + 1,
-                                   postProcessingShaders.size(),
-                                   currentPostProcessingShader()));
+                logEnv(std::format("post-processing shader {} of {}: {}", postProcessingShaderIndex + 1, postProcessingShaders.size(), currentPostProcessingShader()));
                 return;
             }
 
@@ -3232,10 +3071,7 @@ namespace walk {
                 previousPostProcessingTime = postProcessingStartTime;
             }
             setPostProcessingEnabled(true);
-            logEnv(std::format("post-processing shader {} of {}: {}",
-                               postProcessingShaderIndex + 1,
-                               postProcessingShaders.size(),
-                               currentPostProcessingShader()));
+            logEnv(std::format("post-processing shader {} of {}: {}", postProcessingShaderIndex + 1, postProcessingShaders.size(), currentPostProcessingShader()));
         }
 
         void selectPostProcessingShader(const int direction) {
@@ -3289,9 +3125,7 @@ namespace walk {
         }
 
         [[nodiscard]] static std::string toLowerCopy(std::string value) {
-            std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch) {
-                return static_cast<char>(std::tolower(ch));
-            });
+            std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
             return value;
         }
 
@@ -3373,17 +3207,9 @@ namespace walk {
             return false;
         }
 
-        [[nodiscard]] static const char *collectibleTypeName(Collectible::Type type) noexcept {
-            return type == Collectible::Type::Saturn ? "saturn" : "bird";
-        }
+        [[nodiscard]] static const char *collectibleTypeName(Collectible::Type type) noexcept { return type == Collectible::Type::Saturn ? "saturn" : "bird"; }
 
-        void loadModel(mxvk::VKAbstractModel &model,
-                       const std::string &modelPath,
-                       const std::string &textureManifest,
-                       const std::string &textureBase,
-                       const std::string &vertSpv,
-                       const std::string &fragSpv,
-                       bool backfaceCulling = false) {
+        void loadModel(mxvk::VKAbstractModel &model, const std::string &modelPath, const std::string &textureManifest, const std::string &textureBase, const std::string &vertSpv, const std::string &fragSpv, bool backfaceCulling = false) {
             logEnv(std::format("loading model '{}'", modelPath));
             model.load(this, modelPath, textureManifest, textureBase, 1.0f);
             model.setBackfaceCulling(backfaceCulling);
@@ -3685,9 +3511,7 @@ namespace walk {
             }
             gamepadId = id;
             const char *padName = SDL_GetGamepadName(gamepad);
-            logEnv(std::format("gamepad connected: id={} name='{}'",
-                               static_cast<int>(id),
-                               padName != nullptr ? padName : "unknown"));
+            logEnv(std::format("gamepad connected: id={} name='{}'", static_cast<int>(id), padName != nullptr ? padName : "unknown"));
             return true;
         }
 
@@ -3717,21 +3541,11 @@ namespace walk {
         // For meshes whose final world-space dimensions are already baked into `world`
         // (walls/pillars/floor) we still want to recenter the source mesh on its
         // bounding-box center, but we must NOT compound the renderScale on top.
-        [[nodiscard]] static glm::mat4 composeRecenteredModel(const mxvk::VKAbstractModel &model, const glm::mat4 &world) {
-            return world * glm::translate(glm::mat4(1.0f), model.modelCenterOffset());
-        }
+        [[nodiscard]] static glm::mat4 composeRecenteredModel(const mxvk::VKAbstractModel &model, const glm::mat4 &world) { return world * glm::translate(glm::mat4(1.0f), model.modelCenterOffset()); }
 
-        void renderModel(VkCommandBuffer cmd,
-                         uint32_t imageIndex,
-                         mxvk::VKAbstractModel &model,
-                         const glm::mat4 &world,
-                         const glm::mat4 &view,
-                         const glm::mat4 &proj,
-                         const glm::vec4 &fx,
-                         bool autoNormalize = true) {
+        void renderModel(VkCommandBuffer cmd, uint32_t imageIndex, mxvk::VKAbstractModel &model, const glm::mat4 &world, const glm::mat4 &view, const glm::mat4 &proj, const glm::vec4 &fx, bool autoNormalize = true) {
             mxvk::UniformBufferObject ubo{};
-            ubo.model = autoNormalize ? composeNormalizedModel(model, world)
-                                      : composeRecenteredModel(model, world);
+            ubo.model = autoNormalize ? composeNormalizedModel(model, world) : composeRecenteredModel(model, world);
             ubo.view = view;
             ubo.proj = proj;
             ubo.fx = fx;
@@ -3739,13 +3553,7 @@ namespace walk {
             model.render(cmd, imageIndex, false);
         }
 
-        void renderRawModel(VkCommandBuffer cmd,
-                            uint32_t imageIndex,
-                            mxvk::VKAbstractModel &model,
-                            const glm::mat4 &world,
-                            const glm::mat4 &view,
-                            const glm::mat4 &proj,
-                            const glm::vec4 &fx) {
+        void renderRawModel(VkCommandBuffer cmd, uint32_t imageIndex, mxvk::VKAbstractModel &model, const glm::mat4 &world, const glm::mat4 &view, const glm::mat4 &proj, const glm::vec4 &fx) {
             mxvk::UniformBufferObject ubo{};
             ubo.model = world;
             ubo.view = view;
@@ -3907,9 +3715,7 @@ namespace walk {
             constexpr float playerRadius = 0.5f;
             constexpr float cameraStandOff = 0.18f;
             const float collisionRadius = playerRadius + cameraStandOff;
-            const auto isBlocked = [this, collisionRadius](const glm::vec3 &position) {
-                return world.checkWallCollision(position, collisionRadius) || world.checkPillarCollision(position, collisionRadius);
-            };
+            const auto isBlocked = [this, collisionRadius](const glm::vec3 &position) { return world.checkWallCollision(position, collisionRadius) || world.checkPillarCollision(position, collisionRadius); };
 
             if (!isBlocked(desired)) {
                 cameraPos = desired;
@@ -3950,14 +3756,7 @@ namespace walk {
             bullet.position = projectileSpawnPosition();
             bullet.direction = glm::normalize(cameraFront);
             bullets.push_back(bullet);
-            logEnv(std::format("projectile fired from ({:.2f}, {:.2f}, {:.2f}) dir=({:.2f}, {:.2f}, {:.2f}) active_bullets={}",
-                               bullet.position.x,
-                               bullet.position.y,
-                               bullet.position.z,
-                               bullet.direction.x,
-                               bullet.direction.y,
-                               bullet.direction.z,
-                               bullets.size()));
+            logEnv(std::format("projectile fired from ({:.2f}, {:.2f}, {:.2f}) dir=({:.2f}, {:.2f}, {:.2f}) active_bullets={}", bullet.position.x, bullet.position.y, bullet.position.z, bullet.direction.x, bullet.direction.y, bullet.direction.z, bullets.size()));
         }
 
         void emitMuzzleParticles() {
@@ -4016,11 +3815,7 @@ namespace walk {
                 for (Projectile::TrailPoint &point : bullet.trail) {
                     point.lifetime += deltaTime;
                 }
-                bullet.trail.erase(
-                    std::remove_if(bullet.trail.begin(), bullet.trail.end(), [](const Projectile::TrailPoint &point) {
-                        return point.lifetime >= point.maxLifetime;
-                    }),
-                    bullet.trail.end());
+                bullet.trail.erase(std::remove_if(bullet.trail.begin(), bullet.trail.end(), [](const Projectile::TrailPoint &point) { return point.lifetime >= point.maxLifetime; }), bullet.trail.end());
 
                 size_t collectibleIndex = 0;
                 glm::vec3 collectibleImpact{0.0f};
@@ -4033,14 +3828,7 @@ namespace walk {
                     if (removed) {
                         ++destroyedCount;
                     }
-                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}",
-                                       bulletIndex,
-                                       collectibleTypeName(hitType),
-                                       collectibleIndex,
-                                       collectibleImpact.x,
-                                       collectibleImpact.y,
-                                       collectibleImpact.z,
-                                       destroyedCount));
+                    logEnv(std::format("bullet {} hit {} collectible {} at ({:.2f}, {:.2f}, {:.2f}); destroyed={}", bulletIndex, collectibleTypeName(hitType), collectibleIndex, collectibleImpact.x, collectibleImpact.y, collectibleImpact.z, destroyedCount));
                     continue;
                 }
 
@@ -4050,22 +3838,13 @@ namespace walk {
                     if (segmentHit.type == ProjectileHitType::Floor) {
                         createExplosion(glm::vec3(segmentHit.impact.x, 0.0f, segmentHit.impact.z), 1500, true);
                         bullet.active = false;
-                        logEnv(std::format("bullet {} hit floor at ({:.2f}, {:.2f}, {:.2f})",
-                                           bulletIndex,
-                                           segmentHit.impact.x,
-                                           0.0f,
-                                           segmentHit.impact.z));
+                        logEnv(std::format("bullet {} hit floor at ({:.2f}, {:.2f}, {:.2f})", bulletIndex, segmentHit.impact.x, 0.0f, segmentHit.impact.z));
                         continue;
                     }
 
                     createExplosion(segmentHit.impact, 1500, true);
                     bullet.active = false;
-                    logEnv(std::format("bullet {} hit {} at ({:.2f}, {:.2f}, {:.2f})",
-                                       bulletIndex,
-                                       (segmentHit.type == ProjectileHitType::Pillar) ? "pillar" : "wall",
-                                       segmentHit.impact.x,
-                                       segmentHit.impact.y,
-                                       segmentHit.impact.z));
+                    logEnv(std::format("bullet {} hit {} at ({:.2f}, {:.2f}, {:.2f})", bulletIndex, (segmentHit.type == ProjectileHitType::Pillar) ? "pillar" : "wall", segmentHit.impact.x, segmentHit.impact.y, segmentHit.impact.z));
                     continue;
                 }
 
@@ -4114,12 +3893,7 @@ namespace walk {
             std::uniform_real_distribution<float> colorDist(0.7f, 1.0f);
 
             const int count = std::min(requestedCount * 2, 800);
-            logEnv(std::format("explosion at ({:.2f}, {:.2f}, {:.2f}) particles={} style={}",
-                               position.x,
-                               position.y,
-                               position.z,
-                               count,
-                               isRed ? "impact" : "collectible"));
+            logEnv(std::format("explosion at ({:.2f}, {:.2f}, {:.2f}) particles={} style={}", position.x, position.y, position.z, count, isRed ? "impact" : "collectible"));
             for (int i = 0; i < count; ++i) {
                 ExplosionParticle p{};
                 p.position = position;
@@ -4202,11 +3976,7 @@ namespace walk {
                 }
             }
 
-            explosionParticles.erase(
-                std::remove_if(explosionParticles.begin(), explosionParticles.end(), [](const ExplosionParticle &p) {
-                    return !p.active;
-                }),
-                explosionParticles.end());
+            explosionParticles.erase(std::remove_if(explosionParticles.begin(), explosionParticles.end(), [](const ExplosionParticle &p) { return !p.active; }), explosionParticles.end());
         }
 
         [[nodiscard]] bool lineHitWall(const glm::vec3 &from, const glm::vec3 &to, glm::vec3 &impactOut) const {
@@ -4450,9 +4220,7 @@ namespace walk {
         [[nodiscard]] glm::vec3 saturnHitCenterOffsetForScale(float scale) const {
             const glm::vec3 centerOffset = saturnModel.modelCenterOffset();
             const float clampedScale = std::max(scale, 0.0001f);
-            return glm::vec3(-centerOffset.x * clampedScale,
-                             -centerOffset.y * clampedScale,
-                             -centerOffset.z * clampedScale);
+            return glm::vec3(-centerOffset.x * clampedScale, -centerOffset.y * clampedScale, -centerOffset.z * clampedScale);
         }
 
         [[nodiscard]] glm::vec3 birdHitCenterOffsetForScale(float scale) const {
@@ -4496,10 +4264,7 @@ namespace walk {
             resolveCollectibleClusters(2.0f, 5);
         }
 
-        [[nodiscard]] bool overlapsCollectibleAt(const glm::vec3 &candidate,
-                                                 float radius,
-                                                 size_t ignoreIndex,
-                                                 bool includeInactive) const {
+        [[nodiscard]] bool overlapsCollectibleAt(const glm::vec3 &candidate, float radius, size_t ignoreIndex, bool includeInactive) const {
             const std::vector<Collectible> &collectibles = world.collectibles();
             for (size_t i = 0; i < collectibles.size(); ++i) {
                 if (i == ignoreIndex) {
@@ -4556,8 +4321,7 @@ namespace walk {
                 }
 
                 const float placementRadius = placementRadiusForCollectible(collectibles[i]);
-                if (!world.checkWallCollision(collectibles[i].position, placementRadius) &&
-                    !world.checkPillarCollision(collectibles[i].position, placementRadius)) {
+                if (!world.checkWallCollision(collectibles[i].position, placementRadius) && !world.checkPillarCollision(collectibles[i].position, placementRadius)) {
                     continue;
                 }
 

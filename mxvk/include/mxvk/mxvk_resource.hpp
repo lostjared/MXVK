@@ -62,9 +62,7 @@ namespace mxvk {
      * @return Matching memory type index.
      * @throws mxvk::Exception if no matching memory type is available.
      */
-    [[nodiscard]] uint32_t find_memory_type(VkPhysicalDevice physical_device,
-                                            uint32_t type_filter,
-                                            VkMemoryPropertyFlags properties);
+    [[nodiscard]] uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
 
     /**
      * @brief Create and bind a Vulkan buffer allocation.
@@ -75,11 +73,7 @@ namespace mxvk {
      * @param buffer Output buffer resource; any existing contents are destroyed first.
      * @throws mxvk::Exception on invalid input or Vulkan allocation failure.
      */
-    void create_buffer(const VulkanContext &context,
-                       VkDeviceSize size,
-                       VkBufferUsageFlags usage,
-                       VkMemoryPropertyFlags properties,
-                       BufferResource &buffer);
+    void create_buffer(const VulkanContext &context, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, BufferResource &buffer);
 
     /**
      * @brief Unmap and destroy a BufferResource.
@@ -116,15 +110,7 @@ namespace mxvk {
      * @param memory Output memory handle bound to @p image.
      * @throws mxvk::Exception on invalid dimensions or Vulkan allocation failure.
      */
-    void create_image(const VulkanContext &context,
-                      uint32_t width,
-                      uint32_t height,
-                      VkFormat format,
-                      VkImageTiling tiling,
-                      VkImageUsageFlags usage,
-                      VkMemoryPropertyFlags properties,
-                      VkImage &image,
-                      VkDeviceMemory &memory);
+    void create_image(const VulkanContext &context, uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory);
 
     /**
      * @brief Create a 2D image view for an image.
@@ -135,10 +121,7 @@ namespace mxvk {
      * @return Created image view handle.
      * @throws mxvk::Exception if view creation fails.
      */
-    [[nodiscard]] VkImageView create_image_view(VkDevice device,
-                                                VkImage image,
-                                                VkFormat format,
-                                                VkImageAspectFlags aspect);
+    [[nodiscard]] VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect);
 
     /**
      * @brief Allocate and begin a primary one-time command buffer.
@@ -164,10 +147,7 @@ namespace mxvk {
      * @param size Bytes to copy.
      * @throws mxvk::Exception if command allocation, submission, or completion fails.
      */
-    void copy_buffer(const VulkanContext &context,
-                     VkBuffer source,
-                     VkBuffer destination,
-                     VkDeviceSize size);
+    void copy_buffer(const VulkanContext &context, VkBuffer source, VkBuffer destination, VkDeviceSize size);
 
     /**
      * @brief Record a Vulkan 1.3 synchronization2 image layout transition.
@@ -183,11 +163,7 @@ namespace mxvk {
      *
      * @throws mxvk::Exception for unsupported transitions.
      */
-    void transition_image_layout(VkCommandBuffer command_buffer,
-                                 VkImage image,
-                                 VkImageLayout old_layout,
-                                 VkImageLayout new_layout,
-                                 VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
+    void transition_image_layout(VkCommandBuffer command_buffer, VkImage image, VkImageLayout old_layout, VkImageLayout new_layout, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 
     /**
      * @brief Record a Vulkan 1.3 vkCmdCopyBufferToImage2 copy for a full 2D image.
@@ -197,11 +173,7 @@ namespace mxvk {
      * @param width Copy width in pixels.
      * @param height Copy height in pixels.
      */
-    void copy_buffer_to_image(VkCommandBuffer command_buffer,
-                              VkBuffer buffer,
-                              VkImage image,
-                              uint32_t width,
-                              uint32_t height);
+    void copy_buffer_to_image(VkCommandBuffer command_buffer, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
     /**
      * @brief Upload an SDL surface into a sampled 2D texture.
@@ -216,10 +188,7 @@ namespace mxvk {
      *
      * @throws mxvk::Exception on invalid input, allocation failure, or upload failure.
      */
-    void create_texture_from_surface(const VulkanContext &context,
-                                     SDL_Surface *surface,
-                                     TextureResource &texture,
-                                     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
+    void create_texture_from_surface(const VulkanContext &context, SDL_Surface *surface, TextureResource &texture, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
 
     /**
      * @brief Load a PNG and upload it into a sampled 2D texture.
@@ -229,10 +198,7 @@ namespace mxvk {
      * @param format Destination image format. Defaults to VK_FORMAT_R8G8B8A8_UNORM.
      * @throws mxvk::Exception if loading or upload fails.
      */
-    void create_texture_from_png(const VulkanContext &context,
-                                 const std::string &path,
-                                 TextureResource &texture,
-                                 VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
+    void create_texture_from_png(const VulkanContext &context, const std::string &path, TextureResource &texture, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
 
     /**
      * @brief Destroy every Vulkan handle owned by a TextureResource.

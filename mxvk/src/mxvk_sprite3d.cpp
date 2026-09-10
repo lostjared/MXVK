@@ -16,25 +16,20 @@
 #include <iostream>
 
 #ifndef VK_CHECK_RESULT
-#define VK_CHECK_RESULT(f)                                                                                                                \
-    {                                                                                                                                     \
-        VkResult res = (f);                                                                                                               \
-        if (res != VK_SUCCESS) {                                                                                                          \
-            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__)); \
-        }                                                                                                                                 \
+#define VK_CHECK_RESULT(f)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+        VkResult res = (f);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+        if (res != VK_SUCCESS) {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__));                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
+        }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
     }
 #endif
 
 namespace mxvk {
 
-    VK_Sprite3D::~VK_Sprite3D() {
-        cleanup();
-    }
+    VK_Sprite3D::~VK_Sprite3D() { cleanup(); }
 
-    void VK_Sprite3D::load(VK_Window *window,
-                           const std::string &pngPath,
-                           const std::string &vertexPath,
-                           const std::string &fragmentPath) {
+    void VK_Sprite3D::load(VK_Window *window, const std::string &pngPath, const std::string &vertexPath, const std::string &fragmentPath) {
         SDL_Surface *surface = mxvk::LoadPNG(pngPath.c_str());
         if (surface == nullptr) {
             throw mxvk::Exception("Failed to load 3D sprite image: " + pngPath);
@@ -44,10 +39,7 @@ namespace mxvk {
         std::cout << std::format("mxvk: Loaded 3D sprite PNG: {}\n", pngPath);
     }
 
-    void VK_Sprite3D::load(VK_Window *window,
-                           SDL_Surface *surface,
-                           const std::string &vertexPath,
-                           const std::string &fragmentPath) {
+    void VK_Sprite3D::load(VK_Window *window, SDL_Surface *surface, const std::string &vertexPath, const std::string &fragmentPath) {
         if (window == nullptr) {
             throw mxvk::Exception("VK_Sprite3D::load called with null window");
         }
@@ -98,10 +90,7 @@ namespace mxvk {
         std::memcpy(cameraBuffersMapped[imageIndex], &camera, sizeof(camera));
     }
 
-    void VK_Sprite3D::drawSprite(const glm::vec3 &position,
-                                 const glm::vec2 &size,
-                                 const glm::vec4 &color,
-                                 float rotationRadians) {
+    void VK_Sprite3D::drawSprite(const glm::vec3 &position, const glm::vec2 &size, const glm::vec4 &color, float rotationRadians) {
         if (!spriteLoaded) {
             throw mxvk::Exception("VK_Sprite3D::drawSprite called before sprite was loaded");
         }
@@ -117,8 +106,7 @@ namespace mxvk {
         }
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                                0, 1, &descriptorSets[imageIndex], 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[imageIndex], 0, nullptr);
 
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
@@ -136,15 +124,12 @@ namespace mxvk {
             pc.positionSizeX = glm::vec4(draw.position, draw.size.x);
             pc.color = draw.color;
             pc.sizeYRotationAlpha = glm::vec4(draw.size.y, draw.rotationRadians, alphaDiscardThreshold, 0.0f);
-            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0, sizeof(PushConstants), &pc);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants), &pc);
             vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
         }
     }
 
-    void VK_Sprite3D::clearQueue() {
-        drawQueue.clear();
-    }
+    void VK_Sprite3D::clearQueue() { drawQueue.clear(); }
 
     void VK_Sprite3D::setDepthTestEnabled(bool enabled) {
         if (depthTestEnabled == enabled) {
@@ -218,18 +203,14 @@ namespace mxvk {
         }};
         const std::array<uint16_t, 6> indices{{0, 1, 2, 0, 2, 3}};
 
-        createBuffer(sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     vertexBuffer, vertexBufferMemory);
+        createBuffer(sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, vertexBuffer, vertexBufferMemory);
 
         void *data = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, vertexBufferMemory, 0, sizeof(vertices), 0, &data));
         std::memcpy(data, vertices.data(), sizeof(vertices));
         vkUnmapMemory(device, vertexBufferMemory);
 
-        createBuffer(sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     indexBuffer, indexBufferMemory);
+        createBuffer(sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, indexBuffer, indexBufferMemory);
 
         VK_CHECK_RESULT(vkMapMemory(device, indexBufferMemory, 0, sizeof(indices), 0, &data));
         std::memcpy(data, indices.data(), sizeof(indices));
@@ -245,17 +226,12 @@ namespace mxvk {
         spriteWidth = rgbaSurface->w;
         spriteHeight = rgbaSurface->h;
 
-        createImage(static_cast<uint32_t>(spriteWidth), static_cast<uint32_t>(spriteHeight),
-                    VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
+        createImage(static_cast<uint32_t>(spriteWidth), static_cast<uint32_t>(spriteHeight), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, spriteImage, spriteImageMemory);
 
         const VkDeviceSize imageSize = static_cast<VkDeviceSize>(spriteWidth) * static_cast<VkDeviceSize>(spriteHeight) * 4;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *data = nullptr;
         VK_CHECK_RESULT(vkMapMemory(device, stagingMemory, 0, imageSize, 0, &data));
@@ -327,9 +303,7 @@ namespace mxvk {
         cameraBuffersMapped.resize(imageCount, nullptr);
 
         for (size_t i = 0; i < imageCount; ++i) {
-            createBuffer(sizeof(CameraUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         cameraBuffers[i], cameraBufferMemory[i]);
+            createBuffer(sizeof(CameraUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, cameraBuffers[i], cameraBufferMemory[i]);
             VK_CHECK_RESULT(vkMapMemory(device, cameraBufferMemory[i], 0, sizeof(CameraUBO), 0, &cameraBuffersMapped[i]));
             CameraUBO camera{};
             std::memcpy(cameraBuffersMapped[i], &camera, sizeof(camera));
@@ -486,8 +460,7 @@ namespace mxvk {
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
         VkPipelineColorBlendAttachmentState blendAttachment{};
-        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         blendAttachment.blendEnable = VK_TRUE;
         blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -606,11 +579,7 @@ namespace mxvk {
         }
     }
 
-    void VK_Sprite3D::createBuffer(VkDeviceSize size,
-                                   VkBufferUsageFlags usage,
-                                   VkMemoryPropertyFlags properties,
-                                   VkBuffer &buffer,
-                                   VkDeviceMemory &bufferMemory) const {
+    void VK_Sprite3D::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
         VkBuffer newBuffer = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -656,8 +625,7 @@ namespace mxvk {
         VkPhysicalDeviceMemoryProperties memProperties{};
         vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
-            if ((typeFilter & (1U << i)) != 0U &&
-                (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            if ((typeFilter & (1U << i)) != 0U && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
                 return i;
             }
         }
@@ -693,14 +661,7 @@ namespace mxvk {
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 
-    void VK_Sprite3D::createImage(uint32_t width,
-                                  uint32_t height,
-                                  VkFormat format,
-                                  VkImageTiling tiling,
-                                  VkImageUsageFlags usage,
-                                  VkMemoryPropertyFlags properties,
-                                  VkImage &image,
-                                  VkDeviceMemory &imageMemory) const {
+    void VK_Sprite3D::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory) const {
         VkImage newImage = VK_NULL_HANDLE;
         VkDeviceMemory newMemory = VK_NULL_HANDLE;
 
@@ -795,8 +756,7 @@ namespace mxvk {
             throw mxvk::Exception("Unsupported 3D sprite image layout transition");
         }
 
-        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
-                             0, nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
     }
 

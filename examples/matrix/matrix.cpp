@@ -18,38 +18,26 @@ namespace example {
     namespace {
         constexpr int MATRIX_SURFACE_WIDTH = 1280;
         constexpr int MATRIX_SURFACE_HEIGHT = 720;
-    }
+    } // namespace
 
     class MatrixWindow : public mxvk::VK_Window {
       public:
-        MatrixWindow(const std::string &path,
-                     const std::string &title,
-                     const int width,
-                     const int height,
-                     const bool fullscreen,
-                     const bool enable_vsync,
-                     const bool binary,
-                     const int font_size,
-                     const std::string &font_path,
-                     const std::string &color)
-            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              rain(std::make_unique<matrix::Rain>(
-                  *this, [path, binary, font_size, font_path, color]() {
-                      matrix::RainConfig config = matrix::make_matrix_rain_config(path.empty() ? std::string(matrix_ASSET_DIR) : path, binary);
-                      config.surface_width = MATRIX_SURFACE_WIDTH;
-                      config.surface_height = MATRIX_SURFACE_HEIGHT;
-                      config.font_size = std::max(1, font_size);
-                      if (!font_path.empty()) {
-                          config.font_path = font_path;
-                      }
-                      config.color = color;
-                      return config;
-                  }())) {
+        MatrixWindow(const std::string &path, const std::string &title, const int width, const int height, const bool fullscreen, const bool enable_vsync, const bool binary, const int font_size, const std::string &font_path, const std::string &color)
+            : mxvk::VK_Window(title, width, height, fullscreen, MXVK_VALIDATION, enable_vsync), rain(std::make_unique<matrix::Rain>(*this, [path, binary, font_size, font_path, color]() {
+                  matrix::RainConfig config = matrix::make_matrix_rain_config(path.empty() ? std::string(matrix_ASSET_DIR) : path, binary);
+                  config.surface_width = MATRIX_SURFACE_WIDTH;
+                  config.surface_height = MATRIX_SURFACE_HEIGHT;
+                  config.font_size = std::max(1, font_size);
+                  if (!font_path.empty()) {
+                      config.font_path = font_path;
+                  }
+                  config.color = color;
+                  return config;
+              }())) {
             setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         }
 
-        ~MatrixWindow() override {
-        }
+        ~MatrixWindow() override {}
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN) {
@@ -85,9 +73,7 @@ namespace example {
 int main(int argc, char **argv) {
     try {
         Arguments args = proc_args(argc, argv);
-        example::MatrixWindow window(
-            args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary,
-            args.font_size, args.font_path, args.color);
+        example::MatrixWindow window(args.path, "-[ MXVK Matrix Digital Rain ]-", args.width, args.height, args.fullscreen, args.enable_vsync, args.binary, args.font_size, args.font_path, args.color);
         window.loop();
     } catch (mxvk::Exception &e) {
         std::cerr << std::format("mxvk: Exception: {}\n", e.text());

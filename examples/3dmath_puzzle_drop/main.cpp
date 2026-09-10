@@ -55,9 +55,7 @@ namespace {
 
     class SurfaceDeleter {
       public:
-        void operator()(SDL_Surface *surface) const {
-            SDL_DestroySurface(surface);
-        }
+        void operator()(SDL_Surface *surface) const { SDL_DestroySurface(surface); }
     };
 
     using SurfacePtr = std::unique_ptr<SDL_Surface, SurfaceDeleter>;
@@ -175,17 +173,11 @@ namespace {
         int flash_counter = 0;
     };
 
-    [[nodiscard]] bool is_play_block(BlockType type) {
-        return type >= BlockType::Red1 && type <= BlockType::Match;
-    }
+    [[nodiscard]] bool is_play_block(BlockType type) { return type >= BlockType::Red1 && type <= BlockType::Match; }
 
-    [[nodiscard]] int texture_index(BlockType type) {
-        return is_play_block(type) ? static_cast<int>(type) - static_cast<int>(BlockType::Red1) : 0;
-    }
+    [[nodiscard]] int texture_index(BlockType type) { return is_play_block(type) ? static_cast<int>(type) - static_cast<int>(BlockType::Red1) : 0; }
 
-    [[nodiscard]] bool same_or_match(BlockType actual, BlockType expected) {
-        return actual == expected || actual == BlockType::Match;
-    }
+    [[nodiscard]] bool same_or_match(BlockType actual, BlockType expected) { return actual == expected || actual == BlockType::Match; }
 
     struct TextureLevel {
         int width = 0;
@@ -222,34 +214,18 @@ namespace {
             const int y1 = std::min(y0 + 1, level_height - 1);
             const float x_blend = source_x - static_cast<float>(x0);
             const float y_blend = source_y - static_cast<float>(y0);
-            const mxvk::MXCOLOR top = blend_color(
-                level_pixels[static_cast<std::size_t>(y0 * level_width + x0)],
-                level_pixels[static_cast<std::size_t>(y0 * level_width + x1)],
-                x_blend);
-            const mxvk::MXCOLOR bottom = blend_color(
-                level_pixels[static_cast<std::size_t>(y1 * level_width + x0)],
-                level_pixels[static_cast<std::size_t>(y1 * level_width + x1)],
-                x_blend);
+            const mxvk::MXCOLOR top = blend_color(level_pixels[static_cast<std::size_t>(y0 * level_width + x0)], level_pixels[static_cast<std::size_t>(y0 * level_width + x1)], x_blend);
+            const mxvk::MXCOLOR bottom = blend_color(level_pixels[static_cast<std::size_t>(y1 * level_width + x0)], level_pixels[static_cast<std::size_t>(y1 * level_width + x1)], x_blend);
             return blend_color(top, bottom, y_blend);
         }
 
         [[nodiscard]] static mxvk::MXCOLOR blend_color(mxvk::MXCOLOR first, mxvk::MXCOLOR second, float amount) {
-            const auto blend_channel = [amount](std::uint8_t left, std::uint8_t right) {
-                return static_cast<std::uint8_t>(
-                    std::clamp(
-                        static_cast<float>(left) + (static_cast<float>(right) - static_cast<float>(left)) * amount,
-                        0.0f,
-                        255.0f) +
-                    0.5f);
-            };
+            const auto blend_channel = [amount](std::uint8_t left, std::uint8_t right) { return static_cast<std::uint8_t>(std::clamp(static_cast<float>(left) + (static_cast<float>(right) - static_cast<float>(left)) * amount, 0.0f, 255.0f) + 0.5f); };
             const std::uint8_t red = blend_channel(mxvk::color_r(first), mxvk::color_r(second));
             const std::uint8_t green = blend_channel(mxvk::color_g(first), mxvk::color_g(second));
             const std::uint8_t blue = blend_channel(mxvk::color_b(first), mxvk::color_b(second));
             const std::uint8_t alpha = blend_channel(mxvk::color_a(first), mxvk::color_a(second));
-            return (static_cast<mxvk::MXCOLOR>(alpha) << 24U) |
-                   (static_cast<mxvk::MXCOLOR>(red) << 16U) |
-                   (static_cast<mxvk::MXCOLOR>(green) << 8U) |
-                   static_cast<mxvk::MXCOLOR>(blue);
+            return (static_cast<mxvk::MXCOLOR>(alpha) << 24U) | (static_cast<mxvk::MXCOLOR>(red) << 16U) | (static_cast<mxvk::MXCOLOR>(green) << 8U) | static_cast<mxvk::MXCOLOR>(blue);
         }
     };
 
@@ -279,11 +255,7 @@ namespace {
                             alpha += mxvk::color_a(color);
                         }
                     }
-                    level.pixels[static_cast<std::size_t>(y * level.width + x)] =
-                        ((alpha / 4U) << 24U) |
-                        ((red / 4U) << 16U) |
-                        ((green / 4U) << 8U) |
-                        (blue / 4U);
+                    level.pixels[static_cast<std::size_t>(y * level.width + x)] = ((alpha / 4U) << 24U) | ((red / 4U) << 16U) | ((green / 4U) << 8U) | (blue / 4U);
                 }
             }
             texture.mipmaps.push_back(std::move(level));
@@ -320,11 +292,7 @@ namespace {
                 std::uint8_t blue = 0;
                 std::uint8_t alpha = 0;
                 SDL_GetRGBA(source[x], format, nullptr, &red, &green, &blue, &alpha);
-                texture.pixels[static_cast<std::size_t>(y * texture.width + x)] =
-                    (static_cast<mxvk::MXCOLOR>(alpha) << 24U) |
-                    (static_cast<mxvk::MXCOLOR>(red) << 16U) |
-                    (static_cast<mxvk::MXCOLOR>(green) << 8U) |
-                    static_cast<mxvk::MXCOLOR>(blue);
+                texture.pixels[static_cast<std::size_t>(y * texture.width + x)] = (static_cast<mxvk::MXCOLOR>(alpha) << 24U) | (static_cast<mxvk::MXCOLOR>(red) << 16U) | (static_cast<mxvk::MXCOLOR>(green) << 8U) | static_cast<mxvk::MXCOLOR>(blue);
             }
         }
         if (generate_mipmaps) {
@@ -340,16 +308,7 @@ namespace {
 
     class SoftwareRenderer {
       public:
-        SoftwareRenderer(int width, int height, const std::string &data_root, bool enable_warp_fix, bool enable_mipmapping, float mip_bias)
-            : frame_width(width),
-              frame_height(height),
-              depth_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT),
-              color_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT),
-              background(load_texture(data_root + "/level1.png")),
-              intro(load_texture(data_root + "/intro1.png")),
-              warp_fix_enabled(enable_warp_fix),
-              mipmapping_enabled(enable_mipmapping),
-              mip_level_bias(mip_bias) {
+        SoftwareRenderer(int width, int height, const std::string &data_root, bool enable_warp_fix, bool enable_mipmapping, float mip_bias) : frame_width(width), frame_height(height), depth_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT), color_buffer(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * MSAA_SAMPLE_COUNT), background(load_texture(data_root + "/level1.png")), intro(load_texture(data_root + "/intro1.png")), warp_fix_enabled(enable_warp_fix), mipmapping_enabled(enable_mipmapping), mip_level_bias(mip_bias) {
             frame_surface.reset(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_RGBA32));
             if (!frame_surface) {
                 throw mxvk::Exception(std::format("3dmath_puzzle_drop: failed to create framebuffer: {}", SDL_GetError()));
@@ -359,17 +318,11 @@ namespace {
             }
         }
 
-        [[nodiscard]] SDL_Surface *surface() const {
-            return frame_surface.get();
-        }
+        [[nodiscard]] SDL_Surface *surface() const { return frame_surface.get(); }
 
-        [[nodiscard]] int width() const {
-            return frame_width;
-        }
+        [[nodiscard]] int width() const { return frame_width; }
 
-        [[nodiscard]] int height() const {
-            return frame_height;
-        }
+        [[nodiscard]] int height() const { return frame_height; }
 
         void set_view(float yaw, float pitch, float distance) {
             camera_rotation.BuildXYZ(pitch, yaw, 0.0f);
@@ -389,11 +342,7 @@ namespace {
                 auto *row = static_cast<std::uint8_t *>(frame_surface->pixels) + static_cast<std::size_t>(y * frame_surface->pitch);
                 for (int x = 0; x < frame_width; ++x) {
                     auto *pixel = row + static_cast<std::size_t>(x * 4);
-                    const mxvk::MXCOLOR background_color =
-                        (0xFFU << 24U) |
-                        (static_cast<mxvk::MXCOLOR>(pixel[0]) << 16U) |
-                        (static_cast<mxvk::MXCOLOR>(pixel[1]) << 8U) |
-                        static_cast<mxvk::MXCOLOR>(pixel[2]);
+                    const mxvk::MXCOLOR background_color = (0xFFU << 24U) | (static_cast<mxvk::MXCOLOR>(pixel[0]) << 16U) | (static_cast<mxvk::MXCOLOR>(pixel[1]) << 8U) | static_cast<mxvk::MXCOLOR>(pixel[2]);
                     const std::size_t pixel_index = static_cast<std::size_t>(y * frame_width + x);
                     const std::size_t first_sample = pixel_index * MSAA_SAMPLE_COUNT;
                     std::uint32_t red = 0;
@@ -401,9 +350,7 @@ namespace {
                     std::uint32_t blue = 0;
                     for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
                         const std::size_t sample_index = first_sample + sample;
-                        const mxvk::MXCOLOR color = std::isfinite(depth_buffer[sample_index])
-                                                        ? color_buffer[sample_index]
-                                                        : background_color;
+                        const mxvk::MXCOLOR color = std::isfinite(depth_buffer[sample_index]) ? color_buffer[sample_index] : background_color;
                         red += mxvk::color_r(color);
                         green += mxvk::color_g(color);
                         blue += mxvk::color_b(color);
@@ -416,16 +363,10 @@ namespace {
             }
         }
 
-        void draw_block(BlockType type, float x, float y, float z, float half_extent, const mxvk::vec4D &tint) {
-            draw_cube(&block_textures[static_cast<std::size_t>(texture_index(type))], x, y, z, half_extent, tint);
-        }
+        void draw_block(BlockType type, float x, float y, float z, float half_extent, const mxvk::vec4D &tint) { draw_cube(&block_textures[static_cast<std::size_t>(texture_index(type))], x, y, z, half_extent, tint); }
 
         void draw_wildcard(float x, float y, float z, float half_extent, const mxvk::vec4D &color) {
-            mxvk::vec4D neon(
-                std::max(color.x, 0.08f),
-                std::max(color.y, 0.08f),
-                std::max(color.z, 0.08f),
-                1.0f);
+            mxvk::vec4D neon(std::max(color.x, 0.08f), std::max(color.y, 0.08f), std::max(color.z, 0.08f), 1.0f);
             const float brightest_channel = std::max({neon.x, neon.y, neon.z});
             neon.x /= brightest_channel;
             neon.y /= brightest_channel;
@@ -434,11 +375,7 @@ namespace {
         }
 
         void draw_solid_cube(float x, float y, float z, float half_extent, mxvk::MXCOLOR color) {
-            const mxvk::vec4D tint(
-                static_cast<float>(mxvk::color_r(color)) / 255.0f,
-                static_cast<float>(mxvk::color_g(color)) / 255.0f,
-                static_cast<float>(mxvk::color_b(color)) / 255.0f,
-                1.0f);
+            const mxvk::vec4D tint(static_cast<float>(mxvk::color_r(color)) / 255.0f, static_cast<float>(mxvk::color_g(color)) / 255.0f, static_cast<float>(mxvk::color_b(color)) / 255.0f, 1.0f);
             draw_cube(nullptr, x, y, z, half_extent, tint);
         }
 
@@ -591,11 +528,7 @@ namespace {
             std::array<mxvk::vec4D, 8> camera_vertices{};
             std::array<mxvk::vec4D, 8> projected{};
             for (std::size_t index = 0; index < CUBE_VERTICES.size(); ++index) {
-                mxvk::vec4D point(
-                    CUBE_VERTICES[index].x * half_extent + x,
-                    CUBE_VERTICES[index].y * half_extent + y,
-                    CUBE_VERTICES[index].z * half_extent + z,
-                    1.0f);
+                mxvk::vec4D point(CUBE_VERTICES[index].x * half_extent + x, CUBE_VERTICES[index].y * half_extent + y, CUBE_VERTICES[index].z * half_extent + z, 1.0f);
                 point = camera_rotation.MulVec(point);
                 point.z += camera_distance;
                 camera_vertices[index] = point;
@@ -642,12 +575,7 @@ namespace {
             }
         }
 
-        void rasterize_triangle(const RasterVertex &a,
-                                const RasterVertex &b,
-                                const RasterVertex &c,
-                                const Texture *texture,
-                                const mxvk::vec4D &tint,
-                                float intensity) {
+        void rasterize_triangle(const RasterVertex &a, const RasterVertex &b, const RasterVertex &c, const Texture *texture, const mxvk::vec4D &tint, float intensity) {
             const mxvk::vec2D p0(a.position.x, a.position.y);
             const mxvk::vec2D p1(b.position.x, b.position.y);
             const mxvk::vec2D p2(c.position.x, c.position.y);
@@ -692,14 +620,11 @@ namespace {
                     float centroid_y = 0.0f;
                     int passing_sample_count = 0;
                     for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
-                        const mxvk::vec2D point(
-                            static_cast<float>(x) + MSAA_SAMPLE_OFFSETS[sample][0],
-                            static_cast<float>(y) + MSAA_SAMPLE_OFFSETS[sample][1]);
+                        const mxvk::vec2D point(static_cast<float>(x) + MSAA_SAMPLE_OFFSETS[sample][0], static_cast<float>(y) + MSAA_SAMPLE_OFFSETS[sample][1]);
                         const float edge0 = mxvk::edge_function(p1, p2, point);
                         const float edge1 = mxvk::edge_function(p2, p0, point);
                         const float edge2 = mxvk::edge_function(p0, p1, point);
-                        if ((area > 0.0f && (edge0 < 0.0f || edge1 < 0.0f || edge2 < 0.0f)) ||
-                            (area < 0.0f && (edge0 > 0.0f || edge1 > 0.0f || edge2 > 0.0f))) {
+                        if ((area > 0.0f && (edge0 < 0.0f || edge1 < 0.0f || edge2 < 0.0f)) || (area < 0.0f && (edge0 > 0.0f || edge1 > 0.0f || edge2 > 0.0f))) {
                             continue;
                         }
                         const float weight0 = edge0 * inverse_area;
@@ -721,9 +646,7 @@ namespace {
                         continue;
                     }
 
-                    const mxvk::vec2D shading_point(
-                        centroid_x / static_cast<float>(passing_sample_count),
-                        centroid_y / static_cast<float>(passing_sample_count));
+                    const mxvk::vec2D shading_point(centroid_x / static_cast<float>(passing_sample_count), centroid_y / static_cast<float>(passing_sample_count));
                     const float edge0 = mxvk::edge_function(p1, p2, shading_point);
                     const float edge1 = mxvk::edge_function(p2, p0, shading_point);
                     const float edge2 = mxvk::edge_function(p0, p1, shading_point);
@@ -736,21 +659,11 @@ namespace {
                         const float texture_weight0 = warp_fix_enabled ? weight0 * inverse_z0 / inverse_z : weight0;
                         const float texture_weight1 = warp_fix_enabled ? weight1 * inverse_z1 / inverse_z : weight1;
                         const float texture_weight2 = warp_fix_enabled ? weight2 * inverse_z2 / inverse_z : weight2;
-                        const float u =
-                            texture_weight0 * a.uv.x +
-                            texture_weight1 * b.uv.x +
-                            texture_weight2 * c.uv.x;
-                        const float v =
-                            texture_weight0 * a.uv.y +
-                            texture_weight1 * b.uv.y +
-                            texture_weight2 * c.uv.y;
+                        const float u = texture_weight0 * a.uv.x + texture_weight1 * b.uv.x + texture_weight2 * c.uv.x;
+                        const float v = texture_weight0 * a.uv.y + texture_weight1 * b.uv.y + texture_weight2 * c.uv.y;
                         color = texture->sample_filtered(u, v, texture_lod);
                     }
-                    const mxvk::MXCOLOR shaded_color =
-                        (0xFFU << 24U) |
-                        (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_r(color)) * tint.x * intensity, 0.0f, 255.0f)) << 16U) |
-                        (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_g(color)) * tint.y * intensity, 0.0f, 255.0f)) << 8U) |
-                        static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_b(color)) * tint.z * intensity, 0.0f, 255.0f));
+                    const mxvk::MXCOLOR shaded_color = (0xFFU << 24U) | (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_r(color)) * tint.x * intensity, 0.0f, 255.0f)) << 16U) | (static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_g(color)) * tint.y * intensity, 0.0f, 255.0f)) << 8U) | static_cast<mxvk::MXCOLOR>(std::clamp(static_cast<float>(mxvk::color_b(color)) * tint.z * intensity, 0.0f, 255.0f));
                     for (std::size_t sample = 0; sample < MSAA_SAMPLE_COUNT; ++sample) {
                         if ((passing_samples & static_cast<std::uint8_t>(1U << sample)) == 0) {
                             continue;
@@ -775,11 +688,7 @@ namespace {
 
     class PuzzleDropWindow final : public mxvk::VK_Window {
       public:
-        PuzzleDropWindow(const Arguments &args, const FramebufferDimensions &framebuffer)
-            : mxvk::VK_Window("MXVK 3D Math Puzzle Drop", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync),
-              data_root(((args.path.empty() || args.path == ".") ? std::string(math3d_puzzle_drop_ASSET_DIR) : args.path) + "/data"),
-              renderer(framebuffer.width, framebuffer.height, data_root, !args.nowarpfix, !args.disable_mipmap, args.mip_bias),
-              ui_font(data_root + "/font.ttf", std::max(8, static_cast<int>(std::round(22.0f * framebuffer_scale(framebuffer))))) {
+        PuzzleDropWindow(const Arguments &args, const FramebufferDimensions &framebuffer) : mxvk::VK_Window("MXVK 3D Math Puzzle Drop", args.width, args.height, args.fullscreen, MXVK_VALIDATION, args.enable_vsync), data_root(((args.path.empty() || args.path == ".") ? std::string(math3d_puzzle_drop_ASSET_DIR) : args.path) + "/data"), renderer(framebuffer.width, framebuffer.height, data_root, !args.nowarpfix, !args.disable_mipmap, args.mip_bias), ui_font(data_root + "/font.ttf", std::max(8, static_cast<int>(std::round(22.0f * framebuffer_scale(framebuffer))))) {
             setClearColor(0.01f, 0.02f, 0.03f, 1.0f);
             mxvk::BuildTables();
             std::random_device random_device;
@@ -789,9 +698,7 @@ namespace {
             intro_start = std::chrono::steady_clock::now();
         }
 
-        ~PuzzleDropWindow() override {
-            close_gamepad();
-        }
+        ~PuzzleDropWindow() override { close_gamepad(); }
 
         void event(SDL_Event &event) override {
             if (event.type == SDL_EVENT_QUIT) {
@@ -944,15 +851,9 @@ namespace {
         static constexpr float GAMEPAD_STICK_PITCH_SPEED = 100.0f;
         static constexpr float GAMEPAD_STICK_SCALE = 1.0f / 32768.0f;
 
-        [[nodiscard]] static float framebuffer_scale(const FramebufferDimensions &framebuffer) {
-            return std::min(
-                static_cast<float>(framebuffer.width) / static_cast<float>(DEFAULT_FRAME_WIDTH),
-                static_cast<float>(framebuffer.height) / static_cast<float>(DEFAULT_FRAME_HEIGHT));
-        }
+        [[nodiscard]] static float framebuffer_scale(const FramebufferDimensions &framebuffer) { return std::min(static_cast<float>(framebuffer.width) / static_cast<float>(DEFAULT_FRAME_WIDTH), static_cast<float>(framebuffer.height) / static_cast<float>(DEFAULT_FRAME_HEIGHT)); }
 
-        [[nodiscard]] int scaled(int value) const {
-            return std::max(1, static_cast<int>(std::round(static_cast<float>(value) * framebuffer_scale({renderer.width(), renderer.height()}))));
-        }
+        [[nodiscard]] int scaled(int value) const { return std::max(1, static_cast<int>(std::round(static_cast<float>(value) * framebuffer_scale({renderer.width(), renderer.height()})))); }
 
         void ensure_frame_sprite() {
             if (frame_sprite != nullptr) {
@@ -971,12 +872,7 @@ namespace {
                 renderer.draw_text(ui_font.get(), std::format("Game Over: Lines cleared: {}", lines), scaled(24), scaled(22), primary);
                 renderer.draw_text(ui_font.get(), "Press Enter to Restart", scaled(24), scaled(50), primary);
             } else {
-                renderer.draw_text(
-                    ui_font.get(),
-                    std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1),
-                    scaled(24),
-                    scaled(22),
-                    primary);
+                renderer.draw_text(ui_font.get(), std::format("Level {}   Lines {}   Difficulty {}", level, lines, difficulty + 1), scaled(24), scaled(22), primary);
             }
             draw_next_piece_preview();
         }
@@ -1071,13 +967,7 @@ namespace {
                     renderer.draw_wildcard(block_x, block_y, z, BLOCK_HALF_EXTENT, wildcard_color);
                     return;
                 }
-                renderer.draw_block(
-                    type,
-                    block_x,
-                    block_y,
-                    z,
-                    BLOCK_HALF_EXTENT,
-                    {1.0f, 1.0f, 1.0f, 1.0f});
+                renderer.draw_block(type, block_x, block_y, z, BLOCK_HALF_EXTENT, {1.0f, 1.0f, 1.0f, 1.0f});
             };
 
             const float frame_x = center_x * BLOCK_SPACING + BLOCK_HALF_EXTENT + FRAME_HALF_EXTENT + FRAME_GAP;
@@ -1212,10 +1102,7 @@ namespace {
             const bool dpad_down = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
             const bool dpad_up = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
 
-            const int move_direction = dpad_left == dpad_right
-                                           ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1
-                                                                                                              : 0)
-                                           : (dpad_left ? -1 : 1);
+            const int move_direction = dpad_left == dpad_right ? ((left_x < -GAMEPAD_DEADZONE) ? -1 : (left_x > GAMEPAD_DEADZONE) ? 1 : 0) : (dpad_left ? -1 : 1);
             if (move_direction == 0) {
                 gamepad_move_direction = 0;
                 gamepad_move_held_seconds = 0.0f;
@@ -1227,9 +1114,7 @@ namespace {
                 move_piece_horizontal(gamepad_move_direction);
             } else {
                 gamepad_move_held_seconds += delta_seconds;
-                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS)
-                                            ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS
-                                            : GAMEPAD_MOVE_REPEAT_SECONDS;
+                const float threshold = (gamepad_move_held_seconds < GAMEPAD_MOVE_INITIAL_DELAY_SECONDS) ? GAMEPAD_MOVE_INITIAL_DELAY_SECONDS : GAMEPAD_MOVE_REPEAT_SECONDS;
                 gamepad_move_repeat_timer += delta_seconds;
                 if (gamepad_move_repeat_timer >= threshold) {
                     move_piece_horizontal(gamepad_move_direction);
@@ -1269,10 +1154,7 @@ namespace {
                 grid_yaw += static_cast<float>(right_x) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_ROTATE_SPEED * delta_seconds;
             }
             if (std::abs(right_y) > GAMEPAD_DEADZONE) {
-                grid_pitch = std::clamp(
-                    grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds,
-                    -70.0f,
-                    70.0f);
+                grid_pitch = std::clamp(grid_pitch - static_cast<float>(right_y) * GAMEPAD_STICK_SCALE * GAMEPAD_STICK_PITCH_SPEED * delta_seconds, -70.0f, 70.0f);
             }
 
             constexpr float ZOOM_SPEED = 2.0f;
@@ -1347,9 +1229,7 @@ namespace {
             }
         }
 
-        void cycle_piece_blocks() {
-            piece.shift(ShiftDirection::Up);
-        }
+        void cycle_piece_blocks() { piece.shift(ShiftDirection::Up); }
 
         void hard_drop() {
             if (!game_started || game_over) {
@@ -1496,8 +1376,7 @@ namespace {
                             const BlockType one = start;
                             const BlockType two = static_cast<BlockType>(static_cast<int>(start) + 1);
                             const BlockType three = static_cast<BlockType>(static_cast<int>(start) + 2);
-                            if (check_sequence(x, y, direction[0], direction[1], one, two, three) ||
-                                check_sequence(x, y, direction[0], direction[1], three, two, one)) {
+                            if (check_sequence(x, y, direction[0], direction[1], one, two, three) || check_sequence(x, y, direction[0], direction[1], three, two, one)) {
                                 mark_clear(x, y, direction[0], direction[1]);
                                 add_score();
                                 return true;
@@ -1537,9 +1416,7 @@ namespace {
             return updated;
         }
 
-        [[nodiscard]] bool check_sequence(int x, int y, int dx, int dy, BlockType first, BlockType second, BlockType third) const {
-            return check_block(x, y, first) && check_block(x + dx, y + dy, second) && check_block(x + dx * 2, y + dy * 2, third);
-        }
+        [[nodiscard]] bool check_sequence(int x, int y, int dx, int dy, BlockType first, BlockType second, BlockType third) const { return check_block(x, y, first) && check_block(x + dx, y + dy, second) && check_block(x + dx * 2, y + dy * 2, third); }
 
         [[nodiscard]] bool check_block(int x, int y, BlockType expected) const {
             if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) {
@@ -1569,9 +1446,7 @@ namespace {
 int main(int argc, char **argv) {
     try {
         const Arguments args = proc_args(argc, argv);
-        const FramebufferDimensions framebuffer = args.framebufferSpecified
-                                                      ? args.framebuffer
-                                                      : FramebufferDimensions{DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT};
+        const FramebufferDimensions framebuffer = args.framebufferSpecified ? args.framebuffer : FramebufferDimensions{DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT};
         PuzzleDropWindow window(args, framebuffer);
         window.loop();
     } catch (const mxvk::Exception &exception) {

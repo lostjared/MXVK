@@ -88,10 +88,7 @@ namespace {
 
     bool hasPoolAssets(const std::filesystem::path &root) {
         const std::filesystem::path data = root / "data";
-        return std::filesystem::exists(data / "pooltable_felt.mxmod.z") &&
-               std::filesystem::exists(data / "pooltable_wood.mxmod.z") &&
-               std::filesystem::exists(data / "pooltable_pocket.mxmod.z") &&
-               std::filesystem::exists(data / "table.png");
+        return std::filesystem::exists(data / "pooltable_felt.mxmod.z") && std::filesystem::exists(data / "pooltable_wood.mxmod.z") && std::filesystem::exists(data / "pooltable_pocket.mxmod.z") && std::filesystem::exists(data / "table.png");
     }
 
     std::string resolveAssetRoot(const std::string &userPath) {
@@ -126,19 +123,8 @@ namespace {
         return std::string(POOL_DEMO_ASSET_DIR);
     }
 
-    enum class GameScreen {
-        Intro,
-        Scores,
-        Game,
-        Start
-    };
-    enum class GamePhase {
-        Aiming,
-        Charging,
-        Rolling,
-        Placing,
-        GameOver
-    };
+    enum class GameScreen { Intro, Scores, Game, Start };
+    enum class GamePhase { Aiming, Charging, Rolling, Placing, GameOver };
 
     struct PoolBall {
         glm::vec2 pos{0.0f};
@@ -148,9 +134,7 @@ namespace {
         int number = 0;
         float spinAngle = 0.0f;
 
-        bool isMoving() const {
-            return glm::length(vel) > MIN_SPEED;
-        }
+        bool isMoving() const { return glm::length(vel) > MIN_SPEED; }
     };
 
     struct SinkAnim {
@@ -168,14 +152,9 @@ namespace {
 
     class HighScores {
       public:
-        explicit HighScores(std::string filePath)
-            : filePath(std::move(filePath)) {
-            read();
-        }
+        explicit HighScores(std::string filePath) : filePath(std::move(filePath)) { read(); }
 
-        ~HighScores() {
-            write();
-        }
+        ~HighScores() { write(); }
 
         void addScore(const std::string &name, int shots) {
             entries.push_back({name, shots});
@@ -192,9 +171,7 @@ namespace {
             return shots < entries.back().shots;
         }
 
-        [[nodiscard]] const std::vector<Score> &list() const {
-            return entries;
-        }
+        [[nodiscard]] const std::vector<Score> &list() const { return entries; }
 
         void write() const {
             std::ofstream out(filePath);
@@ -208,9 +185,7 @@ namespace {
 
       private:
         void sort() {
-            std::sort(entries.begin(), entries.end(), [](const Score &a, const Score &b) {
-                return a.shots < b.shots;
-            });
+            std::sort(entries.begin(), entries.end(), [](const Score &a, const Score &b) { return a.shots < b.shots; });
         }
 
         void initDefaults() {
@@ -257,12 +232,7 @@ namespace demo {
 
     class PoolWindow final : public mxvk::VK_Window {
       public:
-        PoolWindow(int width, int height, bool fullscreen, bool enable_vsync, std::string asset_root)
-            : mxvk::VK_Window("3D Pool / MXVK", width, height, fullscreen, MXVK_VALIDATION, enable_vsync),
-              assetRoot(std::move(asset_root)),
-              highScores((std::filesystem::path(assetRoot) / "pool_scores.dat").string()),
-              fallbackWidth(width),
-              fallbackHeight(height) {
+        PoolWindow(int width, int height, bool fullscreen, bool enable_vsync, std::string asset_root) : mxvk::VK_Window("3D Pool / MXVK", width, height, fullscreen, MXVK_VALIDATION, enable_vsync), assetRoot(std::move(asset_root)), highScores((std::filesystem::path(assetRoot) / "pool_scores.dat").string()), fallbackWidth(width), fallbackHeight(height) {
             setFont(assetRoot + "/font.ttf", 24);
             initSprites();
             initModels();
@@ -556,10 +526,7 @@ namespace demo {
             if (backgroundSprite != nullptr) {
                 backgroundSprite->setShaderParams(1.0f, 1.0f, 1.0f, 1.0f);
                 backgroundSprite->drawSpriteRect(0, 0, static_cast<int>(extent.width), static_cast<int>(extent.height));
-                backgroundSprite->renderSprites(cmd,
-                                                backgroundSprite->getPipelineLayout(),
-                                                extent.width,
-                                                extent.height);
+                backgroundSprite->renderSprites(cmd, backgroundSprite->getPipelineLayout(), extent.width, extent.height);
                 backgroundSprite->clearQueue();
             }
 
@@ -571,12 +538,9 @@ namespace demo {
             glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
             proj[1][1] *= -1.0f;
 
-            drawModel(feltModel, imageIndex, cmd, view, proj,
-                      composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}, time);
-            drawModel(woodModel, imageIndex, cmd, view, proj,
-                      composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{0.4f, 0.22f, 0.05f, 1.0f}, time);
-            drawModel(pocketModel, imageIndex, cmd, view, proj,
-                      composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{0.08f, 0.08f, 0.08f, 1.0f}, time);
+            drawModel(feltModel, imageIndex, cmd, view, proj, composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{1.0f, 1.0f, 1.0f, 1.0f}, time);
+            drawModel(woodModel, imageIndex, cmd, view, proj, composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{0.4f, 0.22f, 0.05f, 1.0f}, time);
+            drawModel(pocketModel, imageIndex, cmd, view, proj, composeTransform(glm::vec3{0.0f}, glm::vec3{1.0f}), glm::vec4{0.08f, 0.08f, 0.08f, 1.0f}, time);
 
             for (int i = 0; i < NUM_BALLS; ++i) {
                 if (!balls[i].active || balls[i].pocketed) {
@@ -586,14 +550,7 @@ namespace demo {
                 m = glm::translate(m, glm::vec3{balls[i].pos.x, BALL_RADIUS, balls[i].pos.y});
                 m = glm::rotate(m, balls[i].spinAngle, glm::vec3{0.0f, 1.0f, 0.0f});
                 m = glm::scale(m, glm::vec3{BALL_RADIUS});
-                drawModel(ballModels[static_cast<std::size_t>(i)],
-                          imageIndex,
-                          cmd,
-                          view,
-                          proj,
-                          m,
-                          glm::vec4{BALL_COLORS[static_cast<std::size_t>(i)], 1.0f},
-                          time);
+                drawModel(ballModels[static_cast<std::size_t>(i)], imageIndex, cmd, view, proj, m, glm::vec4{BALL_COLORS[static_cast<std::size_t>(i)], 1.0f}, time);
             }
 
             for (const auto &anim : sinkAnims) {
@@ -621,9 +578,7 @@ namespace demo {
                 cueTransform = glm::scale(cueTransform, glm::vec3{CUE_LENGTH * 0.5f, CUE_THICKNESS, CUE_THICKNESS});
 
                 const float pct = chargeAmount / MAX_POWER;
-                const glm::vec4 cueColor = (phase == GamePhase::Charging)
-                                               ? glm::vec4{0.55f + pct * 0.45f, 0.27f * (1.0f - pct), 0.07f * (1.0f - pct), 1.0f}
-                                               : glm::vec4{0.55f, 0.27f, 0.07f, 1.0f};
+                const glm::vec4 cueColor = (phase == GamePhase::Charging) ? glm::vec4{0.55f + pct * 0.45f, 0.27f * (1.0f - pct), 0.07f * (1.0f - pct), 1.0f} : glm::vec4{0.55f, 0.27f, 0.07f, 1.0f};
                 drawModel(cueStickModel, imageIndex, cmd, view, proj, cueTransform, cueColor, time);
 
                 const glm::vec2 aimCenter = balls[0].pos + dir * (BALL_RADIUS + AIM_LENGTH * 0.5f);
@@ -677,19 +632,10 @@ namespace demo {
 
         void loadModel(mxvk::VKAbstractModel &model, const std::string &path, float scale = 1.0f) {
             model.load(this, path, "", assetRoot + "/data", scale);
-            model.setShaders(this,
-                             assetRoot + "/data/model.vert.spv",
-                             assetRoot + "/data/model.frag.spv");
+            model.setShaders(this, assetRoot + "/data/model.vert.spv", assetRoot + "/data/model.frag.spv");
         }
 
-        void drawModel(mxvk::VKAbstractModel &model,
-                       uint32_t imageIndex,
-                       VkCommandBuffer cmd,
-                       const glm::mat4 &view,
-                       const glm::mat4 &proj,
-                       const glm::mat4 &transform,
-                       const glm::vec4 &fx,
-                       float time) {
+        void drawModel(mxvk::VKAbstractModel &model, uint32_t imageIndex, VkCommandBuffer cmd, const glm::mat4 &view, const glm::mat4 &proj, const glm::mat4 &transform, const glm::vec4 &fx, float time) {
             mxvk::UniformBufferObject ubo{};
             // Keep pool-world coordinates aligned with legacy gameplay physics units.
             ubo.model = transform;
@@ -884,15 +830,12 @@ namespace demo {
             printText("Balls: " + std::to_string(rem), 15, 75, SDL_Color{200, 200, 200, 255});
 
             if (phase == GamePhase::Aiming) {
-                printText("Mouse: move aim + hold/release | Right-drag: rotate table | Wheel/Pinch: zoom", 15, height - 40,
-                          SDL_Color{180, 180, 180, 255});
+                printText("Mouse: move aim + hold/release | Right-drag: rotate table | Wheel/Pinch: zoom", 15, height - 40, SDL_Color{180, 180, 180, 255});
             } else if (phase == GamePhase::Charging) {
                 const int pct = static_cast<int>(chargeAmount / MAX_POWER * 100.0f);
-                printText("Power: " + std::to_string(pct) + "%", 15, 105,
-                          SDL_Color{255, static_cast<Uint8>(std::max(0, 255 - pct * 2)), 0, 255});
+                printText("Power: " + std::to_string(pct) + "%", 15, 105, SDL_Color{255, static_cast<Uint8>(std::max(0, 255 - pct * 2)), 0, 255});
             } else if (phase == GamePhase::Placing) {
-                printText("Mouse move: place cue by camera direction | Click/Enter/A/B: place", 15, height - 40,
-                          SDL_Color{255, 100, 100, 255});
+                printText("Mouse move: place cue by camera direction | Click/Enter/A/B: place", 15, height - 40, SDL_Color{255, 100, 100, 255});
             }
         }
 
@@ -935,11 +878,7 @@ namespace demo {
             for (auto &anim : sinkAnims) {
                 anim.timer += dt;
             }
-            sinkAnims.erase(
-                std::remove_if(sinkAnims.begin(), sinkAnims.end(), [](const SinkAnim &anim) {
-                    return anim.timer >= SINK_DURATION;
-                }),
-                sinkAnims.end());
+            sinkAnims.erase(std::remove_if(sinkAnims.begin(), sinkAnims.end(), [](const SinkAnim &anim) { return anim.timer >= SINK_DURATION; }), sinkAnims.end());
         }
 
         void handleCameraAndInput(float dt) {
@@ -963,9 +902,7 @@ namespace demo {
             }
 
             constexpr float dead = 0.15f;
-            const auto readAxis = [this](SDL_GamepadAxis axis) {
-                return static_cast<float>(SDL_GetGamepadAxis(gamepad, axis)) / 32767.0f;
-            };
+            const auto readAxis = [this](SDL_GamepadAxis axis) { return static_cast<float>(SDL_GetGamepadAxis(gamepad, axis)) / 32767.0f; };
 
             const float rx = readAxis(SDL_GAMEPAD_AXIS_RIGHTX);
             const float ry = readAxis(SDL_GAMEPAD_AXIS_RIGHTY);
@@ -1289,11 +1226,7 @@ namespace demo {
             for (const auto &pocket : POCKETS) {
                 if (glm::length(ball.pos - pocket) < POCKET_R) {
                     const int idx = static_cast<int>(&ball - &balls[0]);
-                    sinkAnims.push_back(SinkAnim{pocket,
-                                                 BALL_COLORS[static_cast<std::size_t>(idx)],
-                                                 ball.spinAngle,
-                                                 0.0f,
-                                                 idx});
+                    sinkAnims.push_back(SinkAnim{pocket, BALL_COLORS[static_cast<std::size_t>(idx)], ball.spinAngle, 0.0f, idx});
                     ball.pocketed = true;
                     ball.vel = glm::vec2{0.0f};
                     return;
@@ -1490,13 +1423,9 @@ namespace demo {
             return r;
         }
 
-        void updateStartClickTargets() {
-            startPlayRect = makeNormRect(0.50f, 0.78f, 0.28f, 0.11f);
-        }
+        void updateStartClickTargets() { startPlayRect = makeNormRect(0.50f, 0.78f, 0.28f, 0.11f); }
 
-        static bool pointInRect(int x, int y, const SDL_Rect &r) {
-            return x >= r.x && x <= (r.x + r.w) && y >= r.y && y <= (r.y + r.h);
-        }
+        static bool pointInRect(int x, int y, const SDL_Rect &r) { return x >= r.x && x <= (r.x + r.w) && y >= r.y && y <= (r.y + r.h); }
 
         void onPointerDown(int px, int py, int64_t pointerId) {
             if (screen == GameScreen::Intro) {

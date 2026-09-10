@@ -21,15 +21,9 @@ namespace mutatris {
         constexpr int START_PROMPT_RECT_Y = 548;
         constexpr int START_PROMPT_RECT_W = 217;
         constexpr int START_PROMPT_RECT_H = 78;
-    }
+    } // namespace
 
-    MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt)
-        : mxvk::VK_Window("Mutatris", width, height, fullscreen, MXVK_VALIDATION, enableVsync),
-          assetRoot((path.empty() || path == ".") ? std::string(mutatris_ASSET_DIR) : path),
-          dataRoot(assetRoot + "/data"),
-          shaderRoot(assetRoot + "/shaders"),
-          fontPath(dataRoot + "/font.ttf"),
-          crtEnabled(enableCrt) {
+    MutatrisWindow::MutatrisWindow(const std::string &path, int width, int height, bool fullscreen, bool enableVsync, bool enableCrt) : mxvk::VK_Window("Mutatris", width, height, fullscreen, MXVK_VALIDATION, enableVsync), assetRoot((path.empty() || path == ".") ? std::string(mutatris_ASSET_DIR) : path), dataRoot(assetRoot + "/data"), shaderRoot(assetRoot + "/shaders"), fontPath(dataRoot + "/font.ttf"), crtEnabled(enableCrt) {
         setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         setFont(fontPath, 24);
         attachPostProcessingShader(shaderRoot + "/crt.frag.spv", 0.0f, 3.0f, 0.5f, 0.002f);
@@ -636,15 +630,7 @@ namespace mutatris {
             game->procBlocks();
         }
         if (game->score != previousScore || game->clears != previousClears || game->level != previousLevel || game->timeout != previousTimeout) {
-            logMutatris(std::format("Grid processed. score {} -> {}, clears {} -> {}, level {} -> {}, timeout {} -> {}",
-                                    previousScore,
-                                    game->score,
-                                    previousClears,
-                                    game->clears,
-                                    previousLevel + 1,
-                                    game->level + 1,
-                                    previousTimeout,
-                                    game->timeout));
+            logMutatris(std::format("Grid processed. score {} -> {}, clears {} -> {}, level {} -> {}, timeout {} -> {}", previousScore, game->score, previousClears, game->clears, previousLevel + 1, game->level + 1, previousTimeout, game->timeout));
         }
     }
 
@@ -664,9 +650,7 @@ namespace mutatris {
     }
 
     void MutatrisWindow::startGame() {
-        game = std::make_unique<PuzzleGame>(difficulty, [this]() {
-            playSound(lineSound);
-        });
+        game = std::make_unique<PuzzleGame>(difficulty, [this]() { playSound(lineSound); });
         focus = 0;
         lastDropTick = SDL_GetTicks();
         lastKeyboardInputTick = 0;
@@ -719,9 +703,7 @@ namespace mutatris {
         sprite->drawSpriteRect(0, 0, width, height);
     }
 
-    void MutatrisWindow::drawTitle() {
-        drawTitleWithAlpha(1.0f);
-    }
+    void MutatrisWindow::drawTitle() { drawTitleWithAlpha(1.0f); }
 
     void MutatrisWindow::drawTitleWithAlpha(float alphaValue) {
         ensureIntroFonts();
@@ -741,14 +723,7 @@ namespace mutatris {
             start->drawSpriteRect(0, 0, width, height);
         }
         printScaledText("Mutatris", 560, 325, {255, 255, 255, 255}, startMediumFont);
-        drawTextCenteredInRect(
-            "Press Space",
-            START_PROMPT_RECT_X,
-            START_PROMPT_RECT_Y,
-            START_PROMPT_RECT_W,
-            START_PROMPT_RECT_H,
-            {255, 255, 255, 255},
-            startSmallFont);
+        drawTextCenteredInRect("Press Space", START_PROMPT_RECT_X, START_PROMPT_RECT_Y, START_PROMPT_RECT_W, START_PROMPT_RECT_H, {255, 255, 255, 255}, startSmallFont);
         const std::array<std::string, 3> labels{{"Easy", "Medium", "Hard"}};
         for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
             const SDL_Color color = i == difficulty ? SDL_Color{255, 230, 64, 255} : SDL_Color{255, 255, 255, 255};
@@ -953,12 +928,8 @@ namespace mutatris {
         const int boardH = sideGrid ? columns * BLOCK_WIDTH : rows * BLOCK_HEIGHT;
         const int thickness = selected ? 4 : 2;
         mxvk::VK_Sprite *pixel = blocks[0];
-        const auto drawHorizontal = [&](int x, int y, int w) {
-            pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(w), scaleY(thickness));
-        };
-        const auto drawVertical = [&](int x, int y, int h) {
-            pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(thickness), scaleY(h));
-        };
+        const auto drawHorizontal = [&](int x, int y, int w) { pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(w), scaleY(thickness)); };
+        const auto drawVertical = [&](int x, int y, int h) { pixel->drawSpriteRect(scaleX(x), scaleY(y), scaleX(thickness), scaleY(h)); };
 
         if (layout.gridIndex == 0) {
             drawHorizontal(layout.x - thickness, layout.y - thickness, boardW + thickness * 2);
@@ -1031,9 +1002,7 @@ namespace mutatris {
         }
     }
 
-    float MutatrisWindow::layoutScale() const {
-        return std::max(0.2f, std::min(static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH), static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT)));
-    }
+    float MutatrisWindow::layoutScale() const { return std::max(0.2f, std::min(static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH), static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT))); }
 
     void MutatrisWindow::ensureUiFont() {
         const int scaledFontSize = std::max(1, static_cast<int>(std::lround(24.0f * layoutScale())));
@@ -1058,9 +1027,7 @@ namespace mutatris {
         resetScaledFont(difficultyFont, 30, scale);
     }
 
-    void MutatrisWindow::resetScaledFont(mxvk::Font &font, int designSize, float scale) {
-        font.reset(fontPath, std::max(1, static_cast<int>(std::lround(static_cast<float>(designSize) * scale))));
-    }
+    void MutatrisWindow::resetScaledFont(mxvk::Font &font, int designSize, float scale) { font.reset(fontPath, std::max(1, static_cast<int>(std::lround(static_cast<float>(designSize) * scale)))); }
 
     void MutatrisWindow::drawTextCentered(const std::string &text, int y, SDL_Color color) {
         int textWidth = 0;
@@ -1088,20 +1055,12 @@ namespace mutatris {
         printText(text, textX, textY, color, font);
     }
 
-    void MutatrisWindow::printScaledText(const std::string &text, int x, int y, SDL_Color color) {
-        printText(text, scaleX(x), scaleY(y), color);
-    }
+    void MutatrisWindow::printScaledText(const std::string &text, int x, int y, SDL_Color color) { printText(text, scaleX(x), scaleY(y), color); }
 
-    void MutatrisWindow::printScaledText(const std::string &text, int x, int y, SDL_Color color, const mxvk::Font &font) {
-        printText(text, scaleX(x), scaleY(y), color, font);
-    }
+    void MutatrisWindow::printScaledText(const std::string &text, int x, int y, SDL_Color color, const mxvk::Font &font) { printText(text, scaleX(x), scaleY(y), color, font); }
 
-    int MutatrisWindow::scaleX(int value) const {
-        return static_cast<int>(static_cast<float>(value) * static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH));
-    }
+    int MutatrisWindow::scaleX(int value) const { return static_cast<int>(static_cast<float>(value) * static_cast<float>(width) / static_cast<float>(DESIGN_WIDTH)); }
 
-    int MutatrisWindow::scaleY(int value) const {
-        return static_cast<int>(static_cast<float>(value) * static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT));
-    }
+    int MutatrisWindow::scaleY(int value) const { return static_cast<int>(static_cast<float>(value) * static_cast<float>(height) / static_cast<float>(DESIGN_HEIGHT)); }
 
 } // namespace mutatris

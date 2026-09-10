@@ -8,9 +8,7 @@
 
 namespace mutatris {
 
-    Piece::Piece(GameGrid *owner)
-        : grid(owner) {
-    }
+    Piece::Piece(GameGrid *owner) : grid(owner) {}
 
     void Piece::reset() {
         x = grid->width() / 2;
@@ -49,9 +47,7 @@ namespace mutatris {
             break;
         }
 
-        return std::all_of(target.begin(), target.end(), [](const Block *block) {
-            return block != nullptr && block->color == 0;
-        });
+        return std::all_of(target.begin(), target.end(), [](const Block *block) { return block != nullptr && block->color == 0; });
     }
 
     void Piece::moveLeft() {

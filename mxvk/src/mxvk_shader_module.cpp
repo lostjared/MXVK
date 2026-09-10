@@ -45,15 +45,12 @@ namespace mxvk {
     }
 
     ShaderModuleInfo inspect_spirv(const std::vector<char> &spv_bytes) {
-        if (spv_bytes.size() < 5U * sizeof(uint32_t) ||
-            (spv_bytes.size() % sizeof(uint32_t)) != 0U) {
+        if (spv_bytes.size() < 5U * sizeof(uint32_t) || (spv_bytes.size() % sizeof(uint32_t)) != 0U) {
             throw mxvk::Exception("Invalid SPIR-V shader data");
         }
 
-        const auto *word_data =
-            reinterpret_cast<const uint32_t *>(spv_bytes.data());
-        const std::span<const uint32_t> words(
-            word_data, spv_bytes.size() / sizeof(uint32_t));
+        const auto *word_data = reinterpret_cast<const uint32_t *>(spv_bytes.data());
+        const std::span<const uint32_t> words(word_data, spv_bytes.size() / sizeof(uint32_t));
         if (words.front() != SPIRV_MAGIC) {
             throw mxvk::Exception("Invalid SPIR-V magic word");
         }
@@ -67,15 +64,12 @@ namespace mxvk {
         std::vector<uint32_t> descriptor_sets(id_bound, UINT32_MAX);
         std::vector<uint32_t> descriptor_bindings(id_bound, UINT32_MAX);
         for (std::size_t offset = 5; offset < words.size();) {
-            const uint16_t word_count =
-                static_cast<uint16_t>(words[offset] >> 16U);
-            const uint16_t opcode =
-                static_cast<uint16_t>(words[offset] & 0xFFFFU);
+            const uint16_t word_count = static_cast<uint16_t>(words[offset] >> 16U);
+            const uint16_t opcode = static_cast<uint16_t>(words[offset] & 0xFFFFU);
             if (word_count == 0 || offset + word_count > words.size()) {
                 throw mxvk::Exception("Malformed SPIR-V instruction stream");
             }
-            if (opcode == OP_ENTRY_POINT && word_count >= 3U &&
-                entry_point_id == 0U) {
+            if (opcode == OP_ENTRY_POINT && word_count >= 3U && entry_point_id == 0U) {
                 entry_point_id = words[offset + 2U];
                 switch (words[offset + 1U]) {
                 case EXECUTION_MODEL_VERTEX:
@@ -91,8 +85,7 @@ namespace mxvk {
                     info.stage = ShaderStage::Unknown;
                     break;
                 }
-            } else if (opcode == OP_DECORATE && word_count >= 4U &&
-                       words[offset + 1U] < id_bound) {
+            } else if (opcode == OP_DECORATE && word_count >= 4U && words[offset + 1U] < id_bound) {
                 const uint32_t target_id = words[offset + 1U];
                 const uint32_t decoration = words[offset + 2U];
                 if (decoration == DECORATION_BINDING) {
@@ -132,13 +125,9 @@ namespace mxvk {
 
         if (info.stage == ShaderStage::Compute && entry_point_id != 0U) {
             for (std::size_t offset = 5; offset < words.size();) {
-                const uint16_t word_count =
-                    static_cast<uint16_t>(words[offset] >> 16U);
-                const uint16_t opcode =
-                    static_cast<uint16_t>(words[offset] & 0xFFFFU);
-                if (opcode == OP_EXECUTION_MODE && word_count >= 6U &&
-                    words[offset + 1U] == entry_point_id &&
-                    words[offset + 2U] == EXECUTION_MODE_LOCAL_SIZE) {
+                const uint16_t word_count = static_cast<uint16_t>(words[offset] >> 16U);
+                const uint16_t opcode = static_cast<uint16_t>(words[offset] & 0xFFFFU);
+                if (opcode == OP_EXECUTION_MODE && word_count >= 6U && words[offset + 1U] == entry_point_id && words[offset + 2U] == EXECUTION_MODE_LOCAL_SIZE) {
                     info.localSizeX = words[offset + 3U];
                     info.localSizeY = words[offset + 4U];
                     info.localSizeZ = words[offset + 5U];

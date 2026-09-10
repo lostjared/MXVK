@@ -36,8 +36,7 @@ namespace mxvk {
             std::string token{};
             while (stream >> token) {
                 if (!token.empty() && token[0] == '-') {
-                    if (token == "-blendu" || token == "-blendv" || token == "-cc" ||
-                        token == "-clamp" || token == "-imfchan" || token == "-type") {
+                    if (token == "-blendu" || token == "-blendv" || token == "-cc" || token == "-clamp" || token == "-imfchan" || token == "-type") {
                         stream >> token;
                     } else if (token == "-mm") {
                         stream >> token;
@@ -78,11 +77,7 @@ namespace mxvk {
         }
     } // namespace
 
-    void VKAbstractModel::load(VK_Window *targetWindow,
-                               const std::string &modelPath,
-                               const std::string &textureManifestPath,
-                               const std::string &textureBasePath,
-                               float scale) {
+    void VKAbstractModel::load(VK_Window *targetWindow, const std::string &modelPath, const std::string &textureManifestPath, const std::string &textureBasePath, float scale) {
         if (targetWindow == nullptr) {
             throw mxvk::Exception("VKAbstractModel::load requires a valid window");
         }
@@ -123,11 +118,7 @@ namespace mxvk {
         logVKAbstractModelStep("creation complete", true);
     }
 
-    void VKAbstractModel::load(VK_Window *targetWindow,
-                               MXModel &&model,
-                               const std::string &textureManifestPath,
-                               const std::string &textureBasePath,
-                               [[maybe_unused]] float scale) {
+    void VKAbstractModel::load(VK_Window *targetWindow, MXModel &&model, const std::string &textureManifestPath, const std::string &textureBasePath, [[maybe_unused]] float scale) {
         if (targetWindow == nullptr) {
             throw mxvk::Exception("VKAbstractModel::load requires a valid window");
         }
@@ -235,9 +226,7 @@ namespace mxvk {
         std::memcpy(fragmentUniformBuffersMapped[imageIndex], &uniforms, sizeof(ModelFragmentUniforms));
     }
 
-    void VKAbstractModel::setFragmentPushConstants(const ModelFragmentPushConstants &constants) {
-        fragmentPushConstants = constants;
-    }
+    void VKAbstractModel::setFragmentPushConstants(const ModelFragmentPushConstants &constants) { fragmentPushConstants = constants; }
 
     bool VKAbstractModel::updatePrimaryTexture(const void *pixels, int width, int height, int pitch) {
         if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
@@ -305,9 +294,7 @@ namespace mxvk {
         const VkDeviceSize stagingSize = static_cast<VkDeviceSize>(tightRowBytes) * uploadHeight;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *mapped = nullptr;
         const VkResult mapResult = vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, stagingSize, 0, &mapped);
@@ -331,18 +318,12 @@ namespace mxvk {
         vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
         if (recreatedTexture) {
-            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_UNDEFINED,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         } else {
-            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         }
         copyBufferToImage(stagingBuffer, texture.image, uploadWidth, uploadHeight);
-        transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        transitionImageLayout(texture.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 #ifdef MXVK_CUDA
         texture.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
@@ -364,12 +345,7 @@ namespace mxvk {
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         if (extendedFragmentUniformsEnabled) {
-            vkCmdPushConstants(cmd,
-                               pipelineLayout,
-                               VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0,
-                               sizeof(ModelFragmentPushConstants),
-                               &fragmentPushConstants);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ModelFragmentPushConstants), &fragmentPushConstants);
         }
 
         const size_t textureCount = std::max<size_t>(1, textures.size());
@@ -381,24 +357,13 @@ namespace mxvk {
                 continue;
             }
 
-            vkCmdBindDescriptorSets(cmd,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayout,
-                                    0,
-                                    1,
-                                    &descriptorSets[setIndex],
-                                    0,
-                                    nullptr);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[setIndex], 0, nullptr);
 
             obj.drawSubMesh(cmd, i);
         }
     }
 
-    void VKAbstractModel::renderWithPushConstants(VkCommandBuffer cmd,
-                                                  uint32_t imageIndex,
-                                                  size_t textureIndex,
-                                                  const UniformBufferObject &ubo,
-                                                  bool wireframe) {
+    void VKAbstractModel::renderWithPushConstants(VkCommandBuffer cmd, uint32_t imageIndex, size_t textureIndex, const UniformBufferObject &ubo, bool wireframe) {
         if (cmd == VK_NULL_HANDLE || imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
             return;
         }
@@ -414,8 +379,7 @@ namespace mxvk {
         if (setIndex >= descriptorSets.size()) {
             return;
         }
-        updateTextureDescriptor(descriptorSets[setIndex],
-                                textures[textureIndex].view);
+        updateTextureDescriptor(descriptorSets[setIndex], textures[textureIndex].view);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         updateUBO(imageIndex, ubo);
@@ -424,45 +388,22 @@ namespace mxvk {
                 .model = ubo.model,
                 .fx = ubo.fx,
             };
-            vkCmdPushConstants(cmd,
-                               pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT,
-                               0,
-                               sizeof(ModelPushConstants),
-                               &pushConstants);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelPushConstants), &pushConstants);
         }
         if (extendedFragmentUniformsEnabled) {
-            vkCmdPushConstants(cmd,
-                               pipelineLayout,
-                               VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0,
-                               sizeof(ModelFragmentPushConstants),
-                               &fragmentPushConstants);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ModelFragmentPushConstants), &fragmentPushConstants);
         }
-        vkCmdBindDescriptorSets(cmd,
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                pipelineLayout,
-                                0,
-                                1,
-                                &descriptorSets[setIndex],
-                                0,
-                                nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[setIndex], 0, nullptr);
 
         obj.draw(cmd);
     }
 
-    void VKAbstractModel::renderWithExternalTexture(
-        VkCommandBuffer cmd, uint32_t imageIndex, VkImageView textureView,
-        const UniformBufferObject &ubo, bool wireframe) {
-        if (cmd == VK_NULL_HANDLE || textureView == VK_NULL_HANDLE ||
-            imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
+    void VKAbstractModel::renderWithExternalTexture(VkCommandBuffer cmd, uint32_t imageIndex, VkImageView textureView, const UniformBufferObject &ubo, bool wireframe) {
+        if (cmd == VK_NULL_HANDLE || textureView == VK_NULL_HANDLE || imageIndex >= uniformBuffers.size() || descriptorSets.empty()) {
             return;
         }
 
-        const VkPipeline pipeline =
-            (wireframe && pipelineWireframe != VK_NULL_HANDLE)
-                ? pipelineWireframe
-                : pipelineFill;
+        const VkPipeline pipeline = (wireframe && pipelineWireframe != VK_NULL_HANDLE) ? pipelineWireframe : pipelineFill;
         if (pipeline == VK_NULL_HANDLE || pipelineLayout == VK_NULL_HANDLE) {
             return;
         }
@@ -481,19 +422,12 @@ namespace mxvk {
                 .model = ubo.model,
                 .fx = ubo.fx,
             };
-            vkCmdPushConstants(cmd, pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT, 0,
-                               sizeof(ModelPushConstants), &pushConstants);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ModelPushConstants), &pushConstants);
         }
         if (extendedFragmentUniformsEnabled) {
-            vkCmdPushConstants(cmd, pipelineLayout,
-                               VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                               sizeof(ModelFragmentPushConstants),
-                               &fragmentPushConstants);
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ModelFragmentPushConstants), &fragmentPushConstants);
         }
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                pipelineLayout, 0, 1,
-                                &descriptorSets[setIndex], 0, nullptr);
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[setIndex], 0, nullptr);
         obj.draw(cmd);
     }
 
@@ -558,10 +492,7 @@ namespace mxvk {
             maxZ = std::max(maxZ, v.pos[2]);
         }
 
-        modelCenterOffsetValue = glm::vec3(
-            -0.5f * (minX + maxX),
-            -0.5f * (minY + maxY),
-            -0.5f * (minZ + maxZ));
+        modelCenterOffsetValue = glm::vec3(-0.5f * (minX + maxX), -0.5f * (minY + maxY), -0.5f * (minZ + maxZ));
 
         modelAxisExtentValue = glm::vec3(maxX - minX, maxY - minY, maxZ - minZ);
         const float maxExtent = std::max(modelAxisExtentValue.x, std::max(modelAxisExtentValue.y, modelAxisExtentValue.z));
@@ -681,9 +612,7 @@ namespace mxvk {
             const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         stagingBuffer, stagingMemory);
+            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
             vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
@@ -691,19 +620,13 @@ namespace mxvk {
             vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
-            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
-                                                      ? VK_IMAGE_LAYOUT_GENERAL
-                                                      : VK_IMAGE_LAYOUT_UNDEFINED;
+            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
 #else
             const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 #endif
-            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  uploadOldLayout,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, uploadOldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, tex.image, width, height);
-            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 #ifdef MXVK_CUDA
             tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
@@ -755,9 +678,7 @@ namespace mxvk {
             const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4U;
             VkBuffer stagingBuffer = VK_NULL_HANDLE;
             VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         stagingBuffer, stagingMemory);
+            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
             void *mapped = nullptr;
             vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
@@ -765,19 +686,13 @@ namespace mxvk {
             vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
-            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
-                                                      ? VK_IMAGE_LAYOUT_GENERAL
-                                                      : VK_IMAGE_LAYOUT_UNDEFINED;
+            const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
 #else
             const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 #endif
-            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  uploadOldLayout,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, uploadOldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
             copyBufferToImage(stagingBuffer, tex.image, width, height);
-            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 #ifdef MXVK_CUDA
             tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
@@ -821,9 +736,7 @@ namespace mxvk {
         const VkDeviceSize imageSize = 4;
         VkBuffer stagingBuffer = VK_NULL_HANDLE;
         VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
-        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     stagingBuffer, stagingMemory);
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingMemory);
 
         void *mapped = nullptr;
         vkMapMemory(windowPtr->getDevice(), stagingMemory, 0, imageSize, 0, &mapped);
@@ -831,19 +744,13 @@ namespace mxvk {
         vkUnmapMemory(windowPtr->getDevice(), stagingMemory);
 
 #ifdef MXVK_CUDA
-        const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL)
-                                                  ? VK_IMAGE_LAYOUT_GENERAL
-                                                  : VK_IMAGE_LAYOUT_UNDEFINED;
+        const VkImageLayout uploadOldLayout = (tex.cudaImageLayout == VK_IMAGE_LAYOUT_GENERAL) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
 #else
         const VkImageLayout uploadOldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 #endif
-        transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                              uploadOldLayout,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, uploadOldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer, tex.image, 1, 1);
-        transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM,
-                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        transitionImageLayout(tex.image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 #ifdef MXVK_CUDA
         tex.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 #endif
@@ -855,9 +762,7 @@ namespace mxvk {
         SDL_DestroySurface(surface);
     }
 
-    void VKAbstractModel::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                                       VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                                       VkDeviceMemory &bufferMemory) const {
+    void VKAbstractModel::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory) const {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -903,8 +808,7 @@ namespace mxvk {
 
         for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
             const bool typeSupported = (typeFilter & (1u << i)) != 0u;
-            const bool propsSupported =
-                (memProperties.memoryTypes[i].propertyFlags & properties) == properties;
+            const bool propsSupported = (memProperties.memoryTypes[i].propertyFlags & properties) == properties;
             if (typeSupported && propsSupported) {
                 return i;
             }
@@ -959,10 +863,7 @@ namespace mxvk {
         vkFreeCommandBuffers(windowPtr->getDevice(), windowPtr->getCommandPool(), 1, &commandBuffer);
     }
 
-    void VKAbstractModel::createImage(uint32_t width, uint32_t height, VkFormat format,
-                                      VkImageTiling tiling, VkImageUsageFlags usage,
-                                      VkMemoryPropertyFlags properties, VkImage &image,
-                                      VkDeviceMemory &memory) const {
+    void VKAbstractModel::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &memory) const {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -1017,20 +918,14 @@ namespace mxvk {
             createCudaExportableImage(width, height, texture);
             return;
         } catch (const std::exception &ex) {
-            logVKAbstractModelStep(std::format(
-                "CUDA exportable model texture unavailable: {}; using standard Vulkan texture",
-                ex.what()));
+            logVKAbstractModelStep(std::format("CUDA exportable model texture unavailable: {}; using standard Vulkan texture", ex.what()));
             texture.cudaExportMemorySize = 0;
             texture.cudaInteropEnabled = false;
             texture.cudaInteropUnavailableLogged = true;
         }
 #endif
 
-        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_TILING_OPTIMAL,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    texture.image, texture.memory);
+        createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture.image, texture.memory);
         texture.width = width;
         texture.height = height;
 #ifdef MXVK_CUDA
@@ -1061,9 +956,7 @@ namespace mxvk {
     }
 
     void VKAbstractModel::createCudaExportableImage(uint32_t width, uint32_t height, TextureEntry &texture) const {
-        logVKAbstractModelStep(std::format(
-            "CUDA interop init: requesting exportable model texture {}x{} RGBA8 optimal-tiled OPAQUE_FD",
-            width, height));
+        logVKAbstractModelStep(std::format("CUDA interop init: requesting exportable model texture {}x{} RGBA8 optimal-tiled OPAQUE_FD", width, height));
 
         VkExternalMemoryImageCreateInfo externalImageInfo{};
         externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
@@ -1127,9 +1020,7 @@ namespace mxvk {
         texture.cudaExportMemorySize = requirements.size;
         texture.cudaInteropUnavailableLogged = false;
         texture.cudaImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        logVKAbstractModelStep(std::format(
-            "CUDA interop init: exportable model texture allocated (memorySize={} bytes, memoryType={}); optimal image memory is imported as cudaArray, not wrapped as pitched GpuMat",
-            static_cast<unsigned long long>(requirements.size), allocInfo.memoryTypeIndex));
+        logVKAbstractModelStep(std::format("CUDA interop init: exportable model texture allocated (memorySize={} bytes, memoryType={}); optimal image memory is imported as cudaArray, not wrapped as pitched GpuMat", static_cast<unsigned long long>(requirements.size), allocInfo.memoryTypeIndex));
     }
 
     bool VKAbstractModel::ensureTextureCudaInterop(TextureEntry &texture) const {
@@ -1176,15 +1067,13 @@ namespace mxvk {
         if (cudaResult != cudaSuccess) {
             close(memoryFd);
             if (!texture.cudaInteropUnavailableLogged) {
-                logVKAbstractModelStep(std::format("CUDA interop init: cudaImportExternalMemory failed for model texture: {}",
-                                                   cudaGetErrorString(cudaResult)));
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaImportExternalMemory failed for model texture: {}", cudaGetErrorString(cudaResult)));
                 texture.cudaInteropUnavailableLogged = true;
             }
             texture.cudaExternalMemory = nullptr;
             return false;
         }
-        logVKAbstractModelStep(std::format("CUDA interop init: imported model texture external memory into CUDA ({} bytes)",
-                                           static_cast<unsigned long long>(texture.cudaExportMemorySize)));
+        logVKAbstractModelStep(std::format("CUDA interop init: imported model texture external memory into CUDA ({} bytes)", static_cast<unsigned long long>(texture.cudaExportMemorySize)));
 
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;
@@ -1196,21 +1085,18 @@ namespace mxvk {
         cudaResult = cudaExternalMemoryGetMappedMipmappedArray(&texture.cudaMipmappedArray, texture.cudaExternalMemory, &arrayDesc);
         if (cudaResult != cudaSuccess) {
             if (!texture.cudaInteropUnavailableLogged) {
-                logVKAbstractModelStep(std::format("CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed for model texture: {}",
-                                                   cudaGetErrorString(cudaResult)));
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaExternalMemoryGetMappedMipmappedArray failed for model texture: {}", cudaGetErrorString(cudaResult)));
                 texture.cudaInteropUnavailableLogged = true;
             }
             destroyTextureCudaInterop(texture);
             return false;
         }
-        logVKAbstractModelStep(std::format("CUDA interop init: mapped model texture CUDA mipmapped array {}x{} uchar4",
-                                           texture.width, texture.height));
+        logVKAbstractModelStep(std::format("CUDA interop init: mapped model texture CUDA mipmapped array {}x{} uchar4", texture.width, texture.height));
 
         cudaResult = cudaGetMipmappedArrayLevel(&texture.cudaArray, texture.cudaMipmappedArray, 0);
         if (cudaResult != cudaSuccess) {
             if (!texture.cudaInteropUnavailableLogged) {
-                logVKAbstractModelStep(std::format("CUDA interop init: cudaGetMipmappedArrayLevel failed for model texture: {}",
-                                                   cudaGetErrorString(cudaResult)));
+                logVKAbstractModelStep(std::format("CUDA interop init: cudaGetMipmappedArrayLevel failed for model texture: {}", cudaGetErrorString(cudaResult)));
                 texture.cudaInteropUnavailableLogged = true;
             }
             destroyTextureCudaInterop(texture);
@@ -1227,9 +1113,7 @@ namespace mxvk {
             return true;
         }
 
-        const VkImageLayout oldLayout = (texture.cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                                            ? VK_IMAGE_LAYOUT_UNDEFINED
-                                            : texture.cudaImageLayout;
+        const VkImageLayout oldLayout = (texture.cudaImageLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? VK_IMAGE_LAYOUT_UNDEFINED : texture.cudaImageLayout;
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkImageMemoryBarrier barrier{};
@@ -1247,11 +1131,8 @@ namespace mxvk {
         barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_ACCESS_SHADER_READ_BIT : 0;
         barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
-        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-                                                  ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                                                  : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        vkCmdPipelineBarrier(commandBuffer, srcStage, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
 
         texture.cudaImageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -1283,8 +1164,7 @@ namespace mxvk {
         barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         endSingleTimeCommands(commandBuffer);
 
         texture.cudaImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1317,8 +1197,7 @@ namespace mxvk {
         createDescriptorSets();
     }
 
-    bool VKAbstractModel::updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels,
-                                                       uint32_t width, uint32_t height, uint32_t pitch) const {
+    bool VKAbstractModel::updatePrimaryTextureCudaHost(TextureEntry &texture, const void *pixels, uint32_t width, uint32_t height, uint32_t pitch) const {
         if (pixels == nullptr || width == 0 || height == 0) {
             return false;
         }
@@ -1331,16 +1210,11 @@ namespace mxvk {
         }
 
         if (!texture.cudaUploadLogged) {
-            logVKAbstractModelStep(std::format(
-                "CUDA interop upload: copying {}x{} host RGBA pixels to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes)",
-                width, height, pitch));
+            logVKAbstractModelStep(std::format("CUDA interop upload: copying {}x{} host RGBA pixels to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes)", width, height, pitch));
             texture.cudaUploadLogged = true;
         }
 
-        const cudaError_t cudaResult = cudaMemcpy2DToArray(
-            texture.cudaArray, 0, 0, pixels, pitch,
-            static_cast<size_t>(rowBytes), static_cast<size_t>(height),
-            cudaMemcpyHostToDevice);
+        const cudaError_t cudaResult = cudaMemcpy2DToArray(texture.cudaArray, 0, 0, pixels, pitch, static_cast<size_t>(rowBytes), static_cast<size_t>(height), cudaMemcpyHostToDevice);
         if (cudaResult != cudaSuccess) {
             logVKAbstractModelStep(std::format("CUDA interop model host texture copy failed: {}", cudaGetErrorString(cudaResult)));
             return false;
@@ -1364,9 +1238,7 @@ namespace mxvk {
         TextureEntry &texture = textures[0];
         const uint32_t uploadWidth = static_cast<uint32_t>(rgba.cols);
         const uint32_t uploadHeight = static_cast<uint32_t>(rgba.rows);
-        if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE ||
-            texture.view == VK_NULL_HANDLE || texture.width != uploadWidth ||
-            texture.height != uploadHeight || texture.cudaExportMemorySize == 0) {
+        if (texture.image == VK_NULL_HANDLE || texture.memory == VK_NULL_HANDLE || texture.view == VK_NULL_HANDLE || texture.width != uploadWidth || texture.height != uploadHeight || texture.cudaExportMemorySize == 0) {
             try {
                 recreatePrimaryTextureForCuda(texture, uploadWidth, uploadHeight);
             } catch (const std::exception &ex) {
@@ -1384,18 +1256,11 @@ namespace mxvk {
 
         cudaStream_t cudaStream = cuda_stream_handle(stream);
         if (!texture.cudaUploadLogged) {
-            logVKAbstractModelStep(std::format(
-                "CUDA interop upload: copying {}x{} RGBA GpuMat to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes, copy row bytes={})",
-                rgba.cols, rgba.rows,
-                static_cast<unsigned long long>(rgba.step),
-                static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U)));
+            logVKAbstractModelStep(std::format("CUDA interop upload: copying {}x{} RGBA GpuMat to optimal-tiled Vulkan model texture via cudaArray (source pitch={} bytes, copy row bytes={})", rgba.cols, rgba.rows, static_cast<unsigned long long>(rgba.step), static_cast<unsigned long long>(static_cast<size_t>(rgba.cols) * 4U)));
             texture.cudaUploadLogged = true;
         }
 
-        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(
-            texture.cudaArray, 0, 0, rgba.ptr(), rgba.step,
-            static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows),
-            cudaMemcpyDeviceToDevice, cudaStream);
+        cudaError_t cudaResult = cudaMemcpy2DToArrayAsync(texture.cudaArray, 0, 0, rgba.ptr(), rgba.step, static_cast<size_t>(rgba.cols) * 4U, static_cast<size_t>(rgba.rows), cudaMemcpyDeviceToDevice, cudaStream);
         if (cudaResult != cudaSuccess) {
             logVKAbstractModelStep(std::format("CUDA interop model texture copy failed: {}", cudaGetErrorString(cudaResult)));
             return false;
@@ -1471,13 +1336,7 @@ namespace mxvk {
             destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         }
 
-        vkCmdPipelineBarrier(cmd,
-                             sourceStage,
-                             destinationStage,
-                             0,
-                             0, nullptr,
-                             0, nullptr,
-                             1, &barrier);
+        vkCmdPipelineBarrier(cmd, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
         endSingleTimeCommands(cmd);
     }
@@ -1510,9 +1369,7 @@ namespace mxvk {
         VkPhysicalDeviceProperties deviceProperties{};
         vkGetPhysicalDeviceProperties(windowPtr->getPhysicalDevice(), &deviceProperties);
         const bool anisotropySupported = deviceFeatures.samplerAnisotropy == VK_TRUE;
-        const float anisotropyLevel = anisotropySupported
-                                          ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy)
-                                          : 1.0f;
+        const float anisotropyLevel = anisotropySupported ? std::min(8.0f, deviceProperties.limits.maxSamplerAnisotropy) : 1.0f;
 
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1587,16 +1444,10 @@ namespace mxvk {
         }
 
         for (size_t i = 0; i < frameCount; ++i) {
-            createBuffer(sizeof(UniformBufferObject),
-                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         uniformBuffers[i], uniformBufferMemory[i]);
+            createBuffer(sizeof(UniformBufferObject), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBufferMemory[i]);
             vkMapMemory(windowPtr->getDevice(), uniformBufferMemory[i], 0, sizeof(UniformBufferObject), 0, &uniformBuffersMapped[i]);
             if (extendedFragmentUniformsEnabled) {
-                createBuffer(sizeof(ModelFragmentUniforms),
-                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                             fragmentUniformBuffers[i], fragmentUniformBufferMemory[i]);
+                createBuffer(sizeof(ModelFragmentUniforms), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, fragmentUniformBuffers[i], fragmentUniformBufferMemory[i]);
                 vkMapMemory(windowPtr->getDevice(), fragmentUniformBufferMemory[i], 0, sizeof(ModelFragmentUniforms), 0, &fragmentUniformBuffersMapped[i]);
             }
         }
@@ -1676,8 +1527,7 @@ namespace mxvk {
         const size_t frameCount = windowPtr->getSwapchainImageCount();
         const size_t setCount = textureCount * frameCount;
 
-        if (descriptorSetLayout == VK_NULL_HANDLE || frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty() ||
-            (extendedFragmentUniformsEnabled && fragmentUniformBuffers.size() < frameCount)) {
+        if (descriptorSetLayout == VK_NULL_HANDLE || frameCount == 0 || uniformBuffers.size() < frameCount || textures.empty() || (extendedFragmentUniformsEnabled && fragmentUniformBuffers.size() < frameCount)) {
             return;
         }
 
@@ -1691,10 +1541,7 @@ namespace mxvk {
             createDescriptorPool();
         }
 
-        const bool needsAllocation = descriptorSets.size() != setCount ||
-                                     std::any_of(descriptorSets.begin(), descriptorSets.end(), [](VkDescriptorSet set) {
-                                         return set == VK_NULL_HANDLE;
-                                     });
+        const bool needsAllocation = descriptorSets.size() != setCount || std::any_of(descriptorSets.begin(), descriptorSets.end(), [](VkDescriptorSet set) { return set == VK_NULL_HANDLE; });
 
         if (needsAllocation) {
             std::vector<VkDescriptorSetLayout> layouts(setCount, descriptorSetLayout);
@@ -1774,10 +1621,8 @@ namespace mxvk {
         }
     }
 
-    void VKAbstractModel::updateTextureDescriptor(
-        VkDescriptorSet descriptorSet, VkImageView imageView) const {
-        if (descriptorSet == VK_NULL_HANDLE || imageView == VK_NULL_HANDLE ||
-            textureSampler == VK_NULL_HANDLE) {
+    void VKAbstractModel::updateTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView) const {
+        if (descriptorSet == VK_NULL_HANDLE || imageView == VK_NULL_HANDLE || textureSampler == VK_NULL_HANDLE) {
             return;
         }
         const VkDescriptorImageInfo imageInfo{
@@ -1902,11 +1747,7 @@ namespace mxvk {
             depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
             VkPipelineColorBlendAttachmentState blendAttachment{};
-            blendAttachment.colorWriteMask =
-                VK_COLOR_COMPONENT_R_BIT |
-                VK_COLOR_COMPONENT_G_BIT |
-                VK_COLOR_COMPONENT_B_BIT |
-                VK_COLOR_COMPONENT_A_BIT;
+            blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             blendAttachment.blendEnable = alphaBlendingEnabled ? VK_TRUE : VK_FALSE;
             blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -1936,18 +1777,13 @@ namespace mxvk {
                 .size = sizeof(ModelFragmentPushConstants),
             };
             layoutInfo.pushConstantRangeCount = 1U;
-            layoutInfo.pPushConstantRanges = extendedFragmentUniformsEnabled
-                                                 ? &fragmentPushConstantRange
-                                                 : &vertexPushConstantRange;
+            layoutInfo.pPushConstantRanges = extendedFragmentUniformsEnabled ? &fragmentPushConstantRange : &vertexPushConstantRange;
 
             if (vkCreatePipelineLayout(windowPtr->getDevice(), &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
                 throw mxvk::Exception("VKAbstractModel failed to create pipeline layout");
             }
 
-            const VkFormat colorFormat =
-                colorAttachmentFormat != VK_FORMAT_UNDEFINED
-                    ? colorAttachmentFormat
-                    : windowPtr->getSwapchainFormat();
+            const VkFormat colorFormat = colorAttachmentFormat != VK_FORMAT_UNDEFINED ? colorAttachmentFormat : windowPtr->getSwapchainFormat();
             const VkFormat depthFormat = windowPtr->getDepthFormat();
             VkPipelineRenderingCreateInfo renderingInfo{};
             renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;

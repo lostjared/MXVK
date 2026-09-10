@@ -35,11 +35,7 @@ namespace space {
         [[nodiscard]] const std::string &status() const;
 
       private:
-        enum class Method {
-            None,
-            Upnp,
-            NatPmp
-        };
+        enum class Method { None, Upnp, NatPmp };
 
         Method method = Method::None;
         std::uint16_t private_port = 0;

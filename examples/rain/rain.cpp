@@ -107,9 +107,7 @@ namespace matrix {
         }
 
         std::function<SDL_Color()> make_tinted_head_color(SDL_Color base_color) {
-            return [base_color]() {
-                return SDL_Color{base_color.r, base_color.g, base_color.b, 255};
-            };
+            return [base_color]() { return SDL_Color{base_color.r, base_color.g, base_color.b, 255}; };
         }
     } // namespace
 
@@ -135,24 +133,11 @@ namespace matrix {
         return SDL_Color{r, g, b, a};
     }
 
-    SDL_Color Rain::head_color() {
-        return SDL_Color{208, 255, 200, 255};
-    }
+    SDL_Color Rain::head_color() { return SDL_Color{208, 255, 200, 255}; }
 
-    std::vector<Uint32> Rain::full_symbol_set() {
-        return {
-            0xFF66, 0xFF67, 0xFF68, 0xFF69, 0xFF6A, 0xFF6B, 0xFF6C, 0xFF6D,
-            0xFF6E, 0xFF6F, 0xFF71, 0xFF72, 0xFF73, 0xFF74, 0xFF75, 0xFF76,
-            0xFF77, 0xFF78, 0xFF79, 0xFF7A, 0xFF7B, 0xFF7C, 0xFF7D, 0xFF7E,
-            0xFF7F, 0xFF80, 0xFF81, 0xFF82, 0xFF83, 0xFF84, 0xFF85, 0xFF86,
-            0xFF87, 0xFF88, 0xFF89, 0xFF8A, 0xFF8B, 0xFF8C, 0xFF8D, 0xFF8E,
-            0xFF8F, 0xFF90, 0xFF91, 0xFF92, 0xFF93, 0xFF94, 0xFF95, 0xFF96,
-            0xFF97, 0xFF98, 0xFF99, 0xFF9A, 0xFF9B, 0xFF9C, 0xFF9D};
-    }
+    std::vector<Uint32> Rain::full_symbol_set() { return {0xFF66, 0xFF67, 0xFF68, 0xFF69, 0xFF6A, 0xFF6B, 0xFF6C, 0xFF6D, 0xFF6E, 0xFF6F, 0xFF71, 0xFF72, 0xFF73, 0xFF74, 0xFF75, 0xFF76, 0xFF77, 0xFF78, 0xFF79, 0xFF7A, 0xFF7B, 0xFF7C, 0xFF7D, 0xFF7E, 0xFF7F, 0xFF80, 0xFF81, 0xFF82, 0xFF83, 0xFF84, 0xFF85, 0xFF86, 0xFF87, 0xFF88, 0xFF89, 0xFF8A, 0xFF8B, 0xFF8C, 0xFF8D, 0xFF8E, 0xFF8F, 0xFF90, 0xFF91, 0xFF92, 0xFF93, 0xFF94, 0xFF95, 0xFF96, 0xFF97, 0xFF98, 0xFF99, 0xFF9A, 0xFF9B, 0xFF9C, 0xFF9D}; }
 
-    std::vector<Uint32> Rain::binary_symbol_set() {
-        return {U'0', U'1'};
-    }
+    std::vector<Uint32> Rain::binary_symbol_set() { return {U'0', U'1'}; }
 
     RainConfig make_matrix_rain_config(const std::string &asset_root, bool binary_glyph_mode) {
         RainConfig config;
@@ -163,16 +148,11 @@ namespace matrix {
         return config;
     }
 
-    Rain::Rain(mxvk::VK_Window &window, RainConfig rain_config)
-        : Rain(std::move(rain_config), SurfaceMode::window_driven) {
-        resize(window);
-    }
+    Rain::Rain(mxvk::VK_Window &window, RainConfig rain_config) : Rain(std::move(rain_config), SurfaceMode::window_driven) { resize(window); }
 
-    Rain::Rain(RainConfig rain_config)
-        : Rain(std::move(rain_config), SurfaceMode::explicit_default) {}
+    Rain::Rain(RainConfig rain_config) : Rain(std::move(rain_config), SurfaceMode::explicit_default) {}
 
-    Rain::Rain(RainConfig rain_config, SurfaceMode mode)
-        : config(std::move(rain_config)), rng(std::random_device{}()) {
+    Rain::Rain(RainConfig rain_config, SurfaceMode mode) : config(std::move(rain_config)), rng(std::random_device{}()) {
         if (config.font_path.empty()) {
             throw mxvk::Exception("Matrix rain requires a font_path");
         }
@@ -217,11 +197,9 @@ namespace matrix {
         last_frame = std::chrono::steady_clock::now();
     }
 
-    Rain::Rain(mxvk::VK_Window &window, const std::string &asset_root_path, const bool binary_glyph_mode)
-        : Rain(window, make_matrix_rain_config(asset_root_path, binary_glyph_mode)) {}
+    Rain::Rain(mxvk::VK_Window &window, const std::string &asset_root_path, const bool binary_glyph_mode) : Rain(window, make_matrix_rain_config(asset_root_path, binary_glyph_mode)) {}
 
-    Rain::Rain(const std::string &asset_root_path, const bool binary_glyph_mode)
-        : Rain(make_matrix_rain_config(asset_root_path, binary_glyph_mode), SurfaceMode::explicit_default) {}
+    Rain::Rain(const std::string &asset_root_path, const bool binary_glyph_mode) : Rain(make_matrix_rain_config(asset_root_path, binary_glyph_mode), SurfaceMode::explicit_default) {}
 
     Rain::~Rain() {
         glyphs.clear();
@@ -240,9 +218,7 @@ namespace matrix {
         }
     }
 
-    void Rain::resize(mxvk::VK_Window &window) {
-        rebuild_for_extent(window);
-    }
+    void Rain::resize(mxvk::VK_Window &window) { rebuild_for_extent(window); }
 
     void Rain::resize(int width, int height) {
         if (width <= 0 || height <= 0 || (canvas != nullptr && canvas->w == width && canvas->h == height)) {
@@ -291,9 +267,7 @@ namespace matrix {
         rain_sprite->drawSpriteRect(0, 0, width, height);
     }
 
-    void Rain::set_opacity(float value) {
-        opacity = std::clamp(value, 0.0f, 1.0f);
-    }
+    void Rain::set_opacity(float value) { opacity = std::clamp(value, 0.0f, 1.0f); }
 
     void Rain::reset() {
         clear_canvas();
@@ -320,33 +294,19 @@ namespace matrix {
         render(render_width, render_height);
     }
 
-    void Rain::on_swapchain_recreated(mxvk::VK_Window &window) {
-        resize(window);
-    }
+    void Rain::on_swapchain_recreated(mxvk::VK_Window &window) { resize(window); }
 
-    mxvk::VK_Sprite *Rain::sprite() const {
-        return rain_sprite;
-    }
+    mxvk::VK_Sprite *Rain::sprite() const { return rain_sprite; }
 
-    SDL_Surface *Rain::surface() const {
-        return canvas.get();
-    }
+    SDL_Surface *Rain::surface() const { return canvas.get(); }
 
-    const void *Rain::pixels() const {
-        return canvas != nullptr ? canvas->pixels : nullptr;
-    }
+    const void *Rain::pixels() const { return canvas != nullptr ? canvas->pixels : nullptr; }
 
-    int Rain::width() const {
-        return canvas != nullptr ? canvas->w : 0;
-    }
+    int Rain::width() const { return canvas != nullptr ? canvas->w : 0; }
 
-    int Rain::height() const {
-        return canvas != nullptr ? canvas->h : 0;
-    }
+    int Rain::height() const { return canvas != nullptr ? canvas->h : 0; }
 
-    int Rain::pitch() const {
-        return canvas != nullptr ? canvas->pitch : 0;
-    }
+    int Rain::pitch() const { return canvas != nullptr ? canvas->pitch : 0; }
 
     void Rain::load_glyphs() {
         const std::vector<Uint32> &symbols = config.symbols;
@@ -404,12 +364,8 @@ namespace matrix {
             return;
         }
 
-        const int target_width = (config.surface_width > 0)
-                                     ? config.surface_width
-                                     : std::max(1, static_cast<int>(std::lround(static_cast<float>(window_width) * config.surface_scale)));
-        const int target_height = (config.surface_height > 0)
-                                      ? config.surface_height
-                                      : std::max(1, static_cast<int>(std::lround(static_cast<float>(window_height) * config.surface_scale)));
+        const int target_width = (config.surface_width > 0) ? config.surface_width : std::max(1, static_cast<int>(std::lround(static_cast<float>(window_width) * config.surface_scale)));
+        const int target_height = (config.surface_height > 0) ? config.surface_height : std::max(1, static_cast<int>(std::lround(static_cast<float>(window_height) * config.surface_scale)));
 
         const bool resized = (canvas == nullptr || canvas->w != target_width || canvas->h != target_height);
         if (resized) {
@@ -511,8 +467,7 @@ namespace matrix {
                 level = config.glyph_levels;
             }
             level = std::clamp(level, 0, config.glyph_levels + 1);
-            const int glyph_index = (stream.glyphOffset + row * 17 + column * 11 + stream.shimmer + frame_counter / 3 + tail * 5) %
-                                    static_cast<int>(glyphs.size());
+            const int glyph_index = (stream.glyphOffset + row * 17 + column * 11 + stream.shimmer + frame_counter / 3 + tail * 5) % static_cast<int>(glyphs.size());
             const Glyph &glyph = glyphs[glyph_index < 0 ? glyph_index + static_cast<int>(glyphs.size()) : glyph_index];
             if (glyph.levels.empty()) {
                 continue;
@@ -526,12 +481,7 @@ namespace matrix {
 
             const int glyph_x = x + (cell_w - glyph.levels[level]->w) / 2;
             const int glyph_y = row * cell_h;
-            const int glow_alpha = static_cast<int>(
-                std::lround(((tail == 0)
-                                 ? config.head_glow_alpha
-                                 : (tail <= config.near_head_tail_threshold ? config.near_head_glow_alpha
-                                                                            : config.trail_glow_alpha)) *
-                            opacity));
+            const int glow_alpha = static_cast<int>(std::lround(((tail == 0) ? config.head_glow_alpha : (tail <= config.near_head_tail_threshold ? config.near_head_glow_alpha : config.trail_glow_alpha)) * opacity));
 
             SDL_SetSurfaceAlphaMod(surface, static_cast<Uint8>((glow_alpha * opacity_alpha) / 255));
             SDL_Rect glow_dst{glyph_x - 1, glyph_y, glyph.levels[level]->w, glyph.levels[level]->h};

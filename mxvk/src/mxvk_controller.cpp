@@ -13,9 +13,7 @@ namespace mxvk {
 
     VK_Joystick::VK_Joystick() = default;
 
-    VK_Joystick::~VK_Joystick() noexcept {
-        close();
-    }
+    VK_Joystick::~VK_Joystick() noexcept { close(); }
 
     int VK_Joystick::joysticks() {
         int count = 0;
@@ -86,9 +84,7 @@ namespace mxvk {
         throw mxvk::Exception("Invalid joystick handle");
     }
 
-    int VK_Joystick::joystickIndex() const {
-        return deviceIndex;
-    }
+    int VK_Joystick::joystickIndex() const { return deviceIndex; }
 
     bool VK_Joystick::getButton(const int button) const {
         if (stick == nullptr) {
@@ -137,9 +133,7 @@ namespace mxvk {
 
     VK_Controller::VK_Controller() = default;
 
-    VK_Controller::~VK_Controller() noexcept {
-        close();
-    }
+    VK_Controller::~VK_Controller() noexcept { close(); }
 
     int VK_Controller::joysticks() {
         int count = 0;
@@ -213,9 +207,7 @@ namespace mxvk {
         throw mxvk::Exception("Invalid controller handle");
     }
 
-    int VK_Controller::controllerIndex() const {
-        return deviceIndex;
-    }
+    int VK_Controller::controllerIndex() const { return deviceIndex; }
 
     bool VK_Controller::getButton(const SDL_GamepadButton button) const {
         if (stick == nullptr) {
@@ -243,9 +235,7 @@ namespace mxvk {
         return SDL_GetGamepadAxis(stick, axis);
     }
 
-    bool VK_Controller::active() const {
-        return stick != nullptr && SDL_GamepadConnected(stick);
-    }
+    bool VK_Controller::active() const { return stick != nullptr && SDL_GamepadConnected(stick); }
 
     bool VK_Controller::connectEvent(SDL_Event &e) {
         if (e.type == SDL_EVENT_GAMEPAD_ADDED) {

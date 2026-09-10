@@ -137,12 +137,7 @@ namespace {
     ConvertOptions parseArgs(int argc, char **argv) {
         ConvertOptions options{};
         Argz<std::string> parser(argc, argv);
-        parser.addOptionSingle('h', "Show help")
-            .addOptionSingleValue('i', "Input .mxmod or .mxmod.z model")
-            .addOptionSingleValue('t', "Texture manifest")
-            .addOptionSingleValue('b', "Texture base directory")
-            .addOptionSingleValue('o', "Output base name")
-            .addOptionSingleValue('s', "Uniform scale");
+        parser.addOptionSingle('h', "Show help").addOptionSingleValue('i', "Input .mxmod or .mxmod.z model").addOptionSingleValue('t', "Texture manifest").addOptionSingleValue('b', "Texture base directory").addOptionSingleValue('o', "Output base name").addOptionSingleValue('s', "Uniform scale");
 
         Argument<std::string> arg{};
         int code = 0;

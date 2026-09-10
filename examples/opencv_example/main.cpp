@@ -156,9 +156,7 @@ namespace example {
             initializeCameraRendering();
         }
 
-        ~ExampleWindow() override {
-            capture.close();
-        }
+        ~ExampleWindow() override { capture.close(); }
 
         void event(SDL_Event &e) override {
             if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE) {
@@ -166,9 +164,7 @@ namespace example {
             }
         }
 
-        void onSwapchainRecreated() override {
-            initializeCameraRendering();
-        }
+        void onSwapchainRecreated() override { initializeCameraRendering(); }
 
         void proc() override {
             if (camera_sprite == nullptr || !capture.readToSprite(*camera_sprite)) {

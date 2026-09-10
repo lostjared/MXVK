@@ -33,30 +33,9 @@ constexpr int FLASH_DURATION = 300;
 constexpr int SHADER_LEVEL_LINES = 10;
 constexpr int SHADER_LEVEL_COUNT = 4;
 
-enum {
-    BLOCK_BLACK = 0,
-    BLOCK_YELLOW,
-    BLOCK_ORANGE,
-    BLOCK_LTBLUE,
-    BLOCK_DBLUE,
-    BLOCK_PURPLE,
-    BLOCK_PINK,
-    BLOCK_GRAY,
-    BLOCK_RED,
-    BLOCK_GREEN,
-    BLOCK_CLEAR,
-    BLOCK_COUNT
-};
+enum { BLOCK_BLACK = 0, BLOCK_YELLOW, BLOCK_ORANGE, BLOCK_LTBLUE, BLOCK_DBLUE, BLOCK_PURPLE, BLOCK_PINK, BLOCK_GRAY, BLOCK_RED, BLOCK_GREEN, BLOCK_CLEAR, BLOCK_COUNT };
 
-enum ScreenState {
-    SCREEN_INTRO,
-    SCREEN_START,
-    SCREEN_GAME,
-    SCREEN_GAMEOVER,
-    SCREEN_OPTIONS,
-    SCREEN_CREDITS,
-    SCREEN_SCORES
-};
+enum ScreenState { SCREEN_INTRO, SCREEN_START, SCREEN_GAME, SCREEN_GAMEOVER, SCREEN_OPTIONS, SCREEN_CREDITS, SCREEN_SCORES };
 
 struct GameData {
     unsigned long score;
@@ -134,19 +113,13 @@ struct Score {
     std::string name;
     Score(std::string name, int score) : score(score), name(name) {}
     Score() : score{0}, name{} {}
-    auto operator<=>(const Score &s) const {
-        return s.score <=> score;
-    }
+    auto operator<=>(const Score &s) const { return s.score <=> score; }
 };
 
 class HighScores {
   public:
-    HighScores() {
-        read();
-    }
-    ~HighScores() {
-        write();
-    }
+    HighScores() { read(); }
+    ~HighScores() { write(); }
 
     void addScore(const std::string &name, int score) {
         scores.push_back({name, score});
@@ -156,9 +129,7 @@ class HighScores {
             scores.resize(10);
         }
     }
-    void sort() {
-        std::sort(scores.begin(), scores.end());
-    }
+    void sort() { std::sort(scores.begin(), scores.end()); }
 
     bool qualifiesForHighScore(int score) {
         if (scores.size() < 10)
@@ -166,9 +137,7 @@ class HighScores {
         return score > scores.back().score;
     }
 
-    const std::vector<Score> &getScores() const {
-        return scores;
-    }
+    const std::vector<Score> &getScores() const { return scores; }
 
     void init() {
         scores.clear();
@@ -258,11 +227,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
     static constexpr Uint32 JOY_REPEAT_DELAY = 150;
 
   public:
-    MasterPieceWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync)
-        : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync),
-          current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path),
-          w(wx),
-          h(wy) {
+    MasterPieceWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync) : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync), current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path), w(wx), h(wy) {
         tryOpenFirstGamepad();
         updateFontSize();
         srand((unsigned int)time(0));
@@ -279,11 +244,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
     void initGfx() {
         std::string vertShader = current_path + "/data/sprite_vert.spv";
         std::string fragShader = current_path + "/data/sprite_kaleidoscope.spv";
-        const char *fragShaders[SHADER_LEVEL_COUNT] = {
-            "sprite_kaleidoscope.spv",
-            "sprite_kaleidoscope2.spv",
-            "sprite_kaleidoscope3.spv",
-            "sprite_kaleidoscope4.spv"};
+        const char *fragShaders[SHADER_LEVEL_COUNT] = {"sprite_kaleidoscope.spv", "sprite_kaleidoscope2.spv", "sprite_kaleidoscope3.spv", "sprite_kaleidoscope4.spv"};
         for (int i = 0; i < SHADER_LEVEL_COUNT; i++) {
             gamebg[i] = createSprite(current_path + "/data/gamebg.png", vertShader, current_path + "/data/" + fragShaders[i]);
         }
@@ -292,10 +253,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
         creditScreen = createSprite(current_path + "/data/logo.png", current_path + "/data/sprite_vert.spv", current_path + "/data/sprite_time.spv");
         scoresBackground = createSprite(current_path + "/data/bg.png", current_path + "/data/sprite_vert.spv", current_path + "/data/sprite_time.spv");
 
-        const char *blockFiles[] = {
-            "block_black.png", "block_yellow.png", "block_orange.png", "block_ltblue.png",
-            "block_dblue.png", "block_purple.png", "block_pink.png", "block_gray.png",
-            "block_red.png", "block_green.png", "block_clear.png"};
+        const char *blockFiles[] = {"block_black.png", "block_yellow.png", "block_orange.png", "block_ltblue.png", "block_dblue.png", "block_purple.png", "block_pink.png", "block_gray.png", "block_red.png", "block_green.png", "block_clear.png"};
         for (int i = 0; i < BLOCK_COUNT; i++) {
             grid_blocks.push_back(createSprite(current_path + "/data/" + blockFiles[i], current_path + "/data/sprite_vert.spv", current_path + "/data/sprite_frag.spv"));
         }
@@ -364,17 +322,11 @@ class MasterPieceWindow : public mxvk::VK_Window {
         }
     }
 
-    int getCharWidth() {
-        return (int)(lastFontSize * 0.5f);
-    }
+    int getCharWidth() { return (int)(lastFontSize * 0.5f); }
 
-    int getMenuSpacing() {
-        return (int)(40.0f * ((float)h / 480.0f));
-    }
+    int getMenuSpacing() { return (int)(40.0f * ((float)h / 480.0f)); }
 
-    int scaleY(int baseY) {
-        return (int)(baseY * ((float)h / 480.0f));
-    }
+    int scaleY(int baseY) { return (int)(baseY * ((float)h / 480.0f)); }
 
     int centerX(const char *text) {
         int width, height;
@@ -649,8 +601,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
         for (int i = 0; i < GRID_WIDTH; i++) {
             for (int j = 0; j < GRID_HEIGHT; j++) {
                 int blockType = matrix.grid[i][j];
-                if (blockType > 0 && blockType < BLOCK_COUNT &&
-                    static_cast<size_t>(blockType) < grid_blocks.size()) {
+                if (blockType > 0 && blockType < BLOCK_COUNT && static_cast<size_t>(blockType) < grid_blocks.size()) {
                     int x = STARTX + i * (BLOCK_SIZE + BLOCK_SPACING);
                     int y = STARTY + j * (BLOCK_HEIGHT + BLOCK_SPACING) + 10;
 
@@ -659,9 +610,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
                     }
 
                     if (grid_blocks[blockType]) {
-                        grid_blocks[blockType]->drawSpriteRect(
-                            (int)(x * scaleX), (int)(y * scaleY) + 10,
-                            (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+                        grid_blocks[blockType]->drawSpriteRect((int)(x * scaleX), (int)(y * scaleY) + 10, (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
                     }
                 }
             }
@@ -677,14 +626,10 @@ class MasterPieceWindow : public mxvk::VK_Window {
 
             int screenY = STARTY + matrix.block.y * (BLOCK_HEIGHT + BLOCK_SPACING) + 10;
             for (int i = 0; i < 3; i++) {
-                int color = (i == 0) ? c1 : (i == 1) ? c2
-                                                     : c3;
+                int color = (i == 0) ? c1 : (i == 1) ? c2 : c3;
                 int bx = STARTX + (matrix.block.x + i) * (BLOCK_SIZE + BLOCK_SPACING);
-                if (matrix.block.x + i >= 0 && matrix.block.x + i < GRID_WIDTH &&
-                    color > 0 && color < BLOCK_COUNT && grid_blocks[color]) {
-                    grid_blocks[color]->drawSpriteRect(
-                        (int)(bx * scaleX), (int)(screenY * scaleY),
-                        (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+                if (matrix.block.x + i >= 0 && matrix.block.x + i < GRID_WIDTH && color > 0 && color < BLOCK_COUNT && grid_blocks[color]) {
+                    grid_blocks[color]->drawSpriteRect((int)(bx * scaleX), (int)(screenY * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
                 }
             }
         } else {
@@ -696,21 +641,15 @@ class MasterPieceWindow : public mxvk::VK_Window {
 
             if (y0 >= 0 && c1 > 0 && c1 < BLOCK_COUNT && grid_blocks[c1]) {
                 int screenY = STARTY + y0 * (BLOCK_HEIGHT + BLOCK_SPACING) + 10;
-                grid_blocks[c1]->drawSpriteRect(
-                    (int)(bx * scaleX), (int)(screenY * scaleY),
-                    (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+                grid_blocks[c1]->drawSpriteRect((int)(bx * scaleX), (int)(screenY * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
             }
             if (y1 >= 0 && c2 > 0 && c2 < BLOCK_COUNT && grid_blocks[c2]) {
                 int screenY = STARTY + y1 * (BLOCK_HEIGHT + BLOCK_SPACING) + 10;
-                grid_blocks[c2]->drawSpriteRect(
-                    (int)(bx * scaleX), (int)(screenY * scaleY),
-                    (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+                grid_blocks[c2]->drawSpriteRect((int)(bx * scaleX), (int)(screenY * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
             }
             if (y2 >= 0 && c3 > 0 && c3 < BLOCK_COUNT && grid_blocks[c3]) {
                 int screenY = STARTY + y2 * (BLOCK_HEIGHT + BLOCK_SPACING) + 10;
-                grid_blocks[c3]->drawSpriteRect(
-                    (int)(bx * scaleX), (int)(screenY * scaleY),
-                    (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+                grid_blocks[c3]->drawSpriteRect((int)(bx * scaleX), (int)(screenY * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
             }
         }
     }
@@ -725,19 +664,13 @@ class MasterPieceWindow : public mxvk::VK_Window {
         int c3 = matrix.nextblock.color.c3;
 
         if (c1 > 0 && c1 < BLOCK_COUNT && grid_blocks[c1]) {
-            grid_blocks[c1]->drawSpriteRect(
-                (int)(bx * scaleX), (int)(by * scaleY),
-                (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+            grid_blocks[c1]->drawSpriteRect((int)(bx * scaleX), (int)(by * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
         }
         if (c2 > 0 && c2 < BLOCK_COUNT && grid_blocks[c2]) {
-            grid_blocks[c2]->drawSpriteRect(
-                (int)(bx * scaleX), (int)((by + BLOCK_HEIGHT + BLOCK_SPACING) * scaleY),
-                (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+            grid_blocks[c2]->drawSpriteRect((int)(bx * scaleX), (int)((by + BLOCK_HEIGHT + BLOCK_SPACING) * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
         }
         if (c3 > 0 && c3 < BLOCK_COUNT && grid_blocks[c3]) {
-            grid_blocks[c3]->drawSpriteRect(
-                (int)(bx * scaleX), (int)((by + (BLOCK_HEIGHT + BLOCK_SPACING) * 2) * scaleY),
-                (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
+            grid_blocks[c3]->drawSpriteRect((int)(bx * scaleX), (int)((by + (BLOCK_HEIGHT + BLOCK_SPACING) * 2) * scaleY), (int)(BLOCK_SIZE * scaleX), (int)(BLOCK_HEIGHT * scaleY));
         }
     }
 
@@ -939,8 +872,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
                 if (matrix.grid[i][j] > 0) {
                     int color = matrix.grid[i][j];
                     int count = 1;
-                    while (i + count < GRID_WIDTH && j + count < GRID_HEIGHT &&
-                           matrix.grid[i + count][j + count] == color) {
+                    while (i + count < GRID_WIDTH && j + count < GRID_HEIGHT && matrix.grid[i + count][j + count] == color) {
                         count++;
                     }
                     if (count >= 3) {
@@ -963,8 +895,7 @@ class MasterPieceWindow : public mxvk::VK_Window {
                 if (matrix.grid[i][j] > 0) {
                     int color = matrix.grid[i][j];
                     int count = 1;
-                    while (i - count >= 0 && j + count < GRID_HEIGHT &&
-                           matrix.grid[i - count][j + count] == color) {
+                    while (i - count >= 0 && j + count < GRID_HEIGHT && matrix.grid[i - count][j + count] == color) {
                         count++;
                     }
                     if (count >= 3) {

@@ -51,13 +51,9 @@ namespace mxvk {
             if (exponent == 0U) {
                 result = std::ldexp(static_cast<float>(mantissa), -24);
             } else if (exponent == 31U) {
-                result = mantissa == 0U
-                             ? std::numeric_limits<float>::infinity()
-                             : std::numeric_limits<float>::quiet_NaN();
+                result = mantissa == 0U ? std::numeric_limits<float>::infinity() : std::numeric_limits<float>::quiet_NaN();
             } else {
-                result = std::ldexp(
-                    1.0F + static_cast<float>(mantissa) / 1024.0F,
-                    static_cast<int>(exponent) - 15);
+                result = std::ldexp(1.0F + static_cast<float>(mantissa) / 1024.0F, static_cast<int>(exponent) - 15);
             }
             return negative ? -result : result;
         }
@@ -69,9 +65,7 @@ namespace mxvk {
     } // namespace
 
     VKAPI_ATTR VkBool32 VKAPI_CALL VK_Window::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT *callback_data, [[maybe_unused]] void *user_data) {
-        const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr)
-                                  ? callback_data->pMessage
-                                  : "Unknown Vulkan validation message";
+        const char *message = (callback_data != nullptr && callback_data->pMessage != nullptr) ? callback_data->pMessage : "Unknown Vulkan validation message";
 
         if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0U) {
             std::cerr << std::format("vk validation error: {}\n", message);
@@ -109,11 +103,7 @@ namespace mxvk {
         vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, nullptr);
         if (present_mode_count > 0U) {
             support.present_modes.resize(present_mode_count);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(
-                device,
-                surface,
-                &present_mode_count,
-                support.present_modes.data());
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, support.present_modes.data());
         }
 
         return support;
@@ -153,25 +143,15 @@ namespace mxvk {
         SDL_GetWindowSizeInPixels(window, &width, &height);
 
         VkExtent2D actual_extent{};
-        actual_extent.width = std::clamp(
-            static_cast<uint32_t>(std::max(width, 1)),
-            capabilities.minImageExtent.width,
-            capabilities.maxImageExtent.width);
-        actual_extent.height = std::clamp(
-            static_cast<uint32_t>(std::max(height, 1)),
-            capabilities.minImageExtent.height,
-            capabilities.maxImageExtent.height);
+        actual_extent.width = std::clamp(static_cast<uint32_t>(std::max(width, 1)), capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actual_extent.height = std::clamp(static_cast<uint32_t>(std::max(height, 1)), capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
         return actual_extent;
     }
 
-    std::vector<char> VK_Window::loadSpv(const std::string &path) {
-        return mxvk::load_spv(path);
-    }
+    std::vector<char> VK_Window::loadSpv(const std::string &path) { return mxvk::load_spv(path); }
 
-    VkShaderModule VK_Window::createShaderModule(VkDevice device, const std::vector<char> &spv_bytes) {
-        return mxvk::create_shader_module(device, spv_bytes);
-    }
+    VkShaderModule VK_Window::createShaderModule(VkDevice device, const std::vector<char> &spv_bytes) { return mxvk::create_shader_module(device, spv_bytes); }
 
     std::string VK_Window::resolveRuntimeShaderPath(const std::string &shaderFileName, const char *fallbackDir) const {
         if (shaderFileName.empty()) {
@@ -180,13 +160,11 @@ namespace mxvk {
 
         std::vector<std::filesystem::path> candidates{};
 
-        const auto add_executable_candidates =
-            [&candidates, &shaderFileName](const std::filesystem::path &executableDir) {
-                candidates.push_back(executableDir / "data" / shaderFileName);
-                candidates.push_back(executableDir / shaderFileName);
-                candidates.push_back(executableDir.parent_path() / "share" / "mxvk" /
-                                     "shaders" / shaderFileName);
-            };
+        const auto add_executable_candidates = [&candidates, &shaderFileName](const std::filesystem::path &executableDir) {
+            candidates.push_back(executableDir / "data" / shaderFileName);
+            candidates.push_back(executableDir / shaderFileName);
+            candidates.push_back(executableDir.parent_path() / "share" / "mxvk" / "shaders" / shaderFileName);
+        };
 
         if (const char *basePath = SDL_GetBasePath(); basePath != nullptr) {
             add_executable_candidates(std::filesystem::path(basePath));
@@ -194,14 +172,9 @@ namespace mxvk {
 
 #ifdef _WIN32
         std::vector<wchar_t> executableName(MAX_PATH);
-        const DWORD executableLength = GetModuleFileNameW(
-            nullptr, executableName.data(),
-            static_cast<DWORD>(executableName.size()));
-        if (executableLength > 0U &&
-            executableLength < executableName.size() - 1U) {
-            add_executable_candidates(std::filesystem::path(
-                                          std::wstring(executableName.data(), executableLength))
-                                          .parent_path());
+        const DWORD executableLength = GetModuleFileNameW(nullptr, executableName.data(), static_cast<DWORD>(executableName.size()));
+        if (executableLength > 0U && executableLength < executableName.size() - 1U) {
+            add_executable_candidates(std::filesystem::path(std::wstring(executableName.data(), executableLength)).parent_path());
         }
 #endif
 
@@ -229,23 +202,13 @@ namespace mxvk {
         throw mxvk::Exception(std::format("Failed to locate shader file '{}'", shaderFileName));
     }
 
-    VK_Window::VK_Window(const std::string &title, int width, int height,
-                         bool full, bool validiation,
-                         PresentModePreference presentModePreference,
-                         RuntimeMode runtimeMode)
-        : runtime_mode(runtimeMode),
-          requested_headless_extent{
-              width > 0 ? static_cast<uint32_t>(width) : 0U,
-              height > 0 ? static_cast<uint32_t>(height) : 0U},
-          present_mode_preference(presentModePreference) {
+    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, PresentModePreference presentModePreference, RuntimeMode runtimeMode) : runtime_mode(runtimeMode), requested_headless_extent{width > 0 ? static_cast<uint32_t>(width) : 0U, height > 0 ? static_cast<uint32_t>(height) : 0U}, present_mode_preference(presentModePreference) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("Render dimensions must be positive");
         }
         setEnableScreenshot(defaultEnableScreenshot());
         screenshot_prefix = defaultExecutableName();
-        std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={}, mode={})\n",
-                                 title, width, height, full, validiation,
-                                 headless() ? "headless" : "windowed");
+        std::cout << std::format("mxvk: starting VK_Window construction (title='{}', width={}, height={}, fullscreen={}, validation={}, mode={})\n", title, width, height, full, validiation, headless() ? "headless" : "windowed");
         SDL_WindowFlags flags = static_cast<SDL_WindowFlags>(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
         if (full) {
             std::cout << "SDL3: enabling fullscreen window flag\n";
@@ -270,8 +233,7 @@ namespace mxvk {
         std::cout << "mxvk: VK_Window construction complete\n";
     }
 
-    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync)
-        : VK_Window(title, width, height, full, validiation, enableVsync ? PresentModePreference::Vsync : PresentModePreference::LowLatency) {}
+    VK_Window::VK_Window(const std::string &title, int width, int height, bool full, bool validiation, bool enableVsync) : VK_Window(title, width, height, full, validiation, enableVsync ? PresentModePreference::Vsync : PresentModePreference::LowLatency) {}
 
     VK_Window::~VK_Window() {
         std::cout << "mxvk: destructor invoked, releasing resources\n";
@@ -419,38 +381,27 @@ namespace mxvk {
             }
         } else {
             std::cout << "vk: initializing volk from SDL's Vulkan loader\n";
-            const auto get_instance_proc_addr =
-                reinterpret_cast<PFN_vkGetInstanceProcAddr>(
-                    SDL_Vulkan_GetVkGetInstanceProcAddr());
+            const auto get_instance_proc_addr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(SDL_Vulkan_GetVkGetInstanceProcAddr());
             if (get_instance_proc_addr == nullptr) {
-                std::cerr << std::format(
-                    "mxvk: SDL did not provide vkGetInstanceProcAddr: {}\n",
-                    SDL_GetError());
+                std::cerr << std::format("mxvk: SDL did not provide vkGetInstanceProcAddr: {}\n", SDL_GetError());
                 return false;
             }
             volkInitializeCustom(get_instance_proc_addr);
 
             unsigned int extension_count = 0;
             std::cout << "SDL3: querying Vulkan instance extensions required by SDL\n";
-            const char *const *extensions =
-                SDL_Vulkan_GetInstanceExtensions(&extension_count);
+            const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extension_count);
             if (extensions == nullptr || extension_count == 0U) {
-                std::cerr << std::format(
-                    "mxvk: Failed to get Vulkan instance extensions: {}\n",
-                    SDL_GetError());
+                std::cerr << std::format("mxvk: Failed to get Vulkan instance extensions: {}\n", SDL_GetError());
                 return false;
             }
-            std::cout << std::format(
-                "vk: SDL provided {} required instance extension(s)\n",
-                extension_count);
+            std::cout << std::format("vk: SDL provided {} required instance extension(s)\n", extension_count);
             enabled_extensions.assign(extensions, extensions + extension_count);
         }
 
 #if defined(MXVK_USE_MOLTENVK)
         const auto append_instance_extension_if_missing = [&enabled_extensions](const char *extension_name) {
-            const bool exists = std::ranges::any_of(
-                enabled_extensions,
-                [extension_name](const char *existing) { return std::strcmp(existing, extension_name) == 0; });
+            const bool exists = std::ranges::any_of(enabled_extensions, [extension_name](const char *existing) { return std::strcmp(existing, extension_name) == 0; });
             if (!exists) {
                 enabled_extensions.push_back(extension_name);
             }
@@ -464,16 +415,13 @@ namespace mxvk {
         if (validation_enabled) {
             if (!hasValidationLayerSupport()) {
                 if (shouldLogMissingValidationLayer()) {
-                    std::cerr << std::format(
-                        "mxvk: validation layer '{}' is not available; continuing without validation\n",
-                        validation_layer_name);
+                    std::cerr << std::format("mxvk: validation layer '{}' is not available; continuing without validation\n", validation_layer_name);
                 }
                 validation_enabled = false;
             } else {
                 enabled_layers.push_back(validation_layer_name);
                 enabled_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-                const std::optional<VkDebugUtilsMessengerCreateInfoEXT> maybe_debug_create_info =
-                    makeDebugMessengerCreateInfo();
+                const std::optional<VkDebugUtilsMessengerCreateInfoEXT> maybe_debug_create_info = makeDebugMessengerCreateInfo();
                 if (!maybe_debug_create_info.has_value()) {
                     std::cerr << "mxvk: failed to construct debug messenger create info\n";
                     validation_enabled = false;
@@ -495,8 +443,7 @@ namespace mxvk {
         VkInstanceCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         create_info.pApplicationInfo = &app_info;
-        create_info.enabledExtensionCount =
-            static_cast<uint32_t>(enabled_extensions.size());
+        create_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
         create_info.ppEnabledExtensionNames = enabled_extensions.data();
         create_info.enabledLayerCount = static_cast<uint32_t>(enabled_layers.size());
         create_info.ppEnabledLayerNames = enabled_layers.empty() ? nullptr : enabled_layers.data();
@@ -523,22 +470,13 @@ namespace mxvk {
         if (vkEnumerateInstanceVersion != nullptr) {
             vkEnumerateInstanceVersion(&instanceVersion);
         }
-        std::cout << "vk: Vulkan instance version: "
-                  << VK_VERSION_MAJOR(instanceVersion) << "."
-                  << VK_VERSION_MINOR(instanceVersion) << "."
-                  << VK_VERSION_PATCH(instanceVersion) << "\n";
-        std::cout << "mxvk: engine version: "
-                  << MXVK_VERSION_CODE_MAJOR << "."
-                  << MXVK_VERSION_CODE_MINOR << "."
-                  << MXVK_VERSION_CODE_PATCH << "\n";
+        std::cout << "vk: Vulkan instance version: " << VK_VERSION_MAJOR(instanceVersion) << "." << VK_VERSION_MINOR(instanceVersion) << "." << VK_VERSION_PATCH(instanceVersion) << "\n";
+        std::cout << "mxvk: engine version: " << MXVK_VERSION_CODE_MAJOR << "." << MXVK_VERSION_CODE_MINOR << "." << MXVK_VERSION_CODE_PATCH << "\n";
 
         if (!headless()) {
             std::cout << "SDL3: creating Vulkan presentation surface from SDL window\n";
-            if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr,
-                                          &surface)) {
-                std::cerr << std::format(
-                    "mxvk: Failed to create Vulkan surface: {}\n",
-                    SDL_GetError());
+            if (!SDL_Vulkan_CreateSurface(window.get(), instance, nullptr, &surface)) {
+                std::cerr << std::format("mxvk: Failed to create Vulkan surface: {}\n", SDL_GetError());
                 cleanupDebugMessenger();
                 vkDestroyInstance(instance, nullptr);
                 instance = VK_NULL_HANDLE;
@@ -592,11 +530,7 @@ namespace mxvk {
         }
 
         std::ostringstream filename;
-        filename << "pipeline_cache_"
-                 << std::hex << std::setfill('0')
-                 << properties.vendorID << '_'
-                 << properties.deviceID << '_'
-                 << properties.driverVersion << '_';
+        filename << "pipeline_cache_" << std::hex << std::setfill('0') << properties.vendorID << '_' << properties.deviceID << '_' << properties.driverVersion << '_';
         for (uint8_t byte : properties.pipelineCacheUUID) {
             filename << std::setw(2) << static_cast<unsigned>(byte);
         }
@@ -741,9 +675,7 @@ namespace mxvk {
                     if ((e.key.key == SDLK_F12 || e.key.scancode == SDL_SCANCODE_F12) && !e.key.repeat) {
                         toggleFpsCounter();
                     }
-                    if (screenshot_enabled &&
-                        (e.key.key == SDLK_F10 || e.key.scancode == SDL_SCANCODE_F10) &&
-                        !e.key.repeat) {
+                    if (screenshot_enabled && (e.key.key == SDLK_F10 || e.key.scancode == SDL_SCANCODE_F10) && !e.key.repeat) {
                         try {
                             saveScreenshot();
                         } catch (const mxvk::Exception &ex) {
@@ -761,9 +693,7 @@ namespace mxvk {
             }
             if (framebuffer_resized) {
                 const uint64_t now_ms = SDL_GetTicks();
-                if (!force_swapchain_recreate &&
-                    last_resize_event_ms != 0 &&
-                    (now_ms - last_resize_event_ms) < resize_settle_delay_ms) {
+                if (!force_swapchain_recreate && last_resize_event_ms != 0 && (now_ms - last_resize_event_ms) < resize_settle_delay_ms) {
                     proc();
                     render();
                     SDL_Delay(1);
@@ -838,9 +768,7 @@ namespace mxvk {
             ScreenshotSaveTask task{};
             {
                 std::unique_lock<std::mutex> lock(screenshot_queue_mutex);
-                screenshot_queue_cv.wait(lock, [&]() {
-                    return screenshot_worker_stop || !screenshot_save_queue.empty();
-                });
+                screenshot_queue_cv.wait(lock, [&]() { return screenshot_worker_stop || !screenshot_save_queue.empty(); });
 
                 if (screenshot_worker_stop && screenshot_save_queue.empty()) {
                     return;
@@ -850,10 +778,7 @@ namespace mxvk {
                 screenshot_save_queue.pop_front();
             }
 
-            if (!mxvk::SavePNG_RGBA(task.path.c_str(),
-                                    task.rgba.data(),
-                                    static_cast<int>(task.width),
-                                    static_cast<int>(task.height))) {
+            if (!mxvk::SavePNG_RGBA(task.path.c_str(), task.rgba.data(), static_cast<int>(task.width), static_cast<int>(task.height))) {
                 std::cerr << std::format("mxvk: screenshot failed to write PNG: {}\n", task.path);
                 continue;
             }
@@ -863,9 +788,7 @@ namespace mxvk {
 
     std::string VK_Window::makeScreenshotPath() {
         const char *home = std::getenv("HOME");
-        std::filesystem::path pictures_dir = (home != nullptr && home[0] != '\0')
-                                                 ? std::filesystem::path(home) / "Pictures"
-                                                 : std::filesystem::path("Pictures");
+        std::filesystem::path pictures_dir = (home != nullptr && home[0] != '\0') ? std::filesystem::path(home) / "Pictures" : std::filesystem::path("Pictures");
         std::filesystem::create_directories(pictures_dir);
 
         const std::time_t now = std::time(nullptr);
@@ -881,12 +804,7 @@ namespace mxvk {
         std::ostringstream time_stream;
         time_stream << std::put_time(&local_time, "%H.%M.%S");
 
-        const std::string prefix = std::format("{}.screenshot.{}.{}.{}x{}-",
-                                               screenshot_prefix.empty() ? "mxvk" : screenshot_prefix,
-                                               date_stream.str(),
-                                               time_stream.str(),
-                                               swapchain_extent.width,
-                                               swapchain_extent.height);
+        const std::string prefix = std::format("{}.screenshot.{}.{}.{}x{}-", screenshot_prefix.empty() ? "mxvk" : screenshot_prefix, date_stream.str(), time_stream.str(), swapchain_extent.width, swapchain_extent.height);
 
         for (uint32_t attempt = 0; attempt < 10000U; ++attempt) {
             const uint32_t index = screenshot_index++;
@@ -899,9 +817,7 @@ namespace mxvk {
         return (pictures_dir / std::format("{}{}.png", prefix, screenshot_index++)).string();
     }
 
-    void VK_Window::render() {
-        drawFrame();
-    }
+    void VK_Window::render() { drawFrame(); }
 
     void VK_Window::saveSnapshot(const std::string &path) {
         if (path.empty()) {
@@ -913,10 +829,7 @@ namespace mxvk {
         uint32_t height = 0;
         captureSnapshotPixels(rgba, width, height);
 
-        if (!mxvk::SavePNG_RGBA(path.c_str(),
-                                rgba.data(),
-                                static_cast<int>(width),
-                                static_cast<int>(height))) {
+        if (!mxvk::SavePNG_RGBA(path.c_str(), rgba.data(), static_cast<int>(width), static_cast<int>(height))) {
             throw mxvk::Exception("saveSnapshot failed to write PNG: " + path);
         }
     }
@@ -930,13 +843,7 @@ namespace mxvk {
         }
         if (!latest_frame_readback_rgba16.empty()) {
             rgba_pixels.resize(latest_frame_readback_rgba16.size());
-            std::transform(
-                latest_frame_readback_rgba16.begin(),
-                latest_frame_readback_rgba16.end(), rgba_pixels.begin(),
-                [](std::uint16_t value) {
-                    return static_cast<std::uint8_t>(
-                        (static_cast<std::uint32_t>(value) + 128U) / 257U);
-                });
+            std::transform(latest_frame_readback_rgba16.begin(), latest_frame_readback_rgba16.end(), rgba_pixels.begin(), [](std::uint16_t value) { return static_cast<std::uint8_t>((static_cast<std::uint32_t>(value) + 128U) / 257U); });
             width = latest_frame_readback_width;
             height = latest_frame_readback_height;
             return;
@@ -944,55 +851,28 @@ namespace mxvk {
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || graphics_queue == VK_NULL_HANDLE) {
             throw mxvk::Exception("captureSnapshotPixels called before Vulkan render resources are ready");
         }
-        if (last_presented_image_index == invalid_queue_index ||
-            last_presented_image_index >= swapchain_images.size() ||
-            last_presented_image_index >= image_fences.size()) {
+        if (last_presented_image_index == invalid_queue_index || last_presented_image_index >= swapchain_images.size() || last_presented_image_index >= image_fences.size()) {
             throw mxvk::Exception("captureSnapshotPixels called before a frame has been presented");
         }
-        const bool capture_offscreen =
-            render_extent_override.width > 0U &&
-            render_extent_override.height > 0U &&
-            !post_process_images.empty() &&
-            !post_process_initialized.empty() &&
-            last_presented_image_index < post_process_images.front().size() &&
-            last_presented_image_index <
-                post_process_initialized.front().size() &&
-            post_process_images.front()[last_presented_image_index] !=
-                VK_NULL_HANDLE &&
-            post_process_initialized.front()[last_presented_image_index];
+        const bool capture_offscreen = render_extent_override.width > 0U && render_extent_override.height > 0U && !post_process_images.empty() && !post_process_initialized.empty() && last_presented_image_index < post_process_images.front().size() && last_presented_image_index < post_process_initialized.front().size() && post_process_images.front()[last_presented_image_index] != VK_NULL_HANDLE && post_process_initialized.front()[last_presented_image_index];
         if (!capture_offscreen && !swapchain_supports_transfer_src) {
-            throw mxvk::Exception(
-                "captureSnapshotPixels requires swapchain transfer-source support");
+            throw mxvk::Exception("captureSnapshotPixels requires swapchain transfer-source support");
         }
-        const VkExtent2D source_extent =
-            capture_offscreen ? getRenderExtent() : swapchain_extent;
-        const VkImage source_image =
-            capture_offscreen
-                ? post_process_images.front()[last_presented_image_index]
-                : swapchain_images[last_presented_image_index];
-        const VkImageLayout source_layout =
-            capture_offscreen
-                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            : headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                         : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        const VkExtent2D source_extent = capture_offscreen ? getRenderExtent() : swapchain_extent;
+        const VkImage source_image = capture_offscreen ? post_process_images.front()[last_presented_image_index] : swapchain_images[last_presented_image_index];
+        const VkImageLayout source_layout = capture_offscreen ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         if (source_extent.width == 0U || source_extent.height == 0U) {
             throw mxvk::Exception("captureSnapshotPixels cannot capture an empty swapchain extent");
         }
 
-        const bool format_is_bgra =
-            swapchain_format == VK_FORMAT_B8G8R8A8_UNORM ||
-            swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
-        const bool format_is_rgba =
-            swapchain_format == VK_FORMAT_R8G8B8A8_UNORM ||
-            swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
+        const bool format_is_bgra = swapchain_format == VK_FORMAT_B8G8R8A8_UNORM || swapchain_format == VK_FORMAT_B8G8R8A8_SRGB;
+        const bool format_is_rgba = swapchain_format == VK_FORMAT_R8G8B8A8_UNORM || swapchain_format == VK_FORMAT_R8G8B8A8_SRGB;
         if (!format_is_bgra && !format_is_rgba) {
             throw mxvk::Exception(std::format("captureSnapshotPixels unsupported swapchain format: {}", static_cast<int>(swapchain_format)));
         }
 
-        const VkDeviceSize row_bytes =
-            static_cast<VkDeviceSize>(source_extent.width) * 4U;
-        const VkDeviceSize image_bytes =
-            row_bytes * static_cast<VkDeviceSize>(source_extent.height);
+        const VkDeviceSize row_bytes = static_cast<VkDeviceSize>(source_extent.width) * 4U;
+        const VkDeviceSize image_bytes = row_bytes * static_cast<VkDeviceSize>(source_extent.height);
 
         VkBuffer readback_buffer = VK_NULL_HANDLE;
         VkDeviceMemory readback_memory = VK_NULL_HANDLE;
@@ -1030,19 +910,12 @@ namespace mxvk {
             VkPhysicalDeviceMemoryProperties memory_properties{};
             vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
             uint32_t memory_type_index = invalid_queue_index;
-            constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES =
-                REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-            for (VkMemoryPropertyFlags properties :
-                 {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
-                for (uint32_t index = 0;
-                     index < memory_properties.memoryTypeCount; ++index) {
-                    const bool type_matches =
-                        (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
-                    const bool properties_match =
-                        (memory_properties.memoryTypes[index].propertyFlags &
-                         properties) == properties;
+            constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES = REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+            for (VkMemoryPropertyFlags properties : {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
+                for (uint32_t index = 0; index < memory_properties.memoryTypeCount; ++index) {
+                    const bool type_matches = (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+                    const bool properties_match = (memory_properties.memoryTypes[index].propertyFlags & properties) == properties;
                     if (type_matches && properties_match) {
                         memory_type_index = index;
                         break;
@@ -1104,16 +977,8 @@ namespace mxvk {
 
             VkImageMemoryBarrier2 to_transfer_barrier{};
             to_transfer_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_transfer_barrier.srcStageMask =
-                capture_offscreen
-                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
-                : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-                             : VK_PIPELINE_STAGE_2_NONE;
-            to_transfer_barrier.srcAccessMask =
-                capture_offscreen
-                    ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                             : VK_ACCESS_2_NONE;
+            to_transfer_barrier.srcStageMask = capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_2_NONE;
+            to_transfer_barrier.srcAccessMask = capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_NONE;
             to_transfer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_transfer_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             to_transfer_barrier.oldLayout = source_layout;
@@ -1142,29 +1007,15 @@ namespace mxvk {
             copy_region.imageSubresource.baseArrayLayer = 0;
             copy_region.imageSubresource.layerCount = 1;
             copy_region.imageOffset = {0, 0, 0};
-            copy_region.imageExtent = {source_extent.width, source_extent.height,
-                                       1};
-            vkCmdCopyImageToBuffer(command_buffer,
-                                   source_image,
-                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   readback_buffer,
-                                   1,
-                                   &copy_region);
+            copy_region.imageExtent = {source_extent.width, source_extent.height, 1};
+            vkCmdCopyImageToBuffer(command_buffer, source_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback_buffer, 1, &copy_region);
 
             VkImageMemoryBarrier2 to_present_barrier{};
             to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             to_present_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_present_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            to_present_barrier.dstStageMask =
-                capture_offscreen
-                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
-                : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-                             : VK_PIPELINE_STAGE_2_NONE;
-            to_present_barrier.dstAccessMask =
-                capture_offscreen
-                    ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                             : VK_ACCESS_2_NONE;
+            to_present_barrier.dstStageMask = capture_offscreen ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : headless() ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : VK_PIPELINE_STAGE_2_NONE;
+            to_present_barrier.dstAccessMask = capture_offscreen ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : headless() ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_NONE;
             to_present_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_present_barrier.newLayout = source_layout;
             to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -1231,18 +1082,11 @@ namespace mxvk {
         cleanup();
     }
 
-    void VK_Window::onFrameReadback(
-        [[maybe_unused]] std::vector<std::uint8_t> &rgba_pixels,
-        [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
-    }
+    void VK_Window::onFrameReadback([[maybe_unused]] std::vector<std::uint8_t> &rgba_pixels, [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {}
 
-    void VK_Window::onFrameReadbackRgba16(
-        [[maybe_unused]] std::vector<std::uint16_t> &rgba_pixels,
-        [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {
-    }
+    void VK_Window::onFrameReadbackRgba16([[maybe_unused]] std::vector<std::uint16_t> &rgba_pixels, [[maybe_unused]] uint32_t width, [[maybe_unused]] uint32_t height) {}
 
-    void VK_Window::onFrameReadbackScheduled() {
-    }
+    void VK_Window::onFrameReadbackScheduled() {}
 
     void VK_Window::dispatchFrameReadback(FrameReadbackSlot &slot) {
         if (!slot.pending) {
@@ -1255,33 +1099,23 @@ namespace mxvk {
 
         if (slot.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
             const auto *source = static_cast<const std::uint16_t *>(slot.mapped);
-            const std::size_t component_count =
-                static_cast<std::size_t>(slot.width) * slot.height * 4U;
+            const std::size_t component_count = static_cast<std::size_t>(slot.width) * slot.height * 4U;
             latest_frame_readback_rgba16.resize(component_count);
-            for (std::size_t component = 0; component < component_count;
-                 ++component) {
-                const float normalized =
-                    std::clamp(half_to_float(source[component]), 0.0F, 1.0F);
-                latest_frame_readback_rgba16[component] =
-                    static_cast<std::uint16_t>(
-                        std::lround(normalized * 65535.0F));
+            for (std::size_t component = 0; component < component_count; ++component) {
+                const float normalized = std::clamp(half_to_float(source[component]), 0.0F, 1.0F);
+                latest_frame_readback_rgba16[component] = static_cast<std::uint16_t>(std::lround(normalized * 65535.0F));
             }
             latest_frame_readback_width = slot.width;
             latest_frame_readback_height = slot.height;
             slot.pending = false;
-            onFrameReadbackRgba16(latest_frame_readback_rgba16,
-                                  latest_frame_readback_width,
-                                  latest_frame_readback_height);
+            onFrameReadbackRgba16(latest_frame_readback_rgba16, latest_frame_readback_width, latest_frame_readback_height);
             return;
         }
 
         const auto *source = static_cast<const std::uint8_t *>(slot.mapped);
-        const std::size_t pixel_bytes =
-            static_cast<std::size_t>(slot.width) * slot.height * 4U;
+        const std::size_t pixel_bytes = static_cast<std::size_t>(slot.width) * slot.height * 4U;
         latest_frame_readback_rgba.resize(pixel_bytes);
-        const bool format_is_bgra =
-            slot.format == VK_FORMAT_B8G8R8A8_UNORM ||
-            slot.format == VK_FORMAT_B8G8R8A8_SRGB;
+        const bool format_is_bgra = slot.format == VK_FORMAT_B8G8R8A8_UNORM || slot.format == VK_FORMAT_B8G8R8A8_SRGB;
         for (std::size_t offset = 0; offset < pixel_bytes; offset += 4U) {
             if (format_is_bgra) {
                 latest_frame_readback_rgba[offset + 0U] = source[offset + 2U];
@@ -1299,30 +1133,24 @@ namespace mxvk {
         latest_frame_readback_width = slot.width;
         latest_frame_readback_height = slot.height;
         slot.pending = false;
-        onFrameReadback(latest_frame_readback_rgba, latest_frame_readback_width,
-                        latest_frame_readback_height);
+        onFrameReadback(latest_frame_readback_rgba, latest_frame_readback_width, latest_frame_readback_height);
     }
 
     void VK_Window::flushFrameReadbacks() {
         if (device == VK_NULL_HANDLE) {
             return;
         }
-        const bool has_pending = std::ranges::any_of(
-            frame_readback_slots,
-            [](const FrameReadbackSlot &slot) { return slot.pending; });
+        const bool has_pending = std::ranges::any_of(frame_readback_slots, [](const FrameReadbackSlot &slot) { return slot.pending; });
         if (!has_pending) {
             return;
         }
 
         const VkResult wait_result = vkDeviceWaitIdle(device);
         if (wait_result != VK_SUCCESS) {
-            throw mxvk::Exception(std::format(
-                "frame readback flush failed waiting for the device (VkResult={})",
-                static_cast<int>(wait_result)));
+            throw mxvk::Exception(std::format("frame readback flush failed waiting for the device (VkResult={})", static_cast<int>(wait_result)));
         }
         for (uint32_t offset = 0; offset < max_frames_in_flight; ++offset) {
-            const uint32_t slot_index =
-                (current_frame + offset) % max_frames_in_flight;
+            const uint32_t slot_index = (current_frame + offset) % max_frames_in_flight;
             dispatchFrameReadback(frame_readback_slots[slot_index]);
         }
     }
@@ -1336,18 +1164,11 @@ namespace mxvk {
         }
 
         const VkExtent2D readback_extent = getRenderExtent();
-        const VkDeviceSize required_size =
-            static_cast<VkDeviceSize>(readback_extent.width) *
-            readback_extent.height *
-            (frame_readback_rgba16_enabled ? 8U : 4U);
+        const VkDeviceSize required_size = static_cast<VkDeviceSize>(readback_extent.width) * readback_extent.height * (frame_readback_rgba16_enabled ? 8U : 4U);
         if (required_size == 0U) {
             throw mxvk::Exception("frame readback cannot use an empty swapchain extent");
         }
-        const bool resources_ready = std::ranges::all_of(
-            frame_readback_slots, [&](const FrameReadbackSlot &slot) {
-                return slot.buffer != VK_NULL_HANDLE && slot.mapped != nullptr &&
-                       slot.size >= required_size;
-            });
+        const bool resources_ready = std::ranges::all_of(frame_readback_slots, [&](const FrameReadbackSlot &slot) { return slot.buffer != VK_NULL_HANDLE && slot.mapped != nullptr && slot.size >= required_size; });
         if (resources_ready) {
             return;
         }
@@ -1365,32 +1186,22 @@ namespace mxvk {
         buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         VkPhysicalDeviceMemoryProperties memory_properties{};
         vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-        constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES =
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES =
-            REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+        constexpr VkMemoryPropertyFlags REQUIRED_PROPERTIES = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        constexpr VkMemoryPropertyFlags PREFERRED_PROPERTIES = REQUIRED_PROPERTIES | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
         bool memory_type_logged = false;
         try {
             for (FrameReadbackSlot &slot : frame_readback_slots) {
-                if (vkCreateBuffer(device, &buffer_info, nullptr, &slot.buffer) !=
-                    VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "failed to create pipelined frame-readback buffer");
+                if (vkCreateBuffer(device, &buffer_info, nullptr, &slot.buffer) != VK_SUCCESS) {
+                    throw mxvk::Exception("failed to create pipelined frame-readback buffer");
                 }
 
                 VkMemoryRequirements memory_requirements{};
-                vkGetBufferMemoryRequirements(device, slot.buffer,
-                                              &memory_requirements);
+                vkGetBufferMemoryRequirements(device, slot.buffer, &memory_requirements);
                 uint32_t memory_type_index = invalid_queue_index;
-                for (VkMemoryPropertyFlags properties :
-                     {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
-                    for (uint32_t index = 0;
-                         index < memory_properties.memoryTypeCount; ++index) {
-                        const bool type_matches =
-                            (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
-                        const bool properties_match =
-                            (memory_properties.memoryTypes[index].propertyFlags &
-                             properties) == properties;
+                for (VkMemoryPropertyFlags properties : {PREFERRED_PROPERTIES, REQUIRED_PROPERTIES}) {
+                    for (uint32_t index = 0; index < memory_properties.memoryTypeCount; ++index) {
+                        const bool type_matches = (memory_requirements.memoryTypeBits & (1U << index)) != 0U;
+                        const bool properties_match = (memory_properties.memoryTypes[index].propertyFlags & properties) == properties;
                         if (type_matches && properties_match) {
                             memory_type_index = index;
                             break;
@@ -1401,20 +1212,11 @@ namespace mxvk {
                     }
                 }
                 if (memory_type_index == invalid_queue_index) {
-                    throw mxvk::Exception(
-                        "failed to find host-visible frame-readback memory");
+                    throw mxvk::Exception("failed to find host-visible frame-readback memory");
                 }
                 if (!memory_type_logged) {
-                    const VkMemoryPropertyFlags selected_properties =
-                        memory_properties.memoryTypes[memory_type_index]
-                            .propertyFlags;
-                    std::cout << std::format(
-                        "mxvk: frame readback memory type {} ({})\n",
-                        memory_type_index,
-                        (selected_properties & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) !=
-                                0U
-                            ? "host cached"
-                            : "host coherent fallback");
+                    const VkMemoryPropertyFlags selected_properties = memory_properties.memoryTypes[memory_type_index].propertyFlags;
+                    std::cout << std::format("mxvk: frame readback memory type {} ({})\n", memory_type_index, (selected_properties & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) != 0U ? "host cached" : "host coherent fallback");
                     memory_type_logged = true;
                 }
 
@@ -1422,17 +1224,13 @@ namespace mxvk {
                 allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
                 allocation_info.allocationSize = memory_requirements.size;
                 allocation_info.memoryTypeIndex = memory_type_index;
-                if (vkAllocateMemory(device, &allocation_info, nullptr,
-                                     &slot.memory) != VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "failed to allocate frame-readback memory");
+                if (vkAllocateMemory(device, &allocation_info, nullptr, &slot.memory) != VK_SUCCESS) {
+                    throw mxvk::Exception("failed to allocate frame-readback memory");
                 }
-                if (vkBindBufferMemory(device, slot.buffer, slot.memory, 0) !=
-                    VK_SUCCESS) {
+                if (vkBindBufferMemory(device, slot.buffer, slot.memory, 0) != VK_SUCCESS) {
                     throw mxvk::Exception("failed to bind frame-readback memory");
                 }
-                if (vkMapMemory(device, slot.memory, 0, required_size, 0,
-                                &slot.mapped) != VK_SUCCESS) {
+                if (vkMapMemory(device, slot.memory, 0, required_size, 0, &slot.mapped) != VK_SUCCESS) {
                     throw mxvk::Exception("failed to map frame-readback memory");
                 }
                 slot.size = required_size;
@@ -1449,8 +1247,7 @@ namespace mxvk {
 
     void VK_Window::destroyFrameReadbackResources() {
         for (FrameReadbackSlot &slot : frame_readback_slots) {
-            if (device != VK_NULL_HANDLE && slot.mapped != nullptr &&
-                slot.memory != VK_NULL_HANDLE) {
+            if (device != VK_NULL_HANDLE && slot.mapped != nullptr && slot.memory != VK_NULL_HANDLE) {
                 vkUnmapMemory(device, slot.memory);
             }
             slot.mapped = nullptr;
@@ -1474,8 +1271,7 @@ namespace mxvk {
         latest_frame_readback_height = 0;
     }
 
-    void VK_Window::proc() {
-    }
+    void VK_Window::proc() {}
 
     void VK_Window::trimMemory() {
         if (device == VK_NULL_HANDLE || command_pool == VK_NULL_HANDLE || vkTrimCommandPool == nullptr) {
@@ -1518,8 +1314,7 @@ namespace mxvk {
         if (!vulkan_library_loaded) {
             std::cout << "SDL3: loading the Vulkan loader library\n";
             if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-                std::cerr << std::format(
-                    "mxvk: SDL_Vulkan_LoadLibrary failed: {}\n", SDL_GetError());
+                std::cerr << std::format("mxvk: SDL_Vulkan_LoadLibrary failed: {}\n", SDL_GetError());
                 SDL_QuitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
                 sdl_initialized = false;
                 return false;
@@ -1576,9 +1371,7 @@ namespace mxvk {
         return true;
     }
 
-    void VK_Window::exit() {
-        active = false;
-    }
+    void VK_Window::exit() { active = false; }
 
     void VK_Window::onSwapchainAboutToRecreate() {}
 
@@ -1588,22 +1381,13 @@ namespace mxvk {
 
     void VK_Window::onRecordCustomRendering([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index) {}
 
-    void VK_Window::onRecordPostProcessingTexture(
-        [[maybe_unused]] VkCommandBuffer cmd,
-        [[maybe_unused]] uint32_t image_index,
-        [[maybe_unused]] VkImageView texture_view,
-        [[maybe_unused]] VkExtent2D texture_extent) {}
+    void VK_Window::onRecordPostProcessingTexture([[maybe_unused]] VkCommandBuffer cmd, [[maybe_unused]] uint32_t image_index, [[maybe_unused]] VkImageView texture_view, [[maybe_unused]] VkExtent2D texture_extent) {}
 
-    void VK_Window::onConfigureDepthStencilAttachments([[maybe_unused]] VkRenderingAttachmentInfo &depth_attachment,
-                                                       [[maybe_unused]] VkRenderingAttachmentInfo &stencil_attachment,
-                                                       [[maybe_unused]] uint32_t image_index) {}
+    void VK_Window::onConfigureDepthStencilAttachments([[maybe_unused]] VkRenderingAttachmentInfo &depth_attachment, [[maybe_unused]] VkRenderingAttachmentInfo &stencil_attachment, [[maybe_unused]] uint32_t image_index) {}
 
-    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) {
-        renderStandaloneSprite(sprite, cmd, swapchain_extent);
-    }
+    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd) { renderStandaloneSprite(sprite, cmd, swapchain_extent); }
 
-    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd,
-                                           VkExtent2D extent) {
+    void VK_Window::renderStandaloneSprite(VK_Sprite &sprite, VkCommandBuffer cmd, VkExtent2D extent) {
         if (device == VK_NULL_HANDLE || extent.width == 0U || extent.height == 0U) {
             return;
         }
@@ -1619,16 +1403,14 @@ namespace mxvk {
         if ((width == 0U) != (height == 0U)) {
             throw mxvk::Exception("render extent requires two positive dimensions or two zeros");
         }
-        if (render_extent_override.width == width &&
-            render_extent_override.height == height) {
+        if (render_extent_override.width == width && render_extent_override.height == height) {
             return;
         }
         if (headless()) {
             if (width == 0U && height == 0U) {
                 return;
             }
-            if (requested_headless_extent.width == width &&
-                requested_headless_extent.height == height) {
+            if (requested_headless_extent.width == width && requested_headless_extent.height == height) {
                 return;
             }
             if (device != VK_NULL_HANDLE) {
@@ -1646,8 +1428,7 @@ namespace mxvk {
                 createDevice();
                 onSwapchainRecreated();
             }
-            std::cout << std::format(
-                "mxvk: surface-free render extent {}x{}\n", width, height);
+            std::cout << std::format("mxvk: surface-free render extent {}x{}\n", width, height);
             return;
         }
         if (device != VK_NULL_HANDLE && swapchain != VK_NULL_HANDLE) {
@@ -1657,21 +1438,13 @@ namespace mxvk {
         }
         render_extent_override = {width, height};
         sprite_state_dirty = true;
-        if (device != VK_NULL_HANDLE && !swapchain_images.empty() &&
-            !post_process_sprites.empty()) {
+        if (device != VK_NULL_HANDLE && !swapchain_images.empty() && !post_process_sprites.empty()) {
             createPostProcessTargets();
         }
-        std::cout << std::format("mxvk: fixed render extent {}\n",
-                                 width > 0U ? std::format("{}x{}", width, height)
-                                            : "disabled");
+        std::cout << std::format("mxvk: fixed render extent {}\n", width > 0U ? std::format("{}x{}", width, height) : "disabled");
     }
 
-    VkExtent2D VK_Window::getRenderExtent() const noexcept {
-        return render_extent_override.width > 0U &&
-                       render_extent_override.height > 0U
-                   ? render_extent_override
-                   : swapchain_extent;
-    }
+    VkExtent2D VK_Window::getRenderExtent() const noexcept { return render_extent_override.width > 0U && render_extent_override.height > 0U ? render_extent_override : swapchain_extent; }
 
     void VK_Window::setHdrRenderIntermediatesEnabled(bool enabled) {
         if (hdr_render_intermediates_enabled == enabled) {
@@ -1683,12 +1456,10 @@ namespace mxvk {
         }
         hdr_render_intermediates_enabled = enabled;
         sprite_state_dirty = true;
-        if (device != VK_NULL_HANDLE && !swapchain_images.empty() &&
-            !post_process_sprites.empty()) {
+        if (device != VK_NULL_HANDLE && !swapchain_images.empty() && !post_process_sprites.empty()) {
             createPostProcessTargets();
         }
-        std::cout << "mxvk: HDR render intermediates "
-                  << (enabled ? "enabled (RGBA16F)\n" : "disabled (RGBA8)\n");
+        std::cout << "mxvk: HDR render intermediates " << (enabled ? "enabled (RGBA16F)\n" : "disabled (RGBA8)\n");
     }
 
     VK_Sprite *VK_Window::attachPostProcessingShader(const std::string &fragmentShaderPath, float p1, float p2, float p3, float p4) {
@@ -1701,65 +1472,42 @@ namespace mxvk {
 
         std::vector<VK_Sprite *> attachedSprites;
         attachedSprites.reserve(effects.size());
-        for (size_t effect_index = 0; effect_index < effects.size();
-             ++effect_index) {
+        for (size_t effect_index = 0; effect_index < effects.size(); ++effect_index) {
             const PostProcessingEffect &effect = effects[effect_index];
             if (effect.fragmentShaderPath.empty()) {
-                throw mxvk::Exception(
-                    "Cannot attach a post-processing pass with an empty shader path");
+                throw mxvk::Exception("Cannot attach a post-processing pass with an empty shader path");
             }
 
-            const ShaderModuleInfo module_info =
-                inspect_spirv(load_spv(effect.fragmentShaderPath));
-            const ShaderStage stage = effect.stage == ShaderStage::Unknown
-                                          ? module_info.stage
-                                          : effect.stage;
+            const ShaderModuleInfo module_info = inspect_spirv(load_spv(effect.fragmentShaderPath));
+            const ShaderStage stage = effect.stage == ShaderStage::Unknown ? module_info.stage : effect.stage;
             if (stage != ShaderStage::Fragment && stage != ShaderStage::Compute) {
-                throw mxvk::Exception(
-                    "Post-processing shaders must contain a fragment or compute entry point");
+                throw mxvk::Exception("Post-processing shaders must contain a fragment or compute entry point");
             }
-            if (effect.stage != ShaderStage::Unknown &&
-                effect.stage != module_info.stage) {
-                throw mxvk::Exception(
-                    "Post-processing shader stage does not match its SPIR-V entry point");
+            if (effect.stage != ShaderStage::Unknown && effect.stage != module_info.stage) {
+                throw mxvk::Exception("Post-processing shader stage does not match its SPIR-V entry point");
             }
 
-            VK_Sprite *sprite = createSprite(
-                1,
-                1,
-                resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR),
-                "",
-                effect.spectrumBinCount,
-                effect.spectrumHistoryLayerCount);
+            VK_Sprite *sprite = createSprite(1, 1, resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR), "", effect.spectrumBinCount, effect.spectrumHistoryLayerCount);
             sprite->enableExtendedUBO();
             if (effect.historySource != nullptr) {
                 sprite->shareHistoryTexture(*effect.historySource);
             }
-            const bool final_fragment =
-                stage == ShaderStage::Fragment &&
-                effect_index + 1U == effects.size();
+            const bool final_fragment = stage == ShaderStage::Fragment && effect_index + 1U == effects.size();
             if (stage == ShaderStage::Fragment) {
                 if (!final_fragment || hdr_render_intermediates_enabled) {
-                    sprite->setColorAttachmentFormat(
-                        postProcessIntermediateFormat());
+                    sprite->setColorAttachmentFormat(postProcessIntermediateFormat());
                 }
                 sprite->setFragmentShaderPath(effect.fragmentShaderPath);
             } else if (stage == ShaderStage::Compute) {
-                const StorageImageFormat required_format =
-                    hdr_render_intermediates_enabled
-                        ? StorageImageFormat::Rgba16Float
-                        : StorageImageFormat::Rgba8;
+                const StorageImageFormat required_format = hdr_render_intermediates_enabled ? StorageImageFormat::Rgba16Float : StorageImageFormat::Rgba8;
                 if (module_info.storageImageFormat != required_format) {
-                    throw mxvk::Exception(std::format(
-                        "Compute shader '{}' must declare layout({}) for the "
-                        "active {} render path",
-                        effect.fragmentShaderPath,
-                        hdr_render_intermediates_enabled ? "rgba16f" : "rgba8",
-                        hdr_render_intermediates_enabled ? "HDR" : "SDR"));
+                    throw mxvk::Exception(std::format("Compute shader '{}' must declare layout({}) for the "
+                                                      "active {} render path",
+                                                      effect.fragmentShaderPath,
+                                                      hdr_render_intermediates_enabled ? "rgba16f" : "rgba8",
+                                                      hdr_render_intermediates_enabled ? "HDR" : "SDR"));
                 }
-                sprite->enableComputeShader(
-                    effect.fragmentShaderPath, module_info.localSizeX,
-                    module_info.localSizeY, module_info.localSizeZ);
+                sprite->enableComputeShader(effect.fragmentShaderPath, module_info.localSizeX, module_info.localSizeY, module_info.localSizeZ);
             }
             const uint32_t black_pixel = 0xFF000000u;
             sprite->updateTexture(&black_pixel, 1, 1);
@@ -1775,15 +1523,11 @@ namespace mxvk {
         }
 
         if (!post_process_effect_stages.empty()) {
-            post_process_present_sprite = createSprite(
-                1, 1,
-                resolveRuntimeShaderPath("sprite.vert.spv",
-                                         MXVK_SPRITE_SHADER_DIR));
+            post_process_present_sprite = createSprite(1, 1, resolveRuntimeShaderPath("sprite.vert.spv", MXVK_SPRITE_SHADER_DIR));
             const uint32_t black_pixel = 0xFF000000u;
             post_process_present_sprite->updateTexture(&black_pixel, 1, 1);
             if (!post_process_present_shader_path.empty()) {
-                post_process_present_sprite->setFragmentShaderPath(
-                    post_process_present_shader_path);
+                post_process_present_sprite->setFragmentShaderPath(post_process_present_shader_path);
             }
             owned_post_process_sprites.push_back(post_process_present_sprite);
 
@@ -1804,8 +1548,7 @@ namespace mxvk {
         return attachedSprites;
     }
 
-    void VK_Window::setPostProcessingPresentFragmentShader(
-        const std::string &path) {
+    void VK_Window::setPostProcessingPresentFragmentShader(const std::string &path) {
         if (post_process_present_shader_path == path) {
             return;
         }
@@ -1829,14 +1572,7 @@ namespace mxvk {
 
         if (!owned_post_process_sprites.empty()) {
             const std::vector<VK_Sprite *> sprites_to_remove = owned_post_process_sprites;
-            sprites.erase(
-                std::remove_if(
-                    sprites.begin(),
-                    sprites.end(),
-                    [&sprites_to_remove](const std::unique_ptr<VK_Sprite> &sprite) {
-                        return std::ranges::find(sprites_to_remove, sprite.get()) != sprites_to_remove.end();
-                    }),
-                sprites.end());
+            sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [&sprites_to_remove](const std::unique_ptr<VK_Sprite> &sprite) { return std::ranges::find(sprites_to_remove, sprite.get()) != sprites_to_remove.end(); }), sprites.end());
             sprite_state_dirty = true;
         }
         owned_post_process_sprite = nullptr;
@@ -1898,14 +1634,7 @@ namespace mxvk {
             if (sprites_to_remove.empty()) {
                 sprites_to_remove.push_back(owned_post_process_sprite);
             }
-            sprites.erase(
-                std::remove_if(
-                    sprites.begin(),
-                    sprites.end(),
-                    [&sprites_to_remove](const std::unique_ptr<VK_Sprite> &existing_sprite) {
-                        return std::ranges::find(sprites_to_remove, existing_sprite.get()) != sprites_to_remove.end();
-                    }),
-                sprites.end());
+            sprites.erase(std::remove_if(sprites.begin(), sprites.end(), [&sprites_to_remove](const std::unique_ptr<VK_Sprite> &existing_sprite) { return std::ranges::find(sprites_to_remove, existing_sprite.get()) != sprites_to_remove.end(); }), sprites.end());
             owned_post_process_sprite = nullptr;
             owned_post_process_sprites.clear();
             sprite_state_dirty = true;
@@ -1920,13 +1649,7 @@ namespace mxvk {
         }
     }
 
-    bool VK_Window::isPostProcessSprite(const VK_Sprite *sprite) const {
-        return sprite != nullptr &&
-               (sprite == post_process_present_sprite ||
-                sprite == post_process_composite_sprite ||
-                std::ranges::find(post_process_sprites, sprite) !=
-                    post_process_sprites.end());
-    }
+    bool VK_Window::isPostProcessSprite(const VK_Sprite *sprite) const { return sprite != nullptr && (sprite == post_process_present_sprite || sprite == post_process_composite_sprite || std::ranges::find(post_process_sprites, sprite) != post_process_sprites.end()); }
 
     void VK_Window::destroyPostProcessTargets() {
         for (VK_Sprite *sprite : post_process_sprites) {
@@ -1972,35 +1695,24 @@ namespace mxvk {
         if (post_process_sprites.empty() || swapchain_images.empty()) {
             return;
         }
-        const bool has_compute = std::ranges::find(
-                                     post_process_effect_stages,
-                                     ShaderStage::Compute) !=
-                                 post_process_effect_stages.end();
-        const bool detached_render = render_extent_override.width > 0U &&
-                                     render_extent_override.height > 0U;
+        const bool has_compute = std::ranges::find(post_process_effect_stages, ShaderStage::Compute) != post_process_effect_stages.end();
+        const bool detached_render = render_extent_override.width > 0U && render_extent_override.height > 0U;
         size_t target_count = 1U;
         if (hdr_render_intermediates_enabled) {
             target_count = 4U;
-        } else if (detached_render || has_compute ||
-                   post_process_sprites.size() > 1) {
+        } else if (detached_render || has_compute || post_process_sprites.size() > 1) {
             target_count = 3U;
         }
         const VkExtent2D render_extent = getRenderExtent();
         if (hdr_render_intermediates_enabled || has_compute) {
             VkFormatProperties format_properties{};
-            vkGetPhysicalDeviceFormatProperties(
-                physical_device, postProcessIntermediateFormat(),
-                &format_properties);
-            VkFormatFeatureFlags required_features =
-                VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-                VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+            vkGetPhysicalDeviceFormatProperties(physical_device, postProcessIntermediateFormat(), &format_properties);
+            VkFormatFeatureFlags required_features = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
             if (has_compute) {
                 required_features |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
             }
-            if ((format_properties.optimalTilingFeatures & required_features) !=
-                required_features) {
-                throw mxvk::Exception(
-                    "The selected compute post-processing format is unsupported on this device");
+            if ((format_properties.optimalTilingFeatures & required_features) != required_features) {
+                throw mxvk::Exception("The selected compute post-processing format is unsupported on this device");
             }
         }
         post_process_images.assign(target_count, std::vector<VkImage>(swapchain_images.size(), VK_NULL_HANDLE));
@@ -2018,14 +1730,10 @@ namespace mxvk {
                     image_info.extent = {render_extent.width, render_extent.height, 1};
                     image_info.mipLevels = 1;
                     image_info.arrayLayers = 1;
-                    image_info.format = target == 0U
-                                            ? swapchain_format
-                                            : postProcessIntermediateFormat();
+                    image_info.format = target == 0U ? swapchain_format : postProcessIntermediateFormat();
                     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
                     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                       VK_IMAGE_USAGE_SAMPLED_BIT |
-                                       VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+                    image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
                     if (target != 0U && has_compute) {
                         image_info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
                     }
@@ -2038,8 +1746,7 @@ namespace mxvk {
                     vkGetImageMemoryRequirements(device, post_process_images[target][i], &requirements);
                     uint32_t memory_type = UINT32_MAX;
                     for (uint32_t type = 0; type < memory_properties.memoryTypeCount; ++type) {
-                        if ((requirements.memoryTypeBits & (1U << type)) != 0U &&
-                            (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U) {
+                        if ((requirements.memoryTypeBits & (1U << type)) != 0U && (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U) {
                             memory_type = type;
                             break;
                         }
@@ -2051,17 +1758,14 @@ namespace mxvk {
                     allocation.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
                     allocation.allocationSize = requirements.size;
                     allocation.memoryTypeIndex = memory_type;
-                    if (vkAllocateMemory(device, &allocation, nullptr, &post_process_memories[target][i]) != VK_SUCCESS ||
-                        vkBindImageMemory(device, post_process_images[target][i], post_process_memories[target][i], 0) != VK_SUCCESS) {
+                    if (vkAllocateMemory(device, &allocation, nullptr, &post_process_memories[target][i]) != VK_SUCCESS || vkBindImageMemory(device, post_process_images[target][i], post_process_memories[target][i], 0) != VK_SUCCESS) {
                         throw mxvk::Exception("Failed to allocate post-process image memory");
                     }
                     VkImageViewCreateInfo view_info{};
                     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
                     view_info.image = post_process_images[target][i];
                     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                    view_info.format = target == 0U
-                                           ? swapchain_format
-                                           : postProcessIntermediateFormat();
+                    view_info.format = target == 0U ? swapchain_format : postProcessIntermediateFormat();
                     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     view_info.subresourceRange.levelCount = 1;
                     view_info.subresourceRange.layerCount = 1;
@@ -2077,31 +1781,22 @@ namespace mxvk {
     }
 
     bool VK_Window::ensureRenderResources() {
-        const auto sync_ready = [this]() {
-            return std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-                   render_finished.size() == swapchain_images.size() &&
-                   std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-                   std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
-        };
+        const auto sync_ready = [this]() { return std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && render_finished.size() == swapchain_images.size() && std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; }); };
 
         if (device == VK_NULL_HANDLE) {
             return false;
         }
 
-        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() ||
-            image_fences.size() != swapchain_images.size()) {
+        if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE || command_buffers.empty() || !sync_ready() || image_fences.size() != swapchain_images.size()) {
             createDevice();
         }
 
-        return (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() &&
-                image_fences.size() == swapchain_images.size());
+        return (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready() && image_fences.size() == swapchain_images.size());
     }
 
     bool VK_Window::renderTargetsReady() const noexcept {
         if (headless()) {
-            return !swapchain_images.empty() &&
-                   swapchain_images.size() == swapchain_image_views.size() &&
-                   swapchain_images.size() == headless_image_memories.size();
+            return !swapchain_images.empty() && swapchain_images.size() == swapchain_image_views.size() && swapchain_images.size() == headless_image_memories.size();
         }
         return swapchain != VK_NULL_HANDLE;
     }
@@ -2142,8 +1837,7 @@ namespace mxvk {
 
                 if (!headless()) {
                     VkBool32 present_support = VK_FALSE;
-                    vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface,
-                                                         &present_support);
+                    vkGetPhysicalDeviceSurfaceSupportKHR(candidate, i, surface, &present_support);
                     if (present_support == VK_TRUE) {
                         candidate_present = i;
                     }
@@ -2160,10 +1854,8 @@ namespace mxvk {
             }
 
             if (!headless()) {
-                const SwapchainSupport swapchain_support =
-                    querySwapchainSupport(candidate, surface);
-                if (swapchain_support.formats.empty() ||
-                    swapchain_support.present_modes.empty()) {
+                const SwapchainSupport swapchain_support = querySwapchainSupport(candidate, surface);
+                if (swapchain_support.formats.empty() || swapchain_support.present_modes.empty()) {
                     std::cout << "vk: candidate rejected due to incomplete swapchain support\n";
                     continue;
                 }
@@ -2193,12 +1885,7 @@ namespace mxvk {
             physical_device = candidate;
             graphics_queue_family = candidate_graphics;
             present_queue_family = candidate_present;
-            std::cout << std::format(
-                "vk: selected GPU='{}' type={} vendor=0x{:04x} device=0x{:04x}\n",
-                properties.deviceName,
-                device_type,
-                properties.vendorID,
-                properties.deviceID);
+            std::cout << std::format("vk: selected GPU='{}' type={} vendor=0x{:04x} device=0x{:04x}\n", properties.deviceName, device_type, properties.vendorID, properties.deviceID);
             return;
         }
 
@@ -2235,13 +1922,7 @@ namespace mxvk {
             vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &device_extension_count, device_extensions.data());
         }
 
-        [[maybe_unused]] const auto has_device_extension = [&device_extensions](const char *extension_name) {
-            return std::ranges::any_of(
-                device_extensions,
-                [extension_name](const VkExtensionProperties &ext) {
-                    return std::strcmp(ext.extensionName, extension_name) == 0;
-                });
-        };
+        [[maybe_unused]] const auto has_device_extension = [&device_extensions](const char *extension_name) { return std::ranges::any_of(device_extensions, [extension_name](const VkExtensionProperties &ext) { return std::strcmp(ext.extensionName, extension_name) == 0; }); };
 
         std::vector<const char *> required_device_extensions{};
         if (!headless()) {
@@ -2260,11 +1941,7 @@ namespace mxvk {
 #endif
 
 #if defined(MXVK_USE_MOLTENVK)
-        const bool has_portability_subset = std::ranges::any_of(
-            device_extensions,
-            [](const VkExtensionProperties &ext) {
-                return std::strcmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME) == 0;
-            });
+        const bool has_portability_subset = std::ranges::any_of(device_extensions, [](const VkExtensionProperties &ext) { return std::strcmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME) == 0; });
 
         if (has_portability_subset) {
             required_device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
@@ -2277,13 +1954,7 @@ namespace mxvk {
         features2.pNext = &supported_vulkan13_features;
         vkGetPhysicalDeviceFeatures2(physical_device, &features2);
 
-        std::cout << std::format(
-            "vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}, fillModeNonSolid={}, samplerAnisotropy={}\n",
-            supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false",
-            supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false",
-            features2.features.shaderFloat64 == VK_TRUE ? "true" : "false",
-            features2.features.fillModeNonSolid == VK_TRUE ? "true" : "false",
-            features2.features.samplerAnisotropy == VK_TRUE ? "true" : "false");
+        std::cout << std::format("vk: feature support - synchronization2={}, dynamicRendering={}, shaderFloat64={}, fillModeNonSolid={}, samplerAnisotropy={}\n", supported_vulkan13_features.synchronization2 == VK_TRUE ? "true" : "false", supported_vulkan13_features.dynamicRendering == VK_TRUE ? "true" : "false", features2.features.shaderFloat64 == VK_TRUE ? "true" : "false", features2.features.fillModeNonSolid == VK_TRUE ? "true" : "false", features2.features.samplerAnisotropy == VK_TRUE ? "true" : "false");
 
         if (supported_vulkan13_features.synchronization2 != VK_TRUE) {
             std::cout << "vk: synchronization2 is unsupported on selected physical device\n";
@@ -2318,12 +1989,9 @@ namespace mxvk {
         create_info.pEnabledFeatures = nullptr;
 
         std::cout << "vk: creating logical device\n";
-        const VkResult create_device_result =
-            vkCreateDevice(physical_device, &create_info, nullptr, &device);
+        const VkResult create_device_result = vkCreateDevice(physical_device, &create_info, nullptr, &device);
         if (create_device_result != VK_SUCCESS) {
-            std::cerr << std::format(
-                "vk: logical device creation failed (VkResult={})",
-                static_cast<int>(create_device_result));
+            std::cerr << std::format("vk: logical device creation failed (VkResult={})", static_cast<int>(create_device_result));
             if (!required_device_extensions.empty()) {
                 std::cerr << "; requested extensions:";
                 for (const char *extension_name : required_device_extensions) {
@@ -2343,8 +2011,7 @@ namespace mxvk {
             device = VK_NULL_HANDLE;
             return;
         }
-        std::cout << (headless() ? "vk: retrieving graphics queue\n"
-                                 : "vk: retrieving graphics and present queues\n");
+        std::cout << (headless() ? "vk: retrieving graphics queue\n" : "vk: retrieving graphics and present queues\n");
         vkGetDeviceQueue(device, graphics_queue_family, 0, &graphics_queue);
         if (headless()) {
             present_queue = graphics_queue;
@@ -2361,14 +2028,9 @@ namespace mxvk {
             return;
         }
 
-        const bool sync_ready =
-            std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            render_finished.size() == swapchain_images.size() &&
-            std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        const bool sync_ready = std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && render_finished.size() == swapchain_images.size() && std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
 
-        if (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() &&
-            sync_ready && image_fences.size() == swapchain_images.size()) {
+        if (renderTargetsReady() && command_pool != VK_NULL_HANDLE && !command_buffers.empty() && sync_ready && image_fences.size() == swapchain_images.size()) {
             std::cout << "vk: createDevice skipped because render resources are already initialized\n";
             return;
         }
@@ -2423,18 +2085,13 @@ namespace mxvk {
                 return std::nullopt;
             }
             return VkExtent2D{
-                .width = std::clamp(static_cast<uint32_t>(pixel_w),
-                                    support.capabilities.minImageExtent.width,
-                                    support.capabilities.maxImageExtent.width),
-                .height = std::clamp(static_cast<uint32_t>(pixel_h),
-                                     support.capabilities.minImageExtent.height,
-                                     support.capabilities.maxImageExtent.height),
+                .width = std::clamp(static_cast<uint32_t>(pixel_w), support.capabilities.minImageExtent.width, support.capabilities.maxImageExtent.width),
+                .height = std::clamp(static_cast<uint32_t>(pixel_h), support.capabilities.minImageExtent.height, support.capabilities.maxImageExtent.height),
             };
         };
         auto extentMatchesWindowPixels = [&clampedWindowPixelExtent](const VkExtent2D extent) {
             const std::optional<VkExtent2D> target_extent = clampedWindowPixelExtent();
-            return !target_extent.has_value() ||
-                   (extent.width == target_extent->width && extent.height == target_extent->height);
+            return !target_extent.has_value() || (extent.width == target_extent->width && extent.height == target_extent->height);
         };
 
         VkExtent2D extent = chooseExtent(support.capabilities, window.get());
@@ -2447,11 +2104,7 @@ namespace mxvk {
         if (!extentMatchesWindowPixels(extent)) {
             const std::optional<VkExtent2D> target_extent = clampedWindowPixelExtent();
             if (target_extent.has_value()) {
-                std::cout << std::format("vk: delaying swapchain creation until surface extent catches up to window pixels (surface={}x{}, window={}x{})\n",
-                                         extent.width,
-                                         extent.height,
-                                         target_extent->width,
-                                         target_extent->height);
+                std::cout << std::format("vk: delaying swapchain creation until surface extent catches up to window pixels (surface={}x{}, window={}x{})\n", extent.width, extent.height, target_extent->width, target_extent->height);
             }
             return false;
         }
@@ -2552,10 +2205,7 @@ namespace mxvk {
     }
 
     bool VK_Window::createHeadlessTargets() {
-        if (!headless() || device == VK_NULL_HANDLE ||
-            physical_device == VK_NULL_HANDLE ||
-            requested_headless_extent.width == 0U ||
-            requested_headless_extent.height == 0U) {
+        if (!headless() || device == VK_NULL_HANDLE || physical_device == VK_NULL_HANDLE || requested_headless_extent.width == 0U || requested_headless_extent.height == 0U) {
             return false;
         }
         if (renderTargetsReady()) {
@@ -2567,74 +2217,54 @@ namespace mxvk {
         swapchain_supports_transfer_src = true;
         constexpr size_t HEADLESS_TARGET_COUNT = max_frames_in_flight;
         swapchain_images.assign(HEADLESS_TARGET_COUNT, VK_NULL_HANDLE);
-        headless_image_memories.assign(HEADLESS_TARGET_COUNT,
-                                       VK_NULL_HANDLE);
+        headless_image_memories.assign(HEADLESS_TARGET_COUNT, VK_NULL_HANDLE);
         swapchain_image_views.assign(HEADLESS_TARGET_COUNT, VK_NULL_HANDLE);
         swapchain_image_initialized.assign(HEADLESS_TARGET_COUNT, false);
 
         VkPhysicalDeviceMemoryProperties memory_properties{};
-        vkGetPhysicalDeviceMemoryProperties(physical_device,
-                                            &memory_properties);
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
         try {
             for (size_t index = 0; index < HEADLESS_TARGET_COUNT; ++index) {
                 VkImageCreateInfo image_info{};
                 image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                 image_info.imageType = VK_IMAGE_TYPE_2D;
-                image_info.extent = {swapchain_extent.width,
-                                     swapchain_extent.height, 1};
+                image_info.extent = {swapchain_extent.width, swapchain_extent.height, 1};
                 image_info.mipLevels = 1;
                 image_info.arrayLayers = 1;
                 image_info.format = swapchain_format;
                 image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
                 image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                   VK_IMAGE_USAGE_SAMPLED_BIT;
+                image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
                 image_info.samples = VK_SAMPLE_COUNT_1_BIT;
                 image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                if (vkCreateImage(device, &image_info, nullptr,
-                                  &swapchain_images[index]) != VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "Failed to create a headless color image");
+                if (vkCreateImage(device, &image_info, nullptr, &swapchain_images[index]) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to create a headless color image");
                 }
 
                 VkMemoryRequirements requirements{};
-                vkGetImageMemoryRequirements(device, swapchain_images[index],
-                                             &requirements);
+                vkGetImageMemoryRequirements(device, swapchain_images[index], &requirements);
                 uint32_t memory_type = invalid_queue_index;
-                for (uint32_t type = 0;
-                     type < memory_properties.memoryTypeCount; ++type) {
-                    const bool type_matches =
-                        (requirements.memoryTypeBits & (1U << type)) != 0U;
-                    const bool device_local =
-                        (memory_properties.memoryTypes[type].propertyFlags &
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U;
+                for (uint32_t type = 0; type < memory_properties.memoryTypeCount; ++type) {
+                    const bool type_matches = (requirements.memoryTypeBits & (1U << type)) != 0U;
+                    const bool device_local = (memory_properties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U;
                     if (type_matches && device_local) {
                         memory_type = type;
                         break;
                     }
                 }
                 if (memory_type == invalid_queue_index) {
-                    throw mxvk::Exception(
-                        "Failed to find headless image memory");
+                    throw mxvk::Exception("Failed to find headless image memory");
                 }
 
                 VkMemoryAllocateInfo allocation_info{};
-                allocation_info.sType =
-                    VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocation_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
                 allocation_info.allocationSize = requirements.size;
                 allocation_info.memoryTypeIndex = memory_type;
-                if (vkAllocateMemory(device, &allocation_info, nullptr,
-                                     &headless_image_memories[index]) !=
-                    VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "Failed to allocate headless image memory");
+                if (vkAllocateMemory(device, &allocation_info, nullptr, &headless_image_memories[index]) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to allocate headless image memory");
                 }
-                if (vkBindImageMemory(device, swapchain_images[index],
-                                      headless_image_memories[index], 0) !=
-                    VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "Failed to bind headless image memory");
+                if (vkBindImageMemory(device, swapchain_images[index], headless_image_memories[index], 0) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to bind headless image memory");
                 }
 
                 VkImageViewCreateInfo view_info{};
@@ -2642,15 +2272,11 @@ namespace mxvk {
                 view_info.image = swapchain_images[index];
                 view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
                 view_info.format = swapchain_format;
-                view_info.subresourceRange.aspectMask =
-                    VK_IMAGE_ASPECT_COLOR_BIT;
+                view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 view_info.subresourceRange.levelCount = 1;
                 view_info.subresourceRange.layerCount = 1;
-                if (vkCreateImageView(device, &view_info, nullptr,
-                                      &swapchain_image_views[index]) !=
-                    VK_SUCCESS) {
-                    throw mxvk::Exception(
-                        "Failed to create a headless image view");
+                if (vkCreateImageView(device, &view_info, nullptr, &swapchain_image_views[index]) != VK_SUCCESS) {
+                    throw mxvk::Exception("Failed to create a headless image view");
                 }
             }
         } catch (const mxvk::Exception &ex) {
@@ -2661,10 +2287,7 @@ namespace mxvk {
 
         next_headless_image = 0;
         last_presented_image_index = invalid_queue_index;
-        std::cout << std::format(
-            "vk: created {} surface-free color targets ({}x{}, RGBA8)\n",
-            HEADLESS_TARGET_COUNT, swapchain_extent.width,
-            swapchain_extent.height);
+        std::cout << std::format("vk: created {} surface-free color targets ({}x{}, RGBA8)\n", HEADLESS_TARGET_COUNT, swapchain_extent.width, swapchain_extent.height);
         return true;
     }
 
@@ -2798,8 +2421,7 @@ namespace mxvk {
             vkGetPhysicalDeviceMemoryProperties(physical_device, &memProps);
             uint32_t memoryTypeIndex = UINT32_MAX;
             for (uint32_t t = 0; t < memProps.memoryTypeCount; ++t) {
-                if (((memReq.memoryTypeBits & (1u << t)) != 0U) &&
-                    ((memProps.memoryTypes[t].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U)) {
+                if (((memReq.memoryTypeBits & (1u << t)) != 0U) && ((memProps.memoryTypes[t].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0U)) {
                     memoryTypeIndex = t;
                     break;
                 }
@@ -2913,18 +2535,9 @@ namespace mxvk {
             return;
         }
 
-        const bool has_in_flight_fences = std::ranges::any_of(
-            in_flight_fences.begin(),
-            in_flight_fences.end(),
-            [](VkFence fence) { return fence != VK_NULL_HANDLE; });
-        const bool has_render_finished = std::ranges::any_of(
-            render_finished.begin(),
-            render_finished.end(),
-            [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
-        const bool has_image_available = std::ranges::any_of(
-            image_available.begin(),
-            image_available.end(),
-            [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
+        const bool has_in_flight_fences = std::ranges::any_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        const bool has_render_finished = std::ranges::any_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
+        const bool has_image_available = std::ranges::any_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; });
 
         if (!has_in_flight_fences && !has_render_finished && !has_image_available) {
             image_fences.clear();
@@ -2982,37 +2595,27 @@ namespace mxvk {
         if (surface_capabilities.currentExtent.width != 0xFFFFFFFFU) {
             new_extent = surface_capabilities.currentExtent;
         } else {
-            new_extent.width = std::clamp(static_cast<uint32_t>(pixel_w),
-                                          surface_capabilities.minImageExtent.width,
-                                          surface_capabilities.maxImageExtent.width);
+            new_extent.width = std::clamp(static_cast<uint32_t>(pixel_w), surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
 
-            new_extent.height = std::clamp(static_cast<uint32_t>(pixel_h),
-                                           surface_capabilities.minImageExtent.height,
-                                           surface_capabilities.maxImageExtent.height);
+            new_extent.height = std::clamp(static_cast<uint32_t>(pixel_h), surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
         }
 
         if (new_extent.width == 0 || new_extent.height == 0) {
             return;
         }
 
-        const uint32_t target_w = std::clamp(static_cast<uint32_t>(pixel_w),
-                                             surface_capabilities.minImageExtent.width,
-                                             surface_capabilities.maxImageExtent.width);
-        const uint32_t target_h = std::clamp(static_cast<uint32_t>(pixel_h),
-                                             surface_capabilities.minImageExtent.height,
-                                             surface_capabilities.maxImageExtent.height);
+        const uint32_t target_w = std::clamp(static_cast<uint32_t>(pixel_w), surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
+        const uint32_t target_h = std::clamp(static_cast<uint32_t>(pixel_h), surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
 
         if (new_extent.width != target_w || new_extent.height != target_h) {
             return;
         }
 
-        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width &&
-            swapchain_extent.height == new_extent.height) {
+        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width && swapchain_extent.height == new_extent.height) {
             return;
         }
 
-        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width &&
-            swapchain_extent.height == new_extent.height) {
+        if (!force_swapchain_recreate && swapchain_extent.width == new_extent.width && swapchain_extent.height == new_extent.height) {
             return;
         }
 
@@ -3161,15 +2764,9 @@ namespace mxvk {
             }
         }
 
-        if (!headless() && swapchain_extent.width != 0 &&
-            swapchain_extent.height != 0) {
-            if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) ||
-                swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
-                std::cout << std::format("mxvk: requesting swapchain recreation because window pixels changed from {}x{} to {}x{}\n",
-                                         swapchain_extent.width,
-                                         swapchain_extent.height,
-                                         pixel_w,
-                                         pixel_h);
+        if (!headless() && swapchain_extent.width != 0 && swapchain_extent.height != 0) {
+            if (swapchain_extent.width != static_cast<uint32_t>(pixel_w) || swapchain_extent.height != static_cast<uint32_t>(pixel_h)) {
+                std::cout << std::format("mxvk: requesting swapchain recreation because window pixels changed from {}x{} to {}x{}\n", swapchain_extent.width, swapchain_extent.height, pixel_w, pixel_h);
                 framebuffer_resized = true;
                 force_swapchain_recreate = true;
                 return;
@@ -3184,10 +2781,7 @@ namespace mxvk {
             }
         }
 
-        const bool sync_ready =
-            std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) &&
-            std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
+        const bool sync_ready = std::ranges::all_of(image_available.begin(), image_available.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && std::ranges::all_of(render_finished.begin(), render_finished.end(), [](VkSemaphore semaphore) { return semaphore != VK_NULL_HANDLE; }) && std::ranges::all_of(in_flight_fences.begin(), in_flight_fences.end(), [](VkFence fence) { return fence != VK_NULL_HANDLE; });
         if (!sync_ready) {
             return;
         }
@@ -3198,21 +2792,13 @@ namespace mxvk {
                     continue;
                 }
                 VkFormat sprite_color_format = swapchain_format;
-                const auto post_process_match = std::ranges::find(
-                    post_process_sprites, sprite.get());
+                const auto post_process_match = std::ranges::find(post_process_sprites, sprite.get());
                 if (post_process_match != post_process_sprites.end()) {
-                    const size_t effect_index = static_cast<size_t>(
-                        std::distance(post_process_sprites.begin(),
-                                      post_process_match));
-                    if (hdr_render_intermediates_enabled ||
-                        effect_index + 1U < post_process_sprites.size() ||
-                        (render_extent_override.width > 0U &&
-                         render_extent_override.height > 0U)) {
+                    const size_t effect_index = static_cast<size_t>(std::distance(post_process_sprites.begin(), post_process_match));
+                    if (hdr_render_intermediates_enabled || effect_index + 1U < post_process_sprites.size() || (render_extent_override.width > 0U && render_extent_override.height > 0U)) {
                         sprite_color_format = postProcessIntermediateFormat();
                     }
-                } else if (hdr_render_intermediates_enabled &&
-                           !post_process_sprites.empty() &&
-                           !isPostProcessSprite(sprite.get())) {
+                } else if (hdr_render_intermediates_enabled && !post_process_sprites.empty() && !isPostProcessSprite(sprite.get())) {
                     sprite_color_format = postProcessIntermediateFormat();
                 }
                 sprite->setColorAttachmentFormat(sprite_color_format);
@@ -3233,14 +2819,12 @@ namespace mxvk {
             updateFpsCounter();
         }
 
-        if (text_state_dirty && (text_renderer || preview_text_renderer) &&
-            swapchain_format != VK_FORMAT_UNDEFINED) {
+        if (text_state_dirty && (text_renderer || preview_text_renderer) && swapchain_format != VK_FORMAT_UNDEFINED) {
             if (text_renderer) {
                 text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
             }
             if (preview_text_renderer) {
-                preview_text_renderer->setDescriptorSetLayout(
-                    text_descriptor_set_layout);
+                preview_text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
             }
             try {
                 createTextPipeline();
@@ -3275,17 +2859,11 @@ namespace mxvk {
         uint32_t image_index = 0;
         VkResult acquire_result = VK_SUCCESS;
         if (headless()) {
-            image_index = next_headless_image %
-                          static_cast<uint32_t>(swapchain_images.size());
-            next_headless_image =
-                (next_headless_image + 1U) %
-                static_cast<uint32_t>(swapchain_images.size());
+            image_index = next_headless_image % static_cast<uint32_t>(swapchain_images.size());
+            next_headless_image = (next_headless_image + 1U) % static_cast<uint32_t>(swapchain_images.size());
         } else {
-            const uint64_t acquire_timeout_ns =
-                100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
-            acquire_result = vkAcquireNextImageKHR(
-                device, swapchain, acquire_timeout_ns, acquire_semaphore,
-                VK_NULL_HANDLE, &image_index);
+            const uint64_t acquire_timeout_ns = 100000000ULL; // 100 ms avoids UINT64_MAX forward-progress VUIDs.
+            acquire_result = vkAcquireNextImageKHR(device, swapchain, acquire_timeout_ns, acquire_semaphore, VK_NULL_HANDLE, &image_index);
         }
 
         static VkResult last_acquire_error = VK_SUCCESS;
@@ -3321,16 +2899,12 @@ namespace mxvk {
             if (last_acquire_error == acquire_result) {
                 ++repeated_acquire_errors;
                 if ((repeated_acquire_errors % 120U) == 0U) {
-                    std::cerr << std::format(
-                        "mxvk: repeated swapchain acquire failures continue (VkResult={})\n",
-                        static_cast<int>(acquire_result));
+                    std::cerr << std::format("mxvk: repeated swapchain acquire failures continue (VkResult={})\n", static_cast<int>(acquire_result));
                 }
             } else {
                 last_acquire_error = acquire_result;
                 repeated_acquire_errors = 0;
-                std::cerr << std::format(
-                    "mxvk: Failed to acquire swapchain image (VkResult={})\n",
-                    static_cast<int>(acquire_result));
+                std::cerr << std::format("mxvk: Failed to acquire swapchain image (VkResult={})\n", static_cast<int>(acquire_result));
             }
 
             if (acquire_result == VK_ERROR_DEVICE_LOST) {
@@ -3386,22 +2960,12 @@ namespace mxvk {
 
         VkClearValue clear_value{};
         clear_value.color = clear_color;
-        const bool detached_render = render_extent_override.width > 0U &&
-                                     render_extent_override.height > 0U;
+        const bool detached_render = render_extent_override.width > 0U && render_extent_override.height > 0U;
         const VkExtent2D render_extent = getRenderExtent();
-        const bool use_post_process = post_process_enabled &&
-                                      !post_process_sprites.empty() &&
-                                      !post_process_images.empty() &&
-                                      !post_process_views.empty() &&
-                                      !post_process_initialized.empty() &&
-                                      image_index < post_process_images.front().size() &&
-                                      image_index < post_process_views.front().size() &&
-                                      image_index < post_process_initialized.front().size();
+        const bool use_post_process = post_process_enabled && !post_process_sprites.empty() && !post_process_images.empty() && !post_process_views.empty() && !post_process_initialized.empty() && image_index < post_process_images.front().size() && image_index < post_process_views.front().size() && image_index < post_process_initialized.front().size();
         const bool use_offscreen_target = use_post_process || detached_render;
-        const bool consume_post_process =
-            use_post_process && post_process_texture_consumer_enabled;
-        const size_t scene_target =
-            hdr_render_intermediates_enabled ? 1U : 0U;
+        const bool consume_post_process = use_post_process && post_process_texture_consumer_enabled;
+        const size_t scene_target = hdr_render_intermediates_enabled ? 1U : 0U;
         VkImage rgba16_readback_image = VK_NULL_HANDLE;
 
         VkImageMemoryBarrier2 to_color_barrier{};
@@ -3410,11 +2974,7 @@ namespace mxvk {
         to_color_barrier.srcAccessMask = VK_ACCESS_2_NONE;
         to_color_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         to_color_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        to_color_barrier.oldLayout = swapchain_image_initialized[image_index]
-                                         ? (headless()
-                                                ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                                : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-                                         : VK_IMAGE_LAYOUT_UNDEFINED;
+        to_color_barrier.oldLayout = swapchain_image_initialized[image_index] ? (headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) : VK_IMAGE_LAYOUT_UNDEFINED;
         to_color_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         to_color_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_color_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3434,10 +2994,7 @@ namespace mxvk {
         if (use_offscreen_target) {
             VkImageMemoryBarrier2 post_target_barrier{};
             post_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            post_target_barrier.srcStageMask = post_process_initialized[scene_target][image_index]
-                                                   ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                                                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
-                                                   : VK_PIPELINE_STAGE_2_NONE;
+            post_target_barrier.srcStageMask = post_process_initialized[scene_target][image_index] ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE;
             post_target_barrier.srcAccessMask = post_process_initialized[scene_target][image_index] ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE;
             post_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             post_target_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
@@ -3462,10 +3019,7 @@ namespace mxvk {
         to_depth_barrier.srcAccessMask = VK_ACCESS_2_NONE;
         to_depth_barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
         to_depth_barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        to_depth_barrier.oldLayout =
-            (depth_slot < depth_image_initialized.size() && depth_image_initialized[depth_slot])
-                ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
-                : VK_IMAGE_LAYOUT_UNDEFINED;
+        to_depth_barrier.oldLayout = (depth_slot < depth_image_initialized.size() && depth_image_initialized[depth_slot]) ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
         to_depth_barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         to_depth_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_depth_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3495,9 +3049,7 @@ namespace mxvk {
 
         VkRenderingAttachmentInfo color_attachment{};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        color_attachment.imageView = use_offscreen_target
-                                         ? post_process_views[scene_target][image_index]
-                                         : swapchain_image_views[image_index];
+        color_attachment.imageView = use_offscreen_target ? post_process_views[scene_target][image_index] : swapchain_image_views[image_index];
         color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         color_attachment.resolveImageView = VK_NULL_HANDLE;
@@ -3526,9 +3078,7 @@ namespace mxvk {
         VkRenderingInfo rendering_info{};
         rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         rendering_info.renderArea.offset = {0, 0};
-        rendering_info.renderArea.extent = use_offscreen_target
-                                               ? render_extent
-                                               : swapchain_extent;
+        rendering_info.renderArea.extent = use_offscreen_target ? render_extent : swapchain_extent;
         rendering_info.layerCount = 1;
         rendering_info.viewMask = 0;
         rendering_info.colorAttachmentCount = 1;
@@ -3563,17 +3113,13 @@ namespace mxvk {
                 if (sprite_pipeline != VK_NULL_HANDLE) {
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sprite_pipeline);
                 }
-                sprite->renderSprites(cmd, sprite_pipeline_layout,
-                                      rendering_info.renderArea.extent.width,
-                                      rendering_info.renderArea.extent.height);
+                sprite->renderSprites(cmd, sprite_pipeline_layout, rendering_info.renderArea.extent.width, rendering_info.renderArea.extent.height);
             }
         }
 
         if (!use_post_process && text_renderer && text_pipeline != VK_NULL_HANDLE) {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
-            text_renderer->renderText(cmd, text_pipeline_layout,
-                                      rendering_info.renderArea.extent.width,
-                                      rendering_info.renderArea.extent.height);
+            text_renderer->renderText(cmd, text_pipeline_layout, rendering_info.renderArea.extent.width, rendering_info.renderArea.extent.height);
         }
 
         vkCmdEndRendering(cmd);
@@ -3586,9 +3132,7 @@ namespace mxvk {
             post_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             post_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             post_target_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            post_target_barrier.dstStageMask =
-                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            post_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
             post_target_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
             post_target_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             post_target_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -3620,106 +3164,60 @@ namespace mxvk {
                     effect_sprite->setShaderParams(params[0], params[1], params[2], params[3]);
                 }
 
-                const bool compute_effect =
-                    effect_index < post_process_effect_stages.size() &&
-                    post_process_effect_stages[effect_index] == ShaderStage::Compute;
-                const bool final_effect =
-                    (effect_index + 1U) == post_process_sprites.size();
-                const size_t destination_target = hdr_render_intermediates_enabled
-                                                      ? (source_target == 2U ? 3U : 2U)
-                                                      : (source_target == 1U ? 2U : 1U);
+                const bool compute_effect = effect_index < post_process_effect_stages.size() && post_process_effect_stages[effect_index] == ShaderStage::Compute;
+                const bool final_effect = (effect_index + 1U) == post_process_sprites.size();
+                const size_t destination_target = hdr_render_intermediates_enabled ? (source_target == 2U ? 3U : 2U) : (source_target == 1U ? 2U : 1U);
 
                 if (compute_effect) {
                     VkImageMemoryBarrier2 storage_target_barrier{};
-                    storage_target_barrier.sType =
-                        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    storage_target_barrier.srcStageMask =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                                  VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
-                            : VK_PIPELINE_STAGE_2_NONE;
-                    storage_target_barrier.srcAccessMask =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                            : VK_ACCESS_2_NONE;
-                    storage_target_barrier.dstStageMask =
-                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                    storage_target_barrier.dstAccessMask =
-                        VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-                    storage_target_barrier.oldLayout =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                            : VK_IMAGE_LAYOUT_UNDEFINED;
+                    storage_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    storage_target_barrier.srcStageMask = post_process_initialized[destination_target][image_index] ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE;
+                    storage_target_barrier.srcAccessMask = post_process_initialized[destination_target][image_index] ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE;
+                    storage_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                    storage_target_barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+                    storage_target_barrier.oldLayout = post_process_initialized[destination_target][image_index] ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
                     storage_target_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    storage_target_barrier.srcQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    storage_target_barrier.dstQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    storage_target_barrier.image =
-                        post_process_images[destination_target][image_index];
-                    storage_target_barrier.subresourceRange.aspectMask =
-                        VK_IMAGE_ASPECT_COLOR_BIT;
+                    storage_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    storage_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    storage_target_barrier.image = post_process_images[destination_target][image_index];
+                    storage_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     storage_target_barrier.subresourceRange.levelCount = 1;
                     storage_target_barrier.subresourceRange.layerCount = 1;
                     VkDependencyInfo storage_target_dependency{};
-                    storage_target_dependency.sType =
-                        VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    storage_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     storage_target_dependency.imageMemoryBarrierCount = 1;
-                    storage_target_dependency.pImageMemoryBarriers =
-                        &storage_target_barrier;
+                    storage_target_dependency.pImageMemoryBarriers = &storage_target_barrier;
                     vkCmdPipelineBarrier2(cmd, &storage_target_dependency);
 
-                    effect_sprite->dispatchCompute(
-                        cmd, post_process_views[source_target][image_index],
-                        post_process_views[destination_target][image_index],
-                        render_extent.width, render_extent.height);
+                    effect_sprite->dispatchCompute(cmd, post_process_views[source_target][image_index], post_process_views[destination_target][image_index], render_extent.width, render_extent.height);
 
                     VkImageMemoryBarrier2 sampled_target_barrier{};
-                    sampled_target_barrier.sType =
-                        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    sampled_target_barrier.srcStageMask =
-                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                    sampled_target_barrier.srcAccessMask =
-                        VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-                    sampled_target_barrier.dstStageMask =
-                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                    sampled_target_barrier.dstAccessMask =
-                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                    sampled_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    sampled_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                    sampled_target_barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+                    sampled_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                    sampled_target_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
                     sampled_target_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    sampled_target_barrier.newLayout =
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    sampled_target_barrier.srcQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    sampled_target_barrier.dstQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    sampled_target_barrier.image =
-                        post_process_images[destination_target][image_index];
-                    sampled_target_barrier.subresourceRange.aspectMask =
-                        VK_IMAGE_ASPECT_COLOR_BIT;
+                    sampled_target_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    sampled_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    sampled_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    sampled_target_barrier.image = post_process_images[destination_target][image_index];
+                    sampled_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     sampled_target_barrier.subresourceRange.levelCount = 1;
                     sampled_target_barrier.subresourceRange.layerCount = 1;
                     VkDependencyInfo sampled_target_dependency{};
-                    sampled_target_dependency.sType =
-                        VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    sampled_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     sampled_target_dependency.imageMemoryBarrierCount = 1;
-                    sampled_target_dependency.pImageMemoryBarriers =
-                        &sampled_target_barrier;
+                    sampled_target_dependency.pImageMemoryBarriers = &sampled_target_barrier;
                     vkCmdPipelineBarrier2(cmd, &sampled_target_dependency);
                     post_process_initialized[destination_target][image_index] = true;
                     source_target = destination_target;
 
-                    if (final_effect && !hdr_render_intermediates_enabled &&
-                        !detached_render &&
-                        !consume_post_process &&
-                        post_process_present_sprite != nullptr) {
+                    if (final_effect && !hdr_render_intermediates_enabled && !detached_render && !consume_post_process && post_process_present_sprite != nullptr) {
                         VkRenderingAttachmentInfo post_attachment{};
-                        post_attachment.sType =
-                            VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                        post_attachment.imageView =
-                            swapchain_image_views[image_index];
-                        post_attachment.imageLayout =
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                        post_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                        post_attachment.imageView = swapchain_image_views[image_index];
+                        post_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                         post_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                         post_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                         VkRenderingInfo post_info{};
@@ -3729,106 +3227,62 @@ namespace mxvk {
                         post_info.colorAttachmentCount = 1;
                         post_info.pColorAttachments = &post_attachment;
                         vkCmdBeginRendering(cmd, &post_info);
-                        post_process_present_sprite->setExternalTexture(
-                            post_process_views[source_target][image_index],
-                            static_cast<int>(swapchain_extent.width),
-                            static_cast<int>(swapchain_extent.height));
-                        post_process_present_sprite->drawSpriteRect(
-                            0, 0, static_cast<int>(swapchain_extent.width),
-                            static_cast<int>(swapchain_extent.height));
+                        post_process_present_sprite->setExternalTexture(post_process_views[source_target][image_index], static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
+                        post_process_present_sprite->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
                         renderStandaloneSprite(*post_process_present_sprite, cmd);
                         vkCmdEndRendering(cmd);
                     }
                     continue;
                 }
 
-                const VkImageView destination_view =
-                    final_effect && !hdr_render_intermediates_enabled &&
-                            !detached_render && !consume_post_process
-                        ? swapchain_image_views[image_index]
-                        : post_process_views[destination_target][image_index];
-                if (!final_effect || hdr_render_intermediates_enabled ||
-                    detached_render || consume_post_process) {
+                const VkImageView destination_view = final_effect && !hdr_render_intermediates_enabled && !detached_render && !consume_post_process ? swapchain_image_views[image_index] : post_process_views[destination_target][image_index];
+                if (!final_effect || hdr_render_intermediates_enabled || detached_render || consume_post_process) {
                     VkImageMemoryBarrier2 next_target_barrier{};
-                    next_target_barrier.sType =
-                        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    next_target_barrier.srcStageMask =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                                  VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
-                            : VK_PIPELINE_STAGE_2_NONE;
-                    next_target_barrier.srcAccessMask =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                            : VK_ACCESS_2_NONE;
-                    next_target_barrier.dstStageMask =
-                        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    next_target_barrier.dstAccessMask =
-                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                    next_target_barrier.oldLayout =
-                        post_process_initialized[destination_target][image_index]
-                            ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                            : VK_IMAGE_LAYOUT_UNDEFINED;
-                    next_target_barrier.newLayout =
-                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    next_target_barrier.srcQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    next_target_barrier.dstQueueFamilyIndex =
-                        VK_QUEUE_FAMILY_IGNORED;
-                    next_target_barrier.image =
-                        post_process_images[destination_target][image_index];
-                    next_target_barrier.subresourceRange.aspectMask =
-                        VK_IMAGE_ASPECT_COLOR_BIT;
+                    next_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    next_target_barrier.srcStageMask = post_process_initialized[destination_target][image_index] ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE;
+                    next_target_barrier.srcAccessMask = post_process_initialized[destination_target][image_index] ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE;
+                    next_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    next_target_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                    next_target_barrier.oldLayout = post_process_initialized[destination_target][image_index] ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+                    next_target_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    next_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    next_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    next_target_barrier.image = post_process_images[destination_target][image_index];
+                    next_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     next_target_barrier.subresourceRange.levelCount = 1;
                     next_target_barrier.subresourceRange.layerCount = 1;
                     VkDependencyInfo next_target_dependency{};
-                    next_target_dependency.sType =
-                        VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    next_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     next_target_dependency.imageMemoryBarrierCount = 1;
-                    next_target_dependency.pImageMemoryBarriers =
-                        &next_target_barrier;
+                    next_target_dependency.pImageMemoryBarriers = &next_target_barrier;
                     vkCmdPipelineBarrier2(cmd, &next_target_dependency);
                 }
 
                 VkRenderingAttachmentInfo post_attachment{};
-                post_attachment.sType =
-                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                post_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                 post_attachment.imageView = destination_view;
-                post_attachment.imageLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                post_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 post_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 post_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo post_info{};
                 post_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-                post_info.renderArea.extent = detached_render
-                                                  ? render_extent
-                                                  : swapchain_extent;
+                post_info.renderArea.extent = detached_render ? render_extent : swapchain_extent;
                 post_info.layerCount = 1;
                 post_info.colorAttachmentCount = 1;
                 post_info.pColorAttachments = &post_attachment;
                 vkCmdBeginRendering(cmd, &post_info);
 
-                effect_sprite->setExternalTexture(
-                    post_process_views[source_target][image_index],
-                    static_cast<int>(render_extent.width),
-                    static_cast<int>(render_extent.height));
-                effect_sprite->drawSpriteRect(
-                    0, 0, static_cast<int>(render_extent.width),
-                    static_cast<int>(render_extent.height));
-                renderStandaloneSprite(*effect_sprite, cmd,
-                                       detached_render ? render_extent
-                                                       : swapchain_extent);
+                effect_sprite->setExternalTexture(post_process_views[source_target][image_index], static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+                effect_sprite->drawSpriteRect(0, 0, static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+                renderStandaloneSprite(*effect_sprite, cmd, detached_render ? render_extent : swapchain_extent);
                 vkCmdEndRendering(cmd);
 
-                if (!final_effect || hdr_render_intermediates_enabled ||
-                    detached_render || consume_post_process) {
+                if (!final_effect || hdr_render_intermediates_enabled || detached_render || consume_post_process) {
                     VkImageMemoryBarrier2 sampled_target_barrier{};
                     sampled_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     sampled_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
                     sampled_target_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                    sampled_target_barrier.dstStageMask =
-                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                    sampled_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
                     sampled_target_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
                     sampled_target_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     sampled_target_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -3850,55 +3304,31 @@ namespace mxvk {
 
             bool hdr_consumer_rendered = false;
             if (consume_post_process && hdr_render_intermediates_enabled) {
-                const size_t consumer_target =
-                    source_target == 2U ? 3U : 2U;
+                const size_t consumer_target = source_target == 2U ? 3U : 2U;
                 VkImageMemoryBarrier2 consumer_target_barrier{};
-                consumer_target_barrier.sType =
-                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                consumer_target_barrier.srcStageMask =
-                    post_process_initialized[consumer_target][image_index]
-                        ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                              VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
-                        : VK_PIPELINE_STAGE_2_NONE;
-                consumer_target_barrier.srcAccessMask =
-                    post_process_initialized[consumer_target][image_index]
-                        ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                        : VK_ACCESS_2_NONE;
-                consumer_target_barrier.dstStageMask =
-                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                consumer_target_barrier.dstAccessMask =
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                consumer_target_barrier.oldLayout =
-                    post_process_initialized[consumer_target][image_index]
-                        ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                        : VK_IMAGE_LAYOUT_UNDEFINED;
-                consumer_target_barrier.newLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                consumer_target_barrier.srcQueueFamilyIndex =
-                    VK_QUEUE_FAMILY_IGNORED;
-                consumer_target_barrier.dstQueueFamilyIndex =
-                    VK_QUEUE_FAMILY_IGNORED;
-                consumer_target_barrier.image =
-                    post_process_images[consumer_target][image_index];
-                consumer_target_barrier.subresourceRange.aspectMask =
-                    VK_IMAGE_ASPECT_COLOR_BIT;
+                consumer_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                consumer_target_barrier.srcStageMask = post_process_initialized[consumer_target][image_index] ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE;
+                consumer_target_barrier.srcAccessMask = post_process_initialized[consumer_target][image_index] ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE;
+                consumer_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                consumer_target_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                consumer_target_barrier.oldLayout = post_process_initialized[consumer_target][image_index] ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+                consumer_target_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                consumer_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                consumer_target_barrier.image = post_process_images[consumer_target][image_index];
+                consumer_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 consumer_target_barrier.subresourceRange.levelCount = 1;
                 consumer_target_barrier.subresourceRange.layerCount = 1;
                 VkDependencyInfo consumer_target_dependency{};
-                consumer_target_dependency.sType =
-                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                consumer_target_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                 consumer_target_dependency.imageMemoryBarrierCount = 1;
-                consumer_target_dependency.pImageMemoryBarriers =
-                    &consumer_target_barrier;
+                consumer_target_dependency.pImageMemoryBarriers = &consumer_target_barrier;
                 vkCmdPipelineBarrier2(cmd, &consumer_target_dependency);
 
                 VkRenderingAttachmentInfo consumer_attachment{};
-                consumer_attachment.sType =
-                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                consumer_attachment.imageView =
-                    post_process_views[consumer_target][image_index];
-                consumer_attachment.imageLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                consumer_attachment.imageView = post_process_views[consumer_target][image_index];
+                consumer_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 consumer_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 consumer_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo consumer_info{};
@@ -3907,61 +3337,39 @@ namespace mxvk {
                 consumer_info.layerCount = 1;
                 consumer_info.colorAttachmentCount = 1;
                 consumer_info.pColorAttachments = &consumer_attachment;
-                consumer_info.pDepthAttachment =
-                    depth_attachment.imageView != VK_NULL_HANDLE
-                        ? &depth_attachment
-                        : nullptr;
+                consumer_info.pDepthAttachment = depth_attachment.imageView != VK_NULL_HANDLE ? &depth_attachment : nullptr;
                 vkCmdBeginRendering(cmd, &consumer_info);
                 vkCmdSetViewport(cmd, 0, 1, &viewport);
                 vkCmdSetScissor(cmd, 0, 1, &scissor);
-                onRecordPostProcessingTexture(
-                    cmd, image_index,
-                    post_process_views[source_target][image_index],
-                    render_extent);
+                onRecordPostProcessingTexture(cmd, image_index, post_process_views[source_target][image_index], render_extent);
                 vkCmdEndRendering(cmd);
 
-                VkImageMemoryBarrier2 sampled_consumer_barrier =
-                    consumer_target_barrier;
-                sampled_consumer_barrier.srcStageMask =
-                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                sampled_consumer_barrier.srcAccessMask =
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                sampled_consumer_barrier.dstStageMask =
-                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                sampled_consumer_barrier.dstAccessMask =
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-                sampled_consumer_barrier.oldLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                sampled_consumer_barrier.newLayout =
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                VkImageMemoryBarrier2 sampled_consumer_barrier = consumer_target_barrier;
+                sampled_consumer_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                sampled_consumer_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                sampled_consumer_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                sampled_consumer_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                sampled_consumer_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                sampled_consumer_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 VkDependencyInfo sampled_consumer_dependency{};
-                sampled_consumer_dependency.sType =
-                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                sampled_consumer_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                 sampled_consumer_dependency.imageMemoryBarrierCount = 1;
-                sampled_consumer_dependency.pImageMemoryBarriers =
-                    &sampled_consumer_barrier;
+                sampled_consumer_dependency.pImageMemoryBarriers = &sampled_consumer_barrier;
                 vkCmdPipelineBarrier2(cmd, &sampled_consumer_dependency);
                 post_process_initialized[consumer_target][image_index] = true;
                 source_target = consumer_target;
                 hdr_consumer_rendered = true;
             }
 
-            if (frame_readback_rgba16_enabled &&
-                hdr_render_intermediates_enabled) {
-                rgba16_readback_image =
-                    post_process_images[source_target][image_index];
+            if (frame_readback_rgba16_enabled && hdr_render_intermediates_enabled) {
+                rgba16_readback_image = post_process_images[source_target][image_index];
             }
 
-            if (hdr_render_intermediates_enabled && !detached_render &&
-                (!consume_post_process || hdr_consumer_rendered) &&
-                post_process_present_sprite != nullptr) {
+            if (hdr_render_intermediates_enabled && !detached_render && (!consume_post_process || hdr_consumer_rendered) && post_process_present_sprite != nullptr) {
                 VkRenderingAttachmentInfo present_attachment{};
-                present_attachment.sType =
-                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                present_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                 present_attachment.imageView = swapchain_image_views[image_index];
-                present_attachment.imageLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                present_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 present_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 present_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo present_info{};
@@ -3971,13 +3379,8 @@ namespace mxvk {
                 present_info.colorAttachmentCount = 1;
                 present_info.pColorAttachments = &present_attachment;
                 vkCmdBeginRendering(cmd, &present_info);
-                post_process_present_sprite->setExternalTexture(
-                    post_process_views[source_target][image_index],
-                    static_cast<int>(render_extent.width),
-                    static_cast<int>(render_extent.height));
-                post_process_present_sprite->drawSpriteRect(
-                    0, 0, static_cast<int>(swapchain_extent.width),
-                    static_cast<int>(swapchain_extent.height));
+                post_process_present_sprite->setExternalTexture(post_process_views[source_target][image_index], static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+                post_process_present_sprite->drawSpriteRect(0, 0, static_cast<int>(swapchain_extent.width), static_cast<int>(swapchain_extent.height));
                 renderStandaloneSprite(*post_process_present_sprite, cmd);
                 post_process_present_sprite->clearQueue();
                 vkCmdEndRendering(cmd);
@@ -3985,45 +3388,29 @@ namespace mxvk {
 
             if (detached_render && post_process_composite_sprite != nullptr) {
                 VkImageMemoryBarrier2 composite_target_barrier{};
-                composite_target_barrier.sType =
-                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                composite_target_barrier.srcStageMask =
-                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                composite_target_barrier.srcAccessMask =
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-                composite_target_barrier.dstStageMask =
-                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                composite_target_barrier.dstAccessMask =
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                composite_target_barrier.oldLayout =
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                composite_target_barrier.newLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                composite_target_barrier.srcQueueFamilyIndex =
-                    VK_QUEUE_FAMILY_IGNORED;
-                composite_target_barrier.dstQueueFamilyIndex =
-                    VK_QUEUE_FAMILY_IGNORED;
-                composite_target_barrier.image =
-                    post_process_images[0][image_index];
-                composite_target_barrier.subresourceRange.aspectMask =
-                    VK_IMAGE_ASPECT_COLOR_BIT;
+                composite_target_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                composite_target_barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                composite_target_barrier.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                composite_target_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                composite_target_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                composite_target_barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                composite_target_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                composite_target_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                composite_target_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                composite_target_barrier.image = post_process_images[0][image_index];
+                composite_target_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 composite_target_barrier.subresourceRange.levelCount = 1;
                 composite_target_barrier.subresourceRange.layerCount = 1;
                 VkDependencyInfo composite_dependency{};
                 composite_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                 composite_dependency.imageMemoryBarrierCount = 1;
-                composite_dependency.pImageMemoryBarriers =
-                    &composite_target_barrier;
+                composite_dependency.pImageMemoryBarriers = &composite_target_barrier;
                 vkCmdPipelineBarrier2(cmd, &composite_dependency);
 
                 VkRenderingAttachmentInfo composite_attachment{};
-                composite_attachment.sType =
-                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                composite_attachment.imageView =
-                    post_process_views[0][image_index];
-                composite_attachment.imageLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                composite_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                composite_attachment.imageView = post_process_views[0][image_index];
+                composite_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 composite_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 composite_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo composite_info{};
@@ -4032,40 +3419,24 @@ namespace mxvk {
                 composite_info.layerCount = 1;
                 composite_info.colorAttachmentCount = 1;
                 composite_info.pColorAttachments = &composite_attachment;
-                composite_info.pDepthAttachment =
-                    consume_post_process && !hdr_consumer_rendered &&
-                            depth_attachment.imageView != VK_NULL_HANDLE
-                        ? &depth_attachment
-                        : nullptr;
+                composite_info.pDepthAttachment = consume_post_process && !hdr_consumer_rendered && depth_attachment.imageView != VK_NULL_HANDLE ? &depth_attachment : nullptr;
                 vkCmdBeginRendering(cmd, &composite_info);
                 if (consume_post_process && !hdr_consumer_rendered) {
                     vkCmdSetViewport(cmd, 0, 1, &viewport);
                     vkCmdSetScissor(cmd, 0, 1, &scissor);
-                    onRecordPostProcessingTexture(
-                        cmd, image_index,
-                        post_process_views[source_target][image_index],
-                        render_extent);
+                    onRecordPostProcessingTexture(cmd, image_index, post_process_views[source_target][image_index], render_extent);
                 } else {
-                    post_process_composite_sprite->setExternalTexture(
-                        post_process_views[source_target][image_index],
-                        static_cast<int>(render_extent.width),
-                        static_cast<int>(render_extent.height));
-                    post_process_composite_sprite->drawSpriteRect(
-                        0, 0, static_cast<int>(render_extent.width),
-                        static_cast<int>(render_extent.height));
-                    renderStandaloneSprite(*post_process_composite_sprite, cmd,
-                                           render_extent);
+                    post_process_composite_sprite->setExternalTexture(post_process_views[source_target][image_index], static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+                    post_process_composite_sprite->drawSpriteRect(0, 0, static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+                    renderStandaloneSprite(*post_process_composite_sprite, cmd, render_extent);
                     post_process_composite_sprite->clearQueue();
                 }
                 vkCmdEndRendering(cmd);
             } else if (consume_post_process && !hdr_consumer_rendered) {
                 VkRenderingAttachmentInfo consumer_attachment{};
-                consumer_attachment.sType =
-                    VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                consumer_attachment.imageView =
-                    swapchain_image_views[image_index];
-                consumer_attachment.imageLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                consumer_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                consumer_attachment.imageView = swapchain_image_views[image_index];
+                consumer_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 consumer_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                 consumer_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
                 VkRenderingInfo consumer_info{};
@@ -4074,17 +3445,11 @@ namespace mxvk {
                 consumer_info.layerCount = 1;
                 consumer_info.colorAttachmentCount = 1;
                 consumer_info.pColorAttachments = &consumer_attachment;
-                consumer_info.pDepthAttachment =
-                    depth_attachment.imageView != VK_NULL_HANDLE
-                        ? &depth_attachment
-                        : nullptr;
+                consumer_info.pDepthAttachment = depth_attachment.imageView != VK_NULL_HANDLE ? &depth_attachment : nullptr;
                 vkCmdBeginRendering(cmd, &consumer_info);
                 vkCmdSetViewport(cmd, 0, 1, &viewport);
                 vkCmdSetScissor(cmd, 0, 1, &scissor);
-                onRecordPostProcessingTexture(
-                    cmd, image_index,
-                    post_process_views[source_target][image_index],
-                    render_extent);
+                onRecordPostProcessingTexture(cmd, image_index, post_process_views[source_target][image_index], render_extent);
                 vkCmdEndRendering(cmd);
             }
         }
@@ -4099,15 +3464,12 @@ namespace mxvk {
             to_text_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             to_text_barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_text_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_text_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
-                                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_text_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_text_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_text_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_text_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_text_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            to_text_barrier.image = detached_render
-                                        ? post_process_images[0][image_index]
-                                        : swapchain_images[image_index];
+            to_text_barrier.image = detached_render ? post_process_images[0][image_index] : swapchain_images[image_index];
             to_text_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_text_barrier.subresourceRange.levelCount = 1;
             to_text_barrier.subresourceRange.layerCount = 1;
@@ -4119,17 +3481,13 @@ namespace mxvk {
 
             VkRenderingAttachmentInfo text_attachment{};
             text_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            text_attachment.imageView = detached_render
-                                            ? post_process_views[0][image_index]
-                                            : swapchain_image_views[image_index];
+            text_attachment.imageView = detached_render ? post_process_views[0][image_index] : swapchain_image_views[image_index];
             text_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             text_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             text_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             VkRenderingInfo text_info{};
             text_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-            text_info.renderArea.extent = detached_render
-                                              ? render_extent
-                                              : swapchain_extent;
+            text_info.renderArea.extent = detached_render ? render_extent : swapchain_extent;
             text_info.layerCount = 1;
             text_info.colorAttachmentCount = 1;
             text_info.pColorAttachments = &text_attachment;
@@ -4137,39 +3495,21 @@ namespace mxvk {
             vkCmdSetViewport(cmd, 0, 1, &viewport);
             vkCmdSetScissor(cmd, 0, 1, &scissor);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
-            text_renderer->renderText(cmd, text_pipeline_layout,
-                                      text_info.renderArea.extent.width,
-                                      text_info.renderArea.extent.height);
+            text_renderer->renderText(cmd, text_pipeline_layout, text_info.renderArea.extent.width, text_info.renderArea.extent.height);
             vkCmdEndRendering(cmd);
         }
 
-        const bool use_rgba16_readback =
-            frame_readback_enabled &&
-            rgba16_readback_image != VK_NULL_HANDLE;
-        const bool use_output_readback =
-            frame_readback_enabled && !use_rgba16_readback;
+        const bool use_rgba16_readback = frame_readback_enabled && rgba16_readback_image != VK_NULL_HANDLE;
+        const bool use_output_readback = frame_readback_enabled && !use_rgba16_readback;
         if (frame_readback_enabled) {
-            const VkImage readback_image = use_rgba16_readback
-                                               ? rgba16_readback_image
-                                           : detached_render
-                                               ? post_process_images[0][image_index]
-                                               : swapchain_images[image_index];
+            const VkImage readback_image = use_rgba16_readback ? rgba16_readback_image : detached_render ? post_process_images[0][image_index] : swapchain_images[image_index];
             VkImageMemoryBarrier2 to_readback_barrier{};
             to_readback_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_readback_barrier.srcStageMask =
-                use_rgba16_readback
-                    ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
-                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_readback_barrier.srcAccessMask =
-                use_rgba16_readback ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT
-                                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_readback_barrier.srcStageMask = use_rgba16_readback ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_readback_barrier.srcAccessMask = use_rgba16_readback ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_readback_barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             to_readback_barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            to_readback_barrier.oldLayout =
-                use_rgba16_readback
-                    ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_readback_barrier.oldLayout = use_rgba16_readback ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_readback_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             to_readback_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_readback_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -4191,63 +3531,33 @@ namespace mxvk {
             readback_region.imageSubresource.mipLevel = 0;
             readback_region.imageSubresource.baseArrayLayer = 0;
             readback_region.imageSubresource.layerCount = 1;
-            readback_region.imageExtent = {
-                use_rgba16_readback || detached_render
-                    ? render_extent.width
-                    : swapchain_extent.width,
-                use_rgba16_readback || detached_render
-                    ? render_extent.height
-                    : swapchain_extent.height,
-                1};
-            vkCmdCopyImageToBuffer(cmd, readback_image,
-                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   frame_readback_slots[current_frame].buffer, 1,
-                                   &readback_region);
+            readback_region.imageExtent = {use_rgba16_readback || detached_render ? render_extent.width : swapchain_extent.width, use_rgba16_readback || detached_render ? render_extent.height : swapchain_extent.height, 1};
+            vkCmdCopyImageToBuffer(cmd, readback_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, frame_readback_slots[current_frame].buffer, 1, &readback_region);
 
             if (use_rgba16_readback) {
-                VkImageMemoryBarrier2 restore_readback_barrier =
-                    to_readback_barrier;
-                restore_readback_barrier.srcStageMask =
-                    VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-                restore_readback_barrier.srcAccessMask =
-                    VK_ACCESS_2_TRANSFER_READ_BIT;
-                restore_readback_barrier.dstStageMask =
-                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT |
-                    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-                restore_readback_barrier.dstAccessMask =
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-                restore_readback_barrier.oldLayout =
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                restore_readback_barrier.newLayout =
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                VkImageMemoryBarrier2 restore_readback_barrier = to_readback_barrier;
+                restore_readback_barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                restore_readback_barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+                restore_readback_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                restore_readback_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+                restore_readback_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                restore_readback_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 VkDependencyInfo restore_readback_dependency{};
-                restore_readback_dependency.sType =
-                    VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                restore_readback_dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                 restore_readback_dependency.imageMemoryBarrierCount = 1;
-                restore_readback_dependency.pImageMemoryBarriers =
-                    &restore_readback_barrier;
+                restore_readback_dependency.pImageMemoryBarriers = &restore_readback_barrier;
                 vkCmdPipelineBarrier2(cmd, &restore_readback_dependency);
             }
         }
 
-        if (!headless() && detached_render &&
-            post_process_present_sprite != nullptr) {
+        if (!headless() && detached_render && post_process_present_sprite != nullptr) {
             VkImageMemoryBarrier2 to_sample_barrier{};
             to_sample_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_sample_barrier.srcStageMask =
-                use_output_readback
-                    ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
-                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_sample_barrier.srcAccessMask =
-                use_output_readback
-                    ? VK_ACCESS_2_TRANSFER_READ_BIT
-                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_sample_barrier.srcStageMask = use_output_readback ? VK_PIPELINE_STAGE_2_TRANSFER_BIT : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_sample_barrier.srcAccessMask = use_output_readback ? VK_ACCESS_2_TRANSFER_READ_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             to_sample_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
             to_sample_barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-            to_sample_barrier.oldLayout =
-                use_output_readback
-                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_sample_barrier.oldLayout = use_output_readback ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_sample_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             to_sample_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_sample_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -4285,59 +3595,32 @@ namespace mxvk {
             present_scissor.extent = swapchain_extent;
             vkCmdSetScissor(cmd, 0, 1, &present_scissor);
 
-            const double preview_scale = std::min(
-                static_cast<double>(swapchain_extent.width) / render_extent.width,
-                static_cast<double>(swapchain_extent.height) / render_extent.height);
-            const int preview_width = std::max(
-                1, static_cast<int>(std::lround(render_extent.width * preview_scale)));
-            const int preview_height = std::max(
-                1, static_cast<int>(std::lround(render_extent.height * preview_scale)));
-            const int preview_x =
-                (static_cast<int>(swapchain_extent.width) - preview_width) / 2;
-            const int preview_y =
-                (static_cast<int>(swapchain_extent.height) - preview_height) / 2;
-            post_process_present_sprite->setExternalTexture(
-                post_process_views[0][image_index],
-                static_cast<int>(render_extent.width),
-                static_cast<int>(render_extent.height));
-            post_process_present_sprite->drawSpriteRect(
-                preview_x, preview_y, preview_width, preview_height);
+            const double preview_scale = std::min(static_cast<double>(swapchain_extent.width) / render_extent.width, static_cast<double>(swapchain_extent.height) / render_extent.height);
+            const int preview_width = std::max(1, static_cast<int>(std::lround(render_extent.width * preview_scale)));
+            const int preview_height = std::max(1, static_cast<int>(std::lround(render_extent.height * preview_scale)));
+            const int preview_x = (static_cast<int>(swapchain_extent.width) - preview_width) / 2;
+            const int preview_y = (static_cast<int>(swapchain_extent.height) - preview_height) / 2;
+            post_process_present_sprite->setExternalTexture(post_process_views[0][image_index], static_cast<int>(render_extent.width), static_cast<int>(render_extent.height));
+            post_process_present_sprite->drawSpriteRect(preview_x, preview_y, preview_width, preview_height);
             renderStandaloneSprite(*post_process_present_sprite, cmd);
             post_process_present_sprite->clearQueue();
             vkCmdEndRendering(cmd);
         }
 
-        const bool render_preview_text =
-            !headless() && preview_text_queued && preview_text_renderer &&
-            text_pipeline != VK_NULL_HANDLE;
+        const bool render_preview_text = !headless() && preview_text_queued && preview_text_renderer && text_pipeline != VK_NULL_HANDLE;
         if (render_preview_text) {
             VkImageMemoryBarrier2 to_preview_barrier{};
-            to_preview_barrier.sType =
-                VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            to_preview_barrier.srcStageMask =
-                use_output_readback && !detached_render
-                    ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
-                    : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_preview_barrier.srcAccessMask =
-                use_output_readback && !detached_render
-                    ? VK_ACCESS_2_TRANSFER_READ_BIT
-                    : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            to_preview_barrier.dstStageMask =
-                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            to_preview_barrier.dstAccessMask =
-                VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
-                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            to_preview_barrier.oldLayout =
-                use_output_readback && !detached_render
-                    ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                    : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            to_preview_barrier.newLayout =
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_preview_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            to_preview_barrier.srcStageMask = use_output_readback && !detached_render ? VK_PIPELINE_STAGE_2_TRANSFER_BIT : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_preview_barrier.srcAccessMask = use_output_readback && !detached_render ? VK_ACCESS_2_TRANSFER_READ_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_preview_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            to_preview_barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            to_preview_barrier.oldLayout = use_output_readback && !detached_render ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            to_preview_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             to_preview_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_preview_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             to_preview_barrier.image = swapchain_images[image_index];
-            to_preview_barrier.subresourceRange.aspectMask =
-                VK_IMAGE_ASPECT_COLOR_BIT;
+            to_preview_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             to_preview_barrier.subresourceRange.levelCount = 1;
             to_preview_barrier.subresourceRange.layerCount = 1;
             VkDependencyInfo to_preview_dependency{};
@@ -4347,11 +3630,9 @@ namespace mxvk {
             vkCmdPipelineBarrier2(cmd, &to_preview_dependency);
 
             VkRenderingAttachmentInfo preview_attachment{};
-            preview_attachment.sType =
-                VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            preview_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
             preview_attachment.imageView = swapchain_image_views[image_index];
-            preview_attachment.imageLayout =
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            preview_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             preview_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             preview_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             VkRenderingInfo preview_info{};
@@ -4366,36 +3647,19 @@ namespace mxvk {
             scissor.extent = swapchain_extent;
             vkCmdSetViewport(cmd, 0, 1, &viewport);
             vkCmdSetScissor(cmd, 0, 1, &scissor);
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              text_pipeline);
-            preview_text_renderer->renderText(
-                cmd, text_pipeline_layout, swapchain_extent.width,
-                swapchain_extent.height);
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, text_pipeline);
+            preview_text_renderer->renderText(cmd, text_pipeline_layout, swapchain_extent.width, swapchain_extent.height);
             vkCmdEndRendering(cmd);
         }
 
         VkImageMemoryBarrier2 to_present_barrier{};
         to_present_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        to_present_barrier.srcStageMask = render_preview_text
-                                              ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
-                                          : use_output_readback && !detached_render
-                                              ? VK_PIPELINE_STAGE_2_TRANSFER_BIT
-                                              : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        to_present_barrier.srcAccessMask = render_preview_text
-                                               ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                           : use_output_readback && !detached_render
-                                               ? VK_ACCESS_2_TRANSFER_READ_BIT
-                                               : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        to_present_barrier.srcStageMask = render_preview_text ? VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT : use_output_readback && !detached_render ? VK_PIPELINE_STAGE_2_TRANSFER_BIT : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        to_present_barrier.srcAccessMask = render_preview_text ? VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT : use_output_readback && !detached_render ? VK_ACCESS_2_TRANSFER_READ_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         to_present_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         to_present_barrier.dstAccessMask = VK_ACCESS_2_NONE;
-        to_present_barrier.oldLayout = render_preview_text
-                                           ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                       : use_output_readback && !detached_render
-                                           ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        to_present_barrier.newLayout =
-            headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                       : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        to_present_barrier.oldLayout = render_preview_text ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : use_output_readback && !detached_render ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        to_present_barrier.newLayout = headless() ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         to_present_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_present_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         to_present_barrier.image = swapchain_images[image_index];
@@ -4439,13 +3703,11 @@ namespace mxvk {
         VkSubmitInfo2 submit_info{};
         submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
         submit_info.waitSemaphoreInfoCount = headless() ? 0U : 1U;
-        submit_info.pWaitSemaphoreInfos =
-            headless() ? nullptr : &wait_semaphore_info;
+        submit_info.pWaitSemaphoreInfos = headless() ? nullptr : &wait_semaphore_info;
         submit_info.commandBufferInfoCount = 1;
         submit_info.pCommandBufferInfos = &command_buffer_info;
         submit_info.signalSemaphoreInfoCount = headless() ? 0U : 1U;
-        submit_info.pSignalSemaphoreInfos =
-            headless() ? nullptr : &signal_semaphore_info;
+        submit_info.pSignalSemaphoreInfos = headless() ? nullptr : &signal_semaphore_info;
 
         const VkResult fence_reset_result = vkResetFences(device, 1, &frame_fence);
         if (fence_reset_result == VK_ERROR_DEVICE_LOST) {
@@ -4490,15 +3752,9 @@ namespace mxvk {
             last_presented_image_index = image_index;
             if (frame_readback_enabled) {
                 FrameReadbackSlot &slot = frame_readback_slots[current_frame];
-                slot.width = use_rgba16_readback || detached_render
-                                 ? render_extent.width
-                                 : swapchain_extent.width;
-                slot.height = use_rgba16_readback || detached_render
-                                  ? render_extent.height
-                                  : swapchain_extent.height;
-                slot.format = use_rgba16_readback
-                                  ? VK_FORMAT_R16G16B16A16_SFLOAT
-                                  : swapchain_format;
+                slot.width = use_rgba16_readback || detached_render ? render_extent.width : swapchain_extent.width;
+                slot.height = use_rgba16_readback || detached_render ? render_extent.height : swapchain_extent.height;
+                slot.format = use_rgba16_readback ? VK_FORMAT_R16G16B16A16_SFLOAT : swapchain_format;
                 slot.pending = true;
                 onFrameReadbackScheduled();
             }
@@ -4516,10 +3772,7 @@ namespace mxvk {
                 SDL_GetWindowSizeInPixels(window.get(), &present_pixel_w, &present_pixel_h);
             }
             const bool known_present_extent = present_pixel_w > 0 && present_pixel_h > 0;
-            const bool present_extent_changed =
-                known_present_extent &&
-                (swapchain_extent.width != static_cast<uint32_t>(present_pixel_w) ||
-                 swapchain_extent.height != static_cast<uint32_t>(present_pixel_h));
+            const bool present_extent_changed = known_present_extent && (swapchain_extent.width != static_cast<uint32_t>(present_pixel_w) || swapchain_extent.height != static_cast<uint32_t>(present_pixel_h));
             if (!known_present_extent || present_extent_changed) {
                 std::cout << "mxvk: requesting swapchain recreation because present returned VK_SUBOPTIMAL_KHR with changed window extent\n";
                 last_resize_event_ms = SDL_GetTicks();
@@ -4552,17 +3805,13 @@ namespace mxvk {
         }
     }
 
-    bool VK_Window::validationEnabled() const {
-        return validation_enabled;
-    }
+    bool VK_Window::validationEnabled() const { return validation_enabled; }
 
     bool VK_Window::hasValidationLayerSupport() {
         uint32_t layer_count = 0;
         const VkResult count_result = vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
         if (count_result != VK_SUCCESS) {
-            std::cerr << std::format(
-                "mxvk: Failed to query validation layer count (VkResult={})\n",
-                static_cast<int>(count_result));
+            std::cerr << std::format("mxvk: Failed to query validation layer count (VkResult={})\n", static_cast<int>(count_result));
             return false;
         }
 
@@ -4573,30 +3822,18 @@ namespace mxvk {
         std::vector<VkLayerProperties> available_layers(layer_count);
         const VkResult layers_result = vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
         if (layers_result != VK_SUCCESS) {
-            std::cerr << std::format(
-                "mxvk: Failed to enumerate validation layers (VkResult={})\n",
-                static_cast<int>(layers_result));
+            std::cerr << std::format("mxvk: Failed to enumerate validation layers (VkResult={})\n", static_cast<int>(layers_result));
             return false;
         }
 
-        return std::ranges::any_of(
-            available_layers,
-            [](const VkLayerProperties &layer) {
-                return std::strcmp(layer.layerName, validation_layer_name) == 0;
-            });
+        return std::ranges::any_of(available_layers, [](const VkLayerProperties &layer) { return std::strcmp(layer.layerName, validation_layer_name) == 0; });
     }
 
     std::optional<VkDebugUtilsMessengerCreateInfoEXT> VK_Window::makeDebugMessengerCreateInfo() {
         VkDebugUtilsMessengerCreateInfoEXT create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        create_info.messageSeverity =
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        create_info.messageType =
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         create_info.pfnUserCallback = debugCallback;
         create_info.pUserData = nullptr;
         return create_info;
@@ -4613,11 +3850,7 @@ namespace mxvk {
             return;
         }
 
-        const VkResult result = vkCreateDebugUtilsMessengerEXT(
-            instance,
-            &maybe_create_info.value(),
-            nullptr,
-            &debug_messenger);
+        const VkResult result = vkCreateDebugUtilsMessengerEXT(instance, &maybe_create_info.value(), nullptr, &debug_messenger);
         if (result != VK_SUCCESS) {
             std::cerr << "mxvk: failed to create Vulkan debug messenger\n";
             debug_messenger = VK_NULL_HANDLE;
@@ -4664,12 +3897,10 @@ namespace mxvk {
 
     void VK_Window::setPreviewFont(const std::string &fontPath, int fontSize) {
         if (fontPath.empty() || fontSize <= 0) {
-            throw mxvk::Exception(
-                "setPreviewFont requires a non-empty path and positive font size");
+            throw mxvk::Exception("setPreviewFont requires a non-empty path and positive font size");
         }
         if (device == VK_NULL_HANDLE) {
-            throw mxvk::Exception(
-                "Cannot set preview font before Vulkan device initialization");
+            throw mxvk::Exception("Cannot set preview font before Vulkan device initialization");
         }
         if (!preview_text_renderer) {
             ensurePreviewTextRenderer(fontPath, fontSize);
@@ -4736,37 +3967,31 @@ namespace mxvk {
         preview_text_queued = false;
     }
 
-    void VK_Window::printPreviewText(const std::string &text, int x, int y,
-                                     const SDL_Color &col) {
+    void VK_Window::printPreviewText(const std::string &text, int x, int y, const SDL_Color &col) {
         if (text.empty()) {
             return;
         }
         if (!font_configured) {
-            throw mxvk::Exception(
-                "printPreviewText requires setFont() to be called first");
+            throw mxvk::Exception("printPreviewText requires setFont() to be called first");
         }
         ensurePreviewTextRenderer();
         if (!preview_text_renderer) {
-            throw mxvk::Exception(
-                "printPreviewText could not initialize the text renderer");
+            throw mxvk::Exception("printPreviewText could not initialize the text renderer");
         }
         preview_text_renderer->printTextG_Solid(text, x, y, col);
         preview_text_queued = true;
     }
 
-    void VK_Window::printPreviewText(const std::string &text, int x, int y,
-                                     const SDL_Color &col, const Font &font) {
+    void VK_Window::printPreviewText(const std::string &text, int x, int y, const SDL_Color &col, const Font &font) {
         if (text.empty()) {
             return;
         }
         if (!font) {
-            throw mxvk::Exception(
-                "printPreviewText requires a valid mxvk::Font");
+            throw mxvk::Exception("printPreviewText requires a valid mxvk::Font");
         }
         ensurePreviewTextRenderer(font.path(), font.size());
         if (!preview_text_renderer) {
-            throw mxvk::Exception(
-                "printPreviewText could not initialize the text renderer");
+            throw mxvk::Exception("printPreviewText could not initialize the text renderer");
         }
         preview_text_renderer->printTextG_Solid(text, x, y, col, font);
         preview_text_queued = true;
@@ -4852,8 +4077,7 @@ namespace mxvk {
         if (preview_text_renderer) {
             return;
         }
-        if (!font_configured || font_path.empty() || font_size <= 0 ||
-            device == VK_NULL_HANDLE) {
+        if (!font_configured || font_path.empty() || font_size <= 0 || device == VK_NULL_HANDLE) {
             return;
         }
         if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
@@ -4865,16 +4089,12 @@ namespace mxvk {
         if (text_descriptor_set_layout == VK_NULL_HANDLE) {
             createTextDescriptorSetLayout();
         }
-        preview_text_renderer = std::make_unique<VK_Text>(
-            device, physical_device, graphics_queue, command_pool, font_path,
-            font_size);
-        preview_text_renderer->setDescriptorSetLayout(
-            text_descriptor_set_layout);
+        preview_text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, font_path, font_size);
+        preview_text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
         text_state_dirty = true;
     }
 
-    void VK_Window::ensurePreviewTextRenderer(
-        const std::string &fallbackFontPath, int fallbackFontSize) {
+    void VK_Window::ensurePreviewTextRenderer(const std::string &fallbackFontPath, int fallbackFontSize) {
         if (preview_text_renderer) {
             return;
         }
@@ -4887,21 +4107,16 @@ namespace mxvk {
         if (!renderTargetsReady() || command_pool == VK_NULL_HANDLE) {
             return;
         }
-        const std::string renderer_font_path =
-            font_configured ? font_path : fallbackFontPath;
-        const int renderer_font_size =
-            font_configured ? font_size : fallbackFontSize;
+        const std::string renderer_font_path = font_configured ? font_path : fallbackFontPath;
+        const int renderer_font_size = font_configured ? font_size : fallbackFontSize;
         if (renderer_font_path.empty() || renderer_font_size <= 0) {
             return;
         }
         if (text_descriptor_set_layout == VK_NULL_HANDLE) {
             createTextDescriptorSetLayout();
         }
-        preview_text_renderer = std::make_unique<VK_Text>(
-            device, physical_device, graphics_queue, command_pool,
-            renderer_font_path, renderer_font_size);
-        preview_text_renderer->setDescriptorSetLayout(
-            text_descriptor_set_layout);
+        preview_text_renderer = std::make_unique<VK_Text>(device, physical_device, graphics_queue, command_pool, renderer_font_path, renderer_font_size);
+        preview_text_renderer->setDescriptorSetLayout(text_descriptor_set_layout);
         text_state_dirty = true;
     }
 
@@ -5015,8 +4230,7 @@ namespace mxvk {
             fps_counter_text = std::format("FPS: {:.1f}", fps);
         }
 
-        printPreviewText(fps_counter_text, 12, 10,
-                         SDL_Color{255, 255, 255, 255}, fps_counter_font);
+        printPreviewText(fps_counter_text, 12, 10, SDL_Color{255, 255, 255, 255}, fps_counter_font);
     }
 
     void VK_Window::createTextDescriptorSetLayout() {
@@ -5152,11 +4366,7 @@ namespace mxvk {
             depth_stencil.depthWriteEnable = VK_FALSE;
 
             VkPipelineColorBlendAttachmentState color_attachment{};
-            color_attachment.colorWriteMask =
-                VK_COLOR_COMPONENT_R_BIT |
-                VK_COLOR_COMPONENT_G_BIT |
-                VK_COLOR_COMPONENT_B_BIT |
-                VK_COLOR_COMPONENT_A_BIT;
+            color_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             color_attachment.blendEnable = VK_TRUE;
             color_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             color_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -5310,16 +4520,9 @@ namespace mxvk {
         return sprite_ptr;
     }
 
-    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount) {
-        return createSprite(width, height, vertexShaderPath, fragmentShaderPath,
-                            spectrumBinCount, 0);
-    }
+    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount) { return createSprite(width, height, vertexShaderPath, fragmentShaderPath, spectrumBinCount, 0); }
 
-    VK_Sprite *VK_Window::createSprite(int width, int height,
-                                       const std::string &vertexShaderPath,
-                                       const std::string &fragmentShaderPath,
-                                       uint32_t spectrumBinCount,
-                                       uint32_t spectrumHistoryLayerCount) {
+    VK_Sprite *VK_Window::createSprite(int width, int height, const std::string &vertexShaderPath, const std::string &fragmentShaderPath, uint32_t spectrumBinCount, uint32_t spectrumHistoryLayerCount) {
         if (width <= 0 || height <= 0) {
             throw mxvk::Exception("Sprite dimensions must be positive");
         }
@@ -5350,11 +4553,9 @@ namespace mxvk {
         }
         if (spectrumHistoryLayerCount > 0) {
             if (spectrumBinCount == 0) {
-                throw mxvk::Exception(
-                    "Spectrum history requires a positive spectrum bin count");
+                throw mxvk::Exception("Spectrum history requires a positive spectrum bin count");
             }
-            sprite->enableSpectrumHistoryTexture(
-                spectrumBinCount, spectrumHistoryLayerCount);
+            sprite->enableSpectrumHistoryTexture(spectrumBinCount, spectrumHistoryLayerCount);
         }
 
         sprite->createEmptySprite(width, height, vertexShaderPath, fragmentShaderPath);
@@ -5376,12 +4577,8 @@ namespace mxvk {
             throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
         }
 
-        const std::string vertPath = vertexShaderPath.empty()
-                                         ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR)
-                                         : vertexShaderPath;
-        const std::string fragPath = fragmentShaderPath.empty()
-                                         ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR)
-                                         : fragmentShaderPath;
+        const std::string vertPath = vertexShaderPath.empty() ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR) : vertexShaderPath;
+        const std::string fragPath = fragmentShaderPath.empty() ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR) : fragmentShaderPath;
 
         auto sprite = std::make_unique<VK_Sprite3D>();
         sprite->load(this, pngPath, vertPath, fragPath);
@@ -5405,12 +4602,8 @@ namespace mxvk {
             throw mxvk::Exception("Cannot create 3D sprite before swapchain and command resources are available");
         }
 
-        const std::string vertPath = vertexShaderPath.empty()
-                                         ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR)
-                                         : vertexShaderPath;
-        const std::string fragPath = fragmentShaderPath.empty()
-                                         ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR)
-                                         : fragmentShaderPath;
+        const std::string vertPath = vertexShaderPath.empty() ? resolveRuntimeShaderPath("sprite3d.vert.spv", MXVK_SPRITE3D_SHADER_DIR) : vertexShaderPath;
+        const std::string fragPath = fragmentShaderPath.empty() ? resolveRuntimeShaderPath("sprite3d.frag.spv", MXVK_SPRITE3D_SHADER_DIR) : fragmentShaderPath;
 
         auto sprite = std::make_unique<VK_Sprite3D>();
         sprite->load(this, surface, vertPath, fragPath);
@@ -5563,11 +4756,7 @@ namespace mxvk {
             depth_stencil.depthWriteEnable = VK_FALSE;
 
             VkPipelineColorBlendAttachmentState color_attachment{};
-            color_attachment.colorWriteMask =
-                VK_COLOR_COMPONENT_R_BIT |
-                VK_COLOR_COMPONENT_G_BIT |
-                VK_COLOR_COMPONENT_B_BIT |
-                VK_COLOR_COMPONENT_A_BIT;
+            color_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
             color_attachment.blendEnable = VK_TRUE;
             color_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
             color_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;

@@ -89,15 +89,9 @@ struct Star {
     float twinkleSpeed;
 };
 
-enum GameState {
-    STATE_COUNTDOWN,
-    STATE_LAUNCH,
-    STATE_PLAYING,
-    STATE_GAMEOVER
-};
+enum GameState { STATE_COUNTDOWN, STATE_LAUNCH, STATE_PLAYING, STATE_GAMEOVER };
 
-template <typename Func>
-void bresenhamLine(int x0, int y0, int x1, int y1, Func plot) {
+template <typename Func> void bresenhamLine(int x0, int y0, int x1, int y1, Func plot) {
     int dx = abs(x1 - x0);
     int dy = abs(y1 - y0);
     int sx = (x0 < x1) ? 1 : -1;
@@ -121,13 +115,7 @@ void bresenhamLine(int x0, int y0, int x1, int y1, Func plot) {
 
 class SpaceRoxWindow : public mxvk::VK_Window {
   public:
-    SpaceRoxWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync)
-        : mxvk::VK_Window("-[ SpaceRox - MXVK ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync),
-          current_path((path.empty() || path == ".") ? std::string(asteroids_ASSET_DIR) : path),
-          w(wx),
-          h(wy) {
-        srand(static_cast<unsigned>(time(nullptr)));
-    }
+    SpaceRoxWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync) : mxvk::VK_Window("-[ SpaceRox - MXVK ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync), current_path((path.empty() || path == ".") ? std::string(asteroids_ASSET_DIR) : path), w(wx), h(wy) { srand(static_cast<unsigned>(time(nullptr))); }
     virtual ~SpaceRoxWindow() {
         if (gamepad != nullptr) {
             SDL_CloseGamepad(gamepad);
@@ -436,11 +424,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
             }
         }
 
-        starSprite = createSprite(
-            4,
-            4,
-            current_path + "/data/sprite_vert.spv",
-            current_path + "/data/sprite_frag.spv");
+        starSprite = createSprite(4, 4, current_path + "/data/sprite_vert.spv", current_path + "/data/sprite_frag.spv");
         starSprite->updateTexture(starPixels.data(), 4, 4, 4 * 4);
 
         const std::array<std::uint8_t, 2 * 2 * 4> whitePixels{
@@ -462,42 +446,30 @@ class SpaceRoxWindow : public mxvk::VK_Window {
             255,
         };
 
-        pixel = createSprite(
-            2,
-            2,
-            current_path + "/data/sprite_vert.spv",
-            current_path + "/data/solid_frag.spv");
+        pixel = createSprite(2, 2, current_path + "/data/sprite_vert.spv", current_path + "/data/solid_frag.spv");
         pixel->updateTexture(whitePixels.data(), 2, 2, 2 * 4);
 
         initGame();
         resources_initialized = true;
     }
 
-    void setColor(float r, float g, float b, float a = 1.0f) {
-        pixel->setShaderParams(r, g, b, a);
-    }
+    void setColor(float r, float g, float b, float a = 1.0f) { pixel->setShaderParams(r, g, b, a); }
 
     void drawPixel(float gx, float gy) {
         int psz = std::max(1, static_cast<int>(2.0f * std::min(sx(), sy())));
         pixel->drawSpriteRect(toScreenX(gx), toScreenY(gy), psz, psz);
     }
 
-    void drawRect(float gx, float gy, float gw, float gh) {
-        pixel->drawSpriteRect(toScreenX(gx), toScreenY(gy), toScreenW(gw), toScreenH(gh));
-    }
+    void drawRect(float gx, float gy, float gw, float gh) { pixel->drawSpriteRect(toScreenX(gx), toScreenY(gy), toScreenW(gw), toScreenH(gh)); }
 
     void drawLine(float x0f, float y0f, float x1f, float y1f) {
         int x0 = toScreenX(x0f), y0 = toScreenY(y0f);
         int x1 = toScreenX(x1f), y1 = toScreenY(y1f);
         int psz = std::max(1, static_cast<int>(1.5f * std::min(sx(), sy())));
-        bresenhamLine(x0, y0, x1, y1, [&](int px, int py) {
-            pixel->drawSpriteRect(px, py, psz, psz);
-        });
+        bresenhamLine(x0, y0, x1, y1, [&](int px, int py) { pixel->drawSpriteRect(px, py, psz, psz); });
     }
 
-    void drawPoint(int screenX, int screenY, int size = 2) {
-        pixel->drawSpriteRect(screenX, screenY, size, size);
-    }
+    void drawPoint(int screenX, int screenY, int size = 2) { pixel->drawSpriteRect(screenX, screenY, size, size); }
 
     void updateFontSize() {
         int fontSize = static_cast<int>(20.0f * (static_cast<float>(h) / 480.0f));
@@ -522,9 +494,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         wasExploding = false;
     }
 
-    void restartGame() {
-        initGame();
-    }
+    void restartGame() { initGame(); }
 
     void initStars() {
         int starIndex = 0;
@@ -1071,9 +1041,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
         const Uint32 now = SDL_GetTicks();
         launchTimer = std::min<Uint32>(now - launchStartMs, launchDuration);
         if (launchTimer < launchDuration / 2U) {
-            shipLaunchY = static_cast<float>(GAME_H) -
-                          (static_cast<float>(launchTimer) * (static_cast<float>(GAME_H) - ship.y) /
-                           static_cast<float>(launchDuration / 2U));
+            shipLaunchY = static_cast<float>(GAME_H) - (static_cast<float>(launchTimer) * (static_cast<float>(GAME_H) - ship.y) / static_cast<float>(launchDuration / 2U));
         } else {
             shipLaunchY = ship.y;
         }
@@ -1115,11 +1083,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
             float twinkle = 0.7f + 0.3f * sinf(s.twinklePhase);
             float finalBrightness = s.brightness * twinkle;
 
-            starSprite->setShaderParams(
-                s.r * finalBrightness,
-                s.g * finalBrightness,
-                s.b * finalBrightness,
-                finalBrightness);
+            starSprite->setShaderParams(s.r * finalBrightness, s.g * finalBrightness, s.b * finalBrightness, finalBrightness);
 
             int screenSize = static_cast<int>(s.size * std::min(sx(), sy()));
             screenSize = std::max(2, screenSize);
@@ -1240,8 +1204,7 @@ class SpaceRoxWindow : public mxvk::VK_Window {
             setColor(1.0f, 1.0f, 1.0f, 1.0f);
             for (int j = 0; j < ASTEROID_VERTICES; ++j) {
                 int next = (j + 1) % ASTEROID_VERTICES;
-                drawLine(a.x + rv[j][0], a.y + rv[j][1],
-                         a.x + rv[next][0], a.y + rv[next][1]);
+                drawLine(a.x + rv[j][0], a.y + rv[j][1], a.x + rv[next][0], a.y + rv[next][1]);
             }
 
             float iv[ASTEROID_VERTICES][2];
@@ -1252,21 +1215,18 @@ class SpaceRoxWindow : public mxvk::VK_Window {
             setColor(0.59f, 0.59f, 0.59f, 1.0f);
             for (int j = 0; j < ASTEROID_VERTICES; ++j) {
                 int next = (j + 1) % ASTEROID_VERTICES;
-                drawLine(a.x + iv[j][0], a.y + iv[j][1],
-                         a.x + iv[next][0], a.y + iv[next][1]);
+                drawLine(a.x + iv[j][0], a.y + iv[j][1], a.x + iv[next][0], a.y + iv[next][1]);
             }
 
             setColor(0.39f, 0.39f, 0.39f, 1.0f);
             for (int j = 0; j < ASTEROID_VERTICES; j += 2) {
-                drawLine(a.x + rv[j][0], a.y + rv[j][1],
-                         a.x + iv[j][0], a.y + iv[j][1]);
+                drawLine(a.x + rv[j][0], a.y + rv[j][1], a.x + iv[j][0], a.y + iv[j][1]);
             }
 
             setColor(0.71f, 0.71f, 0.71f, 1.0f);
             for (int j = 0; j < ASTEROID_VERTICES; j += 2) {
                 int next = (j + 1) % ASTEROID_VERTICES;
-                drawLine(a.x + rv[j][0], a.y + rv[j][1],
-                         a.x + iv[next][0], a.y + iv[next][1]);
+                drawLine(a.x + rv[j][0], a.y + rv[j][1], a.x + iv[next][0], a.y + iv[next][1]);
             }
         }
     }

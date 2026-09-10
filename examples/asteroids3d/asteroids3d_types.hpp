@@ -53,13 +53,7 @@ namespace space {
     constexpr float BOUNDARY_Z_MAX = 150.0f;
     constexpr float BOUNDARY_BOUNCE_FACTOR = 1.2f;
 
-    enum class GameMode {
-        Intro,
-        Loading,
-        Playing,
-        GameComplete,
-        GameOver
-    };
+    enum class GameMode { Intro, Loading, Playing, GameComplete, GameOver };
 
     inline std::default_random_engine &rng() {
         static thread_local std::default_random_engine engine{std::random_device{}()};
@@ -191,10 +185,7 @@ namespace space {
         return value / len;
     }
 
-    inline glm::mat4 build_model_matrix(const glm::vec3 &position,
-                                        const glm::vec3 &rotation_degrees,
-                                        float scale,
-                                        const glm::vec3 &center_offset) {
+    inline glm::mat4 build_model_matrix(const glm::vec3 &position, const glm::vec3 &rotation_degrees, float scale, const glm::vec3 &center_offset) {
         glm::mat4 model(1.0f);
         model = glm::translate(model, position);
         model = glm::rotate(model, glm::radians(rotation_degrees.y), glm::vec3(0.0f, 1.0f, 0.0f));

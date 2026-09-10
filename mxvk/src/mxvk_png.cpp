@@ -25,18 +25,11 @@ namespace mxvk {
         }
 
         std::string lower(file);
-        std::ranges::transform(lower, lower.begin(),
-                               [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        std::ranges::transform(lower, lower.begin(), [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
         return lower.ends_with(".png");
     }
 
-    [[nodiscard]] bool WriteRgbaPng(const char *filename,
-                                    const std::uint8_t *pixels,
-                                    const int width,
-                                    const int height,
-                                    const int pitch,
-                                    const int bit_depth,
-                                    const bool swap_16bit_endianness) {
+    [[nodiscard]] bool WriteRgbaPng(const char *filename, const std::uint8_t *pixels, const int width, const int height, const int pitch, const int bit_depth, const bool swap_16bit_endianness) {
         if (filename == nullptr || pixels == nullptr || width <= 0 || height <= 0 || pitch <= 0) {
             std::cerr << "mx: Invalid PNG write parameters.\n";
             return false;
@@ -71,15 +64,7 @@ namespace mxvk {
         }
 
         png_init_io(png, file);
-        png_set_IHDR(png,
-                     info,
-                     width,
-                     height,
-                     bit_depth,
-                     PNG_COLOR_TYPE_RGBA,
-                     PNG_INTERLACE_NONE,
-                     PNG_COMPRESSION_TYPE_DEFAULT,
-                     PNG_FILTER_TYPE_DEFAULT);
+        png_set_IHDR(png, info, width, height, bit_depth, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
         if (bit_depth == 16 && swap_16bit_endianness) {
             png_set_swap(png);
@@ -160,8 +145,7 @@ namespace mxvk {
             png_set_gray_to_rgb(png);
         }
 
-        if (color_type == PNG_COLOR_TYPE_RGB || color_type == PNG_COLOR_TYPE_GRAY ||
-            color_type == PNG_COLOR_TYPE_PALETTE) {
+        if (color_type == PNG_COLOR_TYPE_RGB || color_type == PNG_COLOR_TYPE_GRAY || color_type == PNG_COLOR_TYPE_PALETTE) {
             png_set_filler(png, 0xFF, PNG_FILLER_AFTER);
         }
 
@@ -253,13 +237,7 @@ namespace mxvk {
         }
 
         const auto *pixels = static_cast<const std::uint8_t *>(rgba32_surface_raw->pixels);
-        return WriteRgbaPng(filename,
-                            pixels,
-                            rgba32_surface_raw->w,
-                            rgba32_surface_raw->h,
-                            rgba32_surface_raw->pitch,
-                            8,
-                            false);
+        return WriteRgbaPng(filename, pixels, rgba32_surface_raw->w, rgba32_surface_raw->h, rgba32_surface_raw->pitch, 8, false);
     }
 
     bool SaveRawBytes(const char *filename, const void *buffer, size_t w, size_t h, size_t bpp) {
@@ -299,13 +277,7 @@ namespace mxvk {
 
     bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h) {
         const int pitch = w * 4;
-        return WriteRgbaPng(filename,
-                            static_cast<const std::uint8_t *>(buffer),
-                            w,
-                            h,
-                            pitch,
-                            8,
-                            false);
+        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 8, false);
     }
 
     bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h) {
@@ -315,12 +287,6 @@ namespace mxvk {
 #else
         constexpr bool swap_16bit_endianness = false;
 #endif
-        return WriteRgbaPng(filename,
-                            static_cast<const std::uint8_t *>(buffer),
-                            w,
-                            h,
-                            pitch,
-                            16,
-                            swap_16bit_endianness);
+        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 16, swap_16bit_endianness);
     }
 } // namespace mxvk

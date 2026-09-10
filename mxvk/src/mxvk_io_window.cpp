@@ -56,13 +56,9 @@ namespace mxvk {
         });
     }
 
-    bool VK_IOWindow::handleConsoleCommand([[maybe_unused]] const std::vector<std::string> &args,
-                                           [[maybe_unused]] std::ostream &out) {
-        return false;
-    }
+    bool VK_IOWindow::handleConsoleCommand([[maybe_unused]] const std::vector<std::string> &args, [[maybe_unused]] std::ostream &out) { return false; }
 
-    void VK_IOWindow::appendConsoleHelp([[maybe_unused]] std::ostream &out) const {
-    }
+    void VK_IOWindow::appendConsoleHelp([[maybe_unused]] std::ostream &out) const {}
 
     void VK_IOWindow::event(SDL_Event &e) {
         const bool is_escape_down = (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_ESCAPE);
@@ -85,9 +81,7 @@ namespace mxvk {
         console_event(e);
     }
 
-    void VK_IOWindow::print(const std::string &text, SDL_Color col) {
-        console.printLine(text, col);
-    }
+    void VK_IOWindow::print(const std::string &text, SDL_Color col) { console.printLine(text, col); }
 
     void VK_IOWindow::proc() {
         console_proc();

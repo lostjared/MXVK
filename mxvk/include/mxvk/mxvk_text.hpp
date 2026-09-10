@@ -25,12 +25,12 @@
 #include <vector>
 
 #ifndef VK_CHECK_RESULT
-#define VK_CHECK_RESULT(f)                                                                                                                \
-    {                                                                                                                                     \
-        VkResult res = (f);                                                                                                               \
-        if (res != VK_SUCCESS) {                                                                                                          \
-            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__)); \
-        }                                                                                                                                 \
+#define VK_CHECK_RESULT(f)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             \
+    {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
+        VkResult res = (f);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
+        if (res != VK_SUCCESS) {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       \
+            throw mxvk::Exception(std::format("Fatal : VkResult is \"{}\" in {} at line {}", static_cast<int>(res), __FILE__, __LINE__));                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
+        }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              \
     }
 #endif
 
@@ -122,8 +122,7 @@ namespace mxvk {
          * @param fontPath       Path to the TTF font file.
          * @param fontSize       Point size.
          */
-        VK_Text(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue,
-                VkCommandPool commandPool, const std::string &fontPath, int fontSize = 24);
+        VK_Text(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue graphicsQueue, VkCommandPool commandPool, const std::string &fontPath, int fontSize = 24);
 
         /** @brief Destructor -- destroys all Vulkan and SDL_ttf resources. */
         ~VK_Text();
@@ -151,8 +150,7 @@ namespace mxvk {
          * @param screenWidth  Viewport width.
          * @param screenHeight Viewport height.
          */
-        void renderText(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout,
-                        uint32_t screenWidth, uint32_t screenHeight);
+        void renderText(VkCommandBuffer cmdBuffer, VkPipelineLayout pipelineLayout, uint32_t screenWidth, uint32_t screenHeight);
 
         /** @brief Discard all pending text quads without rendering them. */
         void clearQueue();
@@ -211,9 +209,7 @@ namespace mxvk {
             TextQuad() = default;
             TextQuad(const TextQuad &) = delete;
             TextQuad &operator=(const TextQuad &) = delete;
-            TextQuad(TextQuad &&other) noexcept {
-                *this = std::move(other);
-            }
+            TextQuad(TextQuad &&other) noexcept { *this = std::move(other); }
             TextQuad &operator=(TextQuad &&other) noexcept {
                 if (this != &other) {
                     text = std::move(other.text);
@@ -298,17 +294,13 @@ namespace mxvk {
         void createDescriptorPool(uint32_t maxSets);
         void growDescriptorPool();
         VkDescriptorSet createDescriptorSet(VkImageView imageView);
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                          VkMemoryPropertyFlags properties, VkBuffer &buffer,
-                          VkDeviceMemory &bufferMemory);
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         [[nodiscard]] bool copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         VkCommandBuffer beginSingleTimeCommands();
         [[nodiscard]] bool endSingleTimeCommands(VkCommandBuffer commandBuffer);
         [[nodiscard]] bool transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
-        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
-                         VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                         VkImage &image, VkDeviceMemory &imageMemory);
+        void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
         VkImageView createImageView(VkImage image, VkFormat format);
         SDL_Surface *convertToRGBA(SDL_Surface *surface);
     };

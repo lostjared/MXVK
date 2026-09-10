@@ -25,4 +25,4 @@ namespace mxvk {
         VkCommandPool command_pool = VK_NULL_HANDLE;
     };
 
-}
+} // namespace mxvk

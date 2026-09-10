@@ -14,17 +14,11 @@
 
 namespace mxvk {
 
-    std::size_t VK_Mixer::toIndex(const int value) {
-        return static_cast<std::size_t>(value);
-    }
+    std::size_t VK_Mixer::toIndex(const int value) { return static_cast<std::size_t>(value); }
 
-    VK_Mixer::VK_Mixer() {
-        init();
-    }
+    VK_Mixer::VK_Mixer() { init(); }
 
-    VK_Mixer::~VK_Mixer() noexcept {
-        cleanup();
-    }
+    VK_Mixer::~VK_Mixer() noexcept { cleanup(); }
 
     void VK_Mixer::init() {
         if (initialized) {
