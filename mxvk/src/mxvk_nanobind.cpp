@@ -204,6 +204,8 @@ namespace mxvk {
         module.attr("has_ffmpeg_capture") = false;
         module.attr("has_mixer") = false;
         module.attr("has_jpeg") = false;
+        module.attr("EVENT_KEY_DOWN") = static_cast<uint32_t>(SDL_EVENT_KEY_DOWN);
+        module.attr("KEY_ESCAPE") = static_cast<int32_t>(SDLK_ESCAPE);
 
         module.def("set_default_enable_screenshot", &setDefaultEnableScreenshot, nb::arg("enabled"));
         module.def("default_enable_screenshot", &defaultEnableScreenshot);
@@ -839,6 +841,7 @@ namespace mxvk {
         nb::class_<VK_IOWindow, VK_Window, PythonIOWindow>(module, "IOWindow")
             .def(nb::init<const std::string &, const std::string &, int, int, bool, bool>(), nb::arg("path"), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("enable_vsync") = false)
             .def("print", &VK_IOWindow::print, nb::arg("text"), nb::arg("color") = SDL_Color{255, 255, 255, 255})
+            .def("request_exit", &VK_IOWindow::requestExit)
             .def("console_proc", &VK_IOWindow::console_proc)
             .def(
                 "console_event",

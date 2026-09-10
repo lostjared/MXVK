@@ -17,6 +17,7 @@ namespace mxvk {
         void proc() override;
         virtual void console_proc() = 0;
         virtual void console_event(SDL_Event &e) = 0;
+        void requestExit() { exit(); }
         bool visible() const { return console.isVisible(); }
 
       protected:
