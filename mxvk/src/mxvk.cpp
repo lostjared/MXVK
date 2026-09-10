@@ -160,6 +160,10 @@ namespace mxvk {
 
         std::vector<std::filesystem::path> candidates{};
 
+        if (!defaultShaderDirectory().empty()) {
+            candidates.push_back(std::filesystem::path(defaultShaderDirectory()) / shaderFileName);
+        }
+
         const auto add_executable_candidates = [&candidates, &shaderFileName](const std::filesystem::path &executableDir) {
             candidates.push_back(executableDir / "data" / shaderFileName);
             candidates.push_back(executableDir / shaderFileName);

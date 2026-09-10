@@ -600,7 +600,7 @@ if(PYTHON_MODULE)
     endif()
 
     nanobind_add_module(mxvk_ext mxvk/src/mxvk_nanobind.cpp)
-    target_link_libraries(mxvk_ext PRIVATE mxvk)
+    target_link_libraries(mxvk_ext PRIVATE mxvk ${CMAKE_DL_LIBS})
 
     set(MXVK_PYTHON_INSTALL_DIR
         "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"

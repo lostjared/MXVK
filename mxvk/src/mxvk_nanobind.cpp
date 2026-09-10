@@ -9,14 +9,25 @@
 #include <nanobind/trampoline.h>
 
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <stdexcept>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#elif defined(__APPLE__) || defined(__linux__)
+#include <dlfcn.h>
+#endif
 
 #include <mxvk/mxvk.hpp>
 #include <mxvk/mxvk_abstract_model.hpp>
 #include <mxvk/mxvk_cfg.hpp>
 #include <mxvk/mxvk_console.hpp>
 #include <mxvk/mxvk_controller.hpp>
+#include <mxvk/mxvk_exception.hpp>
 #include <mxvk/mxvk_io_window.hpp>
 #include <mxvk/mxvk_model.hpp>
 #include <mxvk/mxvk_png.hpp>
@@ -43,6 +54,37 @@
 namespace nb = nanobind;
 
 namespace {
+    const int MODULE_LOCATION_ANCHOR = 0;
+
+    std::filesystem::path python_module_directory() {
+#if defined(_WIN32)
+        HMODULE module_handle = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&MODULE_LOCATION_ANCHOR), &module_handle) == 0) {
+            return {};
+        }
+
+        std::vector<wchar_t> module_path(1024);
+        while (true) {
+            const DWORD path_length = GetModuleFileNameW(module_handle, module_path.data(), static_cast<DWORD>(module_path.size()));
+            if (path_length == 0) {
+                return {};
+            }
+            if (path_length < module_path.size() - 1U) {
+                return std::filesystem::path(std::wstring(module_path.data(), path_length)).parent_path();
+            }
+            module_path.resize(module_path.size() * 2U);
+        }
+#elif defined(__APPLE__) || defined(__linux__)
+        Dl_info module_info{};
+        if (dladdr(&MODULE_LOCATION_ANCHOR, &module_info) == 0 || module_info.dli_fname == nullptr) {
+            return {};
+        }
+        return std::filesystem::path(module_info.dli_fname).parent_path();
+#else
+        return {};
+#endif
+    }
+
     glm::mat4 matrix_from_rows(const std::array<float, 16> &values) {
         glm::mat4 matrix{1.0F};
         for (size_t row = 0; row < 4; ++row)
@@ -199,6 +241,17 @@ namespace mxvk {
     void bind_nanobind_module(nb::module_ &module) {
         module.doc() = "Python bindings for the MXVK Vulkan framework.";
 
+        nb::exception<Exception>(module, "MXVKError", PyExc_RuntimeError);
+
+        const std::filesystem::path module_directory = python_module_directory();
+        const std::array<std::filesystem::path, 3> shader_directories{module_directory / "share" / "mxvk" / "shaders", module_directory / "mxvk" / "shaders", module_directory / "shaders"};
+        for (const std::filesystem::path &shader_directory : shader_directories) {
+            if (std::filesystem::is_directory(shader_directory)) {
+                setDefaultShaderDirectory(shader_directory.string());
+                break;
+            }
+        }
+
         module.attr("version") = nb::make_tuple(MXVK_VERSION_CODE_MAJOR, MXVK_VERSION_CODE_MINOR, MXVK_VERSION_CODE_PATCH);
         module.attr("has_cv") = false;
         module.attr("has_ffmpeg_capture") = false;
@@ -211,6 +264,8 @@ namespace mxvk {
         module.def("default_enable_screenshot", &defaultEnableScreenshot);
         module.def("set_default_executable_name", &setDefaultExecutableName, nb::arg("name"));
         module.def("default_executable_name", &defaultExecutableName, nb::rv_policy::copy);
+        module.def("set_default_shader_directory", &setDefaultShaderDirectory, nb::arg("directory"));
+        module.def("default_shader_directory", &defaultShaderDirectory, nb::rv_policy::copy);
         module.def("save_png_rgba", [](const std::string &path, nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> pixels, int width, int height) { return SavePNG_RGBA(path.c_str(), pixels.data(), width, height); }, nb::arg("path"), nb::arg("pixels"), nb::arg("width"), nb::arg("height"));
         module.def("save_png_rgba16", [](const std::string &path, nb::ndarray<uint16_t, nb::c_contig, nb::device::cpu> pixels, int width, int height) { return SavePNG_RGBA16(path.c_str(), pixels.data(), width, height); }, nb::arg("path"), nb::arg("pixels"), nb::arg("width"), nb::arg("height"));
         module.def("inspect_spirv_file", [](const std::string &path) { return inspect_spirv(load_spv(path)); }, nb::arg("path"));

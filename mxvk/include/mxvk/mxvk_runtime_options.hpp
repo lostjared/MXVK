@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MXVK_RUNTIME_OPTIONS_HPP
+#define MXVK_RUNTIME_OPTIONS_HPP
 
 #include <string>
 
@@ -20,4 +21,15 @@ namespace mxvk {
     inline void setDefaultExecutableName(const std::string &name) { defaultExecutableNameStorage() = name.empty() ? "mxvk" : name; }
 
     [[nodiscard]] inline const std::string &defaultExecutableName() { return defaultExecutableNameStorage(); }
+
+    [[nodiscard]] inline std::string &defaultShaderDirectoryStorage() {
+        static std::string directory{};
+        return directory;
+    }
+
+    inline void setDefaultShaderDirectory(const std::string &directory) { defaultShaderDirectoryStorage() = directory; }
+
+    [[nodiscard]] inline const std::string &defaultShaderDirectory() { return defaultShaderDirectoryStorage(); }
 } // namespace mxvk
+
+#endif
