@@ -1,0 +1,32 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mxvk"
+version = "0.33.1"
+description = "Python bindings for the MXVK Vulkan rendering framework"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [{ name = "LostSideDead Software" }]
+dependencies = ["numpy>=1.21"]
+
+[project.urls]
+Homepage = "https://github.com/lostjared/MXVK"
+Repository = "https://github.com/lostjared/MXVK"
+
+[tool.scikit-build]
+cmake.version = ">=3.15"
+cmake.build-type = "Release"
+wheel.packages = []
+
+[tool.scikit-build.cmake.define]
+PYTHON_MODULE = "ON"
+EXAMPLES = "OFF"
+WITH_MXWRITE = "OFF"
+WITH_CUDA = "OFF"
+WITH_MIXER = "OFF"
+CV = "OFF"
+JPEG = "OFF"
+MXVK_PYTHON_INSTALL_DIR = "."
