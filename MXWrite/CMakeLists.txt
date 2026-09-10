@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(GNUInstallDirs)
 include(CheckIncludeFileCXX)
 option(SHARED "Build MXWrite as a shared library" OFF)
-option(PYTHON_MODULE "Build the MXWrite nanobind Python module" OFF)
+option(MXWRITE_PYTHON_MODULE "Build the MXWrite nanobind Python module" OFF)
 
 # Homebrew support for Intel and Apple Silicon
 if(APPLE)
@@ -194,9 +194,9 @@ endif()
 
 target_compile_options(mxwrite PRIVATE -O3 -Wall -Wextra -pedantic)
 
-if(PYTHON_MODULE)
+if(MXWRITE_PYTHON_MODULE)
     if(CMAKE_VERSION VERSION_LESS 3.15)
-        message(FATAL_ERROR "PYTHON_MODULE requires CMake 3.15 or newer")
+        message(FATAL_ERROR "MXWRITE_PYTHON_MODULE requires CMake 3.15 or newer")
     endif()
 
     find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
@@ -211,7 +211,7 @@ if(PYTHON_MODULE)
         )
         if(NOT NANOBIND_CMAKE_DIR_RESULT EQUAL 0 OR NANOBIND_CMAKE_DIR STREQUAL "")
             message(FATAL_ERROR
-                "PYTHON_MODULE requires nanobind for ${Python_EXECUTABLE}. "
+                "MXWRITE_PYTHON_MODULE requires nanobind for ${Python_EXECUTABLE}. "
                 "Install it with: ${Python_EXECUTABLE} -m pip install nanobind"
             )
         endif()

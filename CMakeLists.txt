@@ -31,6 +31,7 @@ set_property(CACHE WITH_MIXER PROPERTY STRINGS AUTO ON OFF)
 option(JPEG "Enable JPEG image support" OFF)
 option(EXAMPLES "Enable/Disable Examples" ON)
 option(FRACTAL_ZOOM "Build the Boost.Multiprecision fractal_zoom example" OFF)
+option(PYTHON_MODULE "Build the MXVK nanobind Python module" OFF)
 
 if(MINGW AND CMAKE_CROSSCOMPILING)
 set(MXVK_MINGW_TRIPLET "")
@@ -558,7 +559,7 @@ endif()
 if(JPEG)
     target_link_libraries(mxvk PUBLIC JPEG::JPEG)
 endif()
-if(MXVK_CUDA_ENABLED)
+if(CV OR MXVK_CUDA_ENABLED)
     target_link_libraries(mxvk PUBLIC ${OpenCV_LIBS})
 endif()
 if(TARGET glm::glm)
@@ -573,6 +574,44 @@ target_compile_definitions(mxvk PUBLIC
     MXVK_SPRITE3D_SHADER_DIR="${mxvk_SHADER_OUTPUT_DIR}"
     MXVK_DEFAULT_FONT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mxvk/data"
 )
+
+if(PYTHON_MODULE)
+    if(CMAKE_VERSION VERSION_LESS 3.15)
+        message(FATAL_ERROR "PYTHON_MODULE requires CMake 3.15 or newer")
+    endif()
+
+    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(nanobind CONFIG QUIET)
+    if(NOT nanobind_FOUND)
+        execute_process(
+            COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+            RESULT_VARIABLE NANOBIND_CMAKE_DIR_RESULT
+            OUTPUT_VARIABLE NANOBIND_CMAKE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(NOT NANOBIND_CMAKE_DIR_RESULT EQUAL 0 OR NANOBIND_CMAKE_DIR STREQUAL "")
+            message(FATAL_ERROR
+                "PYTHON_MODULE requires nanobind for ${Python_EXECUTABLE}. "
+                "Install it with: ${Python_EXECUTABLE} -m pip install nanobind"
+            )
+        endif()
+        find_package(nanobind CONFIG REQUIRED PATHS "${NANOBIND_CMAKE_DIR}" NO_DEFAULT_PATH)
+    endif()
+
+    nanobind_add_module(mxvk_ext mxvk/src/mxvk_nanobind.cpp)
+    target_link_libraries(mxvk_ext PRIVATE mxvk)
+
+    set(MXVK_PYTHON_INSTALL_DIR
+        "${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages"
+        CACHE STRING "Install directory for the MXVK Python module"
+    )
+    install(TARGETS mxvk_ext
+        LIBRARY DESTINATION "${MXVK_PYTHON_INSTALL_DIR}"
+        RUNTIME DESTINATION "${MXVK_PYTHON_INSTALL_DIR}"
+    )
+endif()
+
 add_executable(mxmod2obj tools/mxmod2obj.cpp)
 target_link_libraries(mxmod2obj PRIVATE mxvk)
 mxvk_configure_mingw_target(mxmod2obj)
