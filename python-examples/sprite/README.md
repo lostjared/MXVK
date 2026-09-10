@@ -25,6 +25,20 @@ alive to prevent dangling native pointers. Python subclasses that store other
 window-owned handles on `self` should clear those attributes during shutdown in
 the same order.
 
+Use `mxvk.key_code()` to handle any SDL key by name. For example, a Python
+`console_event` implementation can check
+`event.key_down and event.key == mxvk.key_code("Space")`. `EVENT_KEY_UP` and
+the `MOD_SHIFT`, `MOD_CTRL`, `MOD_ALT`, and `MOD_GUI` modifier masks are also
+available.
+
+Mouse input is delivered through the same callback. Check `event.mouse_motion`,
+`event.mouse_button_down`, `event.mouse_button_up`, or `event.mouse_wheel`.
+Mouse coordinates are `event.x` and `event.y`; motion deltas are
+`event.relative_x` and `event.relative_y`; wheel deltas are `event.wheel_x` and
+`event.wheel_y`. Compare `event.button` with `MOUSE_BUTTON_LEFT`,
+`MOUSE_BUTTON_MIDDLE`, `MOUSE_BUTTON_RIGHT`, `MOUSE_BUTTON_X1`, or
+`MOUSE_BUTTON_X2`.
+
 To rebuild the copied shaders after editing their sources:
 
 ```bash

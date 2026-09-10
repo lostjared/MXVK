@@ -115,14 +115,42 @@ namespace {
         [[nodiscard]] int32_t key() const { return value.key.key; }
         [[nodiscard]] uint32_t scancode() const { return value.key.scancode; }
         [[nodiscard]] uint16_t modifiers() const { return value.key.mod; }
+        [[nodiscard]] bool key_down() const { return value.type == SDL_EVENT_KEY_DOWN; }
+        [[nodiscard]] bool key_up() const { return value.type == SDL_EVENT_KEY_UP; }
         [[nodiscard]] bool down() const { return value.key.down; }
         [[nodiscard]] bool repeat() const { return value.key.repeat; }
         [[nodiscard]] const std::string &text() const { return text_value; }
-        [[nodiscard]] float x() const { return value.motion.x; }
-        [[nodiscard]] float y() const { return value.motion.y; }
-        [[nodiscard]] float relative_x() const { return value.motion.xrel; }
-        [[nodiscard]] float relative_y() const { return value.motion.yrel; }
-        [[nodiscard]] uint8_t button() const { return value.button.button; }
+        [[nodiscard]] bool mouse_motion() const { return value.type == SDL_EVENT_MOUSE_MOTION; }
+        [[nodiscard]] bool mouse_button_down() const { return value.type == SDL_EVENT_MOUSE_BUTTON_DOWN; }
+        [[nodiscard]] bool mouse_button_up() const { return value.type == SDL_EVENT_MOUSE_BUTTON_UP; }
+        [[nodiscard]] bool mouse_wheel() const { return value.type == SDL_EVENT_MOUSE_WHEEL; }
+        [[nodiscard]] float x() const {
+            if (mouse_motion())
+                return value.motion.x;
+            if (mouse_button_down() || mouse_button_up())
+                return value.button.x;
+            if (mouse_wheel())
+                return value.wheel.mouse_x;
+            return 0.0F;
+        }
+        [[nodiscard]] float y() const {
+            if (mouse_motion())
+                return value.motion.y;
+            if (mouse_button_down() || mouse_button_up())
+                return value.button.y;
+            if (mouse_wheel())
+                return value.wheel.mouse_y;
+            return 0.0F;
+        }
+        [[nodiscard]] float relative_x() const { return mouse_motion() ? value.motion.xrel : 0.0F; }
+        [[nodiscard]] float relative_y() const { return mouse_motion() ? value.motion.yrel : 0.0F; }
+        [[nodiscard]] uint8_t button() const { return mouse_button_down() || mouse_button_up() ? value.button.button : 0; }
+        [[nodiscard]] uint8_t clicks() const { return mouse_button_down() || mouse_button_up() ? value.button.clicks : 0; }
+        [[nodiscard]] float wheel_x() const { return mouse_wheel() ? value.wheel.x : 0.0F; }
+        [[nodiscard]] float wheel_y() const { return mouse_wheel() ? value.wheel.y : 0.0F; }
+        [[nodiscard]] int32_t wheel_ticks_x() const { return mouse_wheel() ? value.wheel.integer_x : 0; }
+        [[nodiscard]] int32_t wheel_ticks_y() const { return mouse_wheel() ? value.wheel.integer_y : 0; }
+        [[nodiscard]] bool wheel_flipped() const { return mouse_wheel() && value.wheel.direction == SDL_MOUSEWHEEL_FLIPPED; }
 
       private:
         SDL_Event value{};
@@ -258,7 +286,21 @@ namespace mxvk {
         module.attr("has_mixer") = false;
         module.attr("has_jpeg") = false;
         module.attr("EVENT_KEY_DOWN") = static_cast<uint32_t>(SDL_EVENT_KEY_DOWN);
+        module.attr("EVENT_KEY_UP") = static_cast<uint32_t>(SDL_EVENT_KEY_UP);
+        module.attr("EVENT_MOUSE_MOTION") = static_cast<uint32_t>(SDL_EVENT_MOUSE_MOTION);
+        module.attr("EVENT_MOUSE_BUTTON_DOWN") = static_cast<uint32_t>(SDL_EVENT_MOUSE_BUTTON_DOWN);
+        module.attr("EVENT_MOUSE_BUTTON_UP") = static_cast<uint32_t>(SDL_EVENT_MOUSE_BUTTON_UP);
+        module.attr("EVENT_MOUSE_WHEEL") = static_cast<uint32_t>(SDL_EVENT_MOUSE_WHEEL);
         module.attr("KEY_ESCAPE") = static_cast<int32_t>(SDLK_ESCAPE);
+        module.attr("MOUSE_BUTTON_LEFT") = SDL_BUTTON_LEFT;
+        module.attr("MOUSE_BUTTON_MIDDLE") = SDL_BUTTON_MIDDLE;
+        module.attr("MOUSE_BUTTON_RIGHT") = SDL_BUTTON_RIGHT;
+        module.attr("MOUSE_BUTTON_X1") = SDL_BUTTON_X1;
+        module.attr("MOUSE_BUTTON_X2") = SDL_BUTTON_X2;
+        module.attr("MOD_SHIFT") = static_cast<uint16_t>(SDL_KMOD_SHIFT);
+        module.attr("MOD_CTRL") = static_cast<uint16_t>(SDL_KMOD_CTRL);
+        module.attr("MOD_ALT") = static_cast<uint16_t>(SDL_KMOD_ALT);
+        module.attr("MOD_GUI") = static_cast<uint16_t>(SDL_KMOD_GUI);
 
         module.def("set_default_enable_screenshot", &setDefaultEnableScreenshot, nb::arg("enabled"));
         module.def("default_enable_screenshot", &defaultEnableScreenshot);
@@ -266,6 +308,22 @@ namespace mxvk {
         module.def("default_executable_name", &defaultExecutableName, nb::rv_policy::copy);
         module.def("set_default_shader_directory", &setDefaultShaderDirectory, nb::arg("directory"));
         module.def("default_shader_directory", &defaultShaderDirectory, nb::rv_policy::copy);
+        module.def(
+            "key_code",
+            [](const std::string &name) {
+                const SDL_Keycode key = SDL_GetKeyFromName(name.c_str());
+                if (key == SDLK_UNKNOWN)
+                    throw std::invalid_argument("unknown SDL key name: " + name);
+                return static_cast<int32_t>(key);
+            },
+            nb::arg("name"));
+        module.def(
+            "key_name",
+            [](int32_t key) -> nb::object {
+                const char *name = SDL_GetKeyName(static_cast<SDL_Keycode>(key));
+                return name == nullptr || name[0] == '\0' ? nb::none() : nb::cast(std::string(name));
+            },
+            nb::arg("key"));
         module.def("save_png_rgba", [](const std::string &path, nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> pixels, int width, int height) { return SavePNG_RGBA(path.c_str(), pixels.data(), width, height); }, nb::arg("path"), nb::arg("pixels"), nb::arg("width"), nb::arg("height"));
         module.def("save_png_rgba16", [](const std::string &path, nb::ndarray<uint16_t, nb::c_contig, nb::device::cpu> pixels, int width, int height) { return SavePNG_RGBA16(path.c_str(), pixels.data(), width, height); }, nb::arg("path"), nb::arg("pixels"), nb::arg("width"), nb::arg("height"));
         module.def("inspect_spirv_file", [](const std::string &path) { return inspect_spirv(load_spv(path)); }, nb::arg("path"));
@@ -891,7 +949,7 @@ namespace mxvk {
                          })
             .def_prop_ro("swapchain_image_count", &VK_Window::getSwapchainImageCount);
 
-        nb::class_<PythonEvent>(module, "Event").def_prop_ro("type", &PythonEvent::type).def_prop_ro("timestamp", &PythonEvent::timestamp).def_prop_ro("key", &PythonEvent::key).def_prop_ro("scancode", &PythonEvent::scancode).def_prop_ro("modifiers", &PythonEvent::modifiers).def_prop_ro("down", &PythonEvent::down).def_prop_ro("repeat", &PythonEvent::repeat).def_prop_ro("text", &PythonEvent::text).def_prop_ro("x", &PythonEvent::x).def_prop_ro("y", &PythonEvent::y).def_prop_ro("relative_x", &PythonEvent::relative_x).def_prop_ro("relative_y", &PythonEvent::relative_y).def_prop_ro("button", &PythonEvent::button);
+        nb::class_<PythonEvent>(module, "Event").def_prop_ro("type", &PythonEvent::type).def_prop_ro("timestamp", &PythonEvent::timestamp).def_prop_ro("key", &PythonEvent::key).def_prop_ro("scancode", &PythonEvent::scancode).def_prop_ro("modifiers", &PythonEvent::modifiers).def_prop_ro("key_down", &PythonEvent::key_down).def_prop_ro("key_up", &PythonEvent::key_up).def_prop_ro("down", &PythonEvent::down).def_prop_ro("repeat", &PythonEvent::repeat).def_prop_ro("text", &PythonEvent::text).def_prop_ro("mouse_motion", &PythonEvent::mouse_motion).def_prop_ro("mouse_button_down", &PythonEvent::mouse_button_down).def_prop_ro("mouse_button_up", &PythonEvent::mouse_button_up).def_prop_ro("mouse_wheel", &PythonEvent::mouse_wheel).def_prop_ro("x", &PythonEvent::x).def_prop_ro("y", &PythonEvent::y).def_prop_ro("relative_x", &PythonEvent::relative_x).def_prop_ro("relative_y", &PythonEvent::relative_y).def_prop_ro("button", &PythonEvent::button).def_prop_ro("clicks", &PythonEvent::clicks).def_prop_ro("wheel_x", &PythonEvent::wheel_x).def_prop_ro("wheel_y", &PythonEvent::wheel_y).def_prop_ro("wheel_ticks_x", &PythonEvent::wheel_ticks_x).def_prop_ro("wheel_ticks_y", &PythonEvent::wheel_ticks_y).def_prop_ro("wheel_flipped", &PythonEvent::wheel_flipped);
 
         nb::class_<VK_IOWindow, VK_Window, PythonIOWindow>(module, "IOWindow")
             .def(nb::init<const std::string &, const std::string &, int, int, bool, bool>(), nb::arg("path"), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("enable_vsync") = false)
