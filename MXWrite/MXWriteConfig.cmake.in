@@ -2,9 +2,7 @@
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)
 find_dependency(PkgConfig)
-
-set(MXWRITE_HAS_CUDA "@CUDAToolkit_FOUND@")
-if(MXWRITE_HAS_CUDA)
+if(@MXWRITE_CONFIG_WITH_CUDA@)
     find_dependency(CUDAToolkit)
 endif()
 
