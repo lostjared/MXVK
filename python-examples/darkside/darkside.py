@@ -94,7 +94,7 @@ def perspective_matrix(fov_radians: float, aspect: float, near_plane: float, far
 
 
 class DarkWindow(mxvk.VK_Window):
-    TITLE_TEXT = "the Lunatic iS in my heaD"
+    TITLE_TEXT = "Python Prism"
 
     def __init__(self, filename: str, path: str, title: str, width: int, height: int, fullscreen: bool, enable_vsync: bool):
         if (not path or path == "."):
@@ -147,6 +147,7 @@ class DarkWindow(mxvk.VK_Window):
 
             beam_vertex_shader = self.data_directory / "beam3d.vert.spv"
             beam_fragment_shader = self.data_directory / "beam3d.frag.spv"
+            gradient_fragment_shader = self.data_directory / "gradient_mix.frag.spv"
 
             self.beam_model = mxvk.AbstractModel()
             self.beam_model.load(self, str(beam_model_path), "", "", 1.0)
@@ -157,6 +158,10 @@ class DarkWindow(mxvk.VK_Window):
             self.model.load(self, str(model_path), "", "", 1.0)
             self.model.set_alpha_blending(True)
             self.model.set_shaders(self, str(dark_vertex_shader), str(dark_fragment_shader))
+
+            self.attach_post_processing_shader(str(gradient_fragment_shader), 0.0, 0.0, 0.0, 0.0)
+            self.set_post_processing_shader_time_enabled(True)
+            self.set_post_processing_enabled(True)
 
         except Exception:
             self.close()
@@ -170,6 +175,7 @@ class DarkWindow(mxvk.VK_Window):
 
         try:
             self.wait_idle()
+            self.detach_post_processing_shader()
 
             if (self.beam_model is not None):
                 self.beam_model.cleanup(self)
