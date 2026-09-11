@@ -172,6 +172,26 @@ namespace {
                 NBBase::event(event);
         }
 
+        void onSwapchainRecreated() override {
+            constexpr uint64_t hash = nanobind::detail::str_hash("on_swapchain_recreated");
+            nanobind::detail::ticket ticket(nb_trampoline, "on_swapchain_recreated", hash, false);
+            if (ticket.key.is_valid())
+                nb_trampoline.base().attr(ticket.key)();
+            else
+                NBBase::onSwapchainRecreated();
+        }
+
+        void onRecordCustomRendering(VkCommandBuffer command_buffer, uint32_t image_index) override {
+            constexpr uint64_t hash = nanobind::detail::str_hash("on_record_custom_rendering");
+            nanobind::detail::ticket ticket(nb_trampoline, "on_record_custom_rendering", hash, false);
+            if (ticket.key.is_valid()) {
+                nb::capsule command(reinterpret_cast<void *>(command_buffer));
+                nb_trampoline.base().attr(ticket.key)(command, image_index);
+            } else {
+                NBBase::onRecordCustomRendering(command_buffer, image_index);
+            }
+        }
+
         void request_exit() { exit(); }
     };
 
@@ -813,6 +833,15 @@ namespace mxvk {
             .def(nb::init<const std::string &, int, int, bool, bool, VK_Window::PresentModePreference, VK_Window::RuntimeMode>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("validation") = true, nb::arg("present_mode") = VK_Window::PresentModePreference::LowLatency, nb::arg("runtime_mode") = VK_Window::RuntimeMode::Windowed)
             .def(nb::init<const std::string &, int, int, bool, bool, bool>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen"), nb::arg("validation"), nb::arg("enable_vsync"))
             .def("release", &VK_Window::release)
+            .def("wait_idle", [](VK_Window &window) {
+                const VkDevice device = window.getDevice();
+                if (device == VK_NULL_HANDLE)
+                    return;
+
+                const VkResult result = vkDeviceWaitIdle(device);
+                if (result != VK_SUCCESS)
+                    throw std::runtime_error("vkDeviceWaitIdle failed");
+            })
             .def("request_exit", [](VK_Window &window) {
                 auto *python_window = dynamic_cast<PythonWindow *>(&window);
                 if (python_window == nullptr)
