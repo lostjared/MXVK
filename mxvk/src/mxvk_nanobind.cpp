@@ -860,6 +860,8 @@ namespace mxvk {
                 nb::arg("event"))
             .def("loop", &VK_Window::loop)
             .def("render", &VK_Window::render)
+            .def("on_swapchain_recreated", [](VK_Window &) {})
+            .def("on_record_custom_rendering", [](VK_Window &, nb::capsule, uint32_t) {}, nb::arg("command_buffer"), nb::arg("image_index"))
             .def(
                 "on_prepare_frame_rendering",
                 [](VK_Window &window, nb::capsule command_buffer, uint32_t image_index) {
