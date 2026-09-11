@@ -6,7 +6,7 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.34.0`. This release adds an optional
+Current development is on version `0.34.1`. The latest release adds an optional
 nanobind Python extension (`mxvk_ext`) over the practical window, input,
 sprite, text, model, post-processing, and utility APIs. Python can subclass
 `VK_Window`, render models from the Vulkan command-recording callback, and run
@@ -14,8 +14,8 @@ the included self-contained examples. It builds on 0.33.1's source-sized
 snapshot support and the earlier post-processing, model, capture, and rendering
 work.
 
-See [MXVK 0.34.0 Release Notes](RELEASE_NOTES_0.34.0.md) for the complete list
-of changes and Python binding guidance.
+See [MXVK 0.34.0 Release Notes](RELEASE_NOTES_0.34.0.md) for the latest complete
+list of changes and Python binding guidance.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -465,7 +465,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.34.0`. Recent public API comments cover `VK_Window`, the optional nanobind extension, the post-processing texture-consumer hook, external model-texture rendering, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.34.1`. Recent public API comments cover `VK_Window`, the optional nanobind extension, the post-processing texture-consumer hook, external model-texture rendering, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
