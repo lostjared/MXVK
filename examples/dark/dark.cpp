@@ -30,7 +30,7 @@ namespace example {
             const std::string vertPath = shaderRoot + "/dark.vert.spv";
             const std::string fragPath = shaderRoot + "/dark.frag.spv";
             const std::string beamVertPath = shaderRoot + "/beam3d.vert.spv";
-            const std::string beamFragPath = shaderRoot + "/beam.frag.spv";
+            const std::string beamFragPath = shaderRoot + "/beam3d.frag.spv";
 
             setFont(assetRoot + "/data/font.ttf", 48);
 

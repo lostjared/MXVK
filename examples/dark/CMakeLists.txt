@@ -18,7 +18,7 @@ set(DARK_BEAM_FRAGMENT_SHADER ${DARK_SHADER_SOURCE_DIR}/beam3d.frag)
 set(DARK_VERTEX_SPV ${DARK_SHADER_OUTPUT_DIR}/dark.vert.spv)
 set(DARK_FRAGMENT_SPV ${DARK_SHADER_OUTPUT_DIR}/dark.frag.spv)
 set(DARK_BEAM_VERTEX_SPV ${DARK_SHADER_OUTPUT_DIR}/beam3d.vert.spv)
-set(DARK_BEAM_FRAGMENT_SPV ${DARK_SHADER_OUTPUT_DIR}/beam.frag.spv)
+set(DARK_BEAM_FRAGMENT_SPV ${DARK_SHADER_OUTPUT_DIR}/beam3d.frag.spv)
 
 add_custom_command(
     OUTPUT ${DARK_VERTEX_SPV}
@@ -79,22 +79,33 @@ foreach(_asset
     endif()
 endforeach()
 
-add_custom_command(TARGET dark POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:dark>/data
+add_custom_target(dark_runtime_data
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/data
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj
-        $<TARGET_FILE_DIR:dark>/data/pyramid.obj
+        ${CMAKE_CURRENT_BINARY_DIR}/data/pyramid.obj
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/data/beam.obj
-        $<TARGET_FILE_DIR:dark>/data/beam.obj
+        ${CMAKE_CURRENT_BINARY_DIR}/data/beam.obj
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf
-        $<TARGET_FILE_DIR:dark>/data/font.ttf
+        ${CMAKE_CURRENT_BINARY_DIR}/data/font.ttf
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${DARK_VERTEX_SPV}
         ${DARK_FRAGMENT_SPV}
         ${DARK_BEAM_VERTEX_SPV}
         ${DARK_BEAM_FRAGMENT_SPV}
-        $<TARGET_FILE_DIR:dark>/data
+        ${CMAKE_CURRENT_BINARY_DIR}/data
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/pyramid.obj
+        ${CMAKE_CURRENT_SOURCE_DIR}/data/beam.obj
+        ${CMAKE_SOURCE_DIR}/examples/text_example/data/font.ttf
+        ${DARK_VERTEX_SPV}
+        ${DARK_FRAGMENT_SPV}
+        ${DARK_BEAM_VERTEX_SPV}
+        ${DARK_BEAM_FRAGMENT_SPV}
     COMMENT "Copying dark assets to runtime output directory"
+    VERBATIM
 )
+
+add_dependencies(dark dark_runtime_data)
