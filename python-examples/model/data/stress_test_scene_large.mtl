@@ -1,0 +1,46 @@
+# Large textured stress test scene materials
+
+newmtl Core
+Ka 0.040000 0.060000 0.090000
+Kd 0.120000 0.300000 0.700000
+Ks 0.700000 0.850000 1.000000
+Ns 180.000000
+d 1.000000
+illum 2
+map_Kd core_diffuse.png
+
+newmtl Glass
+Ka 0.040000 0.050000 0.060000
+Kd 0.180000 0.220000 0.280000
+Ks 0.900000 0.900000 0.950000
+Ns 220.000000
+d 0.550000
+illum 2
+map_Kd glass_diffuse.png
+
+newmtl Metal
+Ka 0.060000 0.060000 0.060000
+Kd 0.500000 0.520000 0.560000
+Ks 0.900000 0.900000 0.900000
+Ns 160.000000
+d 1.000000
+illum 2
+map_Kd metal_diffuse.png
+
+newmtl MetalDark
+Ka 0.020000 0.020000 0.030000
+Kd 0.170000 0.180000 0.210000
+Ks 0.600000 0.620000 0.700000
+Ns 140.000000
+d 1.000000
+illum 2
+map_Kd metal_dark_diffuse.png
+
+newmtl Ground
+Ka 0.050000 0.040000 0.030000
+Kd 0.320000 0.270000 0.220000
+Ks 0.160000 0.160000 0.160000
+Ns 24.000000
+d 1.000000
+illum 2
+map_Kd ground_diffuse.png

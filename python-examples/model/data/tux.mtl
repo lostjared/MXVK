@@ -1,0 +1,46 @@
+# Tux textured materials with integrated chest and integrated face patches
+
+newmtl BodyTex
+Ka 0.020000 0.020000 0.020000
+Kd 0.080000 0.080000 0.100000
+Ks 0.220000 0.220000 0.240000
+Ns 48.000000
+d 1.000000
+illum 2
+map_Kd tux_body.png
+
+newmtl HeadTex
+Ka 0.020000 0.020000 0.020000
+Kd 0.080000 0.080000 0.100000
+Ks 0.220000 0.220000 0.240000
+Ns 48.000000
+d 1.000000
+illum 2
+map_Kd tux_head.png
+
+newmtl Black
+Ka 0.020000 0.020000 0.020000
+Kd 0.080000 0.080000 0.100000
+Ks 0.220000 0.220000 0.240000
+Ns 48.000000
+d 1.000000
+illum 2
+map_Kd tux_black.png
+
+newmtl White
+Ka 0.180000 0.180000 0.180000
+Kd 0.930000 0.940000 0.950000
+Ks 0.250000 0.250000 0.250000
+Ns 36.000000
+d 1.000000
+illum 2
+map_Kd tux_white.png
+
+newmtl Orange
+Ka 0.180000 0.070000 0.010000
+Kd 1.000000 0.470000 0.050000
+Ks 0.180000 0.120000 0.050000
+Ns 28.000000
+d 1.000000
+illum 2
+map_Kd tux_orange.png
