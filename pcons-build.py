@@ -12,11 +12,15 @@ Usage:
 
 Options accept ON/OFF/AUTO where noted and mirror the root CMake project:
 DEBUG_MODE, VALIDATION, CV, JPEG, EXAMPLES, FRACTAL_ZOOM,
-WITH_CUDA, WITH_EIGEN, WITH_MXWRITE, and WITH_MIXER.
+PYTHON_MODULE, WITH_CUDA, WITH_EIGEN, WITH_MXWRITE, and WITH_MIXER.
 """
 
+import json
 import os
 import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from pcons import (
@@ -86,6 +90,7 @@ with_cv = option("CV")
 with_jpeg = option("JPEG")
 with_examples = option("EXAMPLES", default=True)
 with_fractal = option("FRACTAL_ZOOM")
+with_python_module = option("PYTHON_MODULE")
 cuda_request = tristate("WITH_CUDA")
 eigen_request = tristate("WITH_EIGEN")
 mxwrite_request = tristate("WITH_MXWRITE")
@@ -480,6 +485,78 @@ if with_mxwrite and mxwrite:
     mxvk.public.defines.append("MXVK_WITH_FFMPEG_CAPTURE")
     mxvk.link(mxwrite)
 mxvk.add_dependency(font_target, *shader_targets)
+
+python_module = None
+python_module_output = None
+if with_python_module:
+    virtual_environment = os.environ.get("VIRTUAL_ENV")
+    default_python = (
+        str(Path(virtual_environment) / "bin" / "python3")
+        if virtual_environment and (Path(virtual_environment) / "bin" / "python3").exists()
+        else shutil.which("python3") or sys.executable
+    )
+    python_executable = get_var("PYTHON", default_python)
+    try:
+        python_config = json.loads(
+            subprocess.check_output(
+                [
+                    python_executable,
+                    "-c",
+                    "import json, sysconfig; print(json.dumps({"
+                    "'include': sysconfig.get_path('include'), "
+                    "'extension_suffix': sysconfig.get_config_var('EXT_SUFFIX'), "
+                    "'version': sysconfig.get_python_version(), "
+                    "'nanobind': __import__('nanobind').__path__[0]}))",
+                ],
+                text=True,
+                stderr=subprocess.STDOUT,
+            )
+        )
+        python_include_dir = Path(python_config["include"] or "")
+        nanobind_include_dir = Path(
+            subprocess.check_output(
+                [python_executable, "-m", "nanobind", "--include_dir"],
+                text=True,
+                stderr=subprocess.STDOUT,
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(
+            f"PYTHON_MODULE=ON requires nanobind for {python_executable}; "
+            f"install it with {python_executable} -m pip install nanobind"
+        ) from error
+    if not python_include_dir.is_dir():
+        raise SystemExit(
+            f"PYTHON_MODULE=ON requires Python development headers; "
+            f"could not find {python_include_dir}"
+        )
+
+    python_module_shared = project.SharedLibrary(
+        "mxvk_ext_shared",
+        env,
+        sources=[
+            project_dir / "mxvk" / "src" / "mxvk_nanobind.cpp",
+            Path(python_config["nanobind"]) / "src" / "nb_combined.cpp",
+        ],
+    )
+    python_module_shared.private.include_dirs.extend(
+        [python_include_dir, nanobind_include_dir]
+    )
+    python_module_shared.private.compile_flags.append("-fvisibility=hidden")
+    python_module_shared.link_private(mxvk)
+    if platform.is_linux:
+        python_module_shared.link_private("dl")
+
+    python_extension_suffix = python_config["extension_suffix"] or ".so"
+    python_module_output = project.build_dir / f"mxvk_ext{python_extension_suffix}"
+    python_module = project.Command(
+        "mxvk_ext_output",
+        env,
+        target=python_module_output,
+        source=python_module_shared,
+        command=["cp", "$SOURCE", "$TARGET"],
+    )
+    project.Alias("mxvk_ext", python_module)
 
 mxmod2obj = project.Program(
     "mxmod2obj", env, sources=[project_dir / "tools" / "mxmod2obj.cpp"]
@@ -1078,6 +1155,13 @@ installed: list[Target] = [
     ),
     project.Install("share/mxvk/data", [font_output]),
 ]
+if with_python_module and python_module_output is not None:
+    installed.append(
+        project.Install(
+            f"lib/python{python_config['version']}/site-packages",
+            [python_module_output],
+        )
+    )
 installed = [target for target in installed if target]
 if with_examples:
     installed.extend(

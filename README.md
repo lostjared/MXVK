@@ -263,6 +263,7 @@ Common pcons variables are:
 - `JPEG=1` enables JPEG support.
 - `FRACTAL_ZOOM=1` builds the fractal example.
 - `EXAMPLES=0` builds only the libraries and tools.
+- `PYTHON_MODULE=1` builds the optional `mxvk_ext` nanobind Python extension. It requires Python development headers and nanobind.
 - `WITH_CUDA=AUTO|ON|OFF` controls CUDA support.
 - `WITH_EIGEN=AUTO|ON|OFF` controls the Eigen math backend.
 - `WITH_MXWRITE=AUTO|ON|OFF` controls the FFmpeg writer.
