@@ -543,6 +543,10 @@ if with_python_module:
         [python_include_dir, nanobind_include_dir]
     )
     python_module_shared.private.compile_flags.append("-fvisibility=hidden")
+    if platform.is_linux or platform.is_macos:
+        # nanobind's bundled trampoline implementation intentionally uses a
+        # type-punned atomic reference that GCC diagnoses under -Wall.
+        python_module_shared.private.compile_flags.append("-Wno-strict-aliasing")
     python_module_shared.link_private(mxvk)
     if platform.is_linux:
         python_module_shared.link_private("dl")
