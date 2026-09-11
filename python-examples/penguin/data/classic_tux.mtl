@@ -1,0 +1,46 @@
+# Classic Tux materials, fixed geometry
+
+newmtl ShellTex
+Ka 0.020000 0.020000 0.025000
+Kd 0.080000 0.085000 0.100000
+Ks 0.300000 0.300000 0.320000
+Ns 64.000000
+d 1.000000
+illum 2
+map_Kd tux_shell.png
+
+newmtl Black
+Ka 0.015000 0.015000 0.020000
+Kd 0.055000 0.060000 0.075000
+Ks 0.340000 0.340000 0.360000
+Ns 72.000000
+d 1.000000
+illum 2
+map_Kd tux_black.png
+
+newmtl EyeWhite
+Ka 0.180000 0.180000 0.180000
+Kd 0.940000 0.945000 0.950000
+Ks 0.280000 0.280000 0.280000
+Ns 42.000000
+d 1.000000
+illum 2
+map_Kd tux_white.png
+
+newmtl Yellow
+Ka 0.180000 0.080000 0.000000
+Kd 1.000000 0.630000 0.030000
+Ks 0.300000 0.220000 0.070000
+Ns 42.000000
+d 1.000000
+illum 2
+map_Kd tux_yellow.png
+
+newmtl YellowDark
+Ka 0.140000 0.050000 0.000000
+Kd 0.880000 0.390000 0.015000
+Ks 0.220000 0.150000 0.040000
+Ns 34.000000
+d 1.000000
+illum 2
+map_Kd tux_yellow_dark.png
