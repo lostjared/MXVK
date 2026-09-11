@@ -6,18 +6,16 @@ MXVK is a C++20 Vulkan rendering framework with SDL3 integration, focused on pra
 
 It provides a reusable window/render loop (`mxvk::VK_Window`), sprite and text rendering, model rendering, a small engine math library in `mxvk/mxvk_math.h`, optional OpenCV capture support, and a set of examples that demonstrate end-to-end usage. It is designed to be easy to use while still retaining the power that Vulkan provides.
 
-Current development is on version `0.33.1`. This release captures snapshots
-from the source-sized offscreen effect target whenever a fixed render extent is
-active, preserving native output dimensions independently of the preview
-window. It builds on 0.33.0's non-owning post-processing texture-consumer path
-and external model textures, 0.32.0's extended model fragment uniforms, and
-the shared history/audio descriptor reflection, mixed fragment/compute
-post-processing, media-clock synchronization, CUDA/NVDEC, software 3D,
-installer, multiplayer, rendering, and documentation work from earlier
-releases.
+Current development is on version `0.34.0`. This release adds an optional
+nanobind Python extension (`mxvk_ext`) over the practical window, input,
+sprite, text, model, post-processing, and utility APIs. Python can subclass
+`VK_Window`, render models from the Vulkan command-recording callback, and run
+the included self-contained examples. It builds on 0.33.1's source-sized
+snapshot support and the earlier post-processing, model, capture, and rendering
+work.
 
-See [MXVK 0.33.1 Release Notes](RELEASE_NOTES_0.33.1.md) for the complete list
-of changes since the last published 0.24.0 release and upgrade guidance.
+See [MXVK 0.34.0 Release Notes](RELEASE_NOTES_0.34.0.md) for the complete list
+of changes and Python binding guidance.
 
 The repository also includes MXWrite, a small FFmpeg-based video writer library for exporting RGBA frames to video files. It can be built alongside MXVK with `-DWITH_MXWRITE=AUTO|ON|OFF`.
 
@@ -26,6 +24,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [What This Project Is](#what-this-project-is)
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
+- [Python Bindings](#python-bindings)
 - [Surface-Free Headless Rendering](#surface-free-headless-rendering)
 - [Build and Run with pcons](#build-and-run-with-pcons)
 - [Documentation](#documentation)
@@ -108,6 +107,86 @@ From repository root:
 cmake -S . -B build
 cmake --build build -j
 ```
+
+<a id="python-bindings"></a>
+
+## Python Bindings
+
+MXVK ships an optional [nanobind](https://nanobind.readthedocs.io/) extension
+named `mxvk_ext`. The normal C++ build stays Python-free: `PYTHON_MODULE`
+defaults to `OFF`. Enable it explicitly when configuring a CMake build:
+
+```bash
+cmake -S . -B build-python -DPYTHON_MODULE=ON -DEXAMPLES=OFF
+cmake --build build-python -j
+PYTHONPATH=build-python python3 python-examples/window/main.py
+```
+
+For a Python environment, install the project with pip. The wheel build enables
+the extension, installs NumPy as a dependency, and includes MXVK's shared SPIR-V
+shaders:
+
+```bash
+python3 -m pip install .
+python3 python-examples/window/main.py
+```
+
+Import the extension as `mxvk_ext`. `Window` and `VK_Window` are aliases; use
+`VK_Window` when writing a direct Python window subclass. `IOWindow` and
+`VK_IOWindow` remain available for console-overlay programs.
+
+```python
+from pathlib import Path
+
+import mxvk_ext as mxvk
+
+
+class Demo(mxvk.VK_Window):
+    def __init__(self):
+        super().__init__("MXVK Python", 960, 540, False, False, True)
+
+    def proc(self):
+        self.print_text("Hello from Python", 24, 24, mxvk.Color(255, 255, 255, 255))
+
+    def event(self, event):
+        if event.key_down and event.key == mxvk.KEY_ESCAPE:
+            self.request_exit()
+
+
+window = Demo()
+try:
+    window.loop()
+finally:
+    window.release()
+```
+
+The event wrapper exposes keyboard state, named key helpers (`key_code()` and
+`key_name()`), modifiers, mouse motion/buttons/wheel data, and text input.
+`VK_Window` subclasses may additionally implement
+`on_swapchain_recreated()` for swapchain-sized resources and
+`on_record_custom_rendering(command_buffer, image_index)` to record model or
+other custom Vulkan draws. The `command_buffer` value can be passed directly to
+`AbstractModel.render()`.
+
+`AbstractModel`, `ModelUniforms`, `Sprite`, `Sprite3D`, text, joystick,
+post-processing, frame readback, PNG helpers, and safe runtime configuration
+are exposed. Native `mxvk::Exception` values become `mxvk_ext.MXVKError`.
+Use `wait_idle()` before explicit Vulkan-owned model cleanup, then call
+`release()` to tear down the window.
+
+MXVK resolves shared wheel shaders automatically. For custom shaders bundled
+beside a Python example, set the resource directory before creating the window:
+
+```python
+mxvk.set_default_shader_directory(str(Path(__file__).resolve().parent / "data"))
+```
+
+The Python examples under `python-examples/` are self-contained and include
+their required assets and compiled shaders. `window`, `sprite`, `asteroids`,
+`knight`, and `darkside` demonstrate direct windows, sprites, input, model
+rendering, custom command recording, and post-processing.
+
+<a id="surface-free-headless-rendering"></a>
 
 ## Surface-Free Headless Rendering
 
@@ -342,6 +421,7 @@ Useful CMake options:
 - `-DCV=ON` enables OpenCV-based examples and capture support.
 - `-DWITH_MIXER=AUTO|ON|OFF` controls SDL3_mixer audio support (`mxvk_sound.cpp`, `MXVK_WITH_MIXER`). The default is `AUTO`, which enables audio when SDL3_mixer is detected; `ON` requires SDL3_mixer; `OFF` disables it.
 - `-DJPEG=ON` enables JPEG image support (`mxvk_jpeg.cpp`, `MXVK_WITH_JPEG`).
+- `-DPYTHON_MODULE=ON` builds the optional `mxvk_ext` nanobind extension. It requires Python development headers and nanobind; see [Python Bindings](#python-bindings).
 - `-DFRACTAL_ZOOM=ON` enables the `fractal_zoom` example and its Boost dependency.
 - `-DEXAMPLES=OFF` builds/install only the `mxvk` library and skips all examples.
 
@@ -385,7 +465,7 @@ The repository includes a Doxygen configuration for the core framework. The gene
 doxygen Doxyfile
 ```
 
-The current Doxygen project version is `0.33.1`. Recent public API comments cover `VK_Window`, the post-processing texture-consumer hook, external model-texture rendering, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
+The current Doxygen project version is `0.34.0`. Recent public API comments cover `VK_Window`, the optional nanobind extension, the post-processing texture-consumer hook, external model-texture rendering, the shared `VulkanContext` handle bundle in `mxvk_context.hpp`, the Vulkan resource helpers in `mxvk_resource.hpp`, the stencil helper in `mxvk_stencil.hpp`, the point-sprite batch renderer in `mxvk_point_sprite_batch.hpp`, and the `asteroids-net` multiplayer, ship, starfield, and port-mapping components.
 
 
 <a id="command-line-arguments"></a>
@@ -785,6 +865,11 @@ See [`examples/asteroids-net/README.md`](examples/asteroids-net/README.md) for t
 
 ## Recent Updates and Optimizations
 
+- September 11, 2026: version `0.34.0` adds the optional `mxvk_ext` nanobind
+  module and pip packaging. Python now has direct `VK_Window` subclassing,
+  keyboard/mouse events, sprite/text/model/post-processing APIs, safe native
+  exception translation, wheel shader discovery, explicit device-idle cleanup,
+  and self-contained Python examples including `darkside` model rendering.
 - August 27, 2026: version `0.33.1` captures snapshots from the initialized
   source-sized offscreen post-processing image when a fixed render extent is
   active, while retaining swapchain capture for the normal presentation path.

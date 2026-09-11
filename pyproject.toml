@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "mxvk"
-version = "0.33.1"
+version = "0.34.0"
 description = "Python bindings for the MXVK Vulkan rendering framework"
 readme = "README.md"
 requires-python = ">=3.8"

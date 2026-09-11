@@ -7,13 +7,13 @@
 
 DOXYFILE_ENCODING       = UTF-8
 PROJECT_NAME            = "MXVK Vulkan Framework"
-PROJECT_NUMBER          = "0.33.1"
+PROJECT_NUMBER          = "0.34.0"
 PROJECT_BRIEF           = "C++20 Vulkan rendering framework for practical 2D and 3D application development with SDL3."
 OUTPUT_DIRECTORY        = docs/doxygen
 CREATE_SUBDIRS          = YES
 
-INPUT                   = README.md RELEASE_NOTES_0.33.1.md mxvk/include mxvk/src examples MXNetwork MXWrite model_viewer
-FILE_PATTERNS           = *.md *.dox *.h *.hh *.hpp *.hxx *.inl *.c *.cc *.cpp *.cxx
+INPUT                   = README.md RELEASE_NOTES_0.33.1.md RELEASE_NOTES_0.34.0.md mxvk/include mxvk/src examples python-examples MXNetwork MXWrite model_viewer
+FILE_PATTERNS           = *.md *.dox *.h *.hh *.hpp *.hxx *.inl *.c *.cc *.cpp *.cxx *.py
 RECURSIVE               = YES
 EXCLUDE                 = build build_local .git
 EXCLUDE_PATTERNS        = */build/* */build_local/* */.git/*
