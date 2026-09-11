@@ -493,6 +493,8 @@ if with_python_module:
     default_python = (
         str(Path(virtual_environment) / "bin" / "python3")
         if virtual_environment and (Path(virtual_environment) / "bin" / "python3").exists()
+        else str(Path("/usr/bin/python3"))
+        if Path("/usr/bin/python3").exists()
         else shutil.which("python3") or sys.executable
     )
     python_executable = get_var("PYTHON", default_python)
