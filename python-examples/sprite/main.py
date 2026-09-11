@@ -7,9 +7,9 @@ import mxvk_ext as mxvk
 EXAMPLE_DIR = Path(__file__).resolve().parent
 DATA_DIR = EXAMPLE_DIR / "data"
 
-class SpriteWindow(mxvk.IOWindow):
+class SpriteWindow(mxvk.VK_Window):
     def __init__(self, width: int, height: int, fullscreen: bool, enable_vsync: bool) -> None:
-        super().__init__(str(EXAMPLE_DIR), "VK_Example", width, height, fullscreen, enable_vsync)
+        super().__init__("VK_Example", width, height, fullscreen, False, enable_vsync)
         self.fallback_width = width
         self.fallback_height = height
         self.set_font(str(DATA_DIR / "font.ttf"), 24)
@@ -31,10 +31,7 @@ class SpriteWindow(mxvk.IOWindow):
         self.sprite.draw_rect(0, 0, width, height)
         self.print_text("Hello, World!", 15, 15, mxvk.Color(255, 255, 255, 255))
 
-    def console_proc(self) -> None:
-        pass
-
-    def console_event(self, event: mxvk.Event) -> None:
+    def event(self, event: mxvk.Event) -> None:
         if event.type == mxvk.EVENT_KEY_DOWN and event.key == mxvk.KEY_ESCAPE:
             self.request_exit()
 

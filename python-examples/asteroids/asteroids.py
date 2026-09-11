@@ -101,9 +101,9 @@ class Star:
     twinkle_speed: float = 1.0
 
 
-class AsteroidsWindow(mxvk.IOWindow):
+class AsteroidsWindow(mxvk.VK_Window):
     def __init__(self, width: int, height: int, fullscreen: bool, enable_vsync: bool) -> None:
-        super().__init__(str(EXAMPLE_DIR), "-[ SpaceRox - MXVK ]-", width, height, fullscreen, enable_vsync)
+        super().__init__("-[ SpaceRox - MXVK ]-", width, height, fullscreen, False, enable_vsync)
         self.fallback_width = width
         self.fallback_height = height
         self.width = width
@@ -541,10 +541,7 @@ class AsteroidsWindow(mxvk.IOWindow):
             self.print_centered(f"Final Score: {self.ship.score}", self.to_y(165), mxvk.Color(255, 255, 255))
             self.print_centered("Press SPACE to begin", self.to_y(195), mxvk.Color(255, 255, 0))
 
-    def console_proc(self) -> None:
-        pass
-
-    def console_event(self, event: mxvk.Event) -> None:
+    def event(self, event: mxvk.Event) -> None:
         if event.key_down:
             if event.key == mxvk.KEY_ESCAPE:
                 self.request_exit()

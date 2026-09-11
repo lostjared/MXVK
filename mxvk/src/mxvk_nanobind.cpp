@@ -157,6 +157,24 @@ namespace {
         std::string text_value{};
     };
 
+    class PythonWindow : public mxvk::VK_Window {
+      public:
+        NB_TRAMPOLINE(mxvk::VK_Window);
+
+        void proc() override { NB_OVERRIDE(proc); }
+
+        void event(SDL_Event &event) override {
+            constexpr uint64_t hash = nanobind::detail::str_hash("event");
+            nanobind::detail::ticket ticket(nb_trampoline, "event", hash, false);
+            if (ticket.key.is_valid())
+                nb_trampoline.base().attr(ticket.key)(PythonEvent{&event});
+            else
+                NBBase::event(event);
+        }
+
+        void request_exit() { exit(); }
+    };
+
     class PythonIOWindow : public mxvk::VK_IOWindow {
       public:
         NB_TRAMPOLINE(mxvk::VK_IOWindow);
@@ -790,11 +808,17 @@ namespace mxvk {
 
         nb::class_<VK_Window::PostProcessingEffect>(module, "PostProcessingEffect").def(nb::init<>()).def_rw("fragment_shader_path", &VK_Window::PostProcessingEffect::fragmentShaderPath).def_rw("params", &VK_Window::PostProcessingEffect::params).def_rw("time_enabled", &VK_Window::PostProcessingEffect::timeEnabled).def_rw("spectrum_bin_count", &VK_Window::PostProcessingEffect::spectrumBinCount).def_rw("spectrum_history_layer_count", &VK_Window::PostProcessingEffect::spectrumHistoryLayerCount).def_rw("stage", &VK_Window::PostProcessingEffect::stage).def_rw("history_source", &VK_Window::PostProcessingEffect::historySource);
 
-        nb::class_<VK_Window>(module, "Window")
+        nb::class_<VK_Window, PythonWindow>(module, "Window")
             .def(nb::init<>())
             .def(nb::init<const std::string &, int, int, bool, bool, VK_Window::PresentModePreference, VK_Window::RuntimeMode>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("validation") = true, nb::arg("present_mode") = VK_Window::PresentModePreference::LowLatency, nb::arg("runtime_mode") = VK_Window::RuntimeMode::Windowed)
             .def(nb::init<const std::string &, int, int, bool, bool, bool>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen"), nb::arg("validation"), nb::arg("enable_vsync"))
             .def("release", &VK_Window::release)
+            .def("request_exit", [](VK_Window &window) {
+                auto *python_window = dynamic_cast<PythonWindow *>(&window);
+                if (python_window == nullptr)
+                    throw nb::type_error("request_exit requires a Python subclass of Window");
+                python_window->request_exit();
+            })
             .def("init_vulkan", &VK_Window::initVulkan, nb::arg("validation") = true)
             .def(
                 "event",
@@ -966,6 +990,9 @@ namespace mxvk {
                 },
                 nb::arg("event"))
             .def_prop_ro("visible", &VK_IOWindow::visible);
+
+        module.attr("VK_Window") = module.attr("Window");
+        module.attr("VK_IOWindow") = module.attr("IOWindow");
     }
 } // namespace mxvk
 
