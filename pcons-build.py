@@ -21,6 +21,7 @@ from pathlib import Path
 
 from pcons import (
     ImportedTarget,
+    PathToken,
     PackageDescription,
     Project,
     Target,
@@ -454,12 +455,12 @@ mxvk = project.StaticLibrary(
 mxvk.public.include_dirs.extend(
     [project_dir / "mxvk" / "include", project.build_dir / "mxvk" / "include"]
 )
-mxvk.public.defines.extend(
+mxvk.public.compile_flags.extend(
     [
-        f'MXVK_SPRITE_SHADER_DIR="{shader_output_dir}"',
-        f'MXVK_TEXT_SHADER_DIR="{shader_output_dir}"',
-        f'MXVK_SPRITE3D_SHADER_DIR="{shader_output_dir}"',
-        f'MXVK_DEFAULT_FONT_DIR="{font_output_dir}"',
+        PathToken('-DMXVK_SPRITE_SHADER_DIR="', "mxvk/shaders", "build", '"'),
+        PathToken('-DMXVK_TEXT_SHADER_DIR="', "mxvk/shaders", "build", '"'),
+        PathToken('-DMXVK_SPRITE3D_SHADER_DIR="', "mxvk/shaders", "build", '"'),
+        PathToken('-DMXVK_DEFAULT_FONT_DIR="', "mxvk/data", "build", '"'),
     ]
 )
 mxvk.link(volk, sdl3, sdl3_ttf, vulkan, libpng, zlib, glm)
