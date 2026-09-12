@@ -12,7 +12,7 @@ DATA_DIR = EXAMPLE_DIR / "data"
 
 
 class SpriteWindow(mxvk.VK_Window):
-    def __init__(self, width: int, height: int, fullscreen: bool, enable_vsync: bool) -> None:
+    def __init__(self, filename: str, width: int, height: int, fullscreen: bool, enable_vsync: bool) -> None:
         super().__init__("VK_Example", width, height, fullscreen, False, enable_vsync)
 
         self.fallback_width = width
@@ -37,7 +37,7 @@ class SpriteWindow(mxvk.VK_Window):
         self.sample_rate = 44100.0
         self.set_font(str(DATA_DIR / "font.ttf"), 24)
         self.sprite = self.create_sprite(str(DATA_DIR / "intro.png"), str(DATA_DIR / "sprite.vert.spv"), str(DATA_DIR / "fragment.frag.spv"))
-        compute_path = DATA_DIR / "compute.comp.spv"
+        compute_path = DATA_DIR / filename
         info = mxvk.inspect_spirv_file(str(compute_path))
 
         if(info.stage != mxvk.ShaderStage.compute):
@@ -135,6 +135,7 @@ class SpriteWindow(mxvk.VK_Window):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="MXVK Python compute shader example")
+    parser.add_argument("--filename", type=str, default="inter.comp.spv")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fullscreen", action="store_true")
@@ -147,7 +148,7 @@ def main() -> int:
     window = None
 
     try:
-        window = SpriteWindow(args.width, args.height, args.fullscreen, args.vsync)
+        window = SpriteWindow(args.filename, args.width, args.height, args.fullscreen, args.vsync)
         window.loop()
     except mxvk.MXVKError as exception:
         print(f"mxvk: Exception: {exception}")
