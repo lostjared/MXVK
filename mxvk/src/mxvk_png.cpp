@@ -29,7 +29,7 @@ namespace mxvk {
         return lower.ends_with(".png");
     }
 
-    [[nodiscard]] bool WriteRgbaPng(const char *filename, const std::uint8_t *pixels, const int width, const int height, const int pitch, const int bit_depth, const bool swap_16bit_endianness) {
+    [[nodiscard]] bool WriteRgbaPng(const char *filename, const std::uint8_t *pixels, const int width, const int height, const int pitch, const int bit_depth, const bool swap_16bit_endianness, int compression_level) {
         if (filename == nullptr || pixels == nullptr || width <= 0 || height <= 0 || pitch <= 0) {
             std::cerr << "mx: Invalid PNG write parameters.\n";
             return false;
@@ -64,6 +64,7 @@ namespace mxvk {
         }
 
         png_init_io(png, file);
+	png_set_compression_level(png, compression_level);
         png_set_IHDR(png, info, width, height, bit_depth, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
         if (bit_depth == 16 && swap_16bit_endianness) {
@@ -181,7 +182,7 @@ namespace mxvk {
         return surface;
     }
 
-    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename) {
+    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, int compression_level) {
         if (texture == nullptr || renderer == nullptr || filename == nullptr) {
             std::cerr << "mx: Invalid SavePNG parameters.\n";
             return false;
@@ -237,7 +238,7 @@ namespace mxvk {
         }
 
         const auto *pixels = static_cast<const std::uint8_t *>(rgba32_surface_raw->pixels);
-        return WriteRgbaPng(filename, pixels, rgba32_surface_raw->w, rgba32_surface_raw->h, rgba32_surface_raw->pitch, 8, false);
+        return WriteRgbaPng(filename, pixels, rgba32_surface_raw->w, rgba32_surface_raw->h, rgba32_surface_raw->pitch, 8, false, compression_level);
     }
 
     bool SaveRawBytes(const char *filename, const void *buffer, size_t w, size_t h, size_t bpp) {
@@ -275,18 +276,18 @@ namespace mxvk {
         return true;
     }
 
-    bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h) {
+    bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h, int compression_level) {
         const int pitch = w * 4;
-        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 8, false);
+        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 8, false, compression_level);
     }
 
-    bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h) {
+    bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h, int compression_level) {
         const int pitch = w * 8;
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
         constexpr bool swap_16bit_endianness = true;
 #else
         constexpr bool swap_16bit_endianness = false;
 #endif
-        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 16, swap_16bit_endianness);
+        return WriteRgbaPng(filename, static_cast<const std::uint8_t *>(buffer), w, h, pitch, 16, swap_16bit_endianness, compression_level);
     }
 } // namespace mxvk

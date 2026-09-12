@@ -25,7 +25,7 @@ namespace mxvk {
      * @param filename Destination file path.
      * @return @c true on success, @c false on failure.
      */
-    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename);
+    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, int compression_level);
 
     /**
      * @brief Save raw data to a file.
@@ -45,7 +45,7 @@ namespace mxvk {
      * @param h        Image height in pixels.
      * @return @c true on success, @c false on failure.
      */
-    bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h);
+    bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h, int compression_level = 6);
 
     /**
      * @brief Save a raw 16-bit RGBA pixel buffer to a PNG file.
@@ -55,5 +55,5 @@ namespace mxvk {
      * @param h        Image height in pixels.
      * @return @c true on success, @c false on failure.
      */
-    bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h);
+    bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h, int compression_level = 6);
 } // namespace mxvk
