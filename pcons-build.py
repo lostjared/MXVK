@@ -42,10 +42,13 @@ platform = get_platform()
 
 def configure_homebrew_paths() -> None:
     """Make direct macOS Pcons invocations see Homebrew's keg-only packages."""
+
     if not platform.is_macos:
         return
+
     package_dirs: list[str] = []
     binary_dirs: list[str] = []
+
     for prefix in (Path("/opt/homebrew"), Path("/usr/local")):
         package_dirs.extend(
             str(path)
@@ -53,6 +56,7 @@ def configure_homebrew_paths() -> None:
             if path.is_dir()
         )
         opt_dir = prefix / "opt"
+
         if opt_dir.is_dir():
             package_dirs.extend(str(path) for path in opt_dir.glob("*/lib/pkgconfig") if path.is_dir())
             package_dirs.extend(str(path) for path in opt_dir.glob("*/share/pkgconfig") if path.is_dir())
@@ -79,8 +83,10 @@ def option(name: str, default: bool = False) -> bool:
 
 def tristate(name: str, default: str = "AUTO") -> str:
     value = get_var(name, default).upper()
+
     if value not in ("AUTO", "ON", "OFF"):
         raise SystemExit(f"{name} must be AUTO, ON, or OFF (got {value!r})")
+
     return value
 
 
@@ -97,11 +103,13 @@ mxwrite_request = tristate("WITH_MXWRITE")
 mixer_request = tristate("WITH_MIXER")
 
 extra_prefixes = [Path(p) for p in (get_var("PREFIX") or "").split(os.pathsep) if p]
+
 if extra_prefixes:
     os.environ["PKG_CONFIG_PATH"] = os.pathsep.join(
         [str(p / "lib" / "pkgconfig") for p in extra_prefixes]
         + [os.environ.get("PKG_CONFIG_PATH", "")]
     )
+
 search_prefixes = extra_prefixes + [
     Path("/opt/homebrew"),
     Path("/usr/local"),
@@ -115,6 +123,7 @@ env.set_variant("debug" if debug_mode else get_var("VARIANT", "release"))
 env.cxx.set_standard(20)
 env.cc.flags.extend(["-std=c23", "-Wall", "-pedantic"])
 env.cxx.flags.extend(["-Wall", "-pedantic"])
+
 if not debug_mode and get_var("VARIANT", "release").lower() == "release":
     env.cc.flags.append("-O3")
     env.cxx.flags.append("-O3")
@@ -156,21 +165,26 @@ def system_headers(target: Target) -> Target:
     """Treat dependency headers as system headers so -Wall reports our code."""
     include_dirs = list(target.public.include_dirs)
     target.public.include_dirs.clear()
+
     for directory in include_dirs:
         # GCC already searches /usr/include. Re-adding it with -isystem moves
         # it ahead of the compiler's C++ wrapper headers and breaks
         # libstdc++'s #include_next <stdlib.h>.
         if Path(directory).resolve() == Path("/usr/include"):
             continue
+
         target.public.compile_flags.extend(["-isystem", str(directory)])
+
     return target
 
 
 def find_header(probe: str) -> Path | None:
     for prefix in search_prefixes:
         candidate = prefix / "include" / probe
+
         if candidate.exists():
             return candidate.parent
+
     return None
 
 
@@ -179,6 +193,7 @@ def manual_library(
 ) -> ImportedTarget | None:
     include_dir = find_header(header_dir)
     found_library_dir = None
+
     for prefix in search_prefixes:
         for directory in (prefix / "lib", prefix / "lib64"):
             if any((directory / f"lib{library}{suffix}").exists() for suffix in (".so", ".a", ".dylib")):
@@ -197,24 +212,44 @@ def manual_library(
         )
     if required:
         raise SystemExit(f"Missing dependency: {name} ({header_dir}, lib{library})")
+
     return None
 
 
 def header_only(name: str, probe: str, *, required: bool = True) -> ImportedTarget | None:
     include_dir = find_header(probe)
+
     if include_dir:
         # find_header returns the probe's parent. Move back to the include root.
         root = include_dir
+
         for _ in Path(probe).parts[:-1]:
             root = root.parent
+
         return system_headers(imported(name, include_dirs=[str(root)]))
     if required:
         raise SystemExit(f"Missing dependency: {name} (include/{probe})")
+
     return None
 
 
 def quoted(path: Path) -> str:
     return shlex.quote(str(path))
+
+
+def path_define(name: str, path: Path) -> PathToken:
+    resolved = path.resolve()
+    build_root = (project_dir / project.build_dir).resolve()
+
+    if resolved.is_relative_to(build_root):
+        relative = resolved.relative_to(build_root).as_posix()
+        return PathToken(f'-D{name}="', relative, "build", '"')
+
+    if resolved.is_relative_to(project_dir):
+        relative = resolved.relative_to(project_dir).as_posix()
+        return PathToken(f'-D{name}="', relative, "project", '"')
+
+    return PathToken(f'-D{name}="', str(resolved), "absolute", '"')
 
 
 sdl3 = system_headers(project.find_package("sdl3"))
@@ -228,20 +263,26 @@ sdl3_mixer = manual_library(
     "SDL3_mixer", "SDL3_mixer/SDL_mixer.h", "SDL3_mixer", required=False
 )
 with_mixer = mixer_request == "ON" or (mixer_request == "AUTO" and sdl3_mixer is not None)
+
 if mixer_request == "ON" and sdl3_mixer is None:
     raise SystemExit("WITH_MIXER=ON requested, but SDL3_mixer was not found")
 
 eigen = None
+
 for eigen_prefix in search_prefixes:
     eigen_include = eigen_prefix / "include" / "eigen3"
+
     if (eigen_include / "Eigen" / "Dense").exists():
         eigen = system_headers(imported("Eigen3", include_dirs=[str(eigen_include)]))
         break
+
 with_eigen = eigen_request == "ON" or (eigen_request == "AUTO" and eigen is not None)
+
 if eigen_request == "ON" and eigen is None:
     raise SystemExit("WITH_EIGEN=ON requested, but Eigen3 was not found")
 
 ffmpeg_packages: list[Target] = []
+
 if mxwrite_request != "OFF":
     try:
         ffmpeg_packages = [
@@ -251,7 +292,9 @@ if mxwrite_request != "OFF":
     except Exception:
         if mxwrite_request == "ON":
             raise
+
         ffmpeg_packages = []
+
 with_mxwrite = bool(ffmpeg_packages)
 
 opencv = None
@@ -259,11 +302,14 @@ cuda = None
 cuda_root = Path(get_var("CUDA_PREFIX", "/opt/cuda"))
 cuda_header = cuda_root / "include" / "cuda_runtime.h"
 cuda_lib = cuda_root / "lib64" / "libcudart.so"
+
 if not cuda_header.exists():
     cuda_header = cuda_root / "targets" / "x86_64-linux" / "include" / "cuda_runtime.h"
     cuda_lib = cuda_root / "targets" / "x86_64-linux" / "lib" / "libcudart.so"
+
 cuda_available = cuda_header.exists() and cuda_lib.exists()
 with_cuda = cuda_request == "ON" or (cuda_request == "AUTO" and cuda_available)
+
 if cuda_request == "ON" and not cuda_available:
     raise SystemExit(f"WITH_CUDA=ON requested, but CUDA was not found under {cuda_root}")
 if with_cv or with_cuda:
@@ -272,6 +318,7 @@ if with_cv or with_cuda:
     except Exception:
         if with_cv or cuda_request == "ON":
             raise
+
         with_cuda = False
 if with_cuda:
     cuda_include = cuda_header.parent
@@ -305,9 +352,11 @@ font_target = project.Command(
     source=project_dir / "mxvk" / "data" / "default.ttf",
     command=f"mkdir -p {quoted(font_output_dir)} && cp {quoted(project_dir / 'mxvk' / 'data' / 'default.ttf')} {quoted(font_output)}",
 )
+
 for shader in sorted((project_dir / "mxvk" / "shaders").glob("*")):
     if shader.suffix not in (".vert", ".frag", ".comp"):
         continue
+
     output = shader_output_dir / f"{shader.name}.spv"
     shader_targets.append(
         project.Command(
@@ -326,79 +375,84 @@ mutatris_source_dir = project_dir / "examples" / "mutatris"
 mutatris_runtime_dir = (
     project_dir / project.build_dir / "runtime" / "mutatris"
 ).resolve()
-mutatris_shader_dir = mutatris_runtime_dir / "shaders"
-mutatris_runtime_targets: list[Target] = []
-mutatris_runtime_outputs: list[Path] = []
+mutatris_runtime_target = None
 
-mutatris_shader_sources = [
-    (project_dir / "mxvk" / "shaders" / "sprite.vert", "background.vert.spv", ""),
-    (mutatris_source_dir / "shaders" / "background.frag", "background.frag.spv", ""),
-    (mutatris_source_dir / "shaders" / "fade.frag", "fade.frag.spv", ""),
-    (mutatris_source_dir / "shaders" / "crt.frag", "crt.frag.spv", ""),
-]
-for shader, output_name, extra_flags in mutatris_shader_sources:
-    output = mutatris_shader_dir / output_name
-    mutatris_runtime_outputs.append(output)
+if with_examples:
+    mutatris_shader_dir = mutatris_runtime_dir / "shaders"
+    mutatris_runtime_targets: list[Target] = []
+    mutatris_runtime_outputs: list[Path] = []
+    mutatris_shader_sources = [
+        (project_dir / "mxvk" / "shaders" / "sprite.vert", "background.vert.spv", ""),
+        (mutatris_source_dir / "shaders" / "background.frag", "background.frag.spv", ""),
+        (mutatris_source_dir / "shaders" / "fade.frag", "fade.frag.spv", ""),
+        (mutatris_source_dir / "shaders" / "crt.frag", "crt.frag.spv", ""),
+    ]
+
+    for shader, output_name, extra_flags in mutatris_shader_sources:
+        output = mutatris_shader_dir / output_name
+        mutatris_runtime_outputs.append(output)
+        mutatris_runtime_targets.append(
+            project.Command(
+                f"mutatris-shader-{output_name}",
+                env,
+                target=output,
+                source=shader,
+                command=(
+                    f"mkdir -p {mutatris_shader_dir} && "
+                    f"glslc {extra_flags} {shader} -o {output}"
+                ),
+            )
+        )
+
+    mutatris_effect_dir = mutatris_shader_dir / "effects"
+
+    for shader in sorted((mutatris_source_dir / "shaders" / "effects").glob("*.glsl")):
+        output = mutatris_effect_dir / f"{shader.name}.spv"
+        mutatris_runtime_outputs.append(output)
+        mutatris_runtime_targets.append(
+            project.Command(
+                f"mutatris-effect-{shader.stem}",
+                env,
+                target=output,
+                source=shader,
+                command=(
+                    f"mkdir -p {mutatris_effect_dir} && "
+                    f"glslc -fshader-stage=frag {shader} -o {output}"
+                ),
+            )
+        )
+
+    mutatris_data_files = sorted(
+        path for path in (mutatris_source_dir / "data").rglob("*") if path.is_file()
+    )
+    mutatris_data_marker = mutatris_runtime_dir / "data" / ".pcons-assets"
     mutatris_runtime_targets.append(
         project.Command(
-            f"mutatris-shader-{output_name}",
+            "mutatris-runtime-data",
             env,
-            target=output,
-            source=shader,
+            target=mutatris_data_marker,
+            source=mutatris_data_files,
             command=(
-                f"mkdir -p {mutatris_shader_dir} && "
-                f"glslc {extra_flags} {shader} -o {output}"
+                f"mkdir -p {mutatris_runtime_dir / 'data'} && "
+                f"cp -a {mutatris_source_dir / 'data'}/. "
+                f"{mutatris_runtime_dir / 'data'}/ && touch {mutatris_data_marker}"
             ),
         )
     )
-
-mutatris_effect_dir = mutatris_shader_dir / "effects"
-for shader in sorted((mutatris_source_dir / "shaders" / "effects").glob("*.glsl")):
-    output = mutatris_effect_dir / f"{shader.name}.spv"
-    mutatris_runtime_outputs.append(output)
-    mutatris_runtime_targets.append(
-        project.Command(
-            f"mutatris-effect-{shader.stem}",
-            env,
-            target=output,
-            source=shader,
-            command=(
-                f"mkdir -p {mutatris_effect_dir} && "
-                f"glslc -fshader-stage=frag {shader} -o {output}"
-            ),
-        )
-    )
-
-mutatris_data_files = sorted(
-    path for path in (mutatris_source_dir / "data").rglob("*") if path.is_file()
-)
-mutatris_data_marker = mutatris_runtime_dir / "data" / ".pcons-assets"
-mutatris_runtime_targets.append(
-    project.Command(
-        "mutatris-runtime-data",
+    mutatris_runtime_outputs.append(mutatris_data_marker)
+    mutatris_shader_marker = mutatris_runtime_dir / ".pcons-shaders"
+    mutatris_runtime_target = project.Command(
+        "mutatris-runtime",
         env,
-        target=mutatris_data_marker,
-        source=mutatris_data_files,
-        command=(
-            f"mkdir -p {mutatris_runtime_dir / 'data'} && "
-            f"cp -a {mutatris_source_dir / 'data'}/. "
-            f"{mutatris_runtime_dir / 'data'}/ && touch {mutatris_data_marker}"
-        ),
+        target=mutatris_shader_marker,
+        source=mutatris_runtime_outputs,
+        command=f"touch {quoted(mutatris_shader_marker)}",
     )
-)
-mutatris_runtime_outputs.append(mutatris_data_marker)
-mutatris_shader_marker = mutatris_runtime_dir / ".pcons-shaders"
-mutatris_runtime_target = project.Command(
-    "mutatris-runtime",
-    env,
-    target=mutatris_shader_marker,
-    source=mutatris_runtime_outputs,
-    command=f"touch {quoted(mutatris_shader_marker)}",
-)
 
 volk = project.StaticLibrary("volk", env, sources=[project_dir / "volk" / "volk.cpp"])
 volk.public.include_dirs.append(project_dir)
 volk.link(vulkan)
+
 if platform.is_linux:
     volk.public.link_libs.append("dl")
 
@@ -415,6 +469,7 @@ mxnetwork.public.include_dirs.append(project_dir / "MXNetwork" / "include")
 mxnetwork.public.link_flags.append("-pthread")
 
 mxwrite = None
+
 if with_mxwrite:
     mxwrite = project.StaticLibrary(
         "mxwrite", env, sources=[project_dir / "MXWrite" / "mxwrite.cpp"]
@@ -424,6 +479,7 @@ if with_mxwrite:
     mxwrite.private.compile_flags.append("-Wextra")
     mxwrite.link(*ffmpeg_packages)
     mxwrite.public.link_flags.append("-pthread")
+
     if cuda:
         mxwrite.public.defines.append("MXWRITE_HAS_CUDA_COPY=1")
         mxwrite.link(cuda)
@@ -445,6 +501,7 @@ core_sources = [
     "mxvk_cfg.cpp",
     "mxvk_io_window.cpp",
 ]
+
 if with_mixer:
     core_sources.append("mxvk_sound.cpp")
 if with_jpeg:
@@ -469,6 +526,7 @@ mxvk.public.compile_flags.extend(
     ]
 )
 mxvk.link(volk, sdl3, sdl3_ttf, vulkan, libpng, zlib, glm)
+
 if with_mixer and sdl3_mixer:
     mxvk.public.defines.extend(["MXVK_WITH_MIXER", "WITH_MIXER"])
     mxvk.link(sdl3_mixer)
@@ -484,10 +542,12 @@ if with_cuda and cuda and opencv:
 if with_mxwrite and mxwrite:
     mxvk.public.defines.append("MXVK_WITH_FFMPEG_CAPTURE")
     mxvk.link(mxwrite)
+
 mxvk.add_dependency(font_target, *shader_targets)
 
 python_module = None
 python_module_output = None
+
 if with_python_module:
     virtual_environment = os.environ.get("VIRTUAL_ENV")
     default_python = (
@@ -498,6 +558,7 @@ if with_python_module:
         else shutil.which("python3") or sys.executable
     )
     python_executable = get_var("PYTHON", default_python)
+
     try:
         python_config = json.loads(
             subprocess.check_output(
@@ -545,11 +606,14 @@ if with_python_module:
         [python_include_dir, nanobind_include_dir]
     )
     python_module_shared.private.compile_flags.append("-fvisibility=hidden")
+
     if platform.is_linux or platform.is_macos:
         # nanobind's bundled trampoline implementation intentionally uses a
         # type-punned atomic reference that GCC diagnoses under -Wall.
         python_module_shared.private.compile_flags.append("-Wno-strict-aliasing")
+
     python_module_shared.link_private(mxvk)
+
     if platform.is_linux:
         python_module_shared.link_private("dl")
 
@@ -624,6 +688,7 @@ EXAMPLES: list[tuple[str, str, list[str]]] = [
     ("walk_post", "walk_post", ["room.cpp"]),
     ("bluesky", "bluesky", ["bluesky.cpp"]),
 ]
+
 if with_fractal:
     EXAMPLES.append(("fractal_zoom", "fractal_zoom", ["fractal.cpp"]))
 if with_cv:
@@ -848,16 +913,23 @@ SPECIAL_SHADER_OUTPUTS = {
 def unique_paths(paths: list[Path]) -> list[Path]:
     result = []
     seen = set()
+
     for path in paths:
         key = str(path)
+
         if key not in seen:
             seen.add(key)
             result.append(path)
+
     return result
 
 
 demo_runtime_dirs: dict[str, Path] = {}
-demo_runtime_targets: dict[str, list[Target]] = {"mutatris": [mutatris_runtime_target]}
+demo_runtime_targets: dict[str, list[Target]] = {}
+
+if with_examples and mutatris_runtime_target is not None:
+    demo_runtime_targets["mutatris"] = [mutatris_runtime_target]
+
 # Do not generate (or stage) any per-demo assets for a libraries-only build.
 # Pcons otherwise registers their custom commands even though no executable
 # consumes them, which both wastes work and can race with bundled .spv assets.
@@ -903,6 +975,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     asset_files.extend(source for source, destination in extra_asset_files)
     asset_marker = runtime_dir / ".pcons-assets"
     asset_commands = [f"mkdir -p {quoted(runtime_dir)}"]
+
     for directory in asset_roots:
         destination = runtime_dir / directory.name
         asset_commands.extend(
@@ -925,6 +998,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
                 f"cp {quoted(source)} {quoted(destination)}",
             ]
         )
+
     asset_commands.append(f"touch {quoted(asset_marker)}")
     asset_target = project.Command(
         f"runtime-assets-{demo_name}",
@@ -938,6 +1012,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     core_commands = [
         f"mkdir -p {quoted(runtime_dir / 'data')} {quoted(runtime_dir / 'shaders')}"
     ]
+
     for source_name, aliases in core_aliases:
         for alias in aliases:
             for destination in (
@@ -949,6 +1024,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
                     f"cp {quoted(shader_output_dir / source_name)} "
                     f"{quoted(destination)}"
                 )
+
     core_commands.extend(
         [
             f"cp {quoted(project_dir / 'mxvk' / 'data' / 'default.ttf')} "
@@ -978,6 +1054,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     runtime_shader_sources = unique_paths(local_shader_sources + shared_shader_sources)
     compile_targets = []
     compiled_outputs: list[tuple[Path, Path, str]] = []
+
     for shader_index, shader in enumerate(runtime_shader_sources):
         source_key = shader.relative_to(project_dir).as_posix()
         compiled = runtime_dir / ".compiled" / f"{shader_index}-{shader.name}.spv"
@@ -997,16 +1074,19 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
 
     shader_marker = runtime_dir / ".pcons-shaders"
     shader_commands = [f"mkdir -p {quoted(runtime_dir)}"]
+
     for shader, compiled, source_key in compiled_outputs:
         if shader.is_relative_to(demo_source_dir):
             relative_shader = shader.relative_to(demo_source_dir)
         else:
             relative_shader = Path("shared") / shader.name
+
         destinations = [
             runtime_dir / Path(f"{relative_shader}.spv"),
             runtime_dir / "data" / f"{shader.name}.spv",
             runtime_dir / "shaders" / f"{shader.name}.spv",
         ]
+
         for special_output in SPECIAL_SHADER_OUTPUTS.get(
             (demo_name, source_key), []
         ):
@@ -1025,6 +1105,7 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
                     f"cp {quoted(compiled)} {quoted(destination)}",
                 ]
             )
+
     shader_commands.append(f"touch {quoted(shader_marker)}")
     shader_target = project.Command(
         f"runtime-shaders-{demo_name}",
@@ -1036,9 +1117,11 @@ for demo_name in sorted(selected_example_dirs - {"mutatris"}):
     )
     demo_runtime_targets[demo_name] = [shader_target]
 
-demo_runtime_dirs["mutatris"] = mutatris_runtime_dir
+if with_examples:
+    demo_runtime_dirs["mutatris"] = mutatris_runtime_dir
 
 programs: list[tuple[str, Target]] = []
+
 if with_examples:
     rain = project.StaticLibrary(
         "rain", env, sources=[project_dir / "examples" / "rain" / "rain.cpp"]
@@ -1049,18 +1132,23 @@ if with_examples:
     rain_users = {"model_example", "planet", "asteroids3d", "asteroids-net", "defender", "puzzle_drop", "matrix"}
     network_users = {"asteroids-net", "tetris"}
     math_examples = {name for directory, name, unused in EXAMPLES if directory.startswith("3dmath")}
+
     for directory, name, source_names in EXAMPLES:
         source_dir = project_dir / "examples" / directory
         program = project.Program(name, env, sources=[source_dir / item for item in source_names])
         program.link(rain if directory in rain_users else mxvk)
+
         if directory in network_users:
             program.link(mxnetwork)
         if directory in ("asteroids3d", "asteroids-net"):
             program.private.include_dirs.append(project_dir / "examples" / "rain")
-            program.private.defines.extend(
+            program.private.compile_flags.extend(
                 [
-                    f'ASTEROIDS3D_SOURCE_DATA_DIR="{source_dir / "data"}"',
-                    f'ASTEROIDS3D_DEFENDER_SOUND_DIR="{project_dir / "examples" / "defender" / "data"}"',
+                    path_define("ASTEROIDS3D_SOURCE_DATA_DIR", source_dir / "data"),
+                    path_define(
+                        "ASTEROIDS3D_DEFENDER_SOUND_DIR",
+                        project_dir / "examples" / "defender" / "data",
+                    ),
                 ]
             )
         if directory == "defender":
@@ -1072,7 +1160,9 @@ if with_examples:
             program.link(eigen)
         if directory == "3dmath_obj_loader":
             program.private.defines.append("MXVK_OBJ_LOADER")
+
         program.add_dependency(*demo_runtime_targets.get(directory, []))
+
         if directory == "asteroids-net":
             if (Path("/usr/include/miniupnpc/miniupnpc.h")).exists():
                 program.private.defines.append("ASTEROIDS_NET_HAS_MINIUPNPC=1")
@@ -1080,23 +1170,36 @@ if with_examples:
             if (Path("/usr/include/natpmp.h")).exists():
                 program.private.defines.append("ASTEROIDS_NET_HAS_NATPMP=1")
                 program.private.link_libs.append("natpmp")
+
         asset_dir = demo_runtime_dirs.get(directory, source_dir)
+
         if directory in asset_defines:
-            program.private.defines.append(f'{asset_defines[directory]}="{asset_dir}"')
+            program.private.compile_flags.append(
+                path_define(asset_defines[directory], asset_dir)
+            )
         if directory in ("sprite_example", "text_example"):
-            program.private.defines.append(f'{directory}_SHADER_DIR="{source_dir / "shaders"}"')
+            program.private.compile_flags.append(
+                path_define(f"{directory}_SHADER_DIR", source_dir / "shaders")
+            )
         if directory == "viewer":
-            program.private.defines.append(f'VIEWER_SOURCE_DIR="{source_dir}"')
+            program.private.compile_flags.append(
+                path_define("VIEWER_SOURCE_DIR", source_dir)
+            )
         if directory == "starship":
-            program.private.defines.append(
-                f'STARSHIP_EXAMPLE_RUNTIME_DATA_DIR="{source_dir / "data"}"'
+            program.private.compile_flags.append(
+                path_define("STARSHIP_EXAMPLE_RUNTIME_DATA_DIR", source_dir / "data")
             )
         if directory == "shader_viewer":
-            program.private.defines.append(f'shader_viewer_SOURCE_DIR="{source_dir}"')
+            program.private.compile_flags.append(
+                path_define("shader_viewer_SOURCE_DIR", source_dir)
+            )
         if directory == "tictactoe":
-            program.private.defines.append(f'tictactoe_FONT_PATH="{source_dir / "data" / "font.ttf"}"')
+            program.private.compile_flags.append(
+                path_define("tictactoe_FONT_PATH", source_dir / "data" / "font.ttf")
+            )
         if with_cv and directory in ("compute_shader", "opencv_example", "shader_viewer", "opencv_model") and opencv:
             program.link(opencv)
+
         programs.append((name, program))
 
 stage_prefix = get_var("PCONS_INSTALL_PREFIX", str(project_dir / "dist"))
@@ -1109,6 +1212,7 @@ private_requires = " ".join(
     + ([get_var("OPENCV_PACKAGE", "opencv5")] if opencv else [])
 )
 private_libraries = ["-ldl", "-pthread"] if platform.is_linux else []
+
 if with_mixer:
     private_libraries.append("-lSDL3_mixer")
 if with_jpeg:
@@ -1117,7 +1221,9 @@ if with_cuda and cuda:
     private_libraries.extend(
         [f"-L{cuda_lib.parent}", "-lcudart", "-lnppicc", "-lnppidei", "-lnppc"]
     )
+
 public_defines = []
+
 if platform.is_macos:
     # MXVK's public headers and consumers must use the same Vulkan platform
     # declarations as the library.  This mirrors CMake's PUBLIC definitions.
@@ -1132,8 +1238,10 @@ if with_cuda:
     public_defines.extend(["-DMXVK_CUDA", "-DMXVK_CUDA_NPP"])
 if with_mxwrite:
     public_defines.extend(["-DMXVK_WITH_FFMPEG_CAPTURE", "-DMXWRITE_ENABLED=1"])
+
     if with_cuda:
         public_defines.append("-DMXWRITE_HAS_CUDA_COPY=1")
+
 pc_file.write_text(
     f"prefix={final_prefix}\n"
     "exec_prefix=${prefix}\nlibdir=${prefix}/lib\nincludedir=${prefix}/include\n\n"
@@ -1161,6 +1269,7 @@ installed: list[Target] = [
     ),
     project.Install("share/mxvk/data", [font_output]),
 ]
+
 if with_python_module and python_module_output is not None:
     installed.append(
         project.Install(
@@ -1168,10 +1277,13 @@ if with_python_module and python_module_output is not None:
             [python_module_output],
         )
     )
+
 installed = [target for target in installed if target]
+
 if with_examples:
     installed.extend(
         project.Install(f"libexec/mxvk/{name}", [program])
         for name, program in programs
     )
+
 project.Alias("install", *installed)
