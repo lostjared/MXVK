@@ -25,7 +25,7 @@ namespace mxvk {
      * @param filename Destination file path.
      * @return @c true on success, @c false on failure.
      */
-    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, int compression_level);
+    bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, int compression_level = 6);
 
     /**
      * @brief Save raw data to a file.
