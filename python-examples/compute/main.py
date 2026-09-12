@@ -18,37 +18,26 @@ class SpriteWindow(mxvk.VK_Window):
         self.fallback_width = width
         self.fallback_height = height
         self._closed = False
-
         self.start_time = time.monotonic()
         self.last_time = self.start_time
-
         self.frame_count = 0
-
         self.mouse_x = 0.0
         self.mouse_y = 0.0
         self.mouse_pressed = False
-
         self.alpha = 1.0
         self.alpha_direction = 1.0
-
         self.amp = 0.0
         self.iamp = 0.0
         self.amp_peak = 0.0
         self.amp_rms = 0.0
         self.amp_smooth = 0.0
-
         self.amp_low = 0.0
         self.amp_mid = 0.0
         self.amp_high = 0.0
-
         self.sample_rate = 44100.0
-
         self.set_font(str(DATA_DIR / "font.ttf"), 24)
-
         self.sprite = self.create_sprite(str(DATA_DIR / "intro.png"), str(DATA_DIR / "sprite.vert.spv"), str(DATA_DIR / "fragment.frag.spv"))
-
         compute_path = DATA_DIR / "compute.comp.spv"
-
         info = mxvk.inspect_spirv_file(str(compute_path))
 
         if(info.stage != mxvk.ShaderStage.compute):
@@ -58,14 +47,10 @@ class SpriteWindow(mxvk.VK_Window):
         effect.fragment_shader_path = str(compute_path)
         effect.stage = mxvk.ShaderStage.compute
         effect.time_enabled = False
-
         self.effects = [effect]
-
         self.post_sprites = self.attach_post_processing_shaders(self.effects)
         self.compute_sprite = self.post_sprites[0]
-
         self.compute_sprite.set_custom_uniforms([1.0, 0.018, 0.35, 0.12])
-
         self.set_post_processing_enabled(True)
 
     def close(self) -> None:
@@ -76,21 +61,17 @@ class SpriteWindow(mxvk.VK_Window):
 
         try:
             self.detach_post_processing_shader()
-
             self.compute_sprite = None
             self.post_sprites = None
             self.effects = None
             self.sprite = None
-
         finally:
             self.release()
 
     def update_uniforms(self, width: int, height: int) -> None:
         now = time.monotonic()
-
         elapsed = now - self.start_time
         delta_time = now - self.last_time
-
         self.last_time = now
 
         if(delta_time > 0.0):
@@ -122,10 +103,8 @@ class SpriteWindow(mxvk.VK_Window):
             height = self.fallback_height
 
         self.update_uniforms(width, height)
-
         self.sprite.draw_rect(0, 0, width, height)
         self.print_text("MXVK Compute Shader", 15, 15, mxvk.Color(255, 255, 255, 255))
-
         self.frame_count += 1
 
     def event(self, event: mxvk.Event) -> None:
@@ -156,28 +135,23 @@ class SpriteWindow(mxvk.VK_Window):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="MXVK Python compute shader example")
-
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fullscreen", action="store_true")
     parser.add_argument("--vsync", action="store_true")
-
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-
     window = None
 
     try:
         window = SpriteWindow(args.width, args.height, args.fullscreen, args.vsync)
         window.loop()
-
     except mxvk.MXVKError as exception:
         print(f"mxvk: Exception: {exception}")
         return 1
-
     finally:
         if(window is not None):
             window.close()
