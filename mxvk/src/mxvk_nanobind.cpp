@@ -181,6 +181,31 @@ namespace {
                 NBBase::onSwapchainRecreated();
         }
 
+        void onFrameReadbackScheduled() override {
+            constexpr uint64_t hash = nanobind::detail::str_hash("on_frame_readback_scheduled");
+            nanobind::detail::ticket ticket(nb_trampoline, "on_frame_readback_scheduled", hash, false);
+            if (ticket.key.is_valid())
+                nb_trampoline.base().attr(ticket.key)();
+            else
+                NBBase::onFrameReadbackScheduled();
+        }
+
+        void onFrameReadback(std::vector<std::uint8_t> &rgba_pixels, uint32_t width, uint32_t height) override {
+            constexpr uint64_t hash = nanobind::detail::str_hash("on_frame_readback");
+            nanobind::detail::ticket ticket(nb_trampoline, "on_frame_readback", hash, false);
+            if (!ticket.key.is_valid()) {
+                NBBase::onFrameReadback(rgba_pixels, width, height);
+                return;
+            }
+
+            auto *storage = new std::vector<std::uint8_t>(rgba_pixels);
+            nb::capsule owner(storage, [](void *pointer) noexcept { delete static_cast<std::vector<std::uint8_t> *>(pointer); });
+            nb::ndarray<nb::numpy, std::uint8_t> frame(storage->data(), {static_cast<size_t>(height), static_cast<size_t>(width), 4}, owner, {static_cast<int64_t>(width) * 4, 4, 1});
+            nb_trampoline.base().attr(ticket.key)(frame, width, height);
+        }
+
+        void flush_frame_readbacks() { flushFrameReadbacks(); }
+
         void onRecordCustomRendering(VkCommandBuffer command_buffer, uint32_t image_index) override {
             constexpr uint64_t hash = nanobind::detail::str_hash("on_record_custom_rendering");
             nanobind::detail::ticket ticket(nb_trampoline, "on_record_custom_rendering", hash, false);
@@ -861,6 +886,16 @@ namespace mxvk {
             .def("loop", &VK_Window::loop)
             .def("render", &VK_Window::render)
             .def("on_swapchain_recreated", [](VK_Window &) {})
+            .def("on_frame_readback_scheduled", [](VK_Window &) {})
+            .def("on_frame_readback", [](VK_Window &, nb::ndarray<nb::numpy, std::uint8_t>, uint32_t, uint32_t) {}, nb::arg("pixels"), nb::arg("width"), nb::arg("height"))
+            .def(
+                "flush_frame_readbacks",
+                [](VK_Window &window) {
+                    auto *python_window = dynamic_cast<PythonWindow *>(&window);
+                    if (python_window == nullptr)
+                        throw nb::type_error("flush_frame_readbacks requires a Python subclass of Window");
+                    python_window->flush_frame_readbacks();
+                })
             .def("on_record_custom_rendering", [](VK_Window &, nb::capsule, uint32_t) {}, nb::arg("command_buffer"), nb::arg("image_index"))
             .def(
                 "on_prepare_frame_rendering",
