@@ -136,6 +136,26 @@ python3 -c "import mxwrite_ext; print(len(mxwrite_ext.available_video_encoders()
 The pip build uses scikit-build-core to invoke CMake, enables the nanobind
 module automatically, and installs NumPy as its runtime dependency.
 
+To install MXWrite into a new virtual environment from this combined MXVK
+checkout, use:
+
+```bash
+python3 -m venv ~/gpu/writeenv
+~/gpu/writeenv/bin/python -m pip install --upgrade pip
+~/gpu/writeenv/bin/python -m pip install ./MXWrite
+```
+
+Pip installs NumPy plus the isolated build requirements (`scikit-build-core`
+and `nanobind`) automatically. FFmpeg development packages must still be
+installed through the system package manager; see the Debian/Ubuntu and Arch
+commands in the root [Python wheel installation guide](../README.md#python-wheel-installation).
+MXWrite has no OpenCV setting. Its wheel defaults to a static, self-contained
+extension; build a shared variant with:
+
+```bash
+~/gpu/writeenv/bin/python -m pip install ./MXWrite -Ccmake.define.SHARED=ON
+```
+
 CMake automatically enables `MXWRITE_HAS_CUDA_COPY` when it finds the CUDA
 Toolkit. This definition changes the layout of `Writer`, so every translation
 unit using `mxwrite.hpp` must receive the same definition as the library. The

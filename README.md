@@ -25,6 +25,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
 - [Python Bindings](#python-bindings)
+- [Python Wheel Installation](#python-wheel-installation)
 - [Surface-Free Headless Rendering](#surface-free-headless-rendering)
 - [Build and Run with pcons](#build-and-run-with-pcons)
 - [Documentation](#documentation)
@@ -185,6 +186,118 @@ The Python examples under `python-examples/` are self-contained and include
 their required assets and compiled shaders. `window`, `sprite`, `asteroids`,
 `knight`, and `darkside` demonstrate direct windows, sprites, input, model
 rendering, custom command recording, and post-processing.
+
+<a id="python-wheel-installation"></a>
+
+## Python Wheel Installation
+
+The root wheel installs `mxvk_ext`; the separate `MXWrite/` wheel installs
+`mxwrite_ext`. MXVK's wheel enables OpenCV support by default (`CV=ON`) so its
+`Capture` API and the `opencv_mxwrite` Python example are available. This is a
+wheel-only default: a normal CMake build still defaults to `-DCV=OFF`.
+
+### System packages
+
+Install these development packages before building wheels. The MXVK list
+includes OpenCV because the wheel enables it by default; the MXWrite list is
+needed only when installing `./MXWrite` or building MXWrite through CMake.
+
+```bash
+# Debian / Ubuntu: MXVK wheel prerequisites
+sudo apt update
+sudo apt install build-essential cmake ninja-build pkg-config \
+    python3 python3-dev python3-pip python3-venv \
+    libvulkan-dev glslc libsdl3-dev libsdl3-ttf-dev \
+    libpng-dev zlib1g-dev libglm-dev libopencv-dev
+
+# Debian / Ubuntu: MXWrite wheel prerequisites (in addition to Python tools above)
+sudo apt install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
+```
+
+```bash
+# Arch Linux: MXVK wheel prerequisites
+sudo pacman -S --needed base-devel cmake ninja pkgconf \
+    python python-pip vulkan-headers vulkan-icd-loader shaderc sdl3 sdl3_ttf \
+    libpng zlib glm opencv
+
+# Arch Linux: MXWrite wheel prerequisites
+sudo pacman -S --needed ffmpeg
+```
+
+The packages above provide the Vulkan headers, `glslc` (from `shaderc` on
+Arch), SDL3, PNG/ZLIB, GLM, and OpenCV that MXVK needs. The FFmpeg packages
+provide the headers and libraries used by MXWrite. You also need a working
+Vulkan driver/ICD to run a windowed MXVK program; that driver package is
+hardware-specific and is not installed by the build commands.
+
+### Create an environment and install
+
+From the repository root, create an isolated environment and install both
+modules with its interpreter:
+
+```bash
+python3 -m venv ~/gpu/writeenv
+~/gpu/writeenv/bin/python -m pip install --upgrade pip
+~/gpu/writeenv/bin/python -m pip install .
+~/gpu/writeenv/bin/python -m pip install ./MXWrite
+```
+
+The two projects declare NumPy as a runtime dependency. Pip uses build
+isolation to install the build requirements declared in each `pyproject.toml`:
+`scikit-build-core` and `nanobind`. If building without isolation, install them
+yourself first:
+
+```bash
+~/gpu/writeenv/bin/python -m pip install --upgrade numpy scikit-build-core nanobind
+~/gpu/writeenv/bin/python -m pip install --no-build-isolation . ./MXWrite
+```
+
+### Wheel build settings
+
+Pass CMake options to these scikit-build-core wheels through pip's `-C` form,
+not raw `-D` arguments. For example, disable OpenCV in an MXVK wheel when its
+capture API is not needed:
+
+```bash
+~/gpu/writeenv/bin/python -m pip install . -Ccmake.define.CV=OFF
+```
+
+Common MXVK wheel settings are:
+
+| Setting | Wheel default | Override behavior |
+| --- | --- | --- |
+| `VALIDATION` | `OFF` | Enable/disable Vulkan validation layers. |
+| `CV` | `ON` | Include/exclude MXVK OpenCV capture. `OFF` removes `mxvk_ext.Capture`. |
+| `WITH_CUDA` | `OFF` | Enable/disable CUDA interop when a CUDA toolkit is installed. |
+| `WITH_EIGEN` | `AUTO` | Require/skip Eigen-dependent C++ examples; it has no effect while `EXAMPLES=OFF`. |
+| `WITH_MXWRITE` | `OFF` | Build/skip MXWrite as part of the root CMake build; install `./MXWrite` for its separate wheel. |
+| `WITH_MIXER` | `OFF` | Enable/disable SDL3_mixer support. |
+| `JPEG` | `OFF` | Enable/disable JPEG helpers. |
+| `EXAMPLES` | `OFF` | Build/skip C++ examples while producing the wheel. |
+| `FRACTAL_ZOOM` | `OFF` | Build/skip the Boost.Multiprecision fractal example; it has no effect while `EXAMPLES=OFF`. |
+| `PYTHON_MODULE` | `ON` | Build/skip `mxvk_ext`; do not turn this off for an MXVK wheel. |
+
+For example, a compact MXVK wheel without OpenCV, CUDA, audio, or JPEG support
+is built with:
+
+```bash
+~/gpu/writeenv/bin/python -m pip install . \
+    -Ccmake.define.CV=OFF \
+    -Ccmake.define.WITH_CUDA=OFF \
+    -Ccmake.define.WITH_MIXER=OFF \
+    -Ccmake.define.JPEG=OFF
+```
+
+MXWrite's wheel always builds `mxwrite_ext`; it has no `CV` setting. Its useful
+wheel override is `SHARED`, which defaults to `OFF` for a self-contained
+extension:
+
+```bash
+~/gpu/writeenv/bin/python -m pip install ./MXWrite -Ccmake.define.SHARED=ON
+```
+
+Use `-Ccmake.define.NAME=ON` or `-Ccmake.define.NAME=OFF` for any other CMake
+cache option. Run pip with `-v` to see its CMake configure output.
 
 <a id="surface-free-headless-rendering"></a>
 
