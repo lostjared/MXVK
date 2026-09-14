@@ -23,6 +23,8 @@ namespace mxvk {
      * @param texture  Source texture.
      * @param renderer Renderer used to read back the texture pixels.
      * @param filename Destination file path.
+     * @param compression_level PNG compression level passed to libpng; 0 favors
+     *                          speed and 9 favors smaller files. Defaults to 6.
      * @return @c true on success, @c false on failure.
      */
     bool SavePNG(SDL_Texture *texture, SDL_Renderer *renderer, const char *filename, int compression_level = 6);
@@ -43,6 +45,8 @@ namespace mxvk {
      * @param buffer   Pointer to the raw RGBA pixel data.
      * @param w        Image width in pixels.
      * @param h        Image height in pixels.
+     * @param compression_level PNG compression level passed to libpng; 0 favors
+     *                          speed and 9 favors smaller files. Defaults to 6.
      * @return @c true on success, @c false on failure.
      */
     bool SavePNG_RGBA(const char *filename, void *buffer, int w, int h, int compression_level = 6);
@@ -53,6 +57,8 @@ namespace mxvk {
      * @param buffer   Pointer to the raw 16-bit RGBA pixel data.
      * @param w        Image width in pixels.
      * @param h        Image height in pixels.
+     * @param compression_level PNG compression level passed to libpng; 0 favors
+     *                          speed and 9 favors smaller files. Defaults to 6.
      * @return @c true on success, @c false on failure.
      */
     bool SavePNG_RGBA16(const char *filename, const void *buffer, int w, int h, int compression_level = 6);
