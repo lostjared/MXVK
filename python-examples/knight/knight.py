@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+## @file knight.py
+## @brief Animated Knight's Tour visualizer using MXVK Python sprites.
+## @details Implements Warnsdorff-style move selection, board rendering, and
+## interactive tour playback through a Python @c VK_Window subclass.
+## It also demonstrates sprite generation from one-pixel NumPy textures,
+## joystick polling, screenshots, and explicit resource release.
+##
+## @section knight_run Running the example
+## @code{.sh}
+## python3 python-examples/knight/knight.py --resolution 960x720 --enable-vsync
+## @endcode
+## @section knight_controls Controls
+## - Space: advance one Knight's Tour move.
+## - Enter or right mouse button: restart the tour.
+## - Left mouse button: start a tour at the selected board cell.
+## - S: save a screenshot.
+## - Escape: exit.
+## @section knight_design Design notes
+## @c Tour owns the search state and is independent of Vulkan. @c KnightsTourWindow
+## maps that state into reusable sprites and text during @c proc().
 
 from __future__ import annotations
 

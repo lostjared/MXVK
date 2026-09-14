@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+## @file asteroids.py
+## @brief Interactive MXVK Asteroids game implemented in Python.
+## @details Demonstrates a Python @c VK_Window subclass, NumPy-backed sprite
+## rendering, keyboard input, particles, collision handling, and a fixed-step
+## arcade game loop. The game renders to a 640-by-360 logical canvas before it
+## is scaled to the current swapchain extent.
+##
+## @section asteroids_run Running the example
+## @code{.sh}
+## python3 python-examples/asteroids/asteroids.py --width 1280 --height 720 --vsync
+## @endcode
+## @section asteroids_controls Controls
+## - Left/Right: rotate the ship.
+## - Up: thrust.
+## - Space: fire; after game over, start a new game.
+## - Escape: exit.
+## @section asteroids_design Design notes
+## @c AsteroidsWindow owns gameplay state, while the @c Ship, @c Projectile,
+## @c Asteroid, and @c Particle data classes remain renderer-independent. NumPy
+## supplies the dynamic pixel buffers uploaded to the MXVK sprites each frame.
 
 import argparse
 import math

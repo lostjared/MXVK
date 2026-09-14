@@ -35,7 +35,7 @@ from pcons import (
     get_var,
 )
 
-VERSION = "0.34.1"
+VERSION = "0.35.0"
 project_dir = Path(__file__).parent.resolve()
 platform = get_platform()
 
@@ -336,8 +336,8 @@ version_h = configure_file(
     project.build_dir / "mxvk" / "include" / "mxvk" / "mxvk_version.hpp",
     {
         "PROJECT_VERSION_MAJOR": "0",
-        "PROJECT_VERSION_MINOR": "34",
-        "PROJECT_VERSION_PATCH": "1",
+        "PROJECT_VERSION_MINOR": "35",
+        "PROJECT_VERSION_PATCH": "0",
     },
 )
 

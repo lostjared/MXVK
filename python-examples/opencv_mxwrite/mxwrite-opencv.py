@@ -1,4 +1,24 @@
 #!/usr/bin/env python3
+## @file mxwrite-opencv.py
+## @brief Capture OpenCV video through MXVK and encode it with MXWrite.
+## @details Uses @c mxvk_ext.Capture for camera or file input, displays frames
+## in an MXVK sprite, and writes file input as constant-frame-rate video.
+## Camera capture retains monotonic timestamps. The example is intentionally
+## split so MXVK owns capture/windowing and MXWrite owns encoding/muxing.
+##
+## @section mxwrite_opencv_run Running the example
+## @code{.sh}
+## python3 python-examples/opencv_mxwrite/mxwrite-opencv.py --input input.mp4 --output output.mp4
+## python3 python-examples/opencv_mxwrite/mxwrite-opencv.py --camera 0 --width 1280 --height 720
+## @endcode
+## @section mxwrite_opencv_requirements Requirements
+## Requires a CV-enabled @c mxvk_ext module, @c mxwrite_ext, OpenCV, and NumPy.
+## The Linux camera path requests V4L2 MJPEG; other platforms use OpenCV's
+## default camera backend.
+## @section mxwrite_opencv_timing Timing and controls
+## File input uses sequential PTS values at the input frame rate for CFR output.
+## Camera input preserves monotonic capture timestamps. Escape or Ctrl-C stops
+## capture; @c --frames limits the number of submitted frames.
 
 import argparse
 import math
@@ -226,7 +246,10 @@ class CaptureWindow(mxvk.VK_Window):
             self.timestamp_source = current_source
             print(f"Timestamp source: {self.timestamp_source}")
 
-        output_pts = int(round(timestamp * self.output_fps))
+        # File playback is encoded as constant-frame-rate output: every
+        # decoded frame occupies exactly one output frame interval. Camera
+        # capture keeps its existing monotonic-clock timestamps.
+        output_pts = self.frame_index if not self.is_camera else int(round(timestamp * self.output_fps))
 
         if self.last_pts is not None and output_pts < self.last_pts:
             print(f"Warning: non-monotonic PTS at frame {self.frame_index}: {output_pts} < {self.last_pts}")

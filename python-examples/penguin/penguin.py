@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+## @file penguin.py
+## @brief Python MXVK textured penguin model demonstration.
+## @details Shows NumPy transform generation, model loading, and interactive
+## camera controls in a Python @c VK_Window application. An optional OBJ or
+## MXMOD input replaces the bundled asset while retaining the example shaders.
+##
+## @section penguin_run Running the example
+## @code{.sh}
+## python3 python-examples/penguin/penguin.py --resolution 1280x720
+## python3 python-examples/penguin/penguin.py --input penguin.mxmod --enable-vsync
+## @endcode
+## @section penguin_controls Controls
+## - Drag with the left mouse button: orbit the camera.
+## - Mouse wheel: zoom.
+## - Escape: exit.
+## @section penguin_lifecycle Lifecycle
+## @c PenguinWindow owns the native model handle and cleans it up before calling
+## @c release(), avoiding Vulkan-resource teardown after the parent device dies.
 
 from __future__ import annotations
 

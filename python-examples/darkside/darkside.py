@@ -1,4 +1,23 @@
 #!/usr/bin/env python3
+## @file darkside.py
+## @brief Python MXVK prism model and post-processing demonstration.
+## @details Demonstrates NumPy matrix construction, model rendering, camera
+## interaction, and shader-driven presentation in a @c VK_Window subclass.
+## It can load an OBJ or MXMOD asset supplied on the command line, otherwise it
+## uses the model and shader resources staged beneath the selected path.
+##
+## @section darkside_run Running the example
+## @code{.sh}
+## python3 python-examples/darkside/darkside.py --resolution 1280x720
+## python3 python-examples/darkside/darkside.py --input model.mxmod --enable-vsync
+## @endcode
+## @section darkside_controls Controls
+## - Drag with the left mouse button: orbit the camera.
+## - Mouse wheel: adjust camera distance.
+## - Escape: exit.
+## @section darkside_lifecycle Lifecycle
+## @c DarkWindow constructs NumPy view and projection matrices for every draw,
+## then releases the model before its parent Vulkan window during shutdown.
 
 from __future__ import annotations
 

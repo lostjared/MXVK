@@ -1,4 +1,26 @@
 #!/usr/bin/env python3
+## @file mxwrite-opencv-shader.py
+## @brief Compute-process OpenCV video in MXVK and encode it with MXWrite.
+## @details Feeds captured frames through an MXVK compute post-processing chain,
+## reads back the processed RGBA output, and encodes file input at constant rate
+## while retaining monotonic camera timestamps.
+## The asynchronous readback callbacks retain the presentation timestamp that
+## belongs to each processed frame before passing it to MXWrite.
+##
+## @section mxwrite_shader_run Running the example
+## @code{.sh}
+## python3 python-examples/opencv_mxwrite_shader/mxwrite-opencv-shader.py \
+##     --input input.mp4 --output processed.mp4 --shader data/compute.comp.spv
+## @endcode
+## @section mxwrite_shader_requirements Requirements
+## Requires a CV-enabled @c mxvk_ext module built from this revision because it
+## uses @c on_frame_readback() and @c flush_frame_readbacks(), plus @c mxwrite_ext,
+## OpenCV, NumPy, and a compatible compute SPIR-V shader.
+## @section mxwrite_shader_flow Processing flow
+## @c CaptureWindow uploads each source frame, queues the source sprite, records
+## the compute effect, receives the processed frame through Vulkan readback, and
+## sends that readback to MXWrite. Dragging with the left mouse button supplies
+## the shader mouse state; Escape or Ctrl-C stops capture.
 
 import argparse
 import math
@@ -304,7 +326,10 @@ class CaptureWindow(mxvk.VK_Window):
             self.timestamp_source = current_source
             print(f"Timestamp source: {self.timestamp_source}")
 
-        output_pts = int(round(timestamp * self.output_fps))
+        # File playback is encoded as constant-frame-rate output: every
+        # decoded frame occupies exactly one output frame interval. Camera
+        # capture keeps its existing monotonic-clock timestamps.
+        output_pts = self.frame_index if not self.is_camera else int(round(timestamp * self.output_fps))
 
         if self.last_pts is not None and output_pts < self.last_pts:
             print(f"Warning: non-monotonic PTS at frame {self.frame_index}: {output_pts} < {self.last_pts}")

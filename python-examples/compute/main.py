@@ -1,4 +1,23 @@
 #!/usr/bin/env python3
+## @file main.py
+## @brief MXVK Python compute-shader post-processing example.
+## @details Loads an image sprite, attaches a compute post-processing shader,
+## and updates shader mouse, timing, frame-rate, and audio-style uniforms.
+## The shader is inspected before use, preventing a fragment or vertex SPIR-V
+## module from being attached as a compute effect.
+##
+## @section compute_run Running the example
+## @code{.sh}
+## python3 python-examples/compute/main.py --filename inter.comp.spv --vsync
+## @endcode
+## @section compute_controls Controls
+## - Move the mouse to update the shader mouse position.
+## - Hold the left mouse button to set the shader pressed state.
+## - Escape: exit.
+## @section compute_flow Rendering flow
+## @c SpriteWindow queues the source sprite in @c proc(), then MXVK runs the
+## @c PostProcessingEffect compute stage and presents its output. The explicit
+## @c close() method detaches the effect before releasing native resources.
 
 import argparse
 import time

@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+## @file model.py
+## @brief Interactive Python MXVK model loader and renderer.
+## @details Loads an OBJ or MXMOD asset, builds NumPy transform matrices, and
+## renders the model with mouse-controlled camera interaction. The resource
+## path selects the shader and texture data directory used by the example.
+##
+## @section model_run Running the example
+## @code{.sh}
+## python3 python-examples/model/model.py --resolution 1280x720
+## python3 python-examples/model/model.py --input models/pyramid.obj --enable-vsync
+## @endcode
+## @section model_controls Controls
+## - Drag with the left mouse button: orbit the camera.
+## - Mouse wheel: zoom.
+## - Escape: exit.
+## @section model_lifecycle Lifecycle
+## @c ModelWindow creates and renders @c AbstractModel through the Python
+## binding, then calls model cleanup before releasing the Vulkan window.
 
 from __future__ import annotations
 

@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+## @file main.py
+## @brief Minimal textured-sprite MXVK Python example.
+## @details Creates a Python @c VK_Window subclass, loads a sprite and font,
+## stretches the sprite to the swapchain, and exits when Escape is pressed.
+## It is the smallest example of the native window-owned sprite lifetime model.
+##
+## @section sprite_run Running the example
+## @code{.sh}
+## python3 python-examples/sprite/main.py --width 1280 --height 720 --vsync
+## @endcode
+## @section sprite_controls Controls
+## - Escape: exit.
+## @section sprite_lifecycle Lifecycle
+## @c SpriteWindow releases its Python sprite handle before @c release() so the
+## native window/sprite reference relationship cannot form a shutdown cycle.
 
 import argparse
 from pathlib import Path
