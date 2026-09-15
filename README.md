@@ -192,7 +192,7 @@ rendering, custom command recording, and post-processing.
 
 ## Simple Python Wrappers
 
-`python-examples/wrapper/` is a pure-Python, beginner-friendly layer over
+`python-examples/mxvk_wrap/` is a pure-Python, beginner-friendly layer over
 `mxvk_ext`. It keeps the native module available for advanced features, but
 turns the common workflow into small classes with safe ownership and shutdown.
 Use this layer when you want an application callback, a few sprites or models,
@@ -205,13 +205,13 @@ and `python-examples` to Python when running from a checkout:
 ```bash
 cmake -S . -B build-python -DPYTHON_MODULE=ON -DEXAMPLES=OFF
 cmake --build build-python -j
-PYTHONPATH=build-python:python-examples python3 python-examples/wrapper/example.py
+PYTHONPATH=build-python:python-examples python3 python-examples/mxvk_wrap/example.py
 ```
 
 If `mxvk_ext` was installed with `pip`, only the source-tree half is needed:
 
 ```bash
-PYTHONPATH=python-examples python3 python-examples/wrapper/example.py
+PYTHONPATH=python-examples python3 python-examples/mxvk_wrap/example.py
 ```
 
 ### Quick start
@@ -224,27 +224,26 @@ model from disappearing while the native window still owns it.
 ```python
 from pathlib import Path
 
-from wrapper import App, Color, Sprite
-from wrapper._native import mxvk
+import mxvk_wrap as mx
 
 
-class Hello(App):
+class Hello(mx.App):
     def __init__(self):
         data = Path("python-examples/sprite/data")
         super().__init__("My first MXVK app", 960, 540, vsync=True,
                          shader_directory=data)
         self.set_font(str(data / "font.ttf"), 24)
-        self.logo = Sprite(self, data / "intro.png",
+        self.logo = mx.Sprite(self, data / "intro.png",
                            vertex_shader=str(data / "sprite.vert.spv"),
                            fragment_shader=str(data / "fragment.frag.spv"))
 
     def draw(self):
         width, height = self.swapchain_extent
         self.logo.draw(0, 0, width=width, height=height)
-        self.print_text("Hello, MXVK!", 20, 20, Color(255, 255, 255))
+        self.print_text("Hello, MXVK!", 20, 20, mx.Color(255, 255, 255))
 
     def on_event(self, event):
-        if event.key_down and event.key == mxvk.KEY_ESCAPE:
+        if event.key_down and event.key == mx.KEY_ESCAPE:
             self.quit()
 
 
@@ -261,6 +260,7 @@ event callback.
 | Class | Use |
 | --- | --- |
 | `App` | Window, render-loop callbacks, text, cleanup, and resource lifetime. |
+| `Font` | Load a reusable font for per-draw custom-font text. |
 | `Sprite` / `Sprite3D` | Load an image and queue 2D or 3D sprite drawing. |
 | `Model` | Load a model, choose shaders, and access advanced rendering through `.native`. |
 | `GpuBuffer` / `GpuTexture` | Allocate a writable uniform/storage buffer or load a GPU texture. |
@@ -287,9 +287,9 @@ contiguous RGBA8 NumPy array with `sprite.update(pixels, 640, 360)`.
 Use `Settings` for persistent strings:
 
 ```python
-from wrapper import Settings
+import mxvk_wrap as mx
 
-settings = Settings("settings.ini")
+settings = mx.Settings("settings.ini")
 width = int(settings.get("window", "width", "1280"))
 settings.set("window", "width", str(width))
 settings.save("settings.ini")
@@ -298,7 +298,25 @@ settings.save("settings.ini")
 `Sound` requires a build with mixer support, and `Camera` requires `-DCV=ON`.
 Both raise a clear `RuntimeError` when their optional MXVK capability is absent.
 For a complete working reference, run
-[`python-examples/wrapper/example.py`](python-examples/wrapper/example.py).
+[`python-examples/mxvk_wrap/example.py`](python-examples/mxvk_wrap/example.py).
+
+### Custom fonts without changing the window font
+
+`App.set_font()` changes the default font used by `print_text()`. To draw one
+label with another typeface or size while keeping that default unchanged, create
+a `Font` and pass it to `draw_text()`:
+
+```python
+import mxvk_wrap as mx
+
+heading = mx.Font("data/title.ttf", 48)
+app.draw_text("Settings", 32, 32, heading, mx.Color(255, 220, 120))
+width, height = app.text_size("Settings", heading)
+```
+
+The supplied `Font` is passed to MXVK's per-draw font overload; no default font
+is reloaded or modified. Keep it alive for as long as text uses it, then call
+`heading.close()` when it is no longer needed.
 
 <a id="python-wheel-installation"></a>
 
