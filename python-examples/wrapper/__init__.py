@@ -5,12 +5,12 @@
 
 from .app import App, Color
 from .config import Settings
-from .graphics import GpuBuffer, GpuTexture, Model, Sprite, Sprite3D
+from .graphics import Font, GpuBuffer, GpuTexture, Model, Sprite, Sprite3D
 from .input import Controller, Joystick
 from .media import Camera, Sound, Stopwatch
 
 __all__ = [
-    "App", "Camera", "Color", "Controller", "GpuBuffer", "GpuTexture",
+    "App", "Camera", "Color", "Controller", "Font", "GpuBuffer", "GpuTexture",
     "Joystick", "Model", "Settings", "Sound", "Sprite", "Sprite3D",
     "Stopwatch",
 ]

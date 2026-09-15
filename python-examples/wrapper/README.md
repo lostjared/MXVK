@@ -15,3 +15,7 @@ PYTHONPATH=build-python:python-examples python3 python-examples/wrapper/example.
 
 `App` owns cleanup. Create graphics resources with the app, implement `draw`,
 and call `run()`. `example.py` is the smallest complete reference.
+
+For one-off text styles, use `Font(path, size)` with
+`app.draw_text(text, x, y, font, color)`. This does not modify the font selected
+by `app.set_font()`.

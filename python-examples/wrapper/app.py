@@ -56,6 +56,24 @@ class App(mxvk.Window):
         self._managed.append(resource)
         return resource
 
+    def draw_text(self, text: str, x: int, y: int, font: Any, color: Color = Color(255, 255, 255, 255)) -> None:
+        ## @brief Queue text using a supplied font without changing the default font.
+        ## @param text Text to draw.
+        ## @param x Left pixel coordinate.
+        ## @param y Top pixel coordinate.
+        ## @param font A wrapper @c Font created from a font file and size.
+        ## @param color RGBA text color.
+        ## @details This calls MXVK's per-draw font overload and does not call
+        ## @c set_font, so existing default-font text remains unchanged.
+        self.print_text(text, x, y, color, font.native)
+
+    def text_size(self, text: str, font: Any) -> tuple[int, int] | None:
+        ## @brief Measure text using a supplied font without changing the default font.
+        ## @param text Text to measure.
+        ## @param font A wrapper @c Font created from a font file and size.
+        ## @return Width and height in pixels, or @c None when measurement fails.
+        return self.get_text_dimensions(text, font.native)
+
     def run(self) -> None:
         ## @brief Run until @c quit is called or the window is closed.
         try:

@@ -10,6 +10,27 @@ if TYPE_CHECKING:
     from .app import App
 
 
+class Font:
+    ## @brief A reusable TrueType font for individual text draw calls.
+    ## @details Supplying this font to @c App.draw_text does not change or
+    ## reload the window's default font configured with @c App.set_font.
+
+    def __init__(self, path: str | Path, size: int) -> None:
+        ## @brief Load a font file at the requested point size.
+        ## @param path Path to a TrueType or OpenType font file.
+        ## @param size Font size in points.
+        self.native = mxvk.Font(str(path), size)
+
+    @property
+    def valid(self) -> bool:
+        ## @brief Return whether the native font was loaded successfully.
+        return self.native is not None and self.native.valid()
+
+    def close(self) -> None:
+        ## @brief Drop this font's native handle.
+        self.native = None
+
+
 class Sprite:
     ## @brief A 2D image that can be queued for drawing each frame.
 
