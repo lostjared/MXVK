@@ -25,6 +25,7 @@ The repository also includes MXWrite, a small FFmpeg-based video writer library 
 - [Core Dependencies](#core-dependencies)
 - [Build](#build)
 - [Python Bindings](#python-bindings)
+- [Simple Python Wrappers](#simple-python-wrappers)
 - [Python Wheel Installation](#python-wheel-installation)
 - [Surface-Free Headless Rendering](#surface-free-headless-rendering)
 - [Build and Run with pcons](#build-and-run-with-pcons)
@@ -186,6 +187,118 @@ The Python examples under `python-examples/` are self-contained and include
 their required assets and compiled shaders. `window`, `sprite`, `asteroids`,
 `knight`, and `darkside` demonstrate direct windows, sprites, input, model
 rendering, custom command recording, and post-processing.
+
+<a id="simple-python-wrappers"></a>
+
+## Simple Python Wrappers
+
+`python-examples/wrapper/` is a pure-Python, beginner-friendly layer over
+`mxvk_ext`. It keeps the native module available for advanced features, but
+turns the common workflow into small classes with safe ownership and shutdown.
+Use this layer when you want an application callback, a few sprites or models,
+and ordinary settings/input/media helpers without learning MXVK's full native
+API first.
+
+The wrappers are part of the source tree, so expose both the compiled extension
+and `python-examples` to Python when running from a checkout:
+
+```bash
+cmake -S . -B build-python -DPYTHON_MODULE=ON -DEXAMPLES=OFF
+cmake --build build-python -j
+PYTHONPATH=build-python:python-examples python3 python-examples/wrapper/example.py
+```
+
+If `mxvk_ext` was installed with `pip`, only the source-tree half is needed:
+
+```bash
+PYTHONPATH=python-examples python3 python-examples/wrapper/example.py
+```
+
+### Quick start
+
+Subclass `App`, create resources with that application, queue drawing in
+`draw()`, and call `run()`. `App` calls `wait_idle()` and `release()` for you.
+It also retains resources created through its wrappers, preventing a sprite or
+model from disappearing while the native window still owns it.
+
+```python
+from pathlib import Path
+
+from wrapper import App, Color, Sprite
+from wrapper._native import mxvk
+
+
+class Hello(App):
+    def __init__(self):
+        data = Path("python-examples/sprite/data")
+        super().__init__("My first MXVK app", 960, 540, vsync=True,
+                         shader_directory=data)
+        self.set_font(str(data / "font.ttf"), 24)
+        self.logo = Sprite(self, data / "intro.png",
+                           vertex_shader=str(data / "sprite.vert.spv"),
+                           fragment_shader=str(data / "fragment.frag.spv"))
+
+    def draw(self):
+        width, height = self.swapchain_extent
+        self.logo.draw(0, 0, width=width, height=height)
+        self.print_text("Hello, MXVK!", 20, 20, Color(255, 255, 255))
+
+    def on_event(self, event):
+        if event.key_down and event.key == mxvk.KEY_ESCAPE:
+            self.quit()
+
+
+Hello().run()
+```
+
+`draw()` runs once per frame. Use `on_event(event)` only when input is needed;
+the event exposes readable properties such as `key_down`, `key`, mouse position,
+mouse buttons, wheel data, and entered text. `quit()` is safe to call from any
+event callback.
+
+### Wrapper classes
+
+| Class | Use |
+| --- | --- |
+| `App` | Window, render-loop callbacks, text, cleanup, and resource lifetime. |
+| `Sprite` / `Sprite3D` | Load an image and queue 2D or 3D sprite drawing. |
+| `Model` | Load a model, choose shaders, and access advanced rendering through `.native`. |
+| `GpuBuffer` / `GpuTexture` | Allocate a writable uniform/storage buffer or load a GPU texture. |
+| `Settings` | Read and write simple INI-style configuration values. |
+| `Joystick` / `Controller` | Open and query SDL input devices. |
+| `Stopwatch` | Get elapsed time in seconds. |
+| `Sound` / `Camera` | Optional SDL_mixer playback and OpenCV camera/video frames. |
+
+Every wrapper stores the original nanobind object in `.native`. That escape
+hatch is useful for post-processing, custom Vulkan command recording, extended
+shader uniforms, or any native method not intentionally mirrored by the simple
+API. `App` is the exception: it is itself the native window subclass. Do not
+manually call `release()` on it; `App.close()` and `App.run()` own that
+lifecycle.
+
+### Common tasks
+
+Draw a sprite at its natural size with `sprite.draw(24, 24)`, scale it with
+`sprite.draw(24, 24, scale=2)`, or stretch it with
+`sprite.draw(0, 0, width=width, height=height)`. For video or generated pixels,
+create an empty sprite with `Sprite(app, width=640, height=360)` and upload a
+contiguous RGBA8 NumPy array with `sprite.update(pixels, 640, 360)`.
+
+Use `Settings` for persistent strings:
+
+```python
+from wrapper import Settings
+
+settings = Settings("settings.ini")
+width = int(settings.get("window", "width", "1280"))
+settings.set("window", "width", str(width))
+settings.save("settings.ini")
+```
+
+`Sound` requires a build with mixer support, and `Camera` requires `-DCV=ON`.
+Both raise a clear `RuntimeError` when their optional MXVK capability is absent.
+For a complete working reference, run
+[`python-examples/wrapper/example.py`](python-examples/wrapper/example.py).
 
 <a id="python-wheel-installation"></a>
 
