@@ -72,9 +72,15 @@ class App(mxvk.Window):
         if self._closed:
             return
         self._closed = True
-        self._managed.clear()
-        self.wait_idle()
-        self.release()
+        try:
+            self.wait_idle()
+            for resource in reversed(self._managed):
+                close = getattr(resource, "close", None)
+                if close is not None:
+                    close()
+        finally:
+            self._managed.clear()
+            self.release()
 
     def __enter__(self) -> "App":
         ## @brief Enter a context manager owning this application.

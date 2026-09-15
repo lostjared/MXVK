@@ -3,6 +3,13 @@
 ## @brief Minimal application using the simple MXVK wrapper package.
 
 from pathlib import Path
+import sys
+
+# Support both `python3 python-examples/wrapper/example.py` and running this
+# file directly from its own directory.
+EXAMPLES_DIR = Path(__file__).resolve().parents[1]
+if str(EXAMPLES_DIR) not in sys.path:
+    sys.path.insert(0, str(EXAMPLES_DIR))
 
 from wrapper import App, Color, Sprite
 from wrapper._native import mxvk

@@ -27,7 +27,9 @@ class Joystick:
 
     def close(self) -> None:
         ## @brief Close the joystick handle.
-        self.native.close()
+        if self.native is not None:
+            self.native.close()
+            self.native = None
 
 
 class Controller:
@@ -53,4 +55,6 @@ class Controller:
 
     def close(self) -> None:
         ## @brief Close the controller handle.
-        self.native.close()
+        if self.native is not None:
+            self.native.close()
+            self.native = None

@@ -60,6 +60,12 @@ class Sprite:
         ## @brief Set the four generic shader parameters for this sprite.
         self.native.set_shader_params(first, second, third, fourth)
 
+    def close(self) -> None:
+        ## @brief Drop this sprite's native handle before its app is released.
+        ## @details MXVK owns sprites through the window; releasing this Python
+        ## handle first prevents a Python/native reference cycle at shutdown.
+        self.native = None
+
 
 class Sprite3D:
     ## @brief A billboard sprite rendered through MXVK's 3D command callback.
@@ -73,12 +79,19 @@ class Sprite3D:
         ## @brief Queue one billboard draw.
         self.native.draw(tuple(position), tuple(size), tuple(color), rotation)
 
+    def close(self) -> None:
+        ## @brief Release 3D sprite resources and drop its native handle.
+        if self.native is not None:
+            self.native.cleanup()
+            self.native = None
+
 
 class Model:
     ## @brief A loadable 3D model with one-call setup.
 
     def __init__(self, app: "App", path: str | Path, *, textures: str | Path = "", texture_directory: str | Path = "", scale: float = 1.0) -> None:
         ## @brief Load a model and retain its application lifetime.
+        self._app = app
         self.native = mxvk.AbstractModel()
         self.native.load(app, str(path), str(textures), str(texture_directory), scale)
         app.add(self)
@@ -89,7 +102,15 @@ class Model:
 
     def cleanup(self, app: "App") -> None:
         ## @brief Explicitly free model GPU resources before closing @p app.
-        self.native.cleanup(app)
+        if self.native is not None:
+            self.native.cleanup(app)
+            self.native = None
+
+    def close(self) -> None:
+        ## @brief Free model GPU resources and drop its native handle.
+        if self.native is not None:
+            self.native.cleanup(self._app)
+            self.native = None
 
 
 class GpuBuffer:
@@ -106,7 +127,9 @@ class GpuBuffer:
 
     def close(self) -> None:
         ## @brief Release the underlying Vulkan buffer early.
-        self.native.close()
+        if self.native is not None:
+            self.native.close()
+            self.native = None
 
 
 class GpuTexture:
@@ -119,4 +142,6 @@ class GpuTexture:
 
     def close(self) -> None:
         ## @brief Release the underlying Vulkan texture early.
-        self.native.close()
+        if self.native is not None:
+            self.native.close()
+            self.native = None

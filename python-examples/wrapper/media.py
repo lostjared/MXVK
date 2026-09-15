@@ -22,6 +22,12 @@ class Stopwatch:
         ## @brief Restart measurement with an optional label.
         self.native.start(name)
 
+    def close(self) -> None:
+        ## @brief Stop the timer and release its native handle.
+        if self.native is not None:
+            self.native.stop()
+            self.native = None
+
 
 class Sound:
     ## @brief Optional WAV and music playback helper.
@@ -43,7 +49,9 @@ class Sound:
 
     def close(self) -> None:
         ## @brief Release mixer resources.
-        self.native.cleanup()
+        if self.native is not None:
+            self.native.cleanup()
+            self.native = None
 
 
 class Camera:
@@ -65,4 +73,6 @@ class Camera:
 
     def close(self) -> None:
         ## @brief Close the camera or video file.
-        self.native.close()
+        if self.native is not None:
+            self.native.close()
+            self.native = None
