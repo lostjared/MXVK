@@ -318,6 +318,10 @@ The supplied `Font` is passed to MXVK's per-draw font overload; no default font
 is reloaded or modified. Keep it alive for as long as text uses it, then call
 `heading.close()` when it is no longer needed.
 
+The package also includes a playable
+[2D Tetris wrapper example](python-examples/mxvk_wrap/examples/tetris/README.md)
+using its local block artwork and font.
+
 <a id="python-wheel-installation"></a>
 
 ## Python Wheel Installation
