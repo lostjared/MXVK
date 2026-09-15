@@ -10,6 +10,17 @@ if TYPE_CHECKING:
     from .app import App
 
 
+def _abort_failed_resource(app: "App") -> None:
+    ## @brief Release an app after an app-owned resource could not be created.
+    ## @param app Application that owns resources created before the failure.
+    ## @details Cleanup errors are deliberately ignored so callers receive the
+    ## original missing-file or native resource-creation exception.
+    try:
+        app.close()
+    except Exception:
+        pass
+
+
 class Font:
     ## @brief A reusable TrueType font for individual text draw calls.
     ## @details Supplying this font to @c App.draw_text does not change or
@@ -42,12 +53,18 @@ class Sprite:
         ## @param height Empty texture height.
         ## @param vertex_shader Optional vertex SPIR-V path.
         ## @param fragment_shader Optional fragment SPIR-V path.
-        if image is not None:
-            self.native = app.create_sprite(str(image), vertex_shader, fragment_shader)
-        elif width > 0 and height > 0:
-            self.native = app.create_sprite(width, height, vertex_shader, fragment_shader)
-        else:
-            raise ValueError("provide image or positive width and height")
+        self.native = None
+        try:
+            if image is not None:
+                self.native = app.create_sprite(str(image), vertex_shader, fragment_shader)
+            elif width > 0 and height > 0:
+                self.native = app.create_sprite(width, height, vertex_shader, fragment_shader)
+            else:
+                raise ValueError("provide image or positive width and height")
+        except Exception:
+            self.native = None
+            _abort_failed_resource(app)
+            raise
         app.add(self)
 
     def draw(self, x: int = 0, y: int = 0, *, width: int | None = None, height: int | None = None, scale: float = 1.0, rotation: float = 0.0) -> None:
@@ -93,7 +110,12 @@ class Sprite3D:
 
     def __init__(self, app: "App", image: str | Path, *, vertex_shader: str = "", fragment_shader: str = "") -> None:
         ## @brief Load a 3D sprite owned by @p app.
-        self.native = app.create_sprite3d(str(image), vertex_shader, fragment_shader)
+        self.native = None
+        try:
+            self.native = app.create_sprite3d(str(image), vertex_shader, fragment_shader)
+        except Exception:
+            _abort_failed_resource(app)
+            raise
         app.add(self)
 
     def queue(self, position: Sequence[float], size: Sequence[float], color: Sequence[float] = (1.0, 1.0, 1.0, 1.0), rotation: float = 0.0) -> None:
@@ -113,8 +135,14 @@ class Model:
     def __init__(self, app: "App", path: str | Path, *, textures: str | Path = "", texture_directory: str | Path = "", scale: float = 1.0) -> None:
         ## @brief Load a model and retain its application lifetime.
         self._app = app
-        self.native = mxvk.AbstractModel()
-        self.native.load(app, str(path), str(textures), str(texture_directory), scale)
+        self.native = None
+        try:
+            self.native = mxvk.AbstractModel()
+            self.native.load(app, str(path), str(textures), str(texture_directory), scale)
+        except Exception:
+            self.native = None
+            _abort_failed_resource(app)
+            raise
         app.add(self)
 
     def shaders(self, app: "App", vertex: str | Path, fragment: str | Path) -> None:
@@ -139,7 +167,12 @@ class GpuBuffer:
 
     def __init__(self, app: "App", size: int, *, storage: bool = False) -> None:
         ## @brief Allocate a buffer with @p size bytes.
-        self.native = mxvk.create_storage_buffer(app, size) if storage else mxvk.create_uniform_buffer(app, size)
+        self.native = None
+        try:
+            self.native = mxvk.create_storage_buffer(app, size) if storage else mxvk.create_uniform_buffer(app, size)
+        except Exception:
+            _abort_failed_resource(app)
+            raise
         app.add(self)
 
     def write(self, data: bytes) -> None:
@@ -158,7 +191,12 @@ class GpuTexture:
 
     def __init__(self, app: "App", path: str | Path) -> None:
         ## @brief Load @p path into an application-owned GPU texture.
-        self.native = mxvk.load_texture(app, str(path))
+        self.native = None
+        try:
+            self.native = mxvk.load_texture(app, str(path))
+        except Exception:
+            _abort_failed_resource(app)
+            raise
         app.add(self)
 
     def close(self) -> None:
