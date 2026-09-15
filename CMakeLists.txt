@@ -1008,21 +1008,12 @@ if(EXAMPLES)
     list(REMOVE_ITEM mxvk_installed_application_targets math3d_obj_loader)
     list(REMOVE_DUPLICATES mxvk_installed_application_targets)
 
-    foreach(example_target IN LISTS mxvk_installed_application_targets)
-        if(NOT TARGET ${example_target})
-            continue()
-        endif()
+    if(MINGW)
+        foreach(example_target IN LISTS mxvk_installed_application_targets)
+            if(NOT TARGET ${example_target} OR example_target STREQUAL "asteroids3d" OR example_target STREQUAL "asteroids-net")
+                continue()
+            endif()
 
-        set(MXVK_EXAMPLE_DESKTOP_ID ${example_target})
-        string(REPLACE "_" " " MXVK_EXAMPLE_DISPLAY_NAME ${example_target})
-        set(MXVK_EXAMPLE_DESKTOP_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-desktop/${example_target}.desktop")
-        configure_file(
-            ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example.desktop.in
-            ${MXVK_EXAMPLE_DESKTOP_FILE}
-            @ONLY
-        )
-
-        if(MINGW AND NOT example_target STREQUAL "asteroids3d" AND NOT example_target STREQUAL "asteroids-net")
             set(MXVK_EXAMPLE_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}.ico")
             set(MXVK_EXAMPLE_RESOURCE_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-resources/${example_target}.rc")
             configure_file(
@@ -1031,22 +1022,30 @@ if(EXAMPLES)
                 @ONLY
             )
             target_sources(${example_target} PRIVATE ${MXVK_EXAMPLE_RESOURCE_FILE})
-        endif()
-    endforeach()
+        endforeach()
+    endif()
 
     if(UNIX AND NOT APPLE)
         set(MXVK_INSTALLED_APPLICATION_TARGETS)
         foreach(example_target IN LISTS mxvk_generic_install_targets)
-            if(example_target STREQUAL "math3d_obj_loader")
+            if(NOT TARGET ${example_target} OR example_target STREQUAL "math3d_obj_loader")
                 continue()
             endif()
 
             set(mxvk_example_icon "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}.png")
             set(mxvk_example_icon_256 "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}-256.png")
             if(EXISTS "${mxvk_example_icon}" AND EXISTS "${mxvk_example_icon_256}")
+                set(MXVK_EXAMPLE_DESKTOP_ID ${example_target})
+                string(REPLACE "_" " " MXVK_EXAMPLE_DISPLAY_NAME ${example_target})
+                set(MXVK_EXAMPLE_DESKTOP_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-desktop/${example_target}.desktop")
+                configure_file(
+                    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example.desktop.in
+                    ${MXVK_EXAMPLE_DESKTOP_FILE}
+                    @ONLY
+                )
                 list(APPEND MXVK_INSTALLED_APPLICATION_TARGETS ${example_target})
             else()
-                message(STATUS "Skipping desktop entry for ${example_target}: icon files are missing")
+                message(STATUS "Skipping XDG desktop integration for ${example_target}: required PNG icons are missing")
             endif()
         endforeach()
         configure_file(
