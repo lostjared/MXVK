@@ -6,7 +6,10 @@ block, background, and font files in this directory's `data/` folder, and a
 Completed rows flash with the supplied gray block texture before collapsing.
 Gravity and the clear animation run on a fixed 60 Hz simulation step, so their
 timing does not depend on the rendering frame rate. The HUD also shows the next
-tetromino.
+tetromino. The background uses `data/background.frag.spv`, an animated custom
+fragment shader driven by mouse position, render resolution, and elapsed time.
+Its paired `data/sprite.vert.spv` is included so the example does not depend on
+the current working directory for its custom shader pipeline.
 
 From the repository root, build the MXVK Python extension:
 

@@ -57,7 +57,8 @@ class TetrisGame(mx.App):
         self.font = None
         try:
             self.font = mx.Font(self._font_path(), 24)
-            self.background = mx.Sprite(self, self.asset_dir / "psychedelic_background.png")
+            self.background = mx.Sprite(self, self.asset_dir / "psychedelic_background.png", vertex_shader=str(self.asset_dir / "sprite.vert.spv"), fragment_shader=str(self.asset_dir / "background.frag.spv"))
+            self.background.enable_extended_uniforms()
             self.blocks = [mx.Sprite(self, self.asset_dir / path) for path in BLOCK_FILES]
             self.clear_block = mx.Sprite(self, self.asset_dir / "block_gray.png")
         except Exception:
@@ -77,6 +78,10 @@ class TetrisGame(mx.App):
         self.game_over = False
         self.clearing_rows: tuple[int, ...] = ()
         self.clear_started = 0.0
+        self.background_start_time = time.monotonic()
+        self.mouse_x = 0.0
+        self.mouse_y = 0.0
+        self.mouse_pressed = False
         self.simulation_time = 0.0
         self.fall_elapsed = 0.0
         self.frame_accumulator = 0.0
@@ -228,6 +233,15 @@ class TetrisGame(mx.App):
     def on_event(self, event) -> None:
         ## @brief Handle game controls from MXVK keyboard events.
         ## @param event MXVK event received by @c App.
+        if event.mouse_motion:
+            self.mouse_x = event.x
+            self.mouse_y = event.y
+            return
+        if event.mouse_button_down or event.mouse_button_up:
+            self.mouse_x = event.x
+            self.mouse_y = event.y
+            self.mouse_pressed = event.mouse_button_down
+            return
         if not event.key_down:
             return
         if event.key == mx.KEY_ESCAPE:
@@ -267,6 +281,9 @@ class TetrisGame(mx.App):
         width, height = self.swapchain_extent
         if width <= 0 or height <= 0:
             return
+        self.background.set_mouse(self.mouse_x, self.mouse_y, self.mouse_pressed)
+        self.background.set_uniform(0, 0.0, 0.0, float(width), float(height))
+        self.background.set_uniform(2, 0.0, time.monotonic() - self.background_start_time, 0.0, 0.0)
         self.background.draw(0, 0, width=width, height=height)
         cell_size = max(16, min((height - 100) // (BOARD_HEIGHT + 1), (width - 260) // (BOARD_WIDTH + 2)))
         board_width = BOARD_WIDTH * cell_size

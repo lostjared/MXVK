@@ -98,6 +98,28 @@ class Sprite:
         ## @brief Set the four generic shader parameters for this sprite.
         self.native.set_shader_params(first, second, third, fourth)
 
+    def enable_extended_uniforms(self) -> None:
+        ## @brief Enable mouse and four-vector uniforms for a custom sprite shader.
+        self.native.enable_extended_ubo()
+
+    def set_mouse(self, x: float, y: float, pressed: bool = False) -> None:
+        ## @brief Set mouse data consumed by an extended sprite shader.
+        ## @param x Mouse X coordinate in window pixels.
+        ## @param y Mouse Y coordinate in window pixels.
+        ## @param pressed Whether a mouse button is currently pressed.
+        self.native.set_mouse_state(x, y, 1.0 if pressed else 0.0)
+
+    def set_uniform(self, index: int, x: float, y: float, z: float, w: float) -> None:
+        ## @brief Set one of four generic vectors for an extended sprite shader.
+        ## @param index Vector index from zero through three.
+        ## @param x First component.
+        ## @param y Second component.
+        ## @param z Third component.
+        ## @param w Fourth component.
+        if index not in range(4):
+            raise ValueError("uniform index must be from 0 through 3")
+        getattr(self.native, f"set_uniform{index}")(x, y, z, w)
+
     def close(self) -> None:
         ## @brief Drop this sprite's native handle before its app is released.
         ## @details MXVK owns sprites through the window; releasing this Python
