@@ -21,6 +21,11 @@ my $fresh = 0;
 my $install = 1;
 my $use_sudo;
 my $help = 0;
+my ($debug_mode, $validation, $cv, $jpeg, $examples, $fractal_zoom, $python_module, $moltenvk);
+my ($with_cuda, $with_eigen, $with_mxwrite, $with_mixer) = ("AUTO", "AUTO", "AUTO", "AUTO");
+my ($python_install_dir, $glslc_executable);
+my ($mutatris_desktop, $asteroids3d_desktop, $asteroids_net_desktop);
+my ($configuration, $component, $strip_install);
 
 GetOptionsFromArray(
     \@ARGV,
@@ -30,11 +35,36 @@ GetOptionsFromArray(
     "fresh" => \$fresh,
     "install!" => \$install,
     "sudo!" => \$use_sudo,
+    "debug!" => \$debug_mode,
+    "validation!" => \$validation,
+    "cv!" => \$cv,
+    "cuda=s" => \$with_cuda,
+    "eigen=s" => \$with_eigen,
+    "mxwrite=s" => \$with_mxwrite,
+    "mixer=s" => \$with_mixer,
+    "jpeg!" => \$jpeg,
+    "examples!" => \$examples,
+    "fractal-zoom!" => \$fractal_zoom,
+    "python-module!" => \$python_module,
+    "python-install-dir=s" => \$python_install_dir,
+    "moltenvk!" => \$moltenvk,
+    "mutatris-desktop!" => \$mutatris_desktop,
+    "asteroids3d-desktop!" => \$asteroids3d_desktop,
+    "asteroids-net-desktop!" => \$asteroids_net_desktop,
+    "glslc=s" => \$glslc_executable,
+    "config=s" => \$configuration,
+    "component=s" => \$component,
+    "strip" => \$strip_install,
     "help|h" => \$help,
 ) or usage(2);
 
 usage(0) if $help;
 fail("--jobs must be a positive integer") if $jobs < 1;
+for my $option (["--cuda", \$with_cuda], ["--eigen", \$with_eigen], ["--mxwrite", \$with_mxwrite], ["--mixer", \$with_mixer]) {
+    next unless defined ${ $option->[1] };
+    fail("$option->[0] must be AUTO, ON, or OFF") unless ${ $option->[1] } =~ /^(?:AUTO|ON|OFF)$/i;
+    ${ $option->[1] } = uc(${ $option->[1] });
+}
 
 $build_dir = File::Spec->rel2abs($build_dir, getcwd());
 
@@ -55,7 +85,7 @@ if (!$compiler_is_configured && !$ENV{CXX}) {
         unless command_path("c++") || command_path("g++") || command_path("clang++");
 }
 
-my $glslc_is_configured = grep { /^-DGLSLC_EXECUTABLE(?::[^=]+)?=/ } @ARGV;
+my $glslc_is_configured = defined $glslc_executable || grep { /^-DGLSLC_EXECUTABLE(?::[^=]+)?=/ } @ARGV;
 push @missing_tools, "glslc (the Vulkan shader compiler)"
     if !$glslc_is_configured && !command_path("glslc");
 
@@ -99,6 +129,23 @@ if ($generator_is_configured) {
 
 push @configure_command, "-S", $source_dir, "-B", $build_dir;
 push @configure_command, "-DCMAKE_INSTALL_PREFIX=$prefix" if defined $prefix;
+append_cmake_bool(\@configure_command, "DEBUG_MODE", $debug_mode);
+append_cmake_bool(\@configure_command, "VALIDATION", $validation);
+append_cmake_bool(\@configure_command, "CV", $cv);
+append_cmake_value(\@configure_command, "WITH_CUDA", $with_cuda);
+append_cmake_value(\@configure_command, "WITH_EIGEN", $with_eigen);
+append_cmake_value(\@configure_command, "WITH_MXWRITE", $with_mxwrite);
+append_cmake_value(\@configure_command, "WITH_MIXER", $with_mixer);
+append_cmake_bool(\@configure_command, "JPEG", $jpeg);
+append_cmake_bool(\@configure_command, "EXAMPLES", $examples);
+append_cmake_bool(\@configure_command, "FRACTAL_ZOOM", $fractal_zoom);
+append_cmake_bool(\@configure_command, "PYTHON_MODULE", $python_module);
+append_cmake_value(\@configure_command, "MXVK_PYTHON_INSTALL_DIR", $python_install_dir);
+append_cmake_bool(\@configure_command, "MXVK_ENABLE_MOLTENVK", $moltenvk);
+append_cmake_bool(\@configure_command, "MUTATRIS_INSTALL_USER_DESKTOP", $mutatris_desktop);
+append_cmake_bool(\@configure_command, "ASTEROIDS3D_INSTALL_USER_DESKTOP", $asteroids3d_desktop);
+append_cmake_bool(\@configure_command, "ASTEROIDS_NET_INSTALL_USER_DESKTOP", $asteroids_net_desktop);
+append_cmake_value(\@configure_command, "GLSLC_EXECUTABLE", $glslc_executable);
 push @configure_command, @ARGV;
 
 my ($configure_output, $configure_status) = run_command("Configuring", @configure_command);
@@ -127,6 +174,9 @@ my $install_prefix = defined $prefix ? $prefix : read_install_prefix($build_dir)
 $install_prefix = "/usr/local" unless defined $install_prefix && length $install_prefix;
 
 my @install_command = ("cmake", "--install", $build_dir);
+push @install_command, "--config", $configuration if defined $configuration;
+push @install_command, "--component", $component if defined $component;
+push @install_command, "--strip" if $strip_install;
 my $needs_sudo = !prefix_is_writable($install_prefix) && $> != 0;
 
 if (defined $use_sudo && $use_sudo) {
@@ -234,6 +284,16 @@ sub read_install_prefix {
     return read_cache_value($directory, "CMAKE_INSTALL_PREFIX");
 }
 
+sub append_cmake_bool {
+    my ($command, $name, $value) = @_;
+    push @$command, "-D$name=" . ($value ? "ON" : "OFF") if defined $value;
+}
+
+sub append_cmake_value {
+    my ($command, $name, $value) = @_;
+    push @$command, "-D$name=$value" if defined $value;
+}
+
 sub read_cache_value {
     my ($directory, $name) = @_;
     my $cache = File::Spec->catfile($directory, "CMakeCache.txt");
@@ -326,7 +386,8 @@ sub usage {
 Usage: ./install.pl [options] [CMake options]
 
 Configure, build, and install MXVK. Unknown options are passed to CMake,
-so feature flags such as -DVALIDATION=ON and -DEXAMPLES=OFF work directly.
+so standard CMake settings such as -G Ninja and -DCMAKE_TOOLCHAIN_FILE=... work
+directly. Explicit install.pl feature options are translated to CMake cache values.
 
 Options:
   -B, --build-dir DIR  Build directory (default: <source>/build)
@@ -336,12 +397,37 @@ Options:
       --no-install     Configure and build without installing
       --sudo           Always use sudo for installation
       --no-sudo        Never use sudo; fail if the prefix is not writable
+      --config NAME    Install configuration for multi-config generators
+      --component NAME Install only a named CMake install component
+      --strip          Strip installed binaries when supported by CMake
+
+MXVK feature options (use --no-NAME to disable boolean features):
+      --debug                    Enable DEBUG_MODE compile flags
+      --validation               Enable Vulkan validation layers
+      --cv                       Enable OpenCV capture support
+      --cuda AUTO|ON|OFF         CUDA acceleration/interop (default: AUTO)
+      --eigen AUTO|ON|OFF        Eigen 3dmath backend (default: AUTO)
+      --mxwrite AUTO|ON|OFF      MXWrite FFmpeg video writer (default: AUTO)
+      --mixer AUTO|ON|OFF        SDL3_mixer audio support (default: AUTO)
+      --jpeg                     Enable JPEG helpers
+      --examples                 Build examples (default: ON)
+      --fractal-zoom             Build the Boost fractal_zoom example
+      --python-module            Build the nanobind mxvk_ext module
+      --python-install-dir DIR   Python module install directory
+      --glslc PATH               Path to the Vulkan glslc shader compiler
+      --moltenvk                 Enable MoltenVK portability support (macOS only)
+
+Example-install options (effective while examples are enabled):
+      --mutatris-desktop         Install Mutatris desktop entry/icon (default: ON)
+      --asteroids3d-desktop      Install asteroids3d desktop entry/icon (default: ON)
+      --asteroids-net-desktop    Install asteroids-net desktop entry/icon (default: ON)
   -h, --help           Show this help
 
 Examples:
   ./install.pl
-  ./install.pl --prefix "\$HOME/.local" -DEXAMPLES=OFF
-  ./install.pl --fresh -DVALIDATION=ON -DWITH_MIXER=ON
+  ./install.pl --prefix "\$HOME/.local" --no-examples --mixer OFF
+  ./install.pl --fresh --validation --mixer ON
+  ./install.pl --python-module --no-examples --python-install-dir lib/python3.12/site-packages
 USAGE
     exit $status;
 }

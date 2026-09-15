@@ -362,7 +362,35 @@ endif()
 add_subdirectory(volk)
 set(MXNETWORK_EXAMPLES OFF CACHE BOOL "MXNetwork examples ON/OFF" FORCE)
 add_subdirectory(MXNetwork)
-if(NOT WITH_MXWRITE STREQUAL "OFF")
+string(TOUPPER "${WITH_MXWRITE}" MXVK_WITH_MXWRITE_REQUEST)
+if(NOT MXVK_WITH_MXWRITE_REQUEST MATCHES "^(AUTO|ON|OFF)$")
+    message(FATAL_ERROR "WITH_MXWRITE must be AUTO, ON, or OFF")
+endif()
+
+set(MXVK_MXWRITE_AVAILABLE OFF)
+if(NOT MXVK_WITH_MXWRITE_REQUEST STREQUAL "OFF")
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(MXVK_FFMPEG QUIET
+            libavcodec>=58.0.0
+            libavformat>=58.0.0
+            libavutil>=56.0.0
+            libswscale>=5.0.0
+        )
+    endif()
+
+    if(MXVK_FFMPEG_FOUND)
+        set(MXVK_MXWRITE_AVAILABLE ON)
+    elseif(MXVK_WITH_MXWRITE_REQUEST STREQUAL "ON")
+        message(FATAL_ERROR "WITH_MXWRITE=ON was requested, but FFmpeg development files were not found")
+    else()
+        message(STATUS "FFmpeg not found; building without MXWrite")
+    endif()
+else()
+    message(STATUS "MXWrite disabled by WITH_MXWRITE=OFF")
+endif()
+
+if(MXVK_MXWRITE_AVAILABLE)
     add_subdirectory(MXWrite)
 endif()
 
