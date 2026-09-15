@@ -188,6 +188,15 @@ their required assets and compiled shaders. `window`, `sprite`, `asteroids`,
 `knight`, and `darkside` demonstrate direct windows, sprites, input, model
 rendering, custom command recording, and post-processing.
 
+Regenerate every Python example's SPIR-V assets after editing shader source:
+
+```bash
+python3 python-examples/compile_shaders.py
+python3 python-examples/compile_shaders.py --glslc /path/to/glslc
+```
+
+Use `--dry-run` to print the source/output manifest without writing files.
+
 <a id="simple-python-wrappers"></a>
 
 ## Simple Python Wrappers

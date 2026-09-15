@@ -21,6 +21,10 @@ Use the package as `import mxvk_wrap as mx`, then construct values such as
 `mx.Font(path, size)` with `app.draw_text(text, x, y, font, color)`. This does
 not modify the font selected by `app.set_font()`.
 
+After editing an example GLSL file, regenerate all Python-example SPIR-V assets
+with `python3 python-examples/compile_shaders.py`. Pass `--glslc /path/to/glslc`
+to choose a specific compiler.
+
 If an app-owned `Sprite`, `Sprite3D`, `Model`, `GpuBuffer`, or `GpuTexture`
 fails to load or allocate, its wrapper closes the owning `App` before raising
 the original exception. This releases resources that were created earlier in
