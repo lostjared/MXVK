@@ -11,6 +11,10 @@ fragment shader driven by mouse position, render resolution, and elapsed time.
 Its paired `data/sprite.vert.spv` is included so the example does not depend on
 the current working directory for its custom shader pipeline.
 
+Score changes only when completed lines collapse: one, two, three, and four
+simultaneous lines award 100, 300, 500, and 800 points respectively, multiplied
+by the current level. Soft and hard drops do not award points.
+
 From the repository root, build the MXVK Python extension:
 
 ```sh

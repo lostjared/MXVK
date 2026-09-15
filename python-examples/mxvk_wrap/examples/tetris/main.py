@@ -194,10 +194,8 @@ class TetrisGame(mx.App):
         ## @brief Drop the active piece to its lowest valid row and lock it.
         if self.game_over:
             return
-        distance = 0
         while self._move(0, 1):
-            distance += 1
-        self.score += distance * 2
+            pass
         self._lock_piece()
 
     def _fall_interval(self) -> float:
@@ -256,9 +254,7 @@ class TetrisGame(mx.App):
         elif event.key == mx.KEY_RIGHT:
             self._move(1, 0)
         elif event.key == mx.KEY_DOWN:
-            if self._move(0, 1):
-                self.score += 1
-            else:
+            if not self._move(0, 1):
                 self._lock_piece()
         elif event.key == mx.KEY_UP:
             self._rotate()
