@@ -197,4 +197,5 @@ Include `mxnetwork/mxsocket.hpp` to use the C-style API directly.
 
 ## License
 
-MXNetwork is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for the full license text.
+See [LICENSE](LICENSE) for the full license text.
+
