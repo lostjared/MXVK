@@ -4,7 +4,8 @@ A Python port of the MXVK 3D Breakout sample, using `mxvk_wrap` for window,
 sprite, font, and model lifetime management. The game retains the supplied
 MXMOD/OBJ artwork and animated backgrounds. The wrapper renders the background
 inside the custom 3D callback, before models; the score and life count remain
-normal 2D overlays.
+normal 2D overlays. Mixer-enabled builds also play the supplied looping music,
+paddle-hit, block-clear, and missed-ball audio.
 
 From the repository root, first build the extension and generate the local
 SPIR-V files:

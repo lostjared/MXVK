@@ -101,6 +101,11 @@ class BreakoutGame(mx.App):
         super().__init__("MXVK Wrap 3D Breakout", 1280, 720, vsync=True)
         self.set_clear_color(0.0, 0.0, 0.0, 1.0)
         self.font = None
+        self.audio = None
+        self.background_music = -1
+        self.ping_sound = -1
+        self.clear_sound = -1
+        self.die_sound = -1
         self.blocks: list[dict[str, object]] = []
         try:
             self.font = mx.Font(self.asset_dir / "font.ttf", 24)
@@ -111,6 +116,13 @@ class BreakoutGame(mx.App):
             self.ball_model = mx.Model(self, self.asset_dir / "better_sphere.obj", textures=self.asset_dir / "moon_manifest.txt", texture_directory=self.asset_dir)
             self.ball_model.shaders(self, self.asset_dir / "breakout_model.vert.spv", self.asset_dir / "breakout_model.frag.spv")
             self._create_blocks()
+            if mx.native.has_mixer:
+                self.audio = self.add(mx.Sound())
+                self.background_music = self.audio.load_music(self.asset_dir / "breakout.ogg")
+                self.ping_sound = self.audio.load_wav(self.asset_dir / "ping.wav")
+                self.clear_sound = self.audio.load_wav(self.asset_dir / "pop.wav")
+                self.die_sound = self.audio.load_wav(self.asset_dir / "die.wav")
+                self._ensure_music()
         except Exception:
             if self.font is not None:
                 self.font.close()
@@ -179,6 +191,14 @@ class BreakoutGame(mx.App):
     def _launch_ball(self) -> None:
         if self.screen == "game" and self.ball_stuck:
             self.ball_stuck = False
+
+    def _ensure_music(self) -> None:
+        if self.audio is not None and self.background_music >= 0 and not self.audio.music_playing(self.background_music):
+            self.audio.play_music(self.background_music, -1)
+
+    def _play_effect(self, sound_id: int, channel: int) -> None:
+        if self.audio is not None and sound_id >= 0:
+            self.audio.play(sound_id, channel=channel)
 
     def on_event(self, event) -> None:
         ## @brief Accept keyboard and pointer controls for the game.
@@ -263,6 +283,7 @@ class BreakoutGame(mx.App):
                 speed = math.hypot(self.ball_dx, self.ball_dy)
                 self.ball_dx, self.ball_dy = self.ball_dx / speed * BALL_SPEED, self.ball_dy / speed * BALL_SPEED
                 self.ball_y = -3.0
+                self._play_effect(self.ping_sound, 0)
             for block in self.blocks:
                 if block["destroyed"] or block["rotating"]:
                     continue
@@ -270,9 +291,11 @@ class BreakoutGame(mx.App):
                     block["rotating"] = True
                     self.score += 10
                     self.ball_dy = -self.ball_dy
+                    self._play_effect(self.clear_sound, 1)
                     break
             if self.ball_y <= GAME_BOTTOM:
                 self.misses += 1
+                self._play_effect(self.die_sound, 2)
                 if self.misses >= MAX_MISSES:
                     self.screen = "gameover"
                 else:
@@ -291,6 +314,7 @@ class BreakoutGame(mx.App):
         now = time.monotonic()
         delta = min(0.05, max(0.0, now - self.last_frame))
         self.last_frame = now
+        self._ensure_music()
         self._update(delta)
         width, height = self.swapchain_extent
         if self.screen == "intro":
