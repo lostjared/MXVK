@@ -218,6 +218,8 @@ namespace {
         }
 
         void request_exit() { exit(); }
+
+        void render_standalone_sprite(mxvk::VK_Sprite &sprite, VkCommandBuffer command_buffer) { renderStandaloneSprite(sprite, command_buffer); }
     };
 
     class PythonIOWindow : public mxvk::VK_IOWindow {
@@ -380,6 +382,18 @@ namespace mxvk {
                 return static_cast<int32_t>(key);
             },
             nb::arg("name"));
+        module.def(
+            "key_pressed",
+            [](int32_t key) {
+                const SDL_Scancode scancode = SDL_GetScancodeFromKey(static_cast<SDL_Keycode>(key), nullptr);
+                if (scancode == SDL_SCANCODE_UNKNOWN)
+                    return false;
+                int key_count = 0;
+                const bool *keyboard_state = SDL_GetKeyboardState(&key_count);
+                const int index = static_cast<int>(scancode);
+                return keyboard_state != nullptr && index >= 0 && index < key_count && keyboard_state[index];
+            },
+            nb::arg("key"));
         module.def(
             "key_name",
             [](int32_t key) -> nb::object {
@@ -897,6 +911,19 @@ namespace mxvk {
                     python_window->flush_frame_readbacks();
                 })
             .def("on_record_custom_rendering", [](VK_Window &, nb::capsule, uint32_t) {}, nb::arg("command_buffer"), nb::arg("image_index"))
+            .def(
+                "render_standalone_sprite",
+                [](VK_Window &window, VK_Sprite &sprite, nb::capsule command_buffer) {
+                    auto command = static_cast<VkCommandBuffer>(command_buffer.data());
+                    if (command == VK_NULL_HANDLE)
+                        throw nb::value_error("command_buffer capsule must contain a VkCommandBuffer pointer");
+                    auto *python_window = dynamic_cast<PythonWindow *>(&window);
+                    if (python_window == nullptr)
+                        throw nb::type_error("render_standalone_sprite requires a Python subclass of Window");
+                    python_window->render_standalone_sprite(sprite, command);
+                },
+                nb::arg("sprite"),
+                nb::arg("command_buffer"))
             .def(
                 "on_prepare_frame_rendering",
                 [](VK_Window &window, nb::capsule command_buffer, uint32_t image_index) {

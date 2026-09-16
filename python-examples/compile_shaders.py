@@ -77,6 +77,10 @@ def shader_jobs(root: Path) -> list[tuple[Path, Path]]:
         (shared / "sprite.frag", root / "opencv_mxwrite_shader/data/fragment.frag.spv"),
         (root / "mxvk_wrap/examples/tetris/data/background.frag", root / "mxvk_wrap/examples/tetris/data/background.frag.spv"),
         (shared / "sprite.vert", root / "mxvk_wrap/examples/tetris/data/sprite.vert.spv"),
+        (root / "mxvk_wrap/examples/breakout/data/model.vert", root / "mxvk_wrap/examples/breakout/data/breakout_model.vert.spv"),
+        (root / "mxvk_wrap/examples/breakout/data/model.frag", root / "mxvk_wrap/examples/breakout/data/breakout_model.frag.spv"),
+        (shared / "sprite.vert", root / "mxvk_wrap/examples/breakout/data/sprite.vert.spv"),
+        (root / "mxvk_wrap/examples/breakout/data/background.frag", root / "mxvk_wrap/examples/breakout/data/breakout_background.frag.spv"),
     ]
 
 

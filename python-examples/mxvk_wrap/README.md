@@ -34,3 +34,5 @@ the same application setup.
 
 - [2D Tetris](examples/tetris/README.md) is a playable sprite-and-font game
   using the local artwork in `examples/tetris/data/`.
+- [3D Breakout](examples/breakout/README.md) ports the native Breakout game,
+  including its model rendering and animated backgrounds.

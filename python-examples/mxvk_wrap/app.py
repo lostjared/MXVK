@@ -67,6 +67,15 @@ class App(mxvk.Window):
         ## @c set_font, so existing default-font text remains unchanged.
         self.print_text(text, x, y, color, font.native)
 
+    def render_sprite_now(self, sprite: Any, command_buffer: Any) -> None:
+        ## @brief Render a queued sprite during custom 3D rendering.
+        ## @param sprite Wrapper @c Sprite whose queued draws are rendered.
+        ## @param command_buffer Command buffer received by @c on_record_custom_rendering.
+        ## @details Use this for a 2D background that must be drawn before a
+        ## custom 3D scene. Normal @c Sprite.draw calls are rendered afterward
+        ## as overlays.
+        self.render_standalone_sprite(sprite.native, command_buffer)
+
     def text_size(self, text: str, font: Any) -> tuple[int, int] | None:
         ## @brief Measure text using a supplied font without changing the default font.
         ## @param text Text to measure.

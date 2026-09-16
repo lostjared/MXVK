@@ -14,7 +14,11 @@ __all__ = [
     "App", "Camera", "Color", "Controller", "Font", "GpuBuffer", "GpuTexture",
     "Joystick", "KEY_DOWN", "KEY_ESCAPE", "KEY_LEFT", "KEY_RIGHT", "KEY_R", "KEY_SPACE", "KEY_UP", "Model", "native", "Settings", "Sound", "Sprite", "Sprite3D",
     "Stopwatch",
+    "key_pressed",
 ]
+
+key_pressed = native.key_pressed
+"""Return whether a keyboard key is currently held down."""
 
 KEY_ESCAPE = native.KEY_ESCAPE
 """Keyboard value used to detect the Escape key in @c App.on_event."""
