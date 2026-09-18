@@ -1943,6 +1943,17 @@ namespace mxvk {
             std::cout << "vk: external memory FD support unavailable; CUDA texture interop will fall back\n";
         }
 #endif
+#if defined(MXVK_CUDA) && defined(_WIN32)
+        if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)) {
+            if (has_device_extension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME)) {
+                required_device_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+            }
+            required_device_extensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+            std::cout << "vk: enabling external memory Win32 support for CUDA interop\n";
+        } else {
+            std::cout << "vk: external memory Win32 support unavailable; CUDA texture interop will fall back\n";
+        }
+#endif
 
 #if defined(MXVK_USE_MOLTENVK)
         const bool has_portability_subset = std::ranges::any_of(device_extensions, [](const VkExtensionProperties &ext) { return std::strcmp(ext.extensionName, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME) == 0; });

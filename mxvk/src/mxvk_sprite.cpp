@@ -11,7 +11,14 @@
 #include <filesystem>
 #include <limits>
 #ifdef MXVK_CUDA
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 #endif
 
 namespace mxvk {
@@ -1982,10 +1989,15 @@ namespace mxvk {
 
     void VK_Sprite::createCudaExportableImage(uint32_t width, uint32_t height, uint32_t arrayLayers, VkImage &image, VkDeviceMemory &imageMemory, VkDeviceSize &exportMemorySize) {
         std::cout << std::format("mxvk: CUDA interop init: requesting exportable Vulkan image "
-                                 "{}x{}x{} RGBA8 OPAQUE_FD\n",
+                                 "{}x{}x{} RGBA8 {}\n",
                                  width,
                                  height,
-                                 arrayLayers);
+                                 arrayLayers,
+#ifdef _WIN32
+                                 "OPAQUE_WIN32");
+#else
+                                 "OPAQUE_FD");
+#endif
         if (image != VK_NULL_HANDLE) {
             vkDestroyImage(device, image, nullptr);
             image = VK_NULL_HANDLE;
@@ -1997,7 +2009,11 @@ namespace mxvk {
 
         VkExternalMemoryImageCreateInfo externalImageInfo{};
         externalImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
+#ifdef _WIN32
+        externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
         externalImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
 
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -2022,7 +2038,11 @@ namespace mxvk {
 
         VkExportMemoryAllocateInfo exportMemoryInfo{};
         exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+#ifdef _WIN32
+        exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
         exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
 
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -2060,6 +2080,46 @@ namespace mxvk {
             }
             return false;
         }
+#ifdef _WIN32
+        if (vkGetMemoryWin32HandleKHR == nullptr) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA interop init: vkGetMemoryWin32HandleKHR was not loaded; using CPU/pinned fallback\n";
+                cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetWin32HandleInfoKHR handleInfo{};
+        handleInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+        handleInfo.memory = spriteImageMemory;
+        handleInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+        HANDLE memoryHandle = nullptr;
+        const VkResult handleResult = vkGetMemoryWin32HandleKHR(device, &handleInfo, &memoryHandle);
+        if (handleResult != VK_SUCCESS) {
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: vkGetMemoryWin32HandleKHR failed ({})\n", static_cast<int>(handleResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+        externalMemoryDesc.handle.win32.handle = memoryHandle;
+        externalMemoryDesc.size = cudaExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(&cudaExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            CloseHandle(memoryHandle);
+            if (!cudaInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA interop init: cudaImportExternalMemory failed: {}\n", cudaGetErrorString(cudaResult));
+                cudaInteropUnavailableLogged = true;
+            }
+            cudaExternalMemory = nullptr;
+            return false;
+        }
+#else
         if (vkGetMemoryFdKHR == nullptr) {
             if (!cudaInteropUnavailableLogged) {
                 std::cout << "mxvk: CUDA interop init: vkGetMemoryFdKHR was not loaded; using CPU/pinned fallback\n";
@@ -2099,6 +2159,7 @@ namespace mxvk {
             cudaExternalMemory = nullptr;
             return false;
         }
+#endif
         std::cout << std::format("mxvk: CUDA interop init: imported external memory into CUDA ({} bytes)\n", static_cast<unsigned long long>(cudaExportMemorySize));
 
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
@@ -2165,6 +2226,49 @@ namespace mxvk {
             }
             return false;
         }
+#ifdef _WIN32
+        if (vkGetMemoryWin32HandleKHR == nullptr) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << "mxvk: CUDA history interop: vkGetMemoryWin32HandleKHR was "
+                             "not loaded\n";
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        VkMemoryGetWin32HandleInfoKHR handleInfo{};
+        handleInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+        handleInfo.memory = historyImageMemory;
+        handleInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+        HANDLE memoryHandle = nullptr;
+        const VkResult handleResult = vkGetMemoryWin32HandleKHR(device, &handleInfo, &memoryHandle);
+        if (handleResult != VK_SUCCESS) {
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA history interop: vkGetMemoryWin32HandleKHR failed "
+                                         "({})\n",
+                                         static_cast<int>(handleResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            return false;
+        }
+
+        cudaExternalMemoryHandleDesc externalMemoryDesc{};
+        externalMemoryDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+        externalMemoryDesc.handle.win32.handle = memoryHandle;
+        externalMemoryDesc.size = cudaHistoryExportMemorySize;
+
+        cudaError_t cudaResult = cudaImportExternalMemory(&cudaHistoryExternalMemory, &externalMemoryDesc);
+        if (cudaResult != cudaSuccess) {
+            CloseHandle(memoryHandle);
+            if (!cudaHistoryInteropUnavailableLogged) {
+                std::cout << std::format("mxvk: CUDA history interop: import failed: {}\n", cudaGetErrorString(cudaResult));
+                cudaHistoryInteropUnavailableLogged = true;
+            }
+            cudaHistoryExternalMemory = nullptr;
+            return false;
+        }
+#else
         if (vkGetMemoryFdKHR == nullptr) {
             if (!cudaHistoryInteropUnavailableLogged) {
                 std::cout << "mxvk: CUDA history interop: vkGetMemoryFdKHR was "
@@ -2206,6 +2310,7 @@ namespace mxvk {
             cudaHistoryExternalMemory = nullptr;
             return false;
         }
+#endif
 
         cudaExternalMemoryMipmappedArrayDesc arrayDesc{};
         arrayDesc.offset = 0;

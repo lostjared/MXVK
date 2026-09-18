@@ -29,7 +29,11 @@
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudaimgproc.hpp>
 #include <opencv2/cudawarping.hpp>
+#ifdef _WIN32
+#include <io.h>
+#else
 #include <unistd.h>
+#endif
 #endif
 
 #ifndef compute_shader_ASSET_DIR
@@ -1106,7 +1110,11 @@ class ComputeWindow : public mxvk::VK_Window {
 
         cudaError_t cudaResult = cudaImportExternalMemory(&img.cudaExternalMemory, &externalMemoryDesc);
         if (cudaResult != cudaSuccess) {
+#ifdef _WIN32
+            _close(memoryFd);
+#else
             close(memoryFd);
+#endif
             if (!img.cudaInteropUnavailableLogged) {
                 std::cout << "compute_shader: CUDA interop init: cudaImportExternalMemory failed: " << cudaGetErrorString(cudaResult) << "\n";
                 img.cudaInteropUnavailableLogged = true;

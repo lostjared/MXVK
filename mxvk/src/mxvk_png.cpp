@@ -64,7 +64,7 @@ namespace mxvk {
         }
 
         png_init_io(png, file);
-	png_set_compression_level(png, compression_level);
+        png_set_compression_level(png, compression_level);
         png_set_IHDR(png, info, width, height, bit_depth, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 
         if (bit_depth == 16 && swap_16bit_endianness) {

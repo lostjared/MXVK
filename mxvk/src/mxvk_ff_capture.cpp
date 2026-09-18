@@ -367,36 +367,7 @@ namespace mxvk {
         return formats[0];
     }
 
-    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder, int cuda_device) {
-        const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
-        if (deviceType == AV_HWDEVICE_TYPE_NONE) {
-            return false;
-        }
-
-        for (int index = 0;; ++index) {
-            const AVCodecHWConfig *config = avcodec_get_hw_config(decoder, index);
-            if (config == nullptr) {
-                return false;
-            }
-            const bool hasDeviceCtx = (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0;
-            if (hasDeviceCtx && config->device_type == deviceType) {
-                hwPixFmt = config->pix_fmt;
-                break;
-            }
-        }
-
-        const std::string deviceName = cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
-        const char *device = deviceName.empty() ? nullptr : deviceName.c_str();
-        if (av_hwdevice_ctx_create(&hwDeviceCtx, deviceType, device, nullptr, 0) < 0) {
-            hwPixFmt = AV_PIX_FMT_NONE;
-            return false;
-        }
-
-        hardwareDecodeDevice = cuda_device;
-        return true;
-    }
-
-    bool VK_FF_Capture::convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
+   bool VK_FF_Capture::convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         const AVFrame *sourceFrame = decodedFrame;
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
             av_frame_unref(swFrame);
@@ -417,13 +388,65 @@ namespace mxvk {
         rgba.resize(static_cast<size_t>(pitch) * static_cast<size_t>(height));
         uint8_t *dstData[4] = {rgba.data(), nullptr, nullptr, nullptr};
         int dstLinesize[4] = {pitch, 0, 0, 0};
+        AVPixelFormat sourceFormat = static_cast<AVPixelFormat>(sourceFrame->format);
 
-        swsCtx = sws_getCachedContext(swsCtx, sourceFrame->width, sourceFrame->height, static_cast<AVPixelFormat>(sourceFrame->format), width, height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
+        AVColorRange colorRange = sourceFrame->color_range != AVCOL_RANGE_UNSPECIFIED ? sourceFrame->color_range : codecCtx->color_range;
+
+        AVColorSpace colorSpace = sourceFrame->colorspace != AVCOL_SPC_UNSPECIFIED ? sourceFrame->colorspace : codecCtx->colorspace;
+
+        switch (sourceFormat) {
+        case AV_PIX_FMT_YUVJ420P:
+            sourceFormat = AV_PIX_FMT_YUV420P;
+            colorRange = AVCOL_RANGE_JPEG;
+            break;
+        case AV_PIX_FMT_YUVJ422P:
+            sourceFormat = AV_PIX_FMT_YUV422P;
+            colorRange = AVCOL_RANGE_JPEG;
+            break;
+        case AV_PIX_FMT_YUVJ444P:
+            sourceFormat = AV_PIX_FMT_YUV444P;
+            colorRange = AVCOL_RANGE_JPEG;
+            break;
+        case AV_PIX_FMT_YUVJ440P:
+            sourceFormat = AV_PIX_FMT_YUV440P;
+            colorRange = AVCOL_RANGE_JPEG;
+            break;
+        default:
+            break;
+        }
+
+        swsCtx = sws_getCachedContext(swsCtx, sourceFrame->width, sourceFrame->height, sourceFormat, width, height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr, nullptr, nullptr);
+
         if (swsCtx == nullptr) {
             return false;
         }
 
+        int sourceColorSpace = SWS_CS_DEFAULT;
+
+        switch (colorSpace) {
+        case AVCOL_SPC_BT709:
+            sourceColorSpace = SWS_CS_ITU709;
+            break;
+        case AVCOL_SPC_BT2020_NCL:
+        case AVCOL_SPC_BT2020_CL:
+            sourceColorSpace = SWS_CS_BT2020;
+            break;
+        case AVCOL_SPC_SMPTE170M:
+        case AVCOL_SPC_BT470BG:
+            sourceColorSpace = SWS_CS_ITU601;
+            break;
+        default:
+            break;
+        }
+
+        const int *sourceCoefficients = sws_getCoefficients(sourceColorSpace);
+
+        const int *destinationCoefficients = sws_getCoefficients(SWS_CS_DEFAULT);
+
+        sws_setColorspaceDetails(swsCtx, sourceCoefficients, colorRange == AVCOL_RANGE_JPEG ? 1 : 0, destinationCoefficients, 1, 0, 1 << 16, 1 << 16);
+
         const int scaledRows = sws_scale(swsCtx, sourceFrame->data, sourceFrame->linesize, 0, sourceFrame->height, dstData, dstLinesize);
+
         if (scaledRows != height) {
             return false;
         }
@@ -433,7 +456,81 @@ namespace mxvk {
         return true;
     }
 
-    bool VK_FF_Capture::convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
+   bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder, int cuda_device) {
+    const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
+
+    if(deviceType == AV_HWDEVICE_TYPE_NONE) {
+        std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice is unavailable\n";
+        return false;
+    }
+
+    std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice available\n";
+    std::cout << "mxvk_ff_capture: CUDA device type = "
+              << static_cast<int>(deviceType) << '\n';
+
+    for(int index = 0;; ++index) {
+        const AVCodecHWConfig *config = avcodec_get_hw_config(decoder, index);
+
+        if(config == nullptr) {
+            std::cout << "mxvk_ff_capture: decoder has no CUDA hardware configuration\n";
+            return false;
+        }
+
+        const bool hasDeviceCtx =
+            (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0;
+
+        std::cout << "mxvk_ff_capture: hw config "
+                  << index
+                  << " device_type="
+                  << static_cast<int>(config->device_type)
+                  << " pix_fmt="
+                  << static_cast<int>(config->pix_fmt)
+                  << " methods="
+                  << config->methods
+                  << " device_ctx="
+                  << (hasDeviceCtx ? "yes" : "no")
+                  << '\n';
+
+        if(hasDeviceCtx && config->device_type == deviceType) {
+            std::cout << "mxvk_ff_capture: found CUDA decoder configuration\n";
+            hwPixFmt = config->pix_fmt;
+            break;
+        }
+    }
+
+    const std::string deviceName =
+        cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
+
+    const char *device =
+        deviceName.empty() ? nullptr : deviceName.c_str();
+
+    const int result =
+        av_hwdevice_ctx_create(
+            &hwDeviceCtx,
+            deviceType,
+            device,
+            nullptr,
+            0
+        );
+
+    if(result < 0) {
+        char error[AV_ERROR_MAX_STRING_SIZE]{};
+        av_strerror(result, error, sizeof(error));
+
+        std::cout << "mxvk_ff_capture: CUDA hwdevice creation failed: "
+                  << error << '\n';
+
+        hwPixFmt = AV_PIX_FMT_NONE;
+        return false;
+    }
+
+    std::cout << "mxvk_ff_capture: CUDA hardware device created successfully\n";
+
+    hardwareDecodeDevice = cuda_device;
+    return true;
+}
+    
+   bool VK_FF_Capture::convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         const AVFrame *sourceFrame = decodedFrame;
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
             av_frame_unref(swFrame);

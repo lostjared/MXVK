@@ -33,6 +33,10 @@ option(EXAMPLES "Enable/Disable Examples" ON)
 option(FRACTAL_ZOOM "Build the Boost.Multiprecision fractal_zoom example" OFF)
 option(PYTHON_MODULE "Build the MXVK nanobind Python module" OFF)
 
+if(WIN32)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 if(MINGW AND CMAKE_CROSSCOMPILING)
 set(MXVK_MINGW_TRIPLET "")
 if(DEFINED CMAKE_CXX_COMPILER_TARGET AND CMAKE_CXX_COMPILER_TARGET MATCHES "w64-mingw32")
@@ -90,19 +94,33 @@ endif()
 if(DEBUG_MODE)
 add_compile_definitions(DEBUG_MODE)
 message(STATUS "Debug Enabled")
-set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+if(NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+if(MSVC)
+    add_compile_options(/Zi)
 else()
-set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+    add_compile_options(-g)
+endif()
+else()
+if(NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+if(MSVC)
+    add_compile_options(/O2)
+else()
+    add_compile_options(-O3)
+endif()
 message(STATUS "Release mode enabled")
 endif()
 if(UNIX AND NOT APPLE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+add_compile_options(-fPIC)
 endif()
-add_compile_options(-Wall -pedantic)
+if(MSVC)
+    add_compile_options(/W4 /permissive- /Zc:__cplusplus)
+else()
+    add_compile_options(-Wall -pedantic)
+endif()
 message(STATUS "")
 message(STATUS "=== MXVK: Checking System Headers ===")
 check_include_file_cxx(iostream HAVE_IOSTREAM)
@@ -163,6 +181,12 @@ endif()
 message(STATUS "All required C standard headers found.")
 message(STATUS "")
 message(STATUS "=== MXVK: Checking C++20 Compatibility ===")
+set(MXVK_REQUIRED_FLAGS_SAVE "${CMAKE_REQUIRED_FLAGS}")
+if(MSVC)
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} /std:c++20 /Zc:__cplusplus")
+else()
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -std=c++20")
+endif()
 check_cxx_source_compiles("
 #include <version>
 #if __cplusplus < 202002L
@@ -170,6 +194,8 @@ check_cxx_source_compiles("
 #endif
 int main() { return 0; }
 " HAVE_CXX20)
+set(CMAKE_REQUIRED_FLAGS "${MXVK_REQUIRED_FLAGS_SAVE}")
+unset(MXVK_REQUIRED_FLAGS_SAVE)
 
 if(NOT HAVE_CXX20)
 message(WARNING "C++20 support may not be fully available. Some features might not compile correctly.")
@@ -360,6 +386,11 @@ if(NOT CV)
     message(STATUS "OpenCV capture support disabled (pass -DCV=ON to enable VK_Capture)")
 endif()
 add_subdirectory(volk)
+if(WIN32)
+    # Volk must compile the Win32 external-memory function-pointer storage
+    # as well as MXVK's callers.
+    target_compile_definitions(volk PUBLIC VK_USE_PLATFORM_WIN32_KHR)
+endif()
 set(MXNETWORK_EXAMPLES OFF CACHE BOOL "MXNetwork examples ON/OFF" FORCE)
 add_subdirectory(MXNetwork)
 string(TOUPPER "${WITH_MXWRITE}" MXVK_WITH_MXWRITE_REQUEST)
@@ -516,19 +547,19 @@ target_include_directories(mxvk PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-function(mxvk_configure_mingw_target target_name)
-    if(NOT MINGW OR NOT TARGET ${target_name})
+function(mxvk_configure_windows_target target_name)
+    if(NOT WIN32 OR NOT TARGET ${target_name})
         return()
     endif()
 
     set(is_gnu_like_mingw FALSE)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    if(MINGW AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set(is_gnu_like_mingw TRUE)
         target_compile_options(${target_name} PRIVATE -Wa,-mbig-obj)
     endif()
 
     get_target_property(target_type ${target_name} TYPE)
-    if(target_type STREQUAL "EXECUTABLE")
+    if(MINGW AND target_type STREQUAL "EXECUTABLE")
         set_target_properties(${target_name} PROPERTIES WIN32_EXECUTABLE TRUE)
 
         if(is_gnu_like_mingw)
@@ -537,7 +568,19 @@ function(mxvk_configure_mingw_target target_name)
     endif()
 endfunction()
 
-mxvk_configure_mingw_target(mxvk)
+# Kept for existing example declarations; it now also configures native MSVC
+# builds, not only MinGW builds.
+function(mxvk_configure_mingw_target target_name)
+    mxvk_configure_windows_target(${target_name})
+endfunction()
+
+mxvk_configure_windows_target(mxvk)
+
+if(WIN32)
+    # Expose the VK_KHR_external_memory_win32 declarations through volk so
+    # CUDA interop can export opaque Win32 HANDLEs on Windows.
+    target_compile_definitions(mxvk PUBLIC VK_USE_PLATFORM_WIN32_KHR)
+endif()
 
 if(DEFINED GLM_INCLUDE_DIRS AND NOT TARGET glm::glm)
     if(MINGW AND CMAKE_CROSSCOMPILING)
@@ -642,7 +685,7 @@ endif()
 
 add_executable(mxmod2obj tools/mxmod2obj.cpp)
 target_link_libraries(mxmod2obj PRIVATE mxvk)
-mxvk_configure_mingw_target(mxmod2obj)
+mxvk_configure_windows_target(mxmod2obj)
 
 if(EXAMPLES)
     message(STATUS "Examples ON")
@@ -1008,13 +1051,18 @@ if(EXAMPLES)
     list(REMOVE_ITEM mxvk_installed_application_targets math3d_obj_loader)
     list(REMOVE_DUPLICATES mxvk_installed_application_targets)
 
-    if(MINGW)
+    if(WIN32)
         foreach(example_target IN LISTS mxvk_installed_application_targets)
             if(NOT TARGET ${example_target} OR example_target STREQUAL "asteroids3d" OR example_target STREQUAL "asteroids-net")
                 continue()
             endif()
 
             set(MXVK_EXAMPLE_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/examples/icons/${example_target}.ico")
+            if(NOT EXISTS "${MXVK_EXAMPLE_ICON_PATH}")
+                message(STATUS "Skipping Windows icon for ${example_target}: ${MXVK_EXAMPLE_ICON_PATH} is missing")
+                continue()
+            endif()
+
             set(MXVK_EXAMPLE_RESOURCE_FILE "${CMAKE_CURRENT_BINARY_DIR}/example-resources/${example_target}.rc")
             configure_file(
                 ${CMAKE_CURRENT_SOURCE_DIR}/cmake/mxvk-example-icon.rc.in

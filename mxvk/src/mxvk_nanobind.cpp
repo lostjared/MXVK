@@ -872,21 +872,23 @@ namespace mxvk {
             .def(nb::init<const std::string &, int, int, bool, bool, VK_Window::PresentModePreference, VK_Window::RuntimeMode>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("validation") = true, nb::arg("present_mode") = VK_Window::PresentModePreference::LowLatency, nb::arg("runtime_mode") = VK_Window::RuntimeMode::Windowed)
             .def(nb::init<const std::string &, int, int, bool, bool, bool>(), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen"), nb::arg("validation"), nb::arg("enable_vsync"))
             .def("release", &VK_Window::release)
-            .def("wait_idle", [](VK_Window &window) {
-                const VkDevice device = window.getDevice();
-                if (device == VK_NULL_HANDLE)
-                    return;
+            .def("wait_idle",
+                 [](VK_Window &window) {
+                     const VkDevice device = window.getDevice();
+                     if (device == VK_NULL_HANDLE)
+                         return;
 
-                const VkResult result = vkDeviceWaitIdle(device);
-                if (result != VK_SUCCESS)
-                    throw std::runtime_error("vkDeviceWaitIdle failed");
-            })
-            .def("request_exit", [](VK_Window &window) {
-                auto *python_window = dynamic_cast<PythonWindow *>(&window);
-                if (python_window == nullptr)
-                    throw nb::type_error("request_exit requires a Python subclass of Window");
-                python_window->request_exit();
-            })
+                     const VkResult result = vkDeviceWaitIdle(device);
+                     if (result != VK_SUCCESS)
+                         throw std::runtime_error("vkDeviceWaitIdle failed");
+                 })
+            .def("request_exit",
+                 [](VK_Window &window) {
+                     auto *python_window = dynamic_cast<PythonWindow *>(&window);
+                     if (python_window == nullptr)
+                         throw nb::type_error("request_exit requires a Python subclass of Window");
+                     python_window->request_exit();
+                 })
             .def("init_vulkan", &VK_Window::initVulkan, nb::arg("validation") = true)
             .def(
                 "event",
@@ -901,16 +903,24 @@ namespace mxvk {
             .def("render", &VK_Window::render)
             .def("on_swapchain_recreated", [](VK_Window &) {})
             .def("on_frame_readback_scheduled", [](VK_Window &) {})
-            .def("on_frame_readback", [](VK_Window &, nb::ndarray<nb::numpy, std::uint8_t>, uint32_t, uint32_t) {}, nb::arg("pixels"), nb::arg("width"), nb::arg("height"))
             .def(
-                "flush_frame_readbacks",
-                [](VK_Window &window) {
-                    auto *python_window = dynamic_cast<PythonWindow *>(&window);
-                    if (python_window == nullptr)
-                        throw nb::type_error("flush_frame_readbacks requires a Python subclass of Window");
-                    python_window->flush_frame_readbacks();
-                })
-            .def("on_record_custom_rendering", [](VK_Window &, nb::capsule, uint32_t) {}, nb::arg("command_buffer"), nb::arg("image_index"))
+                "on_frame_readback",
+                [](VK_Window &, nb::ndarray<nb::numpy, std::uint8_t>, uint32_t, uint32_t) {},
+                nb::arg("pixels"),
+                nb::arg("width"),
+                nb::arg("height"))
+            .def("flush_frame_readbacks",
+                 [](VK_Window &window) {
+                     auto *python_window = dynamic_cast<PythonWindow *>(&window);
+                     if (python_window == nullptr)
+                         throw nb::type_error("flush_frame_readbacks requires a Python subclass of Window");
+                     python_window->flush_frame_readbacks();
+                 })
+            .def(
+                "on_record_custom_rendering",
+                [](VK_Window &, nb::capsule, uint32_t) {},
+                nb::arg("command_buffer"),
+                nb::arg("image_index"))
             .def(
                 "render_standalone_sprite",
                 [](VK_Window &window, VK_Sprite &sprite, nb::capsule command_buffer) {
@@ -1066,7 +1076,32 @@ namespace mxvk {
                          })
             .def_prop_ro("swapchain_image_count", &VK_Window::getSwapchainImageCount);
 
-        nb::class_<PythonEvent>(module, "Event").def_prop_ro("type", &PythonEvent::type).def_prop_ro("timestamp", &PythonEvent::timestamp).def_prop_ro("key", &PythonEvent::key).def_prop_ro("scancode", &PythonEvent::scancode).def_prop_ro("modifiers", &PythonEvent::modifiers).def_prop_ro("key_down", &PythonEvent::key_down).def_prop_ro("key_up", &PythonEvent::key_up).def_prop_ro("down", &PythonEvent::down).def_prop_ro("repeat", &PythonEvent::repeat).def_prop_ro("text", &PythonEvent::text).def_prop_ro("mouse_motion", &PythonEvent::mouse_motion).def_prop_ro("mouse_button_down", &PythonEvent::mouse_button_down).def_prop_ro("mouse_button_up", &PythonEvent::mouse_button_up).def_prop_ro("mouse_wheel", &PythonEvent::mouse_wheel).def_prop_ro("x", &PythonEvent::x).def_prop_ro("y", &PythonEvent::y).def_prop_ro("relative_x", &PythonEvent::relative_x).def_prop_ro("relative_y", &PythonEvent::relative_y).def_prop_ro("button", &PythonEvent::button).def_prop_ro("clicks", &PythonEvent::clicks).def_prop_ro("wheel_x", &PythonEvent::wheel_x).def_prop_ro("wheel_y", &PythonEvent::wheel_y).def_prop_ro("wheel_ticks_x", &PythonEvent::wheel_ticks_x).def_prop_ro("wheel_ticks_y", &PythonEvent::wheel_ticks_y).def_prop_ro("wheel_flipped", &PythonEvent::wheel_flipped);
+        nb::class_<PythonEvent>(module, "Event")
+            .def_prop_ro("type", &PythonEvent::type)
+            .def_prop_ro("timestamp", &PythonEvent::timestamp)
+            .def_prop_ro("key", &PythonEvent::key)
+            .def_prop_ro("scancode", &PythonEvent::scancode)
+            .def_prop_ro("modifiers", &PythonEvent::modifiers)
+            .def_prop_ro("key_down", &PythonEvent::key_down)
+            .def_prop_ro("key_up", &PythonEvent::key_up)
+            .def_prop_ro("down", &PythonEvent::down)
+            .def_prop_ro("repeat", &PythonEvent::repeat)
+            .def_prop_ro("text", &PythonEvent::text)
+            .def_prop_ro("mouse_motion", &PythonEvent::mouse_motion)
+            .def_prop_ro("mouse_button_down", &PythonEvent::mouse_button_down)
+            .def_prop_ro("mouse_button_up", &PythonEvent::mouse_button_up)
+            .def_prop_ro("mouse_wheel", &PythonEvent::mouse_wheel)
+            .def_prop_ro("x", &PythonEvent::x)
+            .def_prop_ro("y", &PythonEvent::y)
+            .def_prop_ro("relative_x", &PythonEvent::relative_x)
+            .def_prop_ro("relative_y", &PythonEvent::relative_y)
+            .def_prop_ro("button", &PythonEvent::button)
+            .def_prop_ro("clicks", &PythonEvent::clicks)
+            .def_prop_ro("wheel_x", &PythonEvent::wheel_x)
+            .def_prop_ro("wheel_y", &PythonEvent::wheel_y)
+            .def_prop_ro("wheel_ticks_x", &PythonEvent::wheel_ticks_x)
+            .def_prop_ro("wheel_ticks_y", &PythonEvent::wheel_ticks_y)
+            .def_prop_ro("wheel_flipped", &PythonEvent::wheel_flipped);
 
         nb::class_<VK_IOWindow, VK_Window, PythonIOWindow>(module, "IOWindow")
             .def(nb::init<const std::string &, const std::string &, int, int, bool, bool>(), nb::arg("path"), nb::arg("title"), nb::arg("width"), nb::arg("height"), nb::arg("fullscreen") = false, nb::arg("enable_vsync") = false)
