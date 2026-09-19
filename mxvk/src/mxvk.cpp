@@ -696,6 +696,17 @@ namespace mxvk {
                 event(e);
             }
             if (framebuffer_resized) {
+                // A minimized SDL window can retain its last non-zero pixel
+                // size for a short time even though its Vulkan surface has
+                // no usable extent.  Keep the old swapchain alive and wait
+                // for the restore/resize event instead of forcing a rebuild
+                // against that stale size.
+                if (window != nullptr && (SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+                    proc();
+                    render();
+                    SDL_Delay(10);
+                    continue;
+                }
                 const uint64_t now_ms = SDL_GetTicks();
                 if (!force_swapchain_recreate && last_resize_event_ms != 0 && (now_ms - last_resize_event_ms) < resize_settle_delay_ms) {
                     proc();
@@ -2602,6 +2613,9 @@ namespace mxvk {
         int pixel_w = 0;
         int pixel_h = 0;
         SDL_GetWindowSizeInPixels(window.get(), &pixel_w, &pixel_h);
+        if (pixel_w <= 0 || pixel_h <= 0) {
+            return;
+        }
         VkSurfaceCapabilitiesKHR surface_capabilities{};
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities);
 
@@ -2767,6 +2781,14 @@ namespace mxvk {
             return;
         }
 
+        // Do not acquire from a minimized window.  Windows may report
+        // VK_ERROR_OUT_OF_DATE_KHR while its surface is transitioning to a
+        // zero-sized state; recreation must wait until the window is restored.
+        if (!headless() && window != nullptr && (SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+            framebuffer_resized = true;
+            return;
+        }
+
         int pixel_w = 0;
         int pixel_h = 0;
         if (!headless()) {
@@ -2885,8 +2907,20 @@ namespace mxvk {
         static uint32_t repeated_acquire_errors = 0;
 
         if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
-            last_acquire_error = VK_SUCCESS;
+           int width = 0, height = 0; 
+	   if(window != nullptr) {
+	   if((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+	       framebuffer_resized = true;
+	       return;
+	   }
+	   SDL_GetWindowSizeInPixels(window.get(), &width, &height);
+	   if(width == 0 || height == 0)
+		   return;
+	   }
+
+	    last_acquire_error = VK_SUCCESS;
             repeated_acquire_errors = 0;
+
             std::cout << "mxvk: requesting swapchain recreation because acquire returned VK_ERROR_OUT_OF_DATE_KHR\n";
             force_swapchain_recreate = true;
             framebuffer_resized = true;
@@ -3776,7 +3810,19 @@ namespace mxvk {
         }
 
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
-            std::cout << "mxvk: requesting swapchain recreation because present returned VK_ERROR_OUT_OF_DATE_KHR\n";
+
+		int width = 0, height = 0;
+		if(window != nullptr) {
+		if((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+		    framebuffer_resized = true;
+		    return;
+		}
+		SDL_GetWindowSizeInPixels(window.get(), &width, &height);
+		if(width == 0 || height == 0)
+			return;
+		}
+
+        	std::cout << "mxvk: requesting swapchain recreation because present returned VK_ERROR_OUT_OF_DATE_KHR\n";
             force_swapchain_recreate = true;
             last_resize_event_ms = SDL_GetTicks();
             framebuffer_resized = true;
