@@ -2907,18 +2907,18 @@ namespace mxvk {
         static uint32_t repeated_acquire_errors = 0;
 
         if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
-           int width = 0, height = 0; 
-	   if(window != nullptr) {
-	   if((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
-	       framebuffer_resized = true;
-	       return;
-	   }
-	   SDL_GetWindowSizeInPixels(window.get(), &width, &height);
-	   if(width == 0 || height == 0)
-		   return;
-	   }
+            int width = 0, height = 0;
+            if (window != nullptr) {
+                if ((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+                    framebuffer_resized = true;
+                    return;
+                }
+                SDL_GetWindowSizeInPixels(window.get(), &width, &height);
+                if (width == 0 || height == 0)
+                    return;
+            }
 
-	    last_acquire_error = VK_SUCCESS;
+            last_acquire_error = VK_SUCCESS;
             repeated_acquire_errors = 0;
 
             std::cout << "mxvk: requesting swapchain recreation because acquire returned VK_ERROR_OUT_OF_DATE_KHR\n";
@@ -3811,18 +3811,18 @@ namespace mxvk {
 
         if (present_result == VK_ERROR_OUT_OF_DATE_KHR) {
 
-		int width = 0, height = 0;
-		if(window != nullptr) {
-		if((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
-		    framebuffer_resized = true;
-		    return;
-		}
-		SDL_GetWindowSizeInPixels(window.get(), &width, &height);
-		if(width == 0 || height == 0)
-			return;
-		}
+            int width = 0, height = 0;
+            if (window != nullptr) {
+                if ((SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) != 0) {
+                    framebuffer_resized = true;
+                    return;
+                }
+                SDL_GetWindowSizeInPixels(window.get(), &width, &height);
+                if (width == 0 || height == 0)
+                    return;
+            }
 
-        	std::cout << "mxvk: requesting swapchain recreation because present returned VK_ERROR_OUT_OF_DATE_KHR\n";
+            std::cout << "mxvk: requesting swapchain recreation because present returned VK_ERROR_OUT_OF_DATE_KHR\n";
             force_swapchain_recreate = true;
             last_resize_event_ms = SDL_GetTicks();
             framebuffer_resized = true;

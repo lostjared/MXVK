@@ -367,7 +367,7 @@ namespace mxvk {
         return formats[0];
     }
 
-   bool VK_FF_Capture::convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
+    bool VK_FF_Capture::convertFrameToRgba(const AVFrame *decodedFrame, std::vector<uint8_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         const AVFrame *sourceFrame = decodedFrame;
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
             av_frame_unref(swFrame);
@@ -456,81 +456,59 @@ namespace mxvk {
         return true;
     }
 
-   bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder, int cuda_device) {
-    const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
+    bool VK_FF_Capture::initHardwareDevice(const AVCodec *decoder, int cuda_device) {
+        const AVHWDeviceType deviceType = av_hwdevice_find_type_by_name("cuda");
 
-    if(deviceType == AV_HWDEVICE_TYPE_NONE) {
-        std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice is unavailable\n";
-        return false;
-    }
-
-    std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice available\n";
-    std::cout << "mxvk_ff_capture: CUDA device type = "
-              << static_cast<int>(deviceType) << '\n';
-
-    for(int index = 0;; ++index) {
-        const AVCodecHWConfig *config = avcodec_get_hw_config(decoder, index);
-
-        if(config == nullptr) {
-            std::cout << "mxvk_ff_capture: decoder has no CUDA hardware configuration\n";
+        if (deviceType == AV_HWDEVICE_TYPE_NONE) {
+            std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice is unavailable\n";
             return false;
         }
 
-        const bool hasDeviceCtx =
-            (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0;
+        std::cout << "mxvk_ff_capture: FFmpeg CUDA hwdevice available\n";
+        std::cout << "mxvk_ff_capture: CUDA device type = " << static_cast<int>(deviceType) << '\n';
 
-        std::cout << "mxvk_ff_capture: hw config "
-                  << index
-                  << " device_type="
-                  << static_cast<int>(config->device_type)
-                  << " pix_fmt="
-                  << static_cast<int>(config->pix_fmt)
-                  << " methods="
-                  << config->methods
-                  << " device_ctx="
-                  << (hasDeviceCtx ? "yes" : "no")
-                  << '\n';
+        for (int index = 0;; ++index) {
+            const AVCodecHWConfig *config = avcodec_get_hw_config(decoder, index);
 
-        if(hasDeviceCtx && config->device_type == deviceType) {
-            std::cout << "mxvk_ff_capture: found CUDA decoder configuration\n";
-            hwPixFmt = config->pix_fmt;
-            break;
+            if (config == nullptr) {
+                std::cout << "mxvk_ff_capture: decoder has no CUDA hardware configuration\n";
+                return false;
+            }
+
+            const bool hasDeviceCtx = (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0;
+
+            std::cout << "mxvk_ff_capture: hw config " << index << " device_type=" << static_cast<int>(config->device_type) << " pix_fmt=" << static_cast<int>(config->pix_fmt) << " methods=" << config->methods << " device_ctx=" << (hasDeviceCtx ? "yes" : "no") << '\n';
+
+            if (hasDeviceCtx && config->device_type == deviceType) {
+                std::cout << "mxvk_ff_capture: found CUDA decoder configuration\n";
+                hwPixFmt = config->pix_fmt;
+                break;
+            }
         }
+
+        const std::string deviceName = cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
+
+        const char *device = deviceName.empty() ? nullptr : deviceName.c_str();
+
+        const int result = av_hwdevice_ctx_create(&hwDeviceCtx, deviceType, device, nullptr, 0);
+
+        if (result < 0) {
+            char error[AV_ERROR_MAX_STRING_SIZE]{};
+            av_strerror(result, error, sizeof(error));
+
+            std::cout << "mxvk_ff_capture: CUDA hwdevice creation failed: " << error << '\n';
+
+            hwPixFmt = AV_PIX_FMT_NONE;
+            return false;
+        }
+
+        std::cout << "mxvk_ff_capture: CUDA hardware device created successfully\n";
+
+        hardwareDecodeDevice = cuda_device;
+        return true;
     }
 
-    const std::string deviceName =
-        cuda_device >= 0 ? std::to_string(cuda_device) : std::string{};
-
-    const char *device =
-        deviceName.empty() ? nullptr : deviceName.c_str();
-
-    const int result =
-        av_hwdevice_ctx_create(
-            &hwDeviceCtx,
-            deviceType,
-            device,
-            nullptr,
-            0
-        );
-
-    if(result < 0) {
-        char error[AV_ERROR_MAX_STRING_SIZE]{};
-        av_strerror(result, error, sizeof(error));
-
-        std::cout << "mxvk_ff_capture: CUDA hwdevice creation failed: "
-                  << error << '\n';
-
-        hwPixFmt = AV_PIX_FMT_NONE;
-        return false;
-    }
-
-    std::cout << "mxvk_ff_capture: CUDA hardware device created successfully\n";
-
-    hardwareDecodeDevice = cuda_device;
-    return true;
-}
-    
-   bool VK_FF_Capture::convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
+    bool VK_FF_Capture::convertFrameToRgba16(const AVFrame *decodedFrame, std::vector<uint16_t> &rgba, int &width, int &height, int &pitch, bool flipY) {
         const AVFrame *sourceFrame = decodedFrame;
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE) {
             av_frame_unref(swFrame);
