@@ -1507,6 +1507,9 @@ namespace mxvk {
             if (effect.historySource != nullptr) {
                 sprite->shareHistoryTexture(*effect.historySource);
             }
+            if (effect.originalFrameSource != nullptr) {
+                sprite->shareOriginalFrameTexture(*effect.originalFrameSource);
+            }
             const bool final_fragment = stage == ShaderStage::Fragment && effect_index + 1U == effects.size();
             if (stage == ShaderStage::Fragment) {
                 if (!final_fragment || hdr_render_intermediates_enabled) {

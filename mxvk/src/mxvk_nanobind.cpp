@@ -815,6 +815,7 @@ namespace mxvk {
             .def("enable_history_texture", &VK_Sprite::enableHistoryTexture, nb::arg("width"), nb::arg("height"), nb::arg("layers"))
             .def("enable_history_texture_rgba16", &VK_Sprite::enableHistoryTextureRgba16Float, nb::arg("width"), nb::arg("height"), nb::arg("layers"))
             .def("share_history_texture", &VK_Sprite::shareHistoryTexture, nb::arg("source"))
+            .def("share_original_frame_texture", &VK_Sprite::shareOriginalFrameTexture, nb::arg("source"))
             .def("enable_spectrum_texture", &VK_Sprite::enableSpectrumTexture, nb::arg("bins"))
             .def("enable_spectrum_history_texture", &VK_Sprite::enableSpectrumHistoryTexture, nb::arg("bins"), nb::arg("layers"))
             .def_prop_ro("width", &VK_Sprite::getWidth)
@@ -865,7 +866,7 @@ namespace mxvk {
 
         nb::class_<VulkanContext>(module, "VulkanContext").def_prop_ro("device", [](const VulkanContext &context) { return reinterpret_cast<uintptr_t>(context.device); }).def_prop_ro("physical_device", [](const VulkanContext &context) { return reinterpret_cast<uintptr_t>(context.physical_device); }).def_prop_ro("graphics_queue", [](const VulkanContext &context) { return reinterpret_cast<uintptr_t>(context.graphics_queue); }).def_prop_ro("command_pool", [](const VulkanContext &context) { return reinterpret_cast<uintptr_t>(context.command_pool); });
 
-        nb::class_<VK_Window::PostProcessingEffect>(module, "PostProcessingEffect").def(nb::init<>()).def_rw("fragment_shader_path", &VK_Window::PostProcessingEffect::fragmentShaderPath).def_rw("params", &VK_Window::PostProcessingEffect::params).def_rw("time_enabled", &VK_Window::PostProcessingEffect::timeEnabled).def_rw("spectrum_bin_count", &VK_Window::PostProcessingEffect::spectrumBinCount).def_rw("spectrum_history_layer_count", &VK_Window::PostProcessingEffect::spectrumHistoryLayerCount).def_rw("stage", &VK_Window::PostProcessingEffect::stage).def_rw("history_source", &VK_Window::PostProcessingEffect::historySource);
+        nb::class_<VK_Window::PostProcessingEffect>(module, "PostProcessingEffect").def(nb::init<>()).def_rw("fragment_shader_path", &VK_Window::PostProcessingEffect::fragmentShaderPath).def_rw("params", &VK_Window::PostProcessingEffect::params).def_rw("time_enabled", &VK_Window::PostProcessingEffect::timeEnabled).def_rw("spectrum_bin_count", &VK_Window::PostProcessingEffect::spectrumBinCount).def_rw("spectrum_history_layer_count", &VK_Window::PostProcessingEffect::spectrumHistoryLayerCount).def_rw("stage", &VK_Window::PostProcessingEffect::stage).def_rw("history_source", &VK_Window::PostProcessingEffect::historySource).def_rw("original_frame_source", &VK_Window::PostProcessingEffect::originalFrameSource);
 
         nb::class_<VK_Window, PythonWindow>(module, "Window")
             .def(nb::init<>())

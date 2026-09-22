@@ -346,6 +346,28 @@ namespace mxvk {
         recreateExtendedDescriptorLayout();
     }
 
+    void VK_Sprite::shareOriginalFrameTexture(const VK_Sprite &source) {
+        if (source.device != device) {
+            throw mxvk::Exception("VKSprite::shareOriginalFrameTexture requires sprites on the same Vulkan device");
+        }
+        if (source.spriteImageView == VK_NULL_HANDLE || !source.spriteLoaded) {
+            throw mxvk::Exception("VKSprite::shareOriginalFrameTexture source has no loaded texture");
+        }
+        if (&source == this) {
+            throw mxvk::Exception("VKSprite::shareOriginalFrameTexture cannot share a sprite with itself");
+        }
+
+        if (!extendedUBOEnabled) {
+            enableExtendedUBO();
+        }
+        if (originalFrameImageView == source.spriteImageView) {
+            return;
+        }
+
+        destroyTextureDescriptorPools();
+        originalFrameImageView = source.spriteImageView;
+    }
+
     void VK_Sprite::updateHistoryTexture(const void *pixels, int width, int height, int pitch) {
         if (historyImageFormat == VK_FORMAT_R16G16B16A16_SFLOAT) {
             const int source_pitch = pitch > 0 ? pitch : width * 4;
@@ -750,6 +772,12 @@ namespace mxvk {
             outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
             bindings.push_back(outputBinding);
         }
+        VkDescriptorSetLayoutBinding originalFrameBinding{};
+        originalFrameBinding.binding = 6;
+        originalFrameBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        originalFrameBinding.descriptorCount = 1;
+        originalFrameBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+        bindings.push_back(originalFrameBinding);
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -773,7 +801,7 @@ namespace mxvk {
 
         std::array<VkDescriptorPoolSize, 3> poolSizes{};
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[0].descriptorCount = 1U + static_cast<uint32_t>(historyTextureEnabled) + static_cast<uint32_t>(spectrumTextureEnabled) + static_cast<uint32_t>(spectrumHistoryTextureEnabled);
+        poolSizes[0].descriptorCount = 2U + static_cast<uint32_t>(historyTextureEnabled) + static_cast<uint32_t>(spectrumTextureEnabled) + static_cast<uint32_t>(spectrumHistoryTextureEnabled);
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[1].descriptorCount = 1;
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -823,6 +851,11 @@ namespace mxvk {
         VkDescriptorImageInfo outputImageInfo{};
         outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         outputImageInfo.imageView = computeOutputImageView;
+
+        VkDescriptorImageInfo originalFrameImageInfo{};
+        originalFrameImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        originalFrameImageInfo.imageView = originalFrameImageView != VK_NULL_HANDLE ? originalFrameImageView : spriteImageView;
+        originalFrameImageInfo.sampler = spriteSampler;
 
         std::vector<VkWriteDescriptorSet> writes(2);
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -881,6 +914,14 @@ namespace mxvk {
             outputWrite.pImageInfo = &outputImageInfo;
             writes.push_back(outputWrite);
         }
+        VkWriteDescriptorSet originalFrameWrite{};
+        originalFrameWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        originalFrameWrite.dstSet = extendedDescriptorSet;
+        originalFrameWrite.dstBinding = 6;
+        originalFrameWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        originalFrameWrite.descriptorCount = 1;
+        originalFrameWrite.pImageInfo = &originalFrameImageInfo;
+        writes.push_back(originalFrameWrite);
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }

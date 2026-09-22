@@ -247,6 +247,8 @@ namespace mxvk {
          * the sampled input image, binding 1 is SpriteExtended, optional
          * history/audio textures remain at bindings 2-4, and binding 5 is a
          * write-only storage image matching the active render precision.
+         * Binding 6 is the original input frame and remains unchanged across
+         * a multi-pass effect chain.
          */
         void enableComputeShader(const std::string &path, uint32_t localSizeX, uint32_t localSizeY, uint32_t localSizeZ = 1);
 
@@ -360,6 +362,20 @@ namespace mxvk {
          * belongs to a different Vulkan device.
          */
         void shareHistoryTexture(const VK_Sprite &source);
+
+        /**
+         * @brief Bind another sprite's current texture as the original frame.
+         *
+         * The shared image is exposed at set 0, binding 6. This sprite keeps
+         * no ownership of the image, so @p source must outlive it. Binding 0
+         * can continue to change between post-processing passes without
+         * changing binding 6.
+         *
+         * @param source Sprite which owns the original uploaded frame.
+         * @throws mxvk::Exception when the source has no texture or belongs to
+         * a different Vulkan device.
+         */
+        void shareOriginalFrameTexture(const VK_Sprite &source);
 
         /**
          * @brief Upload one RGBA frame into the next history layer.
@@ -594,6 +610,7 @@ namespace mxvk {
         VkDescriptorPool extendedDescriptorPool = VK_NULL_HANDLE;
         VkDescriptorSet extendedDescriptorSet = VK_NULL_HANDLE;
         bool ownExtendedDescriptorSetLayout = false;
+        VkImageView originalFrameImageView = VK_NULL_HANDLE;
         void createExtendedUBO();
         void updateExtendedUBO();
         void createExtendedDescriptorSetLayout();
