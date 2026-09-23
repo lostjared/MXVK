@@ -12,6 +12,11 @@
 #ifdef MXVK_CUDA
 #include <cuda_runtime_api.h>
 #include <opencv2/cudaarithm.hpp>
+#ifdef _WIN32
+extern "C" {
+#include <libavutil/hwcontext_cuda.h>
+}
+#endif
 #ifdef MXVK_CUDA_NPP
 #include <nppi_color_conversion.h>
 #include <nppi_data_exchange_and_initialization.h>
@@ -101,6 +106,32 @@ namespace mxvk {
             }
             return true;
         }
+
+#if defined(MXVK_CUDA) && defined(_WIN32)
+        [[nodiscard]] bool waitForDecoderFrame(const AVHWFramesContext *framesContext) {
+            if (framesContext == nullptr || framesContext->device_ctx == nullptr || framesContext->device_ctx->hwctx == nullptr) {
+                return false;
+            }
+            const auto *cudaDevice = static_cast<const AVCUDADeviceContext *>(framesContext->device_ctx->hwctx);
+            if (cudaDevice->cuda_ctx == nullptr) {
+                return false;
+            }
+            const CUresult pushResult = cuCtxPushCurrent(cudaDevice->cuda_ctx);
+            if (pushResult != CUDA_SUCCESS) {
+                std::cout << "mxvk_ff_capture: failed to enter FFmpeg CUDA context: " << static_cast<int>(pushResult) << '\n';
+                return false;
+            }
+            const CUresult syncResult = cuStreamSynchronize(cudaDevice->stream);
+            CUcontext previousContext = nullptr;
+            const CUresult popResult = cuCtxPopCurrent(&previousContext);
+            if (syncResult != CUDA_SUCCESS || popResult != CUDA_SUCCESS) {
+                std::cout << "mxvk_ff_capture: FFmpeg CUDA decode-stream wait failed: " << static_cast<int>(syncResult)
+                          << ", context restore: " << static_cast<int>(popResult) << '\n';
+                return false;
+            }
+            return true;
+        }
+#endif
 
 #if defined(MXVK_CUDA) && defined(MXVK_CUDA_NPP)
         [[nodiscard]] NppStreamContext makeNppStreamContext(cudaStream_t stream) {
@@ -594,7 +625,13 @@ namespace mxvk {
     bool VK_FF_Capture::convertFrameToGpuRgba(const AVFrame *decodedFrame, cv::cuda::GpuMat &rgba, cv::cuda::Stream &stream, bool flipY) {
         if (decodedFrame->format == hwPixFmt && hwPixFmt != AV_PIX_FMT_NONE && decodedFrame->hw_frames_ctx != nullptr) {
             const auto *framesContext = reinterpret_cast<const AVHWFramesContext *>(decodedFrame->hw_frames_ctx->data);
-            if (framesContext != nullptr && framesContext->sw_format == AV_PIX_FMT_NV12) {
+            if (framesContext != nullptr && framesContext->sw_format == AV_PIX_FMT_NV12
+#ifdef _WIN32
+                // FFmpeg fills this surface asynchronously on its own CUDA stream.
+                // Wait for that copy before reading the surface on OpenCV's stream.
+                && waitForDecoderFrame(framesContext)
+#endif
+            ) {
                 const int width = decodedFrame->width;
                 const int height = decodedFrame->height;
                 if (width <= 0 || height <= 0 || decodedFrame->data[0] == nullptr || decodedFrame->data[1] == nullptr) {
