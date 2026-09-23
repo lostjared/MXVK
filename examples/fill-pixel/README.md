@@ -16,11 +16,12 @@ cmake --build build -j --target fill_pixel
 Run from the repository root:
 
 ```bash
-./build/examples/fill-pixel/fill_pixel source.mp4 material.mp4 output.mp4 1 0 --codec libx264 --bitrate 10000000 --preset fast --tune film
+./build/examples/fill-pixel/fill_pixel --input source.mp4 --fill material.mp4 --output output.mp4 --alpha 1 --restore-black 0 --codec libx264 --bitrate 10000000 --preset fast --tune film
 ```
 
-The optional arguments are `alpha` (default `1`) and `restore-black` (`0` or
-`1`, default `0`). When enabled, exact opaque black source pixels are discarded.
+`--input`, `--fill`, and `--output` are required. The optional `--alpha`
+defaults to `1`, and `--restore-black` accepts `0` or `1` (default `0`).
+When enabled, exact opaque black source pixels are discarded.
 Other source channels above `0.6` are multiplied by the corresponding material
 channel and `alpha`.
 

@@ -154,23 +154,37 @@ int main(int argc, char **argv) {
         Argz<std::string> parser(argc, argv);
         parser.addOptionSingle('h', "Show help")
             .addOptionDouble(256, "help", "Show help")
+            .addOptionDoubleValue(257, "input", "Source video (required)")
+            .addOptionDoubleValue(258, "fill", "Material video (required)")
+            .addOptionDoubleValue(259, "output", "Output video (required)")
+            .addOptionDoubleValue(260, "alpha", "Fill alpha (default: 1)")
+            .addOptionDoubleValue(261, "restore-black", "Restore black source pixels: 0 or 1 (default: 0)")
             .addOptionDoubleValue('c', "codec", "Encoder policy or FFmpeg encoder name (default: auto)")
             .addOptionDoubleValue('b', "bitrate", "Target bitrate in bits per second (default: 0, use CRF/CQ)")
             .addOptionDoubleValue('p', "preset", "Encoder preset (default: medium)")
             .addOptionDoubleValue('t', "tune", "Encoder tune (default: encoder default)");
 
-        std::vector<std::string> positional;
+        std::string input_path;
+        std::string fill_path;
+        std::string output_path;
+        float alpha = 1.0F;
+        float restore_black = 0.0F;
         EncodeOptions options{};
         Argument<std::string> argument;
         int code = 0;
         while ((code = parser.proc(argument)) != -1) {
             switch (code) {
-            case '-': positional.push_back(argument.arg_value); break;
+            case '-': throw std::invalid_argument("unexpected positional argument '" + argument.arg_value + "'; use --input, --fill, and --output");
             case 'h':
             case 256:
-                std::cout << "usage: fill_pixel <source-video> <material-video> <output-video> [alpha=1] [restore-black=0|1] [options]\n";
+                std::cout << "usage: fill_pixel --input <source-video> --fill <material-video> --output <output-video> [options]\n";
                 parser.help(std::cout);
                 return 0;
+            case 257: input_path = argument.arg_value; break;
+            case 258: fill_path = argument.arg_value; break;
+            case 259: output_path = argument.arg_value; break;
+            case 260: alpha = std::stof(argument.arg_value); break;
+            case 261: restore_black = std::stof(argument.arg_value); break;
             case 'c': options.codec = argument.arg_value; break;
             case 'p': options.preset = argument.arg_value; break;
             case 't': options.tune = argument.arg_value; break;
@@ -185,24 +199,21 @@ int main(int argc, char **argv) {
             default: throw std::invalid_argument("unknown argument");
             }
         }
-        if (positional.size() < 3 || positional.size() > 5) {
-            std::cerr << "usage: fill_pixel <source-video> <material-video> <output-video> [alpha=1] [restore-black=0|1] [options]\n";
-            return 1;
+        if (input_path.empty() || fill_path.empty() || output_path.empty()) {
+            throw std::invalid_argument("--input, --fill, and --output are required");
         }
-        const float alpha = positional.size() >= 4 ? std::stof(positional[3]) : 1.0F;
-        const float restore_black = positional.size() >= 5 ? std::stof(positional[4]) : 0.0F;
         if (!std::isfinite(alpha) || (restore_black != 0.0F && restore_black != 1.0F)) {
             throw std::invalid_argument("alpha must be finite and restore-black must be 0 or 1");
         }
 
-        example::VideoInput source(positional[0]);
-        example::VideoInput material(positional[1]);
+        example::VideoInput source(input_path);
+        example::VideoInput material(fill_path);
         const char *base_path = SDL_GetBasePath();
         if (base_path == nullptr) {
             throw std::runtime_error("could not locate the executable's shader directory");
         }
         const std::filesystem::path shader_path = std::filesystem::path(base_path) / "shaders" / "fill_pixel.frag.spv";
-        example::FillPixel app(source, material, positional[2], shader_path.string(), alpha, restore_black == 1.0F, options);
+        example::FillPixel app(source, material, output_path, shader_path.string(), alpha, restore_black == 1.0F, options);
         return app.run() ? 0 : 1;
     } catch (const ArgException<std::string> &ex) {
         std::cerr << "fill_pixel: " << ex.text() << '\n';
