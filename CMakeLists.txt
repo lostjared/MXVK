@@ -699,6 +699,10 @@ if(EXAMPLES)
     mxvk_configure_mingw_target(hello_world)
     add_subdirectory(examples/headless)
     mxvk_configure_mingw_target(headless_example)
+    if(TARGET mxwrite)
+        add_subdirectory(examples/fill-pixel)
+        mxvk_configure_mingw_target(fill_pixel)
+    endif()
     add_subdirectory(examples/static_example)
     mxvk_configure_mingw_target(static_example)
     add_subdirectory(examples/stencil)
@@ -896,6 +900,7 @@ if(EXAMPLES)
         stencil_surface
         hello_world
         headless_example
+        fill_pixel
         static_example
         stencil
         sprite_example
