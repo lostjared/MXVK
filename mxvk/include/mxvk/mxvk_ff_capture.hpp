@@ -116,6 +116,8 @@ namespace mxvk {
         [[nodiscard]] int height() const { return frameHeight; }
         /** @brief Source frame rate, falling back to 30 fps when unknown. */
         [[nodiscard]] double fps() const { return frameFps; }
+        /** @brief Report the container's video frame count, or 0 when unknown. */
+        [[nodiscard]] int64_t frame_count() const { return formatCtx != nullptr && videoStream >= 0 ? formatCtx->streams[videoStream]->nb_frames : 0; }
         /** @brief True when CUDA hardware decode is active. */
         [[nodiscard]] bool using_hardware_decode() const { return hardwareDecode; }
         /** @brief Selected CUDA hardware-decode device, or -1 for FFmpeg's default. */

@@ -16,10 +16,17 @@ cmake --build build -j --target fill_pixel
 Run from the repository root:
 
 ```bash
-./build/examples/fill-pixel/fill_pixel source.mp4 material.mp4 output.mp4 1 0
+./build/examples/fill-pixel/fill_pixel source.mp4 material.mp4 output.mp4 1 0 --codec libx264 --bitrate 10000000 --preset fast --tune film
 ```
 
 The optional arguments are `alpha` (default `1`) and `restore-black` (`0` or
 `1`, default `0`). When enabled, exact opaque black source pixels are discarded.
 Other source channels above `0.6` are multiplied by the corresponding material
 channel and `alpha`.
+
+Use `--codec`, `--bitrate`, `--preset`, and `--tune` to configure MXWrite.
+The codec defaults to `auto`, the preset to `medium`, and the tune to the
+encoder default. Bitrate is in bits per second; `0` (the default) uses
+MXWrite's CRF/CQ setting. Run `fill_pixel --help` for the option list.
+Progress appears on stderr as encoded frames, approximate percentage when
+both input containers report frame counts, and processing frames per second.
