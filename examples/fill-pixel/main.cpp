@@ -212,7 +212,12 @@ int main(int argc, char **argv) {
         if (base_path == nullptr) {
             throw std::runtime_error("could not locate the executable's shader directory");
         }
-        const std::filesystem::path shader_path = std::filesystem::path(base_path) / "shaders" / "fill_pixel.frag.spv";
+        const std::filesystem::path executable_dir(base_path);
+        mxvk::setDefaultShaderDirectory((executable_dir / "data").string());
+        const std::filesystem::path shader_path = executable_dir / "shaders" / "fill_pixel.frag.spv";
+        if (!std::filesystem::is_regular_file(shader_path)) {
+            throw std::runtime_error("could not find fill-pixel shader at '" + shader_path.string() + "'");
+        }
         example::FillPixel app(source, material, output_path, shader_path.string(), alpha, restore_black == 1.0F, options);
         return app.run() ? 0 : 1;
     } catch (const ArgException<std::string> &ex) {

@@ -19,6 +19,11 @@ Run from the repository root:
 ./build/examples/fill-pixel/fill_pixel --input source.mp4 --fill material.mp4 --output output.mp4 --alpha 1 --restore-black 0 --codec libx264 --bitrate 10000000 --preset fast --tune film
 ```
 
+The executable loads MXVK shaders from `data/` and the fill-pixel shader from
+`shaders/` beside the executable, regardless of the working directory. In a
+Windows install, these directories are under `bin/fill_pixel/` alongside
+`fill_pixel.exe`.
+
 `--input`, `--fill`, and `--output` are required. The optional `--alpha`
 defaults to `1`, and `--restore-black` accepts `0` or `1` (default `0`).
 When enabled, exact opaque black source pixels are discarded.
