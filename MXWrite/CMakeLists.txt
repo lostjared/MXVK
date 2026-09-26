@@ -219,6 +219,7 @@ if(MXWRITE_PYTHON_MODULE)
                 "Install it with: ${Python_EXECUTABLE} -m pip install nanobind"
             )
         endif()
+        string(REPLACE "\\" "/" NANOBIND_CMAKE_DIR "${NANOBIND_CMAKE_DIR}")
         find_package(nanobind CONFIG REQUIRED PATHS "${NANOBIND_CMAKE_DIR}" NO_DEFAULT_PATH)
     endif()
 
