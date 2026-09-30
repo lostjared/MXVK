@@ -201,7 +201,8 @@ class MasterPieceWindow : public mxvk::VK_Window {
     bool paused = false;
     int optionsCursor = 0;
     int difficultySetting = 1;
-    bool shaderEffectsEnabled = true;
+    bool shaderEffectsEnabled = false;
+    std::string settings_path;
     bool enteringName = false;
     std::string playerName;
     int finalScore = 0;
@@ -228,6 +229,14 @@ class MasterPieceWindow : public mxvk::VK_Window {
 
   public:
     MasterPieceWindow(const std::string &path, int wx, int wy, bool full, bool enable_vsync) : mxvk::VK_Window("-[ Acid Drop - Vulkan ]-", wx, wy, full, MXVK_VALIDATION, enable_vsync), current_path((path.empty() || path == ".") ? std::string(puzzle_ASSET_DIR) : path), w(wx), h(wy) {
+        char *pref_path = SDL_GetPrefPath("mxvk", "puzzle");
+        if (pref_path != nullptr) {
+            settings_path = std::string(pref_path) + "settings.dat";
+            SDL_free(pref_path);
+            load_settings();
+        } else {
+            SDL_Log("Could not find puzzle settings directory: %s", SDL_GetError());
+        }
         tryOpenFirstGamepad();
         updateFontSize();
         srand((unsigned int)time(0));
@@ -322,6 +331,30 @@ class MasterPieceWindow : public mxvk::VK_Window {
         }
     }
 
+    void load_settings() {
+        std::ifstream file(settings_path);
+        std::string setting;
+        if (std::getline(file, setting)) {
+            shaderEffectsEnabled = setting == "shader_effects=1";
+        }
+    }
+
+    void save_settings() {
+        if (settings_path.empty()) {
+            return;
+        }
+        std::ofstream file(settings_path, std::ios::trunc);
+        if (!file || !(file << "shader_effects=" << (shaderEffectsEnabled ? 1 : 0) << '\n')) {
+            SDL_Log("Could not save puzzle settings to %s", settings_path.c_str());
+        }
+    }
+
+    void toggle_shader_effects() {
+        shaderEffectsEnabled = !shaderEffectsEnabled;
+        applyShaderEffectsToggle();
+        save_settings();
+    }
+
     int getCharWidth() { return (int)(lastFontSize * 0.5f); }
 
     int getMenuSpacing() { return (int)(40.0f * ((float)h / 480.0f)); }
@@ -399,6 +432,10 @@ class MasterPieceWindow : public mxvk::VK_Window {
             printText(menuItems[i], centerX(menuItems[i]), menuStartY + i * spacing, col);
         }
         printText(">>", centerX(menuItems[cursorPos]) - scaleY(30), menuStartY + cursorPos * spacing, {255, 255, 0, 255});
+        const char *effectsMessage = "For the full experience, enable Shader Effects in Options";
+        const char *photosensitivityMessage = "only if you are not photosensitive.";
+        printText(effectsMessage, centerX(effectsMessage), scaleY(390), {220, 220, 220, 255});
+        printText(photosensitivityMessage, centerX(photosensitivityMessage), scaleY(415), {220, 220, 220, 255});
     }
 
     void updateGame() {
@@ -1150,15 +1187,13 @@ class MasterPieceWindow : public mxvk::VK_Window {
                 if (optionsCursor == 0)
                     difficultySetting = (difficultySetting - 1 + 3) % 3;
                 if (optionsCursor == 1) {
-                    shaderEffectsEnabled = !shaderEffectsEnabled;
-                    applyShaderEffectsToggle();
+                    toggle_shader_effects();
                 }
             } else if (button == SDL_GAMEPAD_BUTTON_DPAD_RIGHT) {
                 if (optionsCursor == 0)
                     difficultySetting = (difficultySetting + 1) % 3;
                 if (optionsCursor == 1) {
-                    shaderEffectsEnabled = !shaderEffectsEnabled;
-                    applyShaderEffectsToggle();
+                    toggle_shader_effects();
                 }
             } else if (button == SDL_GAMEPAD_BUTTON_SOUTH || button == SDL_GAMEPAD_BUTTON_START) {
                 if (optionsCursor == 2)
@@ -1303,15 +1338,13 @@ class MasterPieceWindow : public mxvk::VK_Window {
                 if (optionsCursor == 0) {
                     difficultySetting = (difficultySetting - 1 + 3) % 3;
                 } else if (optionsCursor == 1) {
-                    shaderEffectsEnabled = !shaderEffectsEnabled;
-                    applyShaderEffectsToggle();
+                    toggle_shader_effects();
                 }
             } else if (key == SDLK_RIGHT) {
                 if (optionsCursor == 0) {
                     difficultySetting = (difficultySetting + 1) % 3;
                 } else if (optionsCursor == 1) {
-                    shaderEffectsEnabled = !shaderEffectsEnabled;
-                    applyShaderEffectsToggle();
+                    toggle_shader_effects();
                 }
             } else if (key == SDLK_RETURN) {
                 if (optionsCursor == 2) {

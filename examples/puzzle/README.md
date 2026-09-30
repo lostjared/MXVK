@@ -30,6 +30,8 @@ Acid Drop is a falling-block puzzle inspired by color-matching and line-clearing
 - `Left` / `Right` - adjust difficulty or toggle shader effects
 - `Enter` - leave the options screen
 
+Shader effects start off. Enable them in Options for the full experience only if you are not photosensitive. The choice is saved as `settings.dat` in the user's SDL preference directory for `mxvk/puzzle` and loaded on the next run.
+
 ### High score entry
 
 - Type text to enter your name
