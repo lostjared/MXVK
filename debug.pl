@@ -3,9 +3,14 @@ use strict;
 use warnings;
 use Cwd 'abs_path';
 use File::Basename;
+use File::Spec;
+use FindBin;
+use lib $FindBin::Bin;
+use MXVKRunner qw(resolve_executable_path exec_command);
 
 my $root = dirname(abs_path($0));
-my $build_dir = "$root/build/examples";
+my $build_root = File::Spec->rel2abs($ENV{MXVK_BUILD_DIR} // "$root/build");
+my $build_dir = File::Spec->catdir($build_root, 'examples');
 my $source_dir = "$root/examples";
 my $missing_executable_exit_code = 3;
 
@@ -76,16 +81,15 @@ if (!$exe_name) {
     die "Error: Could not resolve executable target from $cmake_file\n";
 }
 
-my $exe_path = "$build_dir/$program_name/$exe_name";
+my $exe_path = resolve_executable_path($build_dir, $program_name, $exe_name);
 my $use_build_asset_path = should_use_build_asset_path($cmake_file);
 
-if (!-x $exe_path) {
+if (!-f $exe_path || ($^O ne 'MSWin32' && !-x $exe_path)) {
     warn "Skipping '$program_name': could not find executable at $exe_path\n";
     exit $missing_executable_exit_code;
 }
 
 my $exe_dir = dirname($exe_path);
-my $resolved_exe_name = basename($exe_path);
 my $runtime_path = $use_build_asset_path ? $exe_dir : $data_path;
 
 chdir($exe_dir) or die "Cannot cd to $exe_dir: $!\n";
@@ -94,8 +98,8 @@ if (!-d $runtime_path) {
     warn "Warning: Data directory '$runtime_path' not found.\n";
 }
 
-my @cmd = ("./$resolved_exe_name", "-p", $runtime_path, @ARGV);
+my @cmd = ($exe_path, "-p", $runtime_path, @ARGV);
 my @gdb_cmd = ("gdb", "-q", "-ex", "set confirm off", "-ex", "run", "--args", @cmd);
 
 print ">> Executing: @gdb_cmd\n";
-exec(@gdb_cmd) or die "Failed to exec gdb: $!\n";
+exec_command(@gdb_cmd);

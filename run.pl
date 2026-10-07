@@ -4,12 +4,15 @@ use warnings;
 use Cwd qw(abs_path getcwd);
 use File::Basename;
 use File::Spec;
+use FindBin;
+use lib $FindBin::Bin;
+use MXVKRunner qw(resolve_executable_path exec_command start_child stop_child);
 use POSIX qw(:sys_wait_h);
 use Time::HiRes qw(time);
 
 my $root = dirname(abs_path($0));
-my $parent = dirname($root);
-my $build_dir = "$root/build/examples";
+my $build_root = File::Spec->rel2abs($ENV{MXVK_BUILD_DIR} // "$root/build");
+my $build_dir = File::Spec->catdir($build_root, 'examples');
 my $source_dir = "$root/examples";
 my $missing_executable_exit_code = 3;
 my $invocation_dir = getcwd();
@@ -56,9 +59,9 @@ if (defined $program && $program eq '--all') {
     }
 
     unshift @ARGV, "--timeout=$timeout_seconds" if $timeout_mode;
-    my @cmd = ($testapps, @ARGV);
+    my @cmd = ($^X, $testapps, @ARGV);
     print ">> Executing: @cmd\n";
-    exec(@cmd) or die "Failed to exec test runner: $!\n";
+    exec_command(@cmd);
 }
 
 if (defined $program && $program eq "--debug") {
@@ -67,8 +70,8 @@ if (defined $program && $program eq "--debug") {
          die "Error:  Could not find debug runner at $rundebug\n";
     }
 
-    my @cmd = ($rundebug, @ARGV);
-    exec(@cmd) or die "Failed to run debug script runner: $!\n";
+    my @cmd = ($^X, $rundebug, @ARGV);
+    exec_command(@cmd);
 }
 
 sub resolve_executable_name {
@@ -95,7 +98,7 @@ sub resolve_program_executable_path {
     my $exe_name = resolve_executable_name($cmake_file);
 
     return undef if !$exe_name;
-    return "$build_dir/$program_name/$exe_name";
+    return resolve_executable_path($build_dir, $program_name, $exe_name);
 }
 
 if (!$program) {
@@ -113,7 +116,8 @@ if (!$program) {
             next if !-d "$build_dir/$entry";
 
             my $exe_path = resolve_program_executable_path($entry);
-            $progs{$entry} = 1 if defined $exe_path && -x $exe_path;
+            $progs{$entry} = 1 if defined $exe_path && -f $exe_path
+                && ($^O eq 'MSWin32' || -x $exe_path);
         }
         closedir($dh);
     }
@@ -147,10 +151,9 @@ if (!$exe_name) {
     die "Error: Could not resolve executable target from $cmake_file\n";
 }
 
-my $exe_path = "$build_dir/$program_name/$exe_name";
-if (-x $exe_path) {
+my $exe_path = resolve_executable_path($build_dir, $program_name, $exe_name);
+if (-f $exe_path && ($^O eq 'MSWin32' || -x $exe_path)) {
     my $exe_dir = dirname($exe_path);
-    my $resolved_exe_name = basename($exe_path);
     my $runtime_path = -d "$exe_dir/data" ? $exe_dir : $data_path;
 
     for (my $i = 0; $i < @ARGV; ++$i) {
@@ -177,21 +180,14 @@ if (-x $exe_path) {
         warn "Warning: Data directory '$runtime_path' not found.\n";
     }
 
-    my @cmd = ("./$resolved_exe_name", "-p", $runtime_path, @ARGV);
+    my @cmd = ($exe_path, "-p", $runtime_path, @ARGV);
 
     print ">> Executing: @cmd\n";
     if (!$timeout_mode) {
-        exec(@cmd) or die "Failed to exec $resolved_exe_name: $!\n";
+        exec_command(@cmd);
     }
 
-    my $pid = fork();
-    die "Error: could not fork for program '$program_name': $!\n" if !defined $pid;
-    if ($pid == 0) {
-        setpgrp(0, 0);
-        $ENV{MXVK_QUIET_MISSING_VALIDATION} //= '1';
-        exec @cmd;
-        die "Failed to exec $resolved_exe_name: $!\n";
-    }
+    my $pid = start_child(@cmd);
 
     my $rc;
     my $deadline = time + $timeout_seconds;
@@ -204,8 +200,7 @@ if (-x $exe_path) {
         die "Error: failed waiting for program '$program_name': $!\n" if $wait == -1;
         if (time >= $deadline) {
             print ">> Timeout reached for $program_name after ${timeout_seconds}s; closing as requested\n";
-            kill 'TERM', -$pid;
-            kill 'TERM', $pid;
+            stop_child($pid, 'TERM');
             my $kill_deadline = time + 2;
             while (time < $kill_deadline) {
                 $wait = waitpid($pid, WNOHANG);
@@ -215,8 +210,7 @@ if (-x $exe_path) {
                 last if $wait == -1;
                 select undef, undef, undef, 0.1;
             }
-            kill 'KILL', -$pid;
-            kill 'KILL', $pid;
+            stop_child($pid, 'KILL');
             waitpid($pid, 0);
             exit 0;
         }

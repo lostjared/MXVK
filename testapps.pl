@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
+use FindBin;
+use lib $FindBin::Bin;
+use MXVKRunner qw(start_child stop_child);
 use POSIX qw(:sys_wait_h);
 use Time::HiRes qw(time);
 
@@ -90,27 +93,18 @@ local $SIG{INT} = sub {
 sub kill_child {
     my ($signal) = @_;
     return if !defined $child_pid;
-    kill $signal, -$child_pid;
-    kill $signal, $child_pid;
+    stop_child($child_pid, $signal);
 }
 
 for my $test (@tests) {
     last if $interrupted;
 
     my $test_number = $count + 1;
-    my @cmd = ('./run.pl', $test, @forward_args);
+    my @cmd = ($^X, "$FindBin::Bin/run.pl", $test, @forward_args);
     print '>> Executing: ';
     print join(' ', map { shell_quote($_) } @cmd);
     print "\n";
-    my $pid = fork();
-    die "Error: could not fork for program '$test': $!\n" if !defined $pid;
-
-    if ($pid == 0) {
-        setpgrp(0, 0);
-        $ENV{MXVK_QUIET_MISSING_VALIDATION} //= '1';
-        exec @cmd;
-        die "Error: failed to exec program '$test': $!\n";
-    }
+    my $pid = start_child(@cmd);
 
     $child_pid = $pid;
 
@@ -183,12 +177,13 @@ for my $test (@tests) {
         next;
     }
 
+    if ($timeout_mode && $timed_out) {
+        $count++;
+        next;
+    }
+
     if ($rc & 127) {
         my $signal = $rc & 127;
-        if ($timeout_mode && $timed_out) {
-            $count++;
-            next;
-        }
         if ($signal == 2) {
             $interrupted = 1;
             last;

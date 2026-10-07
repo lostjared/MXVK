@@ -848,6 +848,25 @@ To run a compiled example from the repository root, use `run.pl`:
 `run.pl` looks up the built executable under `build/examples/<example>/` and
 passes the example's asset directory with `-p` automatically.
 
+The runners detect native Windows Perl automatically. From PowerShell or
+Command Prompt, use `perl run.pl <example> [extra args...]`; `--all`, `--timeout`,
+and `--debug` use the same arguments as on Linux (`--debug` requires GDB on
+`PATH`). Windows executables are resolved with the `.exe` suffix, checking the
+example's build directory first, then `Release`, `RelWithDebInfo`, `Debug`, and
+`MinSizeRel` subdirectories. The runner launches from the executable directory
+so copied DLLs and runtime assets can be found.
+
+For a different CMake build directory, set `MXVK_BUILD_DIR` to its path before
+running the script. Relative paths are resolved from the directory where you
+invoke the runner. For example, in PowerShell:
+
+```powershell
+$env:MXVK_BUILD_DIR = 'builde'
+perl run.pl hello_world
+perl run.pl hello_world --timeout=3
+perl run.pl --all --timeout=3
+```
+
 All examples based on `mxvk::VK_Window` also support `F12` to toggle the
 framework FPS counter. The overlay is disabled by default, uses the copied
 `data/default.ttf` font from the example's build output directory, and is
@@ -874,9 +893,9 @@ timeout with `--timeout=<seconds>`.
 
 Timeout mode is also supported for a single example. `run.pl` accepts
 `--timeout` before or after the example name, and closes the child process group
-when the deadline is reached. In non-interactive `CODEX_CI` runs, single-example
-launches default to timeout mode unless `MXVK_RUN_DEFAULT_TIMEOUT` overrides the
-duration.
+(or process tree on Windows) when the deadline is reached. In non-interactive
+`CODEX_CI` runs, single-example launches default to timeout mode unless
+`MXVK_RUN_DEFAULT_TIMEOUT` overrides the duration.
 
 ```bash
 ./run.pl --all --timeout
