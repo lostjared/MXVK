@@ -207,7 +207,7 @@ if (-f $exe_path && ($^O eq 'MSWin32' || -x $exe_path)) {
                 if ($wait == $pid) {
                     exit 0;
                 }
-                last if $wait == -1;
+                exit 0 if $wait == -1;
                 select undef, undef, undef, 0.1;
             }
             stop_child($pid, 'KILL');

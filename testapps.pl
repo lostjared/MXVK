@@ -140,7 +140,7 @@ for my $test (@tests) {
                 select undef, undef, undef, 0.1;
             }
 
-            if (!defined $rc) {
+            if (!defined $rc && $wait != -1) {
                 kill_child('KILL');
                 waitpid($pid, 0);
                 $rc = $?;
@@ -161,8 +161,13 @@ for my $test (@tests) {
 
     last if $interrupted;
 
+    if ($timeout_mode && $timed_out) {
+        $count++;
+        next;
+    }
+
     if ($rc == -1) {
-        my $message = "program '$test' failed to start: $!";
+        my $message = "could not retrieve exit status for program '$test': $!";
         if ($timeout_mode) {
             push @failures, $message;
             next;
@@ -174,11 +179,6 @@ for my $test (@tests) {
     if ($exit_code == $missing_executable_exit_code) {
         $skipped++;
         print ">> Skipping: $test was not built\n";
-        next;
-    }
-
-    if ($timeout_mode && $timed_out) {
-        $count++;
         next;
     }
 
