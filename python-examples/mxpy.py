@@ -1,124 +1,245 @@
 #!/usr/bin/env python3
+"""Run MXVK scripts with the native module and its Windows DLL dependencies."""
 
+import argparse
+import importlib.machinery
+import json
 import os
-import runpy
-import sys
 from pathlib import Path
+import runpy
+import shutil
+import subprocess
+import sys
 
-def find_module_dir():
-    launcher_dir = Path(__file__).resolve().parent
+EXAMPLES_DIR = Path(__file__).resolve().parent
+REPO_DIR = EXAMPLES_DIR.parent
+EXAMPLES = {
+    "window": "window/main.py",
+    "sprite": "sprite/main.py",
+    "compute": "compute/main.py",
+    "asteroids": "asteroids/asteroids.py",
+    "knight": "knight/knight.py",
+    "model": "model/model.py",
+    "penguin": "penguin/penguin.py",
+    "darkside": "darkside/darkside.py",
+    "wrapper": "mxvk_wrap/example.py",
+    "tetris": "mxvk_wrap/examples/tetris/main.py",
+    "breakout": "mxvk_wrap/examples/breakout/breakout.py",
+    "opencv_mxwrite": "opencv_mxwrite/mxwrite-opencv.py",
+    "opencv_mxwrite_shader": "opencv_mxwrite_shader/mxwrite-opencv-shader.py",
+}
 
-    candidates = [
-        launcher_dir / "python_mod",
-        launcher_dir.parent / "python_mod",
-        Path.cwd() / "python_mod",
-    ]
 
-    env_dir = os.environ.get("MXVK_PYTHON_MODULE_DIR")
+def unique_paths(paths):
+    result = []
+    for path in paths:
+        path = Path(path).expanduser().resolve()
+        if path not in result:
+            result.append(path)
+    return result
 
-    if(env_dir):
-        candidates.insert(0, Path(env_dir))
 
-    for directory in candidates:
-        if(directory.exists() and any(directory.glob("mxvk_ext*.pyd"))):
-            return directory
-        if(directory.exists() and any(directory.glob("mxvk_ext*.so"))):
-            return directory
+def read_cache(directory):
+    cache = directory / "CMakeCache.txt"
+    if not cache.is_file():
+        cache = directory.parent / "CMakeCache.txt"
+    values = {}
+    if cache.is_file():
+        for line in cache.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "=" in line and ":" in line and not line.startswith(("#", "//")):
+                key, value = line.split("=", 1)
+                values[key.split(":", 1)[0]] = value
+    return values
 
-    return None
 
-def find_vcpkg_bin():
-    vcpkg_root = os.environ.get("VCPKG_ROOT")
+def module_directories(explicit=None):
+    if explicit or os.environ.get("MXVK_PYTHON_MODULE_DIR"):
+        return unique_paths([explicit or os.environ["MXVK_PYTHON_MODULE_DIR"]])
+    roots = [REPO_DIR / "python_mod", REPO_DIR / "build-python"]
+    roots += sorted(path for path in REPO_DIR.glob("build*") if path.is_dir())
+    paths = []
+    for root in unique_paths(roots):
+        paths.extend([root, root / "Release", root / "RelWithDebInfo", root / "Debug"])
+    return unique_paths(paths)
 
-    if(vcpkg_root):
-        root = Path(vcpkg_root) / "installed"
 
-        if(root.exists()):
-            for triplet in root.iterdir():
-                bin_dir = triplet / "bin"
+def has_module(directory, suffixes=None):
+    if suffixes is not None:
+        return any((directory / ("mxvk_ext" + suffix)).is_file() for suffix in suffixes)
+    return any(directory.glob("mxvk_ext*.pyd")) or any(directory.glob("mxvk_ext*.so"))
 
-                if(bin_dir.exists()):
-                    return bin_dir
 
-    executable = Path(sys.executable).resolve()
-    parts = executable.parts
+def vcpkg_bins(directories):
+    bins = []
+    roots = []
+    if os.environ.get("VCPKG_ROOT"):
+        roots.append(Path(os.environ["VCPKG_ROOT"]) / "installed")
+    for directory in directories:
+        cache = read_cache(directory)
+        installed = cache.get("VCPKG_INSTALLED_DIR") or cache.get("_VCPKG_INSTALLED_DIR")
+        if installed:
+            bins.append(Path(installed) / cache.get("VCPKG_TARGET_TRIPLET", "x64-windows") / "bin")
+    for parent in Path(sys.executable).resolve().parents:
+        if parent.parent.name == "installed":
+            bins.append(parent / "bin")
+    roots.extend([REPO_DIR / "vcpkg_installed", REPO_DIR / "vcpkg" / "installed", Path("C:/vcpkg/installed")])
+    triplet = os.environ.get("VCPKG_DEFAULT_TRIPLET", "x64-windows")
+    bins += [root / triplet / "bin" for root in roots]
+    return [path for path in unique_paths(bins) if path.is_dir()]
 
+
+def interpreter_candidates(directories):
+    paths = []
+    for directory in directories:
+        cache = read_cache(directory)
+        for key in ("Python_EXECUTABLE", "_Python_EXECUTABLE"):
+            if cache.get(key):
+                paths.append(cache[key])
+    for bin_dir in vcpkg_bins(directories):
+        paths.append(bin_dir.parent / "tools" / "python3" / "python.exe")
+    launcher = shutil.which("py")
+    if launcher:
+        result = subprocess.run([launcher, "-0p"], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            for index, character in enumerate(line):
+                if character == ":" and index > 0:
+                    paths.append(line[index - 1:].strip())
+                    break
+    return [path for path in unique_paths(paths) if path.is_file()]
+
+
+def select_module(directories):
+    for directory in directories:
+        if has_module(directory, importlib.machinery.EXTENSION_SUFFIXES):
+            return directory, None
+    if os.name == "nt" and any(has_module(path) for path in directories) and not os.environ.get("MXVK_LAUNCHER_REEXEC"):
+        for interpreter in interpreter_candidates(directories):
+            if interpreter == Path(sys.executable).resolve():
+                continue
+            try:
+                result = subprocess.run(
+                    [str(interpreter), "-c", "import importlib.machinery,json; print(json.dumps(importlib.machinery.EXTENSION_SUFFIXES))"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                suffixes = json.loads(result.stdout) if result.returncode == 0 else []
+            except (OSError, ValueError, subprocess.TimeoutExpired):
+                continue
+            for directory in directories:
+                if has_module(directory, suffixes):
+                    return directory, interpreter
+    return None, None
+
+
+def configure_runtime(module_dir, extra_dll_dirs):
+    paths = [EXAMPLES_DIR]
+    if module_dir:
+        paths.insert(0, module_dir)
+        paths += [module_dir / "MXWrite", module_dir / "MXWrite" / "Release",
+                  module_dir.parent / "MXWrite" / module_dir.name]
+    for path in reversed(unique_paths(paths)):
+        if path.is_dir():
+            sys.path.insert(0, str(path))
+    handles = []
+    if os.name == "nt":
+        dll_dirs = paths + vcpkg_bins([module_dir] if module_dir else []) + extra_dll_dirs
+        if os.environ.get("MXVK_DLL_DIRS"):
+            dll_dirs += os.environ["MXVK_DLL_DIRS"].split(os.pathsep)
+        for key in ("CUDA_PATH", "VULKAN_SDK"):
+            if os.environ.get(key):
+                root = Path(os.environ[key])
+                dll_dirs += [root / "bin", root / "bin" / "x64"]
+        # Python 3.8+ needs registration even when the DLL directory is on PATH.
+        dll_dirs += [path for path in os.environ.get("PATH", "").split(os.pathsep) if path]
+        for directory in unique_paths(dll_dirs):
+            if directory.is_dir():
+                handles.append(os.add_dll_directory(str(directory)))
+    return handles
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser = argparse.ArgumentParser(
+        description="Run an MXVK example by name, a Python script, -m module, or -c code.",
+        epilog='Examples: mxpy.cmd sprite --vsync | mxpy.cmd --check | mxpy.cmd -c "import mxvk_ext"',
+    )
+    parser.add_argument("--list", action="store_true", help="list bundled examples")
+    parser.add_argument("--check", action="store_true", help="check imports without opening a window")
+    parser.add_argument("--module-dir", help="directory containing mxvk_ext (also MXVK_PYTHON_MODULE_DIR)")
+    parser.add_argument("--dll-dir", action="append", default=[], help="extra Windows DLL directory; repeat as needed")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("-m", dest="module", nargs=argparse.REMAINDER, help="run a Python module with arguments")
+    modes.add_argument("-c", dest="code", nargs=argparse.REMAINDER, help="run Python code with arguments")
+    parser.add_argument("command", nargs=argparse.REMAINDER, help="example name or script path, followed by arguments")
+    args = parser.parse_args(argv)
+    if args.module == [] or args.code == []:
+        parser.error("-m and -c require a module name or code string")
+    if args.list:
+        for name, filename in EXAMPLES.items():
+            print(f"{name:22} {filename}")
+        return 0
+    if not (args.check or args.command or args.module or args.code):
+        parser.print_help()
+        return 0
+    script = None
+    if args.command:
+        target = args.command[0]
+        script = EXAMPLES_DIR / EXAMPLES[target] if target in EXAMPLES else Path(target).expanduser().resolve()
+        if not script.is_file():
+            print(f"Script not found: {script}\nUse --list to see bundled examples.", file=sys.stderr)
+            return 1
+    directories = module_directories(args.module_dir)
+    module_dir, interpreter = select_module(directories)
+    if interpreter:
+        print(f"Using {interpreter} to match {module_dir}", flush=True)
+        env = os.environ.copy()
+        env["MXVK_LAUNCHER_REEXEC"] = "1"
+        env["MXVK_PYTHON_MODULE_DIR"] = str(module_dir)
+        return subprocess.call([str(interpreter), str(Path(__file__).resolve())] + argv, env=env)
+    found = [path for path in directories if has_module(path)]
+    if module_dir is None and (found or args.module_dir or os.environ.get("MXVK_PYTHON_MODULE_DIR")):
+        if not found:
+            print(f"No MXVK extension found in {directories[0]}.", file=sys.stderr)
+            print("Build the module first, or select its directory with --module-dir. See python-examples/README.md.", file=sys.stderr)
+            return 1
+        print(f"No MXVK extension compatible with Python {sys.version.split()[0]} ({sys.executable}).", file=sys.stderr)
+        for directory in found:
+            print(f"  {directory}: " + ", ".join(path.name for path in directory.glob("mxvk_ext*.*") if path.suffix in (".pyd", ".so")), file=sys.stderr)
+        print("Run with the Python used to build the extension, or rebuild for your Python.\nSee python-examples/README.md. Use --module-dir to select another build.", file=sys.stderr)
+        return 1
+    handles = configure_runtime(module_dir, args.dll_dir)
     try:
-        installed_index = parts.index("installed")
-    except ValueError:
-        return None
-
-    if(installed_index + 1 >= len(parts)):
-        return None
-
-    triplet = parts[installed_index + 1]
-    vcpkg_root = Path(*parts[:installed_index])
-    bin_dir = vcpkg_root / "installed" / triplet / "bin"
-
-    if(bin_dir.exists()):
-        return bin_dir
-
-    return None
-
-def find_cuda_bin():
-    cuda_path = os.environ.get("CUDA_PATH")
-
-    if(not cuda_path):
-        return None
-
-    cuda_root = Path(cuda_path)
-    x64_bin = cuda_root / "bin" / "x64"
-    bin_dir = cuda_root / "bin"
-
-    if(x64_bin.exists()):
-        return x64_bin
-
-    if(bin_dir.exists()):
-        return bin_dir
-
-    return None
-
-def main():
-    if(len(sys.argv) < 2):
-        print(f"Usage: {Path(sys.argv[0]).name} script.py [arguments...]")
-        return 1
-
-    script = Path(sys.argv[1]).resolve()
-
-    if(not script.is_file()):
-        print(f"Script not found: {script}")
-        return 1
-
-    module_dir = find_module_dir()
-
-    if(module_dir is None):
-        print("Could not locate the MXVK Python module.")
-        print("Set MXVK_PYTHON_MODULE_DIR to the directory containing mxvk_ext.")
-        return 1
-
-    sys.path.insert(0, str(module_dir))
-
-    dll_handles = []
-
-    if(os.name == "nt"):
-        dll_dirs = [
-            module_dir,
-            find_vcpkg_bin(),
-            find_cuda_bin(),
-        ]
-
-        for directory in dll_dirs:
-            if(directory is not None and directory.exists()):
-                dll_handles.append(os.add_dll_directory(str(directory)))
-
-    sys.argv = [str(script)] + sys.argv[2:]
-
-    try:
-        runpy.run_path(str(script), run_name="__main__")
+        try:
+            import mxvk_ext
+        except ImportError as error:
+            print(f"Could not import mxvk_ext: {error}\nPython: {sys.executable}\nModule directory: {module_dir or 'installed Python packages'}\nSee python-examples/README.md for build instructions.\nFor missing DLLs, set VCPKG_ROOT, CUDA_PATH, or pass --dll-dir PATH.", file=sys.stderr)
+            return 1
+        if args.check:
+            print(f"Python: {sys.executable} ({sys.version.split()[0]})")
+            print(f"MXVK: {mxvk_ext.__file__}")
+            for package in ("numpy", "cv2", "mxwrite_ext"):
+                try:
+                    imported = __import__(package)
+                    print(f"{package}: {getattr(imported, '__version__', 'available')}")
+                except ImportError as error:
+                    print(f"{package}: unavailable ({error})")
+            return 0
+        if args.module:
+            sys.argv = args.module
+            runpy.run_module(args.module[0], run_name="__main__", alter_sys=True)
+        elif args.code:
+            sys.argv = ["-c"] + args.code[1:]
+            exec(args.code[0], {"__name__": "__main__", "__builtins__": __builtins__})
+        elif script:
+            sys.path.insert(0, str(script.parent))
+            sys.argv = [str(script)] + args.command[1:]
+            runpy.run_path(str(script), run_name="__main__")
     except KeyboardInterrupt:
         return 130
-
+    finally:
+        for handle in handles:
+            handle.close()
     return 0
 
-if(__name__ == "__main__"):
+
+if __name__ == "__main__":
     raise SystemExit(main())

@@ -114,6 +114,19 @@ cmake --build build -j
 
 ## Python Bindings
 
+On Windows, use the repository launcher to find the extension, select a matching
+Python, and register DLL dependencies automatically:
+
+```powershell
+.\mxpy.cmd --check
+.\mxpy.cmd --list
+.\mxpy.cmd sprite --vsync
+.\mxpy.cmd tetris
+```
+
+See [Windows Python setup and examples](python-examples/README.md) for the
+`build-python.ps1` helper, custom scripts, and dependency troubleshooting.
+
 MXVK ships an optional [nanobind](https://nanobind.readthedocs.io/) extension
 named `mxvk_ext`. The normal C++ build stays Python-free: `PYTHON_MODULE`
 defaults to `OFF`. Enable it explicitly when configuring a CMake build:
