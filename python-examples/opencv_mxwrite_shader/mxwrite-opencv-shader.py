@@ -37,7 +37,11 @@ except ImportError as error:
 try:
     import mxwrite_ext
 except ImportError as error:
-    raise SystemExit("Could not import mxwrite_ext. Build with -DPYTHON_MODULE=ON and set PYTHONPATH to the directory containing the built module.") from error
+    raise SystemExit(
+        f"Could not import mxwrite_ext: {error}\n"
+        "Build with -DMXWRITE_PYTHON_MODULE=ON, then build the mxwrite_ext target. "
+        "Run through mxpy.cmd or set PYTHONPATH to the directory containing mxwrite_ext."
+    ) from error
 
 try:
     import mxvk_ext as mxvk

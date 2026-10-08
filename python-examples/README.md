@@ -74,6 +74,22 @@ the separate `mxwrite_ext` extension and `opencv-python` installed into the
 selected interpreter. See the repository README's Python wheel instructions
 for feature configuration; the helper builds only MXVK.
 
+For an existing CV-enabled build in `python_mod`, enable and build MXWrite's
+Python extension with the same Python used for MXVK:
+
+```powershell
+cmake -S . -B python_mod -DWITH_MXWRITE=ON -DMXWRITE_PYTHON_MODULE=ON
+cmake --build python_mod --config Release --target mxwrite_ext
+.\mxpy.cmd --check
+.\mxpy.cmd opencv_mxwrite_shader --help
+```
+
+`PYTHON_MODULE` enables `mxvk_ext`; `MXWRITE_PYTHON_MODULE` separately enables
+`mxwrite_ext`. The launcher also searches the selected build's `MXWrite`
+directory and its Release subdirectory, so no manual `PYTHONPATH` is needed
+for this build layout. Supply `--input video.mp4` or `--camera 0` when running
+the capture examples.
+
 ## Select a build or supply DLL directories
 
 An extension matching the current Python takes priority. Otherwise, a matching

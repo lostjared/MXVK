@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-## @file mxwrite-opencv.py
-## @brief Capture OpenCV video through MXVK and encode it with MXWrite.
-## @details Uses @c mxvk_ext.Capture for camera or file input, displays frames
-## in an MXVK sprite, and writes file input as constant-frame-rate video.
-## Camera capture retains monotonic timestamps. The example is intentionally
-## split so MXVK owns capture/windowing and MXWrite owns encoding/muxing.
-##
-## @section mxwrite_opencv_run Running the example
-## @code{.sh}
-## python3 python-examples/opencv_mxwrite/mxwrite-opencv.py --input input.mp4 --output output.mp4
-## python3 python-examples/opencv_mxwrite/mxwrite-opencv.py --camera 0 --width 1280 --height 720
-## @endcode
-## @section mxwrite_opencv_requirements Requirements
-## Requires a CV-enabled @c mxvk_ext module, @c mxwrite_ext, OpenCV, and NumPy.
-## The Linux camera path requests V4L2 MJPEG; other platforms use OpenCV's
-## default camera backend.
-## @section mxwrite_opencv_timing Timing and controls
-## File input uses sequential PTS values at the input frame rate for CFR output.
-## Camera input preserves monotonic capture timestamps. Escape or Ctrl-C stops
-## capture; @c --frames limits the number of submitted frames.
 
 import argparse
 import math
@@ -32,21 +12,14 @@ except ImportError as error:
     raise SystemExit("OpenCV is required: python3 -m pip install opencv-python") from error
 
 try:
-    import mxwrite_ext
+    import numpy as np
 except ImportError as error:
-    raise SystemExit(
-        f"Could not import mxwrite_ext: {error}\n"
-        "Build with -DMXWRITE_PYTHON_MODULE=ON, then build the mxwrite_ext target. "
-        "Run through mxpy.cmd or set PYTHONPATH to the directory containing mxwrite_ext."
-    ) from error
+    raise SystemExit("NumPy is required: python3 -m pip install numpy") from error
 
 try:
-    import mxvk_ext as mxvk
+    import mxwrite_ext
 except ImportError as error:
-    raise SystemExit("Could not import mxvk_ext. Build with -DPYTHON_MODULE=ON and set PYTHONPATH to the directory containing the built module.") from error
-
-if not getattr(mxvk, "has_cv", False):
-    raise SystemExit("mxvk_ext was built without OpenCV support. Rebuild MXVK with -DCV=ON -DPYTHON_MODULE=ON.")
+    raise SystemExit("Could not import mxwrite_ext. Build with -DPYTHON_MODULE=ON and set PYTHONPATH to the directory containing the built module.") from error
 
 
 def parse_arguments():
@@ -96,9 +69,15 @@ def fourcc_to_string(value):
 
 
 def open_file_capture(filename):
-    capture = mxvk.Capture()
+    capture = cv2.VideoCapture(str(filename), cv2.CAP_FFMPEG)
 
-    if not capture.open(str(filename)):
+    if capture.isOpened():
+        return capture
+
+    capture.release()
+    capture = cv2.VideoCapture(str(filename))
+
+    if not capture.isOpened():
         raise SystemExit(f"Could not open input video: {filename}")
 
     return capture
@@ -107,9 +86,10 @@ def open_file_capture(filename):
 def open_camera_capture(index, width, height, fps):
     if sys.platform.startswith("linux"):
         print("Opening camera with Linux V4L2 backend.")
-        capture = mxvk.Capture()
 
-        if not capture.open_camera(index, cv2.CAP_V4L2):
+        capture = cv2.VideoCapture(index, cv2.CAP_V4L2)
+
+        if not capture.isOpened():
             raise SystemExit(f"Could not open camera {index} using V4L2")
 
         fourcc = cv2.VideoWriter_fourcc("M", "J", "P", "G")
@@ -120,9 +100,10 @@ def open_camera_capture(index, width, height, fps):
         capture.set(cv2.CAP_PROP_FPS, fps)
     else:
         print("Opening camera with the default OpenCV backend.")
-        capture = mxvk.Capture()
 
-        if not capture.open_camera(index):
+        capture = cv2.VideoCapture(index)
+
+        if not capture.isOpened():
             raise SystemExit(f"Could not open camera {index}")
 
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -134,7 +115,12 @@ def open_camera_capture(index, width, height, fps):
     actual_fps = float(capture.get(cv2.CAP_PROP_FPS))
     actual_fourcc = capture.get(cv2.CAP_PROP_FOURCC)
 
-    print("Camera backend: MXVK OpenCV capture")
+    try:
+        backend = capture.getBackendName()
+    except cv2.error:
+        backend = "unknown"
+
+    print(f"Camera backend: {backend}")
     print(f"Camera format: {fourcc_to_string(actual_fourcc)}")
     print(f"Camera resolution: {actual_width}x{actual_height}")
     print(f"Camera FPS: {actual_fps:.3f}")
@@ -192,105 +178,22 @@ def configure_encoder(args):
     return encode_options
 
 
-class CaptureWindow(mxvk.VK_Window):
-    def __init__(self, args, capture, is_camera, source_width, source_height, source_fps, output_fps, writer):
-        super().__init__("MXWrite Capture", source_width, source_height, False, False, False)
-        self.args = args
-        self.capture = capture
-        self.is_camera = is_camera
-        self.source_fps = source_fps
-        self.output_fps = output_fps
-        self.writer = writer
-        self.sprite = self.create_sprite(source_width, source_height)
-        self.frame_index = 0
-        self.first_timestamp = None
-        self.start_time = None
-        self.last_pts = None
-        self.timestamp_source = None
-        self.capture_failed = False
-        self.closed = False
-
-    def event(self, event):
-        if event.type == mxvk.EVENT_KEY_DOWN and event.key == mxvk.KEY_ESCAPE:
-            print("Escape pressed. Stopping capture.")
-            self.request_exit()
-
-    def proc(self):
-        if self.args.frames > 0 and self.frame_index >= self.args.frames:
-            self.request_exit()
-            return
-
-        rgba_frame = self.capture.read_rgba()
-
-        if rgba_frame is None:
-            if self.is_camera and not self.capture_failed:
-                print("Camera capture failed.")
-                self.capture_failed = True
-            self.request_exit()
-            return
-
-        if self.is_camera:
-            capture_time = time.monotonic()
-
-            if self.start_time is None:
-                self.start_time = capture_time
-
-            timestamp = capture_time - self.start_time
-            current_source = "MONOTONIC"
-        else:
-            timestamp, current_source = get_file_timestamp(self.capture, self.source_fps, self.frame_index)
-
-            if self.first_timestamp is None:
-                self.first_timestamp = timestamp
-
-            if self.args.normalize_pts:
-                timestamp -= self.first_timestamp
-
-        if self.timestamp_source != current_source:
-            self.timestamp_source = current_source
-            print(f"Timestamp source: {self.timestamp_source}")
-
-        # File playback is encoded as constant-frame-rate output: every
-        # decoded frame occupies exactly one output frame interval. Camera
-        # capture keeps its existing monotonic-clock timestamps.
-        output_pts = self.frame_index if not self.is_camera else int(round(timestamp * self.output_fps))
-
-        if self.last_pts is not None and output_pts < self.last_pts:
-            print(f"Warning: non-monotonic PTS at frame {self.frame_index}: {output_pts} < {self.last_pts}")
-            output_pts = self.last_pts
-
-        self.writer.write_at_pts(rgba_frame, output_pts)
-        self.sprite.update_texture(rgba_frame, rgba_frame.shape[1], rgba_frame.shape[0], rgba_frame.strides[0])
-
-        width, height = self.swapchain_extent
-        self.sprite.draw_rect(0, 0, width, height)
-        self.last_pts = output_pts
-
-        if self.frame_index < 10 or self.frame_index % 100 == 0:
-            print(f"frame={self.frame_index:6d} time={timestamp:10.6f}s pts={output_pts:8d}")
-
-        self.frame_index += 1
-
-    def close(self):
-        if self.closed:
-            return
-
-        self.closed = True
-        self.wait_idle()
-        self.sprite = None
-        self.writer.close()
-        self.capture.close()
-        self.release()
-
-
 def main():
     args = parse_arguments()
     validate_arguments(args)
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
+
     is_camera = args.camera is not None
-    capture = open_camera_capture(args.camera, args.width, args.height, args.fps) if is_camera else open_file_capture(args.input)
-    window = None
-    writer = None
+
+    if is_camera:
+        capture = open_camera_capture(args.camera, args.width, args.height, args.fps)
+    else:
+        capture = open_file_capture(args.input)
+
+    window_name = "MXWrite Capture"
+
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 
     try:
         source_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -305,12 +208,29 @@ def main():
 
         output_fps = args.fps if is_camera else source_fps
 
+        try:
+            backend = capture.getBackendName()
+        except cv2.error:
+            backend = "unknown"
+
         print()
-        print("Backend: MXVK OpenCV capture")
+        print(f"Backend: {backend}")
         print(f"Resolution: {source_width}x{source_height}")
         print(f"Capture FPS: {source_fps:.6f}")
         print(f"Output time base: 1/{output_fps:.6f}")
-        print(f"{'Camera: ' + str(args.camera) if is_camera else 'Input: ' + str(args.input)}")
+
+        if is_camera:
+            print(f"Camera: {args.camera}")
+
+            if sys.platform.startswith("linux"):
+                print("Linux camera mode: V4L2 + MJPEG")
+            else:
+                print("Camera mode: default OpenCV backend")
+
+            print("Timestamp source: monotonic clock")
+        else:
+            print(f"Input: {args.input}")
+
         print("Press Escape to stop capture.")
 
         encode_options = configure_encoder(args)
@@ -319,14 +239,77 @@ def main():
         if not writer.open_ts(str(args.output), source_width, source_height, float(output_fps), encode_options):
             raise SystemExit(f"MXWrite could not open {args.output}")
 
-        window = CaptureWindow(args, capture, is_camera, source_width, source_height, source_fps, output_fps, writer)
+        frame_index = 0
+        first_timestamp = None
+        start_time = None
+        last_pts = None
+        timestamp_source = None
 
         try:
-            window.loop()
+            while True:
+                if args.frames > 0 and frame_index >= args.frames:
+                    break
+
+                success, bgr_frame = capture.read()
+
+                if not success:
+                    if is_camera:
+                        print("Camera capture failed.")
+
+                    break
+
+                if is_camera:
+                    capture_time = time.monotonic()
+
+                    if start_time is None:
+                        start_time = capture_time
+
+                    timestamp = capture_time - start_time
+                    current_source = "MONOTONIC"
+                else:
+                    timestamp, current_source = get_file_timestamp(capture, source_fps, frame_index)
+
+                    if first_timestamp is None:
+                        first_timestamp = timestamp
+
+                    if args.normalize_pts:
+                        timestamp -= first_timestamp
+
+                if timestamp_source != current_source:
+                    timestamp_source = current_source
+                    print(f"Timestamp source: {timestamp_source}")
+
+                output_pts = int(round(timestamp * output_fps))
+
+                if last_pts is not None and output_pts < last_pts:
+                    print(f"Warning: non-monotonic PTS at frame {frame_index}: {output_pts} < {last_pts}")
+                    output_pts = last_pts
+
+                rgba_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGBA)
+
+                writer.write_at_pts(rgba_frame, output_pts)
+
+                cv2.imshow(window_name, bgr_frame)
+
+                key = cv2.waitKey(1) & 0xff
+
+                if key == 27:
+                    print("Escape pressed. Stopping capture.")
+                    break
+
+                last_pts = output_pts
+
+                if frame_index < 10 or frame_index % 100 == 0:
+                    print(f"frame={frame_index:6d} time={timestamp:10.6f}s pts={output_pts:8d}")
+
+                frame_index += 1
+
         except KeyboardInterrupt:
             print("\nCapture stopped.")
 
-        window.close()
+        finally:
+            writer.close()
+
         frame_count = writer.get_frame_count()
         duration = writer.get_duration()
         byte_count = writer.get_bytes_written()
@@ -339,15 +322,12 @@ def main():
         print(f"PASS: wrote {frame_count} frames, {duration:.3f}s, {file_size} filesystem bytes to {args.output}")
         print(f"MXWrite's muxer byte counter reported {byte_count} bytes.")
 
-        if window.last_pts is not None:
-            print(f"Last video PTS: {window.last_pts} ({window.last_pts / output_fps:.6f}s)")
+        if last_pts is not None:
+            print(f"Last video PTS: {last_pts} ({last_pts / output_fps:.6f}s)")
+
     finally:
-        if window is not None:
-            window.close()
-        else:
-            if writer is not None:
-                writer.close()
-            capture.close()
+        capture.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

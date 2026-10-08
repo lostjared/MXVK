@@ -20,6 +20,6 @@ cmake.build-type = "Release"
 wheel.packages = []
 
 [tool.scikit-build.cmake.define]
-PYTHON_MODULE = "ON"
+MXWRITE_PYTHON_MODULE = "ON"
 SHARED = "OFF"
 MXWRITE_PYTHON_INSTALL_DIR = "."
