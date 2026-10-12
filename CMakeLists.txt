@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(libmxvk VERSION 0.36.0)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
