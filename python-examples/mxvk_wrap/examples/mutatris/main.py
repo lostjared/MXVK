@@ -9,7 +9,8 @@ import time
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[3]
 if str(EXAMPLES_DIR) not in sys.path:
-    sys.path.insert(0, str(EXAMPLES_DIR))
+    # Keep this example's helpers ahead of shared modules with the same name.
+    sys.path.append(str(EXAMPLES_DIR))
 
 import mxvk_wrap as mx
 
