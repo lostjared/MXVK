@@ -24,6 +24,7 @@ EXAMPLES = {
     "darkside": "darkside/darkside.py",
     "wrapper": "mxvk_wrap/example.py",
     "tetris": "mxvk_wrap/examples/tetris/main.py",
+    "mutatris": "mxvk_wrap/examples/mutatris/main.py",
     "breakout": "mxvk_wrap/examples/breakout/breakout.py",
     "opencv_mxwrite": "opencv_mxwrite/mxwrite-opencv.py",
     "opencv_mxwrite_shader": "opencv_mxwrite_shader/mxwrite-opencv-shader.py",

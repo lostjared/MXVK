@@ -4,6 +4,15 @@ Python translation of `examples/mutatris`, using `mxvk_wrap` for its Vulkan
 window, sprites, fonts, controller, and optional mixer audio. Bundles the original
 artwork, music, sounds, font, and all 77 background effect shaders.
 
+From `python-examples`, launch through the Python runner:
+
+```powershell
+python .\run_mxvk.py mutatris
+python .\run_mxvk.py mutatris -r 1920x1080 --fullscreen
+```
+
+The runner finds the native extension and its dependencies automatically.
+
 From this directory (`python-examples/mxvk_wrap/examples`), with the current
 native extension in the repository's `build` directory:
 
