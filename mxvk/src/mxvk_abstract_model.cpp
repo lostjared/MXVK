@@ -386,7 +386,7 @@ namespace mxvk {
         if (setIndex >= descriptorSets.size()) {
             return;
         }
-        updateTextureDescriptor(descriptorSets[setIndex], textures[textureIndex].view);
+        updateTextureDescriptor(setIndex, textures[textureIndex].view);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         updateUBO(imageIndex, ubo);
@@ -420,7 +420,7 @@ namespace mxvk {
         if (setIndex >= descriptorSets.size()) {
             return;
         }
-        updateTextureDescriptor(descriptorSets[setIndex], textureView);
+        updateTextureDescriptor(setIndex, textureView);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         updateUBO(imageIndex, ubo);
@@ -1630,6 +1630,7 @@ namespace mxvk {
             }
         }
 
+        descriptor_texture_views.assign(setCount, VK_NULL_HANDLE);
         for (size_t frame = 0; frame < frameCount; ++frame) {
             VkDescriptorBufferInfo bufferInfo{};
             bufferInfo.buffer = uniformBuffers[frame];
@@ -1677,12 +1678,18 @@ namespace mxvk {
 
                 const uint32_t writeCount = extendedFragmentUniformsEnabled ? static_cast<uint32_t>(writes.size()) : 2U;
                 vkUpdateDescriptorSets(windowPtr->getDevice(), writeCount, writes.data(), 0, nullptr);
+                descriptor_texture_views[setIndex] = entry.view;
             }
         }
     }
 
-    void VKAbstractModel::updateTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView) const {
-        if (descriptorSet == VK_NULL_HANDLE || imageView == VK_NULL_HANDLE || textureSampler == VK_NULL_HANDLE) {
+    void VKAbstractModel::updateTextureDescriptor(size_t setIndex, VkImageView imageView) {
+        if (setIndex >= descriptorSets.size() || setIndex >= descriptor_texture_views.size() || descriptorSets[setIndex] == VK_NULL_HANDLE || imageView == VK_NULL_HANDLE || textureSampler == VK_NULL_HANDLE) {
+            return;
+        }
+        // Rewriting a set already bound by this command buffer invalidates it,
+        // even when the image view has not changed. Reuse the existing binding.
+        if (descriptor_texture_views[setIndex] == imageView) {
             return;
         }
         const VkDescriptorImageInfo imageInfo{
@@ -1692,13 +1699,14 @@ namespace mxvk {
         };
         const VkWriteDescriptorSet write{
             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = descriptorSet,
+            .dstSet = descriptorSets[setIndex],
             .dstBinding = 0,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo = &imageInfo,
         };
         vkUpdateDescriptorSets(windowPtr->getDevice(), 1, &write, 0, nullptr);
+        descriptor_texture_views[setIndex] = imageView;
     }
 
     void VKAbstractModel::createPipelines() {
@@ -1916,6 +1924,7 @@ namespace mxvk {
     }
 
     void VKAbstractModel::destroyDescriptors() {
+        descriptor_texture_views.clear();
         if (windowPtr == nullptr || windowPtr->getDevice() == VK_NULL_HANDLE) {
             descriptorSets.clear();
             descriptorPool = VK_NULL_HANDLE;

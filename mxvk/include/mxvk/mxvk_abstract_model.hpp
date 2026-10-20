@@ -229,6 +229,7 @@ namespace mxvk {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         uint32_t descriptorPoolSetCapacity = 0;
         std::vector<VkDescriptorSet> descriptorSets{};
+        std::vector<VkImageView> descriptor_texture_views{};
 
         VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
         VkPipeline pipelineFill = VK_NULL_HANDLE;
@@ -288,7 +289,7 @@ namespace mxvk {
         void destroyUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        void updateTextureDescriptor(VkDescriptorSet descriptorSet, VkImageView imageView) const;
+        void updateTextureDescriptor(size_t setIndex, VkImageView imageView);
         void createPipelines();
 
         void destroyPipelines();
