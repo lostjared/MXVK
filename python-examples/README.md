@@ -9,6 +9,7 @@ From PowerShell in the repository root:
 .\mxpy.cmd sprite --width 1280 --height 720 --vsync
 .\mxpy.cmd tetris
 .\mxpy.cmd mutatris
+.\mxpy.cmd puzzle_drop
 ```
 
 The launcher finds `mxvk_ext` in `python_mod` and `build*` directories, including

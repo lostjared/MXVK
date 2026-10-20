@@ -25,10 +25,10 @@ From the repository root:
 cmake --build build --target mxvk_ext -j
 ```
 
-The portable launcher also accepts the script path. From `python-examples`:
+The portable launcher accepts the example name. From `python-examples`:
 
 ```sh
-python3 run_mxvk.py mxvk_wrap/examples/puzzle_drop/main.py
+python3 run_mxvk.py puzzle_drop
 ```
 
 The first launch compiles the bundled GLSL sources using `glslc` from the Vulkan
