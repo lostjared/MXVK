@@ -34,5 +34,9 @@ the same application setup.
 
 - [2D Tetris](examples/tetris/README.md) is a playable sprite-and-font game
   using the local artwork in `examples/tetris/data/`.
+- [3D Tetris](examples/tetris3d/README.md) renders the board as lit 3D cubes,
+  with a rotatable camera, high scores, and TCP multiplayer. Launch it from
+  `python-examples` with `python mxpy.py tetris3d` or, on Windows,
+  `.\mxpy.cmd tetris3d`.
 - [3D Breakout](examples/breakout/README.md) ports the native Breakout game,
   including its model rendering and animated backgrounds.

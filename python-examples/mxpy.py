@@ -24,6 +24,7 @@ EXAMPLES = {
     "darkside": "darkside/darkside.py",
     "wrapper": "mxvk_wrap/example.py",
     "tetris": "mxvk_wrap/examples/tetris/main.py",
+    "tetris3d": "mxvk_wrap/examples/tetris3d/main.py",
     "mutatris": "mxvk_wrap/examples/mutatris/main.py",
     "puzzle_drop": "mxvk_wrap/examples/puzzle_drop/main.py",
     "breakout": "mxvk_wrap/examples/breakout/breakout.py",
